@@ -202,11 +202,11 @@ m4+makerchip_header(['
    
    // This is where you configure the CPU.
 
-   m4_define(['M4_ISA'], MINI) // MINI, RISCV, DUMMY, etc.
+   m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
    
    m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
 
-   // Adjust the parameters below to define the pipeline depth and staging.
+   // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
    //   Stages:
    //     M4_PC_MUX_STAGE: Determining fetch PC.
@@ -219,16 +219,20 @@ m4+makerchip_header(['
    //                                  might produce offset from EXECUTE, then compute target).
    //     M4_MEM_WR_STAGE: Memory write.
    //     M4_REG_WR_STAGE: Register file write.
-   //   Latencies:
-   //     M4_EXTRA_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
-   //     M4_EXTRA_BRANCH_BUBBLE: 0 aligns PC_MUX with BRANCH_TARGET_CALC for branches. May use 1 to
-   //                             add a bubble only if BRANCH_TARGET_CALC == EXECUTE, and must if JUMP_BUBBLE.
-   //     M4_EXTRA_REPLAY_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
+   //     Deltas (default to 0):
+   //       M4_DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation from its nominal (ISA-specific) value.
+   //   Latencies (default to 0):
    //     M4_LD_RETURN_ALIGN: Alignment of load return pseudo-instruction into |mem pipeline.
    //                         If |mem stages reflect nominal alignment w/ load instruction, this is the
    //                         nominal load latency.
-   //     M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['1-stage'],
+   //     Deltas (default to 0):
+   //       M4 EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
+   //       M4_EXTRA_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
+   //       M4_EXTRA_BRANCH_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
+   //       M4_EXTRA_REPLAY_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
+   //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
+   //   M4_DATA_MEM_WORDS: Number of data memory locations.
+   m4_case(['5-stage'],
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
@@ -238,13 +242,11 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 1),
             (M4_EXECUTE_STAGE, 2),
             (M4_RESULT_STAGE, 2),
-            (M4_BRANCH_TARGET_CALC_STAGE, 3),
             (M4_MEM_WR_STAGE, 3),
             (M4_REG_WR_STAGE, 3),
-            (M4_EXTRA_JUMP_BUBBLE, 0),
-            (M4_EXTRA_BRANCH_BUBBLE, 0),
-            (M4_EXTRA_REPLAY_BUBBLE, 0),
+            (M4_EXTRA_PRED_TAKEN_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 4))
+         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
       '],
       ['1-stage'], ['
@@ -256,13 +258,10 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 0),
             (M4_EXECUTE_STAGE, 0),
             (M4_RESULT_STAGE, 0),
-            (M4_BRANCH_TARGET_CALC_STAGE, 0),
             (M4_MEM_WR_STAGE, 0),
             (M4_REG_WR_STAGE, 0),
-            (M4_EXTRA_JUMP_BUBBLE, 0),
-            (M4_EXTRA_BRANCH_BUBBLE, 0),
-            (M4_EXTRA_REPLAY_BUBBLE, 0),
             (M4_LD_RETURN_ALIGN, 1))
+         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
       '],
       ['
@@ -274,66 +273,112 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 4),
             (M4_EXECUTE_STAGE, 5),
             (M4_RESULT_STAGE, 5),
-            (M4_BRANCH_TARGET_CALC_STAGE, 5),
             (M4_MEM_WR_STAGE, 5),
             (M4_REG_WR_STAGE, 6),
-            (M4_EXTRA_JUMP_BUBBLE, 0),
-            (M4_EXTRA_BRANCH_BUBBLE, 0),
-            (M4_EXTRA_REPLAY_BUBBLE, 0),
+            (M4_EXTRA_PRED_TAKEN_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 7))
+         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
       ']
    )
-
-
+   
+   
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
-   
+
    m4_case(M4_ISA, ['MINI'], ['
-      // Mini-CPU Configuration:
-      
-   '], ['RISCV'], ['
-      // RISC-V Configuration:
-      
-      // ISA options:
+         // Mini-CPU Configuration:
+      '], ['RISCV'], ['
+         // RISC-V Configuration:
 
-      // Currently supported uarch variants:
-      //   RV32I 2.0, w/ no ISA extensions.
+         // ISA options:
 
-      // Machine width
-         m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
-      // ISA extensions,  1, or 0 (following M4 boolean convention).
-      m4_defines(
-         (['M4_EXT_E'], 1),
-         (['M4_EXT_I'], 1),
-         (['M4_EXT_M'], 0),
-         (['M4_EXT_A'], 0),
-         (['M4_EXT_F'], 0),
-         (['M4_EXT_D'], 0),
-         (['M4_EXT_Q'], 0),
-         (['M4_EXT_L'], 0),
-         (['M4_EXT_C'], 0),
-         (['M4_EXT_B'], 0),
-         (['M4_EXT_J'], 0),
-         (['M4_EXT_T'], 0),
-         (['M4_EXT_P'], 0),
-         (['M4_EXT_V'], 0),
-         (['M4_EXT_N'], 0))
-   '], ['
-      // Dummy "ISA".
-      m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
-   '])
+         // Currently supported uarch variants:
+         //   RV32I 2.0, w/ no ISA extensions.
+
+         // Machine width
+            m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
+         // ISA extensions,  1, or 0 (following M4 boolean convention).
+         m4_defines(
+            (['M4_EXT_E'], 1),
+            (['M4_EXT_I'], 1),
+            (['M4_EXT_M'], 0),
+            (['M4_EXT_A'], 0),
+            (['M4_EXT_F'], 0),
+            (['M4_EXT_D'], 0),
+            (['M4_EXT_Q'], 0),
+            (['M4_EXT_L'], 0),
+            (['M4_EXT_C'], 0),
+            (['M4_EXT_B'], 0),
+            (['M4_EXT_J'], 0),
+            (['M4_EXT_T'], 0),
+            (['M4_EXT_P'], 0),
+            (['M4_EXT_V'], 0),
+            (['M4_EXT_N'], 0))
+      '], ['
+         // Dummy "ISA".
+         m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
+      ']
+   )
    
-   // =====Done Configuration=====
+   // =====Done Defining Configuration=====
    
+   // Characterize ISA and apply configuration.
    
+   // Characterize the ISA, including:
+   // M4_NOMINAL_BR_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
+   //                                  can be available.
+   m4_case(M4_ISA, ['MINI'], ['
+         // Mini-CPU Characterization:
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
+      '], ['RISCV'], ['
+         // RISC-V Characterization:
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
+      '], ['DUMMY'], ['
+         // DUMMY Characterization:
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
+      ']
+   )
+
+   // Supply defaults for extra cycles.
+   m4_defines(
+      (M4_DELAY_BRANCH_TARGET_CALC, 0),
+      (M4_EXTRA_JUMP_BUBBLE, 0),
+      (M4_EXTRA_BRANCH_BUBBLE, 0),
+      (M4_EXTRA_PRED_TAKEN_BUBBLE, 0),
+      (M4_EXTRA_REPLAY_BUBBLE, 0)
+   )
    
    // Latencies, calculated from latency parameters:
-   m4_define(M4_REG_BYPASS_STAGES, m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
-   m4_define(M4_JUMP_BUBBLES, m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(M4_BRANCH_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_REPLAY_LATENCY, m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))
+   m4_define(M4_REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
+   m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
+   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_JUMP_BUBBLE))
+   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
+   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))
+
+   
+   // ========================
+   // Check Legality of Config
+   // ========================
+   
+   // (Not intended to be exhaustive.)
+   
+   // Check stage order.
+   m4_define(['m4_stage_order'], ['
+      m4_ifelse($3, [''], [''], ['
+         m4_eval(M4_$1_STAGE > M4_$2_STAGE), 1, ['m4_errprint(['M4_$1_STAGE must precede M4_$2_STAGE.'])'],
+                                                ['m4_stage_order(['m4_shift($*)'])'])
+      '])
+   '])
+   m4_stage_order(PC_MUX, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
+   m4_stage_order(EXECUTE, MEM_WR)
+   
+   // Check limit reg bypass
+   m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
+   
+
 
    // ==================
    // Default Parameters
@@ -727,7 +772,7 @@ m4+makerchip_header(['
       ?$valid_jump
          $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
    @M4_BRANCH_TARGET_CALC_STAGE
-      ?$valid_branch
+      ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
          
 
@@ -975,6 +1020,8 @@ m4+makerchip_header(['
            
       // For debug.
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
+   // Condition signals must not themselves be conditioned (currently).
+   $valid_decode_branch = $valid_decode && $branch;
    $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $returning_ld) &&
                      | $dest_reg;   // r0 not valid.
@@ -982,7 +1029,10 @@ m4+makerchip_header(['
    $spec_ld = $valid_decode && $ld;
    
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
-   
+   @M4_BRANCH_TARGET_CALC_STAGE
+      ?$valid_decode_branch
+         $branch_target[M4_PC_RANGE] = $Pc + $raw_b_imm[M4_PC_RANGE];
+         // TODO: Deal with misaligned address.
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
@@ -1002,8 +1052,6 @@ m4+makerchip_header(['
               )
              )
             );
-         $branch_target[M4_PC_RANGE] = $Pc + $raw_b_imm[M4_PC_RANGE];
-         // TODO: Deal with misaligned address.
       ?$valid_jump
          $jump_target[M4_PC_RANGE] = /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
          // TODO: This assumes aligned addresses. Must deal with zeroing of byte bit and misaligned address.
@@ -1168,6 +1216,42 @@ m4+makerchip_header(['
 
 
 
+//========================//
+//                        //
+//   Branch Predictors    //
+//                        //
+//========================//
+
+// Branch predictor macros:
+// Context: pipeline
+// Inputs:
+//   @M4_EXECUTE_STAGE
+//      $reset
+//      $branch: This instruction is a branch.
+//      ?$branch
+//         $taken: This branch is taken.
+// Outputs:
+//   @M4_BRANCH_TARGET_CALC_STAGE
+//      $pred_taken
+\TLV branch_pred_fallthrough()
+   @M4_BRANCH_TARGET_CALC_STAGE
+      $pred_taken = 1'b0;
+
+\TLV branch_pred_two_bit()
+   @M4_BRANCH_TARGET_CALC_STAGE
+      //?$branch (but not known yet)
+      $pred_taken = >>M4_PRED_TAKEN_BUBBLES$BranchState[1];
+   @M4_EXECUTE_STAGE
+      $branch_or_reset = $branch || $reset;
+      ?$branch_or_reset
+         $BranchState[1:0] <=
+            $reset ? 2'b01 :
+            $taken ? ($BranchState == 2'b11 ? $RETAIN : $BranchState + 2'b1) :
+                     ($BranchState == 2'b00 ? $RETAIN : $BranchState - 2'b1);
+
+
+
+
 //=========================//
 //                         //
 //        THE CPU          //
@@ -1218,6 +1302,7 @@ m4+makerchip_header(['
             
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
+               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target :
                >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
@@ -1236,7 +1321,9 @@ m4+makerchip_header(['
             
             // Returning load doesn't decode the instruction. Provide value to force for dest reg. 
             $returning_ld_dest_reg[M4_REGS_INDEX_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$dest_reg;
-            
+         
+         m4+indirect(['branch_pred_']M4_BRANCH_PRED)
+         
          @M4_REG_RD_STAGE
             // ======
             // Reg Rd
@@ -1249,9 +1336,9 @@ m4+makerchip_header(['
                   $reg_value[M4_WORD_RANGE] =
                      m4_ifelse(m4_isa, ['riscv'], ['($reg == M4_REGS_INDEX_CNT'b0) ? M4_WORD_CNT'b0 :  // Read r0 as 0.'])
                      // Bypass stages:
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr>>1$dest_reg == $reg)) ? /instr>>1$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr>>2$dest_reg == $reg)) ? /instr>>2$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr>>3$dest_reg == $reg)) ? /instr>>3$rslt :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr>>1$dest_reg == $reg)) ? /instr>>1$rslt :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr>>2$dest_reg == $reg)) ? /instr>>2$rslt :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr>>3$dest_reg == $reg)) ? /instr>>3$rslt :'])
                      /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$Value;
                $replay = $is_reg_condition && /instr/regs[$reg]>>1$next_pending;
             $replay = | /src[*]$replay || ($dest_reg_valid && /regs[$dest_reg]>>1$next_pending);
@@ -1272,7 +1359,9 @@ m4+makerchip_header(['
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $valid_jump = $jump && ! $squash;
             $valid_branch = $branch && ! $squash;
+            $valid_pred_taken_branch = $valid_branch && $pred_taken;
             $valid_mispred_branch = $mispred_branch && ~$squash;
+            $valid_dest_reg_valid = ! $squash && $dest_reg_valid;
             $valid_ld = $ld && ! $squash;
             $valid_st = $st && ! $squash;
             $valid_illegal = $illegal && ! $squash;
@@ -1282,6 +1371,7 @@ m4+makerchip_header(['
             $squash = ! $valid_exe || (| $SquashCnt) || $returning_ld || $replay;
             $SquashCnt[2:0] <=
                $reset                ? 3'b0 :
+               $valid_pred_taken_branch ? M4_PRED_TAKEN_BUBBLES :
                $valid_mispred_branch ? M4_BRANCH_BUBBLES :
                $valid_jump           ? M4_JUMP_BUBBLES :
                $replay               ? M4_REPLAY_LATENCY - 3'b1:
@@ -1297,7 +1387,7 @@ m4+makerchip_header(['
             // Reg Write
             // =========
 
-            $reg_write = $reset ? 1'b0 : ($dest_reg_valid && ! $squash) || $returning_ld;
+            $reg_write = $reset ? 1'b0 : ($valid_dest_reg_valid) || $returning_ld;
             \always_comb
                if ($reg_write)
                   /regs[$dest_reg]<<1$$Value[M4_WORD_RANGE] = $rslt;
