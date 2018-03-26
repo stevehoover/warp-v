@@ -1060,22 +1060,22 @@ m4+makerchip_header(['
          
          $lui_rslt[M4_WORD_RANGE] = $raw_u_imm;
          $auipc_rslt[M4_WORD_RANGE] = $Pc + $raw_u_imm;
-         $jal_rslt[M4_WORD_RANGE] = $Pc + 4;
-         $jalr_rslt[M4_WORD_RANGE] = $Pc + 4;
-         $beq_rslt[M4_WORD_RANGE] = (/src[1]$reg_value == /src[2]$reg_value) ? 1 : 0 ;
-         $bne_rslt[M4_WORD_RANGE] = (/src[1]$reg_value == /src[2]$reg_value) ? 0 : 1 ;
-         $blt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0 ;
-         $bge_rslt[M4_WORD_RANGE] = (/src[1]$reg_value >= /src[2]$reg_value) ? 1 : 0 ;
+         $jal_rslt[M4_WORD_RANGE] = $Pc + 1;
+         $jalr_rslt[M4_WORD_RANGE] = $Pc + 1;
+         $beq_rslt[M4_WORD_RANGE] = 32'b0;
+         $bne_rslt[M4_WORD_RANGE] = 32'b0;
+         $blt_rslt[M4_WORD_RANGE] = 32'b0;
+         $bge_rslt[M4_WORD_RANGE] = 32'b0;
          $bltu_rslt[M4_WORD_RANGE] = 32'b0;
          $bgeu_rslt[M4_WORD_RANGE] = 32'b0;
-         $lb_rslt[M4_WORD_RANGE] = {{24{$returning_ld_data[7]}},$returning_ld_data[7:0]};
-         $lh_rslt[M4_WORD_RANGE] = {{16{$returning_ld_data[15]}},$returning_ld_data[15:0]};
+         $lb_rslt[M4_WORD_RANGE] = 32'b0;
+         $lh_rslt[M4_WORD_RANGE] = 32'b0;
          $lw_rslt[M4_WORD_RANGE] = $returning_ld_data;
-         $lbu_rslt[M4_WORD_RANGE] = {24'b0,$returning_ld_data[7:0]};
-         $lhu_rslt[M4_WORD_RANGE] = {16'b0,$returning_ld_data[15:0]};
-         $sb_rslt[M4_WORD_RANGE] = $raw_s_imm + /src[1]$reg_value;//
-         $sh_rslt[M4_WORD_RANGE] = $raw_s_imm + /src[1]$reg_value;//Calculated the destination store address.
-         $sw_rslt[M4_WORD_RANGE] = $raw_s_imm + /src[1]$reg_value;//
+         $lbu_rslt[M4_WORD_RANGE] = 32'b0;
+         $lhu_rslt[M4_WORD_RANGE] = 32'b0;
+         $sb_rslt[M4_WORD_RANGE] = 32'b0;
+         $sh_rslt[M4_WORD_RANGE] = 32'b0;
+         $sw_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
          $slti_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0 ;
          $sltiu_rslt[M4_WORD_RANGE] = 32'b0;
@@ -1084,7 +1084,7 @@ m4+makerchip_header(['
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $srli_srai_rslt[M4_WORD_RANGE] = 32'b0;
-         $add_sub_rslt[M4_WORD_RANGE] = /src[1]$reg_value + /src[2]$reg_value;
+         $add_sub_rslt[M4_WORD_RANGE] = 32'b0;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $sltu_rslt[M4_WORD_RANGE] = 32'b0;
