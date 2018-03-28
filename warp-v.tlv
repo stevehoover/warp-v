@@ -1060,10 +1060,10 @@ m4+makerchip_header(['
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
-         $lui_rslt[M4_WORD_RANGE] = 32'b0;
-         $auipc_rslt[M4_WORD_RANGE] = 32'b0;
-         $jal_rslt[M4_WORD_RANGE] = 32'b0;
-         $jalr_rslt[M4_WORD_RANGE] = 32'b0;
+         $lui_rslt[M4_WORD_RANGE] = $raw_u_imm;
+         $auipc_rslt[M4_WORD_RANGE] = $Pc + $raw_u_imm;
+         $jal_rslt[M4_WORD_RANGE] = $Pc + 1;
+         $jalr_rslt[M4_WORD_RANGE] = $Pc + 1;
          $beq_rslt[M4_WORD_RANGE] = 32'b0;
          $bne_rslt[M4_WORD_RANGE] = 32'b0;
          $blt_rslt[M4_WORD_RANGE] = 32'b0;
@@ -1079,21 +1079,21 @@ m4+makerchip_header(['
          $sh_rslt[M4_WORD_RANGE] = 32'b0;
          $sw_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
-         $slti_rslt[M4_WORD_RANGE] = 32'b0;
+         $slti_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0 ;
          $sltiu_rslt[M4_WORD_RANGE] = 32'b0;
-         $xori_rslt[M4_WORD_RANGE] = 32'b0;
+         $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
-         $andi_rslt[M4_WORD_RANGE] = 32'b0;
-         $slli_rslt[M4_WORD_RANGE] = 32'b0;
+         $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
+         $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $srli_srai_rslt[M4_WORD_RANGE] = 32'b0;
-         $add_sub_rslt[M4_WORD_RANGE] = /src[1]$reg_value + /src[2]$reg_value;
-         $sll_rslt[M4_WORD_RANGE] = 32'b0;
-         $slt_rslt[M4_WORD_RANGE] = 32'b0;
+         $add_sub_rslt[M4_WORD_RANGE] =  /src[1]$reg_value + /src[2]$reg_value;
+         $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
+         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $sltu_rslt[M4_WORD_RANGE] = 32'b0;
-         $xor_rslt[M4_WORD_RANGE] = 32'b0;
+         $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
          $srl_sra_rslt[M4_WORD_RANGE] = 32'b0;
-         $or_rslt[M4_WORD_RANGE] = 32'b0;
-         $and_rslt[M4_WORD_RANGE] = 32'b0;
+         $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
+         $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
    @_exe_stage
       ?$valid_ld_st
          {$addr[M4_ADDR_RANGE], $misaligned_addr_bits[1:0]} = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
