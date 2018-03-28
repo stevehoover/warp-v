@@ -1084,7 +1084,7 @@ m4+makerchip_header(['
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $srli_srai_rslt[M4_WORD_RANGE] = 32'b0;
-         $add_sub_rslt[M4_WORD_RANGE] = 32'b0;
+         $add_sub_rslt[M4_WORD_RANGE] =  /src[1]$reg_value + /src[2]$reg_value;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $sltu_rslt[M4_WORD_RANGE] = 32'b0;
