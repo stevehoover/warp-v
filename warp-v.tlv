@@ -499,7 +499,7 @@ m4+makerchip_header(['
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
       m4_define(['m4_instr_func'],
-                ['m4_instr_decode_expr($5, $3, $4)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+                ['m4_instr_decode_expr($5, $3, $4, $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
       m4_define(['m4_instr_no_func'],
                 ['m4_instr_decode_expr($4, $3, ['xxx'])'])
       // Macros to create, for each instruction (xxx):
@@ -516,9 +516,11 @@ m4+makerchip_header(['
          ['m4_define(
               ['m4_decode_expr'],
               m4_dquote(m4_decode_expr['$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr = ($op5_funct3 ==? 8'b$2_$3);m4_plus_new_line   ']))
-           m4_define(
-              ['m4_rslt_mux_expr'],
-              m4_dquote(m4_rslt_mux_expr[' |']['m4_plus_new_line       ({']M4_WORD_CNT['{$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr}} & $']m4_translit($1, ['A-Z'], ['a-z'])['_rslt)']))
+           m4_ifelse(['$4'], ['no_dest'],
+              [''],
+              ['m4_define(
+                 ['m4_rslt_mux_expr'],
+                 m4_dquote(m4_rslt_mux_expr[' |']['m4_plus_new_line       ({']M4_WORD_CNT['{$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr}} & $']m4_translit($1, ['A-Z'], ['a-z'])['_rslt)']))'])
            m4_define(
               ['m4_illegal_instr_expr'],
               m4_dquote(m4_illegal_instr_expr[' && ! $is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr']))
@@ -535,8 +537,8 @@ m4+makerchip_header(['
       m4_define(['m4_instrR'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrRI'], ['m4_instr_func($@)'])
       m4_define(['m4_instrR4'], ['m4_instr_func($@)'])
-      m4_define(['m4_instrS'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrB'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrS'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrB'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrJ'], ['m4_instr_no_func($@)'])
       m4_define(['m4_instrU'], ['m4_instr_no_func($@)'])
       m4_define(['m4_instr_'], ['m4_instr_no_func($@)'])
@@ -1347,7 +1349,7 @@ m4+makerchip_header(['
          // =======
          // Execute
          // =======
-         m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE)
+         m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
                
          @M4_EXECUTE_STAGE
             $valid_ld_st = $valid_ld || $valid_st;
