@@ -227,9 +227,9 @@ m4+makerchip_header(['
    //                         nominal load latency.
    //     Deltas (default to 0):
    //       M4 EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
-   //       M4_EXTRA_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
-   //       M4_EXTRA_BRANCH_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
-   //       M4_EXTRA_REPLAY_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
+   //       M4_EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
+   //       M4_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
+   //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(['5-stage'],
@@ -356,6 +356,7 @@ m4+makerchip_header(['
    m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_JUMP_BUBBLE))
    m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
    m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
    m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))
 
    
@@ -419,7 +420,7 @@ m4+makerchip_header(['
          // Definitions matching "The RISC-V Instruction Set Manual Vol. I: User-Level ISA", Version 2.2.
 
          m4_define_vector(['M4_INSTR'], 32)
-         m4_define_vector(['M4_ADDR'], 30)
+         m4_define_vector(['M4_ADDR'], 32)
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], 32, 1)
@@ -445,7 +446,9 @@ m4+makerchip_header(['
 
    m4_define(['M4_ADDRS_PER_WORD'], m4_eval(M4_WORD_CNT / M4_BITS_PER_ADDR))
    m4_define(['M4_ADDRS_PER_INSTR'], m4_eval(M4_INSTR_CNT / M4_BITS_PER_ADDR))
-   m4_define_vector(['M4_PC'], M4_ADDR_HIGH, m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
+   m4_define(['M4_SUB_PC_BITS'], m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
+   m4_define_vector(['M4_PC'], M4_ADDR_HIGH, M4_SUB_PC_BITS)
+   m4_define(['M4_FULL_PC'], ['{$Pc, M4_SUB_PC_BITS'b0}'])
    m4_define_hier(M4_DATA_MEM_ADDRS, m4_eval(M4_DATA_MEM_WORDS_HIGH * M4_ADDRS_PER_WORD))  // Addressable data memory locations.
 
    
@@ -989,7 +992,7 @@ m4+makerchip_header(['
       $raw_s_imm[31:0] = {{21{$raw[31]}}, $raw[30:25], $raw[11:7]};
       $raw_b_imm[31:0] = {{20{$raw[31]}}, $raw[7], $raw[30:25], $raw[11:8], 1'b0};
       $raw_u_imm[31:0] = {$raw[31:12], {12{1'b0}}};
-      $raw_j_imm[31:0] = {{12{$raw[31]}}, $raw[19:12], $raw[20], $raw[30:21], 1'b0};
+      //$raw_j_imm[31:0] = {{12{$raw[31]}}, $raw[19:12], $raw[20], $raw[30:21], 1'b0};
       // Extract other type/instruction-specific fields.
       $raw_shamt[6:0] = $raw[26:20];
       $raw_aq = $raw[26];
@@ -1022,6 +1025,7 @@ m4+makerchip_header(['
            
       // For debug.
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
+      `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
    $valid_decode_branch = $valid_decode && $branch;
    $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : $raw_rd;
@@ -1061,23 +1065,14 @@ m4+makerchip_header(['
          // Compute each individual instruction result, combined per-instruction by a macro.
          
          $lui_rslt[M4_WORD_RANGE] = $raw_u_imm;
-         $auipc_rslt[M4_WORD_RANGE] = $Pc + $raw_u_imm;
-         $jal_rslt[M4_WORD_RANGE] = $Pc + 1;
-         $jalr_rslt[M4_WORD_RANGE] = $Pc + 1;
-         $beq_rslt[M4_WORD_RANGE] = 32'b0;
-         $bne_rslt[M4_WORD_RANGE] = 32'b0;
-         $blt_rslt[M4_WORD_RANGE] = 32'b0;
-         $bge_rslt[M4_WORD_RANGE] = 32'b0;
-         $bltu_rslt[M4_WORD_RANGE] = 32'b0;
-         $bgeu_rslt[M4_WORD_RANGE] = 32'b0;
+         $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
+         $jal_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
+         $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
          $lb_rslt[M4_WORD_RANGE] = 32'b0;
          $lh_rslt[M4_WORD_RANGE] = 32'b0;
          $lw_rslt[M4_WORD_RANGE] = $returning_ld_data;
          $lbu_rslt[M4_WORD_RANGE] = 32'b0;
          $lhu_rslt[M4_WORD_RANGE] = 32'b0;
-         $sb_rslt[M4_WORD_RANGE] = 32'b0;
-         $sh_rslt[M4_WORD_RANGE] = 32'b0;
-         $sw_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
          $slti_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0 ;
          $sltiu_rslt[M4_WORD_RANGE] = 32'b0;
@@ -1096,9 +1091,7 @@ m4+makerchip_header(['
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
    @_exe_stage
       ?$valid_ld_st
-         {$addr[M4_ADDR_RANGE], $misaligned_addr_bits[1:0]} = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
-         `BOGUS_USE($misaligned_addr_bits)
-         // TODO: This assumes word-aligned addresses and doesn't treat lower bits properly.
+         $addr[M4_ADDR_RANGE] = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
       ?$valid_st
          $st_value[M4_WORD_RANGE] = /src[2]$reg_value;
 
@@ -1307,6 +1300,7 @@ m4+makerchip_header(['
                >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target :
                >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
+               >>M4_TRAP_BUBBLES$good_path_trap ? '0 :  // TODO: trap target?
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
                $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
                         $Pc + M4_PC_CNT'b1;
@@ -1352,33 +1346,61 @@ m4+makerchip_header(['
          m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
                
          @M4_EXECUTE_STAGE
+
+            // ============
+            // Control Flow
+            // ============
+            
+            // Terminology:
+            // Instruction: An instruction, as viewed by the CPU pipeline (i.e. ld and ld_return are separate instructions).
+            // ISA Instruction: An instruction, as defined by the ISA.
+            // Squash: Do not commit the results of this instruction.
+            // Good Path: On the proper flow of execution of the program.
+            // Redirect: Adjust the PC from the predicted next-PC.
+            // Redirect Shadow: Between the instruction causing the redirect and the redirect target instruction.
+            // Commit: Results are made visible to subsequent instructions.
+            // Retire: Commit and completes an ISA instruction.
+            
+            // Instruction control flow characterization:
+            //
+            // Traps include:
+            //   o illegal instructions
+            //   o misaligned PC
+            //   o ...
+            $trap = $illegal;  // TODO: || $misaligned_pc...
+            $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
+            $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
+            $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
+
+            // Good path & squash.
+            $good_path = $valid_exe && ! $in_redirect_shadow;  // This instruction is on the good path (though it may be replayed).
+            $squash = ! $good_path || $redirecting_squash;  // Instruction will not commit results.
+            $commit = ! $squash;
+
+            // Trap conditions conditioned upon good-path.
+            $good_path_illegal = $illegal && $good_path;
+            $good_path_trap = $trap && $good_path;
+            `BOGUS_USE($good_path_illegal)
+            // Signals conditioned upon commit.
+            $valid_jump = $jump && $commit;
+            $valid_branch = $branch && $commit;
+            $valid_pred_taken_branch = $valid_branch && $pred_taken;
+            $valid_mispred_branch = $mispred_branch && $commit;
+            $valid_dest_reg_valid = $dest_reg_valid && $commit;
+            $valid_ld = $ld && $commit;
+            $valid_st = $st && $commit;
             $valid_ld_st = $valid_ld || $valid_st;
 
-            // =========
-            // Target PC
-            // =========
-            
-            $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
-            $valid_jump = $jump && ! $squash;
-            $valid_branch = $branch && ! $squash;
-            $valid_pred_taken_branch = $valid_branch && $pred_taken;
-            $valid_mispred_branch = $mispred_branch && ~$squash;
-            $valid_dest_reg_valid = ! $squash && $dest_reg_valid;
-            $valid_ld = $ld && ! $squash;
-            $valid_st = $st && ! $squash;
-            $valid_illegal = $illegal && ! $squash;
-            `BOGUS_USE($valid_illegal)
             // Squash. Keep a count of the number of cycles remaining in the shadow of a mispredict.
-            // Also, squash on ! $valid_exe not valid.
-            $squash = ! $valid_exe || (| $SquashCnt) || $returning_ld || $replay;
-            $SquashCnt[2:0] <=
+            $RedirectShadowCnt[2:0] <=
                $reset                ? 3'b0 :
                $valid_pred_taken_branch ? M4_PRED_TAKEN_BUBBLES :
                $valid_mispred_branch ? M4_BRANCH_BUBBLES :
                $valid_jump           ? M4_JUMP_BUBBLES :
-               $replay               ? M4_REPLAY_LATENCY - 3'b1:
-               $SquashCnt == 3'b0    ? 3'b0 :
-                                       $SquashCnt - 3'b1;
+               $good_path_trap       ? M4_TRAP_BUBBLES :
+               $replay               ? M4_REPLAY_LATENCY - 3'b1 :
+               $RedirectShadowCnt == 3'b0    ? 3'b0 :
+                                       $RedirectShadowCnt - 3'b1;
                                        
             $returning_ld_data[M4_WORD_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
    m4+fixed_latency_fake_memory(/top, 0)
@@ -1389,10 +1411,19 @@ m4+makerchip_header(['
             // Reg Write
             // =========
 
-            $reg_write = $reset ? 1'b0 : ($valid_dest_reg_valid) || $returning_ld;
+            $reg_write = $reset ? 1'b0 : $valid_dest_reg_valid;
             \always_comb
                if ($reg_write)
                   /regs[$dest_reg]<<1$$Value[M4_WORD_RANGE] = $rslt;
+            
+            // =======================
+            // For Formal Verification
+            // =======================
+            // Currenty we fetch an instruction every cycle, and squash is the only
+            //   mechanism to avoid retiring. Also loads issue in two parts, the $ld and the
+            //   $returning_ld.
+            $retire = $commit && ! $ld;
+            `BOGUS_USE($retire $good_path_trap)
          
          // There's no bypass on pending, so we must write the same cycle we read.
          @M4_EXECUTE_STAGE
@@ -1422,6 +1453,6 @@ m4+makerchip_header(['
    
    // Assert these to end simulation (before Makerchip cycle limit).
 !  *passed = ! *reset['']m4_ifexpr(M4_TB, [' && |fetch/instr>>5$Pc == {M4_PC_CNT{1'b1}}']);
-!  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$valid_illegal))']);
+!  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
