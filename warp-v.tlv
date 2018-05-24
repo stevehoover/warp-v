@@ -481,10 +481,10 @@ m4+makerchip_header(['
                 ['m4_ifelse(['$1'], [''], [''],
                             ['localparam INSTR_TYPE_$1_MASK = m4_instr_type_$1_mask_expr; m4_instr_types_sv(m4_shift($@))'])'])
       // Instantiated recursively for each instruction type in \SV_plus context to decode instruction type.
-      // Creates "assign $$is_x_type = INSTR_TYPE_X_MASK[$raw_opcode[6:2]];" for each type.
+      // Creates "assign $$is_x_type = INSTR_TYPE_X_MASK[$raw_op5];" for each type.
       m4_define(['m4_types_decode'],
                 ['m4_ifelse(['$1'], [''], [''],
-                            ['['assign $$is_']m4_translit(['$1'], ['A-Z'], ['a-z'])['_type = INSTR_TYPE_$1_MASK[$raw_opcode[6:2]]; ']m4_types_decode(m4_shift($@))'])'])
+                            ['['assign $$is_']m4_translit(['$1'], ['A-Z'], ['a-z'])['_type = INSTR_TYPE_$1_MASK[$raw_op5]; ']m4_types_decode(m4_shift($@))'])'])
       // Instantiated for each op5 in \SV_plus context.
       m4_define(['m4_op5'],
                 ['m4_define(['M4_OP5_$1_TYPE'], $2)['localparam [4:0] OP5_$3 = 5'b$1;']m4_define(['m4_instr_type_$2_mask_expr'], m4_quote(m4_instr_type_$2_mask_expr)[' | (1 << 5'b$1)'])'])
@@ -502,9 +502,9 @@ m4+makerchip_header(['
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
       m4_define(['m4_instr_func'],
-                ['m4_instr_decode_expr($5, $3, $4, $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+                ['m4_instr_decode_expr($5, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4'], $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
       m4_define(['m4_instr_no_func'],
-                ['m4_instr_decode_expr($4, $3, ['xxx'])'])
+                ['m4_instr_decode_expr($4, ['$raw_op5 == 5'b$3'])'])
       // Macros to create, for each instruction (xxx):
       //   o instructiton decode: $is_xxx_instr = ...; ...
       //   o result combining expr.: ({32{$is_xxx_instr}} & $xxx_rslt) | ...
@@ -518,8 +518,8 @@ m4+makerchip_header(['
          ['m4_instr_decode_expr'],
          ['m4_define(
               ['m4_decode_expr'],
-              m4_dquote(m4_decode_expr['$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr = ($op5_funct3 ==? 8'b$2_$3);m4_plus_new_line   ']))
-           m4_ifelse(['$4'], ['no_dest'],
+              m4_dquote(m4_decode_expr['$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr = $2;m4_plus_new_line   ']))
+           m4_ifelse(['$3'], ['no_dest'],
               [''],
               ['m4_define(
                  ['m4_rslt_mux_expr'],
@@ -553,7 +553,7 @@ m4+makerchip_header(['
 
 
       // Instruction fields (User ISA Manual 2.2, Fig. 2.2)
-      m4_define_fields(['M4_INSTR'], 32, FUNCT7, 25, RS2, 20, RS1, 15, FUNCT3, 12, RD, 7, OPCODE, 0)
+      m4_define_fields(['M4_INSTR'], 32, FUNCT7, 25, RS2, 20, RS1, 15, FUNCT3, 12, RD, 7, OP5, 2, OP2, 0)
 
 
       //=========
@@ -985,7 +985,7 @@ m4+makerchip_header(['
 
       // Extract fields of $raw (instruction) into $raw_<field>[x:0].
       m4_into_fields(['M4_INSTR'], ['$raw'])
-      `BOGUS_USE($raw_funct7)  // Delete once its used.
+      `BOGUS_USE($raw_funct7 $raw_op2)  // Delete once its used.
       // Extract immediate fields into type-specific signals.
       // (User ISA Manual 2.2, Fig. 2.4)
       $raw_i_imm[31:0] = {{21{$raw[31]}}, $raw[30:20]};
@@ -1006,7 +1006,6 @@ m4+makerchip_header(['
          m4_types_decode(m4_instr_types_args)
 
       // Instruction decode.
-      $op5_funct3[7:0] = {$raw[6:2], $raw_funct3};
       m4+riscv_decode_expr()
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
