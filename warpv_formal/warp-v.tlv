@@ -26,10 +26,18 @@
    // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    // -----------------------------------------------------------------------------
-   m4_define(['M4_FORMAL'], 1)  // 0 to disable code for formal verificatio.
-   m4_define(['m4_makerchip_module'], ['m4_ifelse(M4_FORMAL, 1, 
-['
-   module warpv(input logic clk, input logic reset, output logic failed, output logic passed,
+	// This code is mastered in https://github.com/stevehoover/warp-v.git
+
+   // ==========================================
+   // Configuration flag for formal verification
+   // ==========================================
+   m4_define(['M4_FORMAL'], 0)  // 0 to disable code for formal verification
+
+   m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
+            module warpv(input logic clk,
+          	input logic reset,
+            output logic failed,
+            output logic passed,
             output logic  rvfi_valid, 
             output logic [31:0] rvfi_insn,
             output logic [63 : 0] rvfi_order,
@@ -50,13 +58,8 @@
             output logic [3: 0] rvfi_mem_wmask,  
             output logic [31: 0] rvfi_mem_rdata,  
             output logic [31: 0] rvfi_mem_wdata);
-\SV'], 
-          
-['\SV
-   module warpv(input logic clk, input logic reset, input logic [31:0] cyc_cnt, output logic passed, output logic failed);    /* verilator lint_save */ /* verilator lint_off UNOPTFLAT */  bit [256:0] RW_rand_raw; bit [256+63:0] RW_rand_vect; pseudo_rand #(.WIDTH(257)) pseudo_rand (clk, reset, RW_rand_raw[256:0]); assign RW_rand_vect[256+63:0] = {RW_rand_raw[62:0], RW_rand_raw};  /* verilator lint_restore */  /* verilator lint_off WIDTH */ /* verilator lint_off UNOPTFLAT */
-\SV'])']) //
+\SV'])'])
 
-   // This code is mastered in https://github.com/stevehoover/warp-v.git
 
 
 m4+makerchip_header(['
@@ -235,7 +238,7 @@ m4+makerchip_header(['
 
    m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
    
-   m4_define(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
+   m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
                      
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -1474,8 +1477,8 @@ m4+makerchip_header(['
                                $RETAIN;
    
 
-m4_ifexpr(M4_FORMAL, ['
 \SV_plus
+m4_ifexpr(M4_FORMAL, ['
  (* keep *)   reg [63:0] rvfi_order_reg;
 always @(posedge clk)
 begin
@@ -1505,8 +1508,7 @@ end
    *rvfi_mem_rmask   = (|fetch/instr$ld ) ? 4'b1111 : 4'b0000;
    *rvfi_mem_wmask   = |fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
    *rvfi_mem_rdata   = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
-   *rvfi_mem_wdata   = |fetch/instr$st_value;
-   '])
+   *rvfi_mem_wdata   = |fetch/instr$st_value;'])
 
 
 \TLV
@@ -1524,3 +1526,4 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
+

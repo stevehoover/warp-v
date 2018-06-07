@@ -26,11 +26,45 @@
    // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    // -----------------------------------------------------------------------------
+	// This code is mastered in https://github.com/stevehoover/warp-v.git
 
-   // This code is mastered in https://github.com/stevehoover/warp-v.git
+   // ==========================================
+   // Configuration flag for formal verification
+   // ==========================================
+   m4_define(['M4_FORMAL'], 0)  // 0 to disable code for formal verification
+
+   m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
+            module warpv(input logic clk,
+          	input logic reset,
+            output logic failed,
+            output logic passed,
+            output logic  rvfi_valid, 
+            output logic [31:0] rvfi_insn,
+            output logic [63 : 0] rvfi_order,
+            output logic rvfi_halt,
+            output logic rvfi_trap,       
+            output logic rvfi_halt,       
+            output logic rvfi_intr,       
+            output logic [4: 0] rvfi_rs1_addr,   
+            output logic [4: 0] rvfi_rs2_addr,   
+            output logic [31: 0] rvfi_rs1_rdata,  
+            output logic [31: 0] rvfi_rs2_rdata,  
+            output logic [4: 0] rvfi_rd_addr,    
+            output logic [31: 0] rvfi_rd_wdata,   
+            output logic [31:0] rvfi_pc_rdata,   
+            output logic [31:0] rvfi_pc_wdata ,   
+            output logic [31:0] rvfi_mem_addr,   
+            output logic [3: 0] rvfi_mem_rmask,  
+            output logic [3: 0] rvfi_mem_wmask,  
+            output logic [31: 0] rvfi_mem_rdata,  
+            output logic [31: 0] rvfi_mem_wdata);
+\SV'])'])
+
+
 
 m4+makerchip_header(['
 
+    
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -205,6 +239,7 @@ m4+makerchip_header(['
    m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
    
    m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+                     
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -232,7 +267,7 @@ m4+makerchip_header(['
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['5-stage'],
+   m4_case(['1-stage'],
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
@@ -795,6 +830,7 @@ m4+makerchip_header(['
 //============================//
 
 \TLV riscv_cnt10_prog()
+   m4_ifexpr(M4_TB, ['
    \SV_plus
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
       
@@ -829,7 +865,7 @@ m4+makerchip_header(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-
+   '])
 // M4-generated code.
 \TLV riscv_gen()
    
@@ -1196,9 +1232,11 @@ m4+makerchip_header(['
             // Store
             // =====
 
-            \always_comb
-               if ($valid_st)
-                  /mem[$addr[M4_DATA_MEM_WORDS_INDEX_RANGE]]<<1$$Word[M4_WORD_RANGE] = $st_value;
+            \SV_plus
+               always @ (posedge clk) begin
+                  if ($valid_st)
+                     /mem[$addr[M4_DATA_MEM_WORDS_INDEX_RANGE]]<<1$$Word[M4_WORD_RANGE] = $st_value;
+               end
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -1299,7 +1337,7 @@ m4+makerchip_header(['
                >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target :
                >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
-               >>M4_TRAP_BUBBLES$good_path_trap ? '0 :  // TODO: trap target?
+               >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
                $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
                         $Pc + M4_PC_CNT'b1;
@@ -1411,9 +1449,11 @@ m4+makerchip_header(['
             // =========
 
             $reg_write = $reset ? 1'b0 : $valid_dest_reg_valid;
-            \always_comb
-               if ($reg_write)
-                  /regs[$dest_reg]<<1$$Value[M4_WORD_RANGE] = $rslt;
+            \SV_plus
+               always @ (posedge clk) begin
+                  if ($reg_write)
+                     /regs[$dest_reg]<<1$$Value[M4_WORD_RANGE] = $rslt;
+               end
             
             // =======================
             // For Formal Verification
@@ -1437,7 +1477,38 @@ m4+makerchip_header(['
                                $RETAIN;
    
 
-
+\SV_plus
+m4_ifexpr(M4_FORMAL, ['
+ (* keep *)   reg [63:0] rvfi_order_reg;
+always @(posedge clk)
+begin
+   rvfi_order_reg      <= reset ? 0 : rvfi_order_reg + rvfi_valid;
+end
+'])
+   
+   
+\TLV 
+   m4_ifexpr(M4_FORMAL, ['
+   //RVFI interface for formal verification
+   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$returning_ld; //
+   *rvfi_insn        = |fetch/instr>>M4_FETCH_STAGE$raw;
+   *rvfi_halt        = |fetch/instr>>M4_EXECUTE_STAGE$illegal;
+   *rvfi_trap        = |fetch/instr>>M4_EXECUTE_STAGE$trap;
+   *rvfi_order       = *rvfi_order_reg;
+   *rvfi_intr        = 1'b0;
+   *rvfi_rs1_addr    = |fetch/instr$is_u_type ? 0 : |fetch/instr$raw_rs1;
+   *rvfi_rs2_addr    = (|fetch/instr$is_i_type | |fetch/instr$is_u_type) ? 0 : |fetch/instr$raw_rs2;
+   *rvfi_rs1_rdata   = |fetch/instr/src[1]$reg_value;
+   *rvfi_rs2_rdata   = |fetch/instr/src[2]$reg_value;
+   *rvfi_rd_addr     = |fetch/instr$is_s_type ? 0 : |fetch/instr$raw_rd;
+   *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr$rslt : 0;
+   *rvfi_pc_rdata    = |fetch/instr$Pc[31:2];
+   *rvfi_pc_wdata    = |fetch/instr$Pc[31:2] + 4'd4;
+   *rvfi_mem_addr    = |fetch/instr$addr[M4_ADDR_RANGE];
+   *rvfi_mem_rmask   = (|fetch/instr$ld ) ? 4'b1111 : 4'b0000;
+   *rvfi_mem_wmask   = |fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
+   *rvfi_mem_rdata   = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
+   *rvfi_mem_wdata   = |fetch/instr$st_value;'])
 
 
 \TLV
@@ -1455,3 +1526,4 @@ m4+makerchip_header(['
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
+
