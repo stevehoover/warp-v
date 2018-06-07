@@ -10,9 +10,6 @@ module rvfi_wrapper (
 	warpv uut (
 		.clk       (clock   ),
 		.reset     (reset   ),
-		.cyc_cnt   (32'b0	),
-		.passed    (passed	),
-		.failed    (failed	),
 		`RVFI_CONN
 );
 
