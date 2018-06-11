@@ -26,16 +26,16 @@
    // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    // -----------------------------------------------------------------------------
-	// This code is mastered in https://github.com/stevehoover/warp-v.git
+   // This code is mastered in https://github.com/stevehoover/warp-v.git
 
    // ==========================================
    // Configuration flag for formal verification
    // ==========================================
-   m4_define(['M4_FORMAL'], 0)  // 0 to disable code for formal verification
+   m4_define(['M4_FORMAL'], 1)  // 0 to disable code for formal verification
 
    m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
             module warpv(input logic clk,
-          	input logic reset,
+            input logic reset,
             output logic failed,
             output logic passed,
             output logic  rvfi_valid, 
@@ -238,7 +238,7 @@ m4+makerchip_header(['
 
    m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
    
-   m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+   m4_define(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
                      
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -1072,8 +1072,9 @@ m4+makerchip_header(['
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
-         $branch_target[M4_PC_RANGE] = $Pc + $raw_b_imm[M4_PC_RANGE];
+         $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
          // TODO: Deal with misaligned address.
+         $misaligned_pc = | $raw_b_imm[1:0];
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
@@ -1099,7 +1100,7 @@ m4+makerchip_header(['
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
-         $lui_rslt[M4_WORD_RANGE] = $raw_u_imm;
+         $lui_rslt[M4_WORD_RANGE] = {$raw_u_imm[31:12], 12'b0};
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
          $jal_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
          $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
@@ -1109,19 +1110,39 @@ m4+makerchip_header(['
          $lbu_rslt[M4_WORD_RANGE] = 32'b0;
          $lhu_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
-         $slti_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0 ;
-         $sltiu_rslt[M4_WORD_RANGE] = 32'b0;
          $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
-         $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
-         $srli_srai_rslt[M4_WORD_RANGE] = 32'b0;
-         $add_sub_rslt[M4_WORD_RANGE] =  /src[1]$reg_value + /src[2]$reg_value;
+         $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
+         $srli_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
+
+         \SV_plus //For operators woking on signed operands
+            logic signed [M4_WORD_RANGE] reg1_val;
+            logic signed [M4_WORD_RANGE] reg2_val;
+            logic signed [M4_WORD_RANGE] raw_i_imm;
+            logic signed [M4_WORD_RANGE] srai_rslt;
+            logic signed [M4_WORD_RANGE] sra_rslt;
+            logic slti_rslt;
+            logic slt_rslt;
+            assign slti_rslt  = (reg1_val < raw_i_imm) ? 1 : 0 ;
+            assign srai_rslt = reg1_val >>> $raw_i_imm[5:0];
+            assign sra_rslt  = reg1_val >>> /src[2]$reg_value[4:0];
+            assign slt_rslt  = (reg1_val < reg2_val) ? 1 : 0;
+         *raw_i_imm = $raw_i_imm;
+         *reg1_val = /src[1]$reg_value;
+         *reg2_val = /src[2]$reg_value;
+         $srai_rslt[M4_WORD_RANGE] = *srai_rslt;
+         $sra_rslt[M4_WORD_RANGE] = sra_rslt;
+         $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $slti_rslt[M4_WORD_RANGE] =  slti_rslt;
+         $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
+         $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_rslt : $srli_rslt;
+         $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
-         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
-         $sltu_rslt[M4_WORD_RANGE] = 32'b0;
+         $slt_rslt[M4_WORD_RANGE] = *slt_rslt;
+         $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
-         $srl_sra_rslt[M4_WORD_RANGE] = 32'b0;
+         $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_rslt : $srl_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
    @_exe_stage
@@ -1267,7 +1288,7 @@ m4+makerchip_header(['
 //      $pred_taken
 \TLV branch_pred_fallthrough()
    @M4_BRANCH_TARGET_CALC_STAGE
-      $pred_taken = 1'b0;
+      $pred_taken = $taken;
 
 \TLV branch_pred_two_bit()
    @M4_BRANCH_TARGET_CALC_STAGE
@@ -1334,8 +1355,10 @@ m4+makerchip_header(['
             
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
-               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target :
-               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target :
+               //>>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
+               >>0$valid_pred_taken_branch ? >>0$branch_target[M4_PC_RANGE] :
+               //>>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
+               >>0$valid_mispred_branch ? >>0$branch_target[M4_PC_RANGE] :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
                >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
@@ -1398,13 +1421,13 @@ m4+makerchip_header(['
             // Commit: Results are made visible to subsequent instructions.
             // Retire: Commit and completes an ISA instruction.
             
-            // Instruction control flow characterization:
+            // Instruction control flow characterization:Next PC
             //
             // Traps include:
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
-            $trap = $illegal;  // TODO: || $misaligned_pc...
+            $trap = $illegal | $misaligned_pc;  // TODO: || $misaligned_pc...
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
@@ -1496,19 +1519,20 @@ end
    *rvfi_trap        = |fetch/instr>>M4_EXECUTE_STAGE$trap;
    *rvfi_order       = *rvfi_order_reg;
    *rvfi_intr        = 1'b0;
-   *rvfi_rs1_addr    = |fetch/instr$is_u_type ? 0 : |fetch/instr$raw_rs1;
-   *rvfi_rs2_addr    = (|fetch/instr$is_i_type | |fetch/instr$is_u_type) ? 0 : |fetch/instr$raw_rs2;
-   *rvfi_rs1_rdata   = |fetch/instr/src[1]$reg_value;
-   *rvfi_rs2_rdata   = |fetch/instr/src[2]$reg_value;
-   *rvfi_rd_addr     = |fetch/instr$is_s_type ? 0 : |fetch/instr$raw_rd;
-   *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr$rslt : 0;
-   *rvfi_pc_rdata    = |fetch/instr$Pc[31:2];
-   *rvfi_pc_wdata    = |fetch/instr$Pc[31:2] + 4'd4;
-   *rvfi_mem_addr    = |fetch/instr$addr[M4_ADDR_RANGE];
-   *rvfi_mem_rmask   = (|fetch/instr$ld ) ? 4'b1111 : 4'b0000;
-   *rvfi_mem_wmask   = |fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
+   *rvfi_rs1_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_u_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs1;
+   *rvfi_rs2_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_i_type | |fetch/instr>>M4_DECODE_STAGE$is_u_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs2;
+   *rvfi_rs1_rdata   = |fetch/instr/src[1]>>M4_REG_RD_STAGE$reg_value;
+   *rvfi_rs2_rdata   = |fetch/instr/src[2]>>M4_REG_RD_STAGE$reg_value;
+   *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
+   *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr>>M4_RESULT_STAGE$rslt : 0;
+   *rvfi_pc_rdata    = {|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$Pc[31:2], 2'b00};
+   //*rvfi_pc_wdata    = |fetch/instr$next_Pc;
+   *rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b0};
+   *rvfi_mem_addr    = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
+   *rvfi_mem_rmask   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  4'b0 : (|fetch/instr>>M4_DECODE_STAGE$ld ) ? 4'b1111 : 4'b0000;
+   *rvfi_mem_wmask   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  4'b0 :|fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
    *rvfi_mem_rdata   = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
-   *rvfi_mem_wdata   = |fetch/instr$st_value;'])
+   *rvfi_mem_wdata   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  0 : |fetch/instr>>M4_EXECUTE_STAGE$st_value;'])
 
 
 \TLV
@@ -1526,4 +1550,3 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
-
