@@ -244,7 +244,7 @@ m4+makerchip_header(['
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
    //   Stages:
-   //     M4_PC_MUX_STAGE: Determining fetch PC.
+   //     M4_NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
    //     M4_FETCH_STAGE: Instruction fetch.
    //     M4_DECODE_STAGE: Instruction decode.
    //     M4_REG_RD_STAGE: Register file read.
@@ -271,7 +271,7 @@ m4+makerchip_header(['
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
-            (M4_PC_MUX_STAGE, -1),
+            (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 1),
             (M4_REG_RD_STAGE, 1),
@@ -287,7 +287,7 @@ m4+makerchip_header(['
       ['1-stage'], ['
          // No pipeline
          m4_defines(
-            (M4_PC_MUX_STAGE, -1),
+            (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 0),
             (M4_REG_RD_STAGE, 0),
@@ -302,7 +302,7 @@ m4+makerchip_header(['
       ['
          // Deep pipeline
          m4_defines(
-            (M4_PC_MUX_STAGE, 0),
+            (M4_NEXT_STAGE, 1),
             (M4_FETCH_STAGE, 1),
             (M4_DECODE_STAGE, 3),
             (M4_REG_RD_STAGE, 4),
@@ -388,11 +388,11 @@ m4+makerchip_header(['
    // Latencies, calculated from latency parameters:
    m4_define(M4_REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
    m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
-   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
-   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
-   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))
+   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
+   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
+   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
+   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))
 
    
    // ========================
@@ -1343,7 +1343,7 @@ m4+makerchip_header(['
 
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
             
-         @m4_eval(M4_PC_MUX_STAGE + 1)
+         @M4_NEXT_PC_STAGE
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
@@ -1355,10 +1355,8 @@ m4+makerchip_header(['
             
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
-               //>>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>0$valid_pred_taken_branch ? >>0$branch_target[M4_PC_RANGE] :
-               //>>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>0$valid_mispred_branch ? >>0$branch_target[M4_PC_RANGE] :
+               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
+               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
                >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
@@ -1513,7 +1511,7 @@ end
 \TLV 
    m4_ifexpr(M4_FORMAL, ['
    //RVFI interface for formal verification
-   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$returning_ld; //
+   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>M4_NEXT_PC_STAGE$returning_ld; //
    *rvfi_insn        = |fetch/instr>>M4_FETCH_STAGE$raw;
    *rvfi_halt        = |fetch/instr>>M4_EXECUTE_STAGE$illegal;
    *rvfi_trap        = |fetch/instr>>M4_EXECUTE_STAGE$trap;
@@ -1525,7 +1523,7 @@ end
    *rvfi_rs2_rdata   = |fetch/instr/src[2]>>M4_REG_RD_STAGE$reg_value;
    *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
    *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr>>M4_RESULT_STAGE$rslt : 0;
-   *rvfi_pc_rdata    = {|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$Pc[31:2], 2'b00};
+   *rvfi_pc_rdata    = {|fetch/instr>>m4_eval(M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
    //*rvfi_pc_wdata    = |fetch/instr$next_Pc;
    *rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b0};
    *rvfi_mem_addr    = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
