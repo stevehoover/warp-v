@@ -408,7 +408,7 @@ m4+makerchip_header(['
                                                 ['m4_stage_order(['m4_shift($*)'])'])
       '])
    '])
-   m4_stage_order(PC_MUX, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
+   m4_stage_order(NEXT_PC, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
    m4_stage_order(EXECUTE, MEM_WR)
    
    // Check limit reg bypass
@@ -1523,7 +1523,7 @@ end
    *rvfi_rs2_rdata   = |fetch/instr/src[2]>>M4_REG_RD_STAGE$reg_value;
    *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
    *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr>>M4_RESULT_STAGE$rslt : 0;
-   *rvfi_pc_rdata    = {|fetch/instr>>m4_eval(M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
+   *rvfi_pc_rdata    = {|fetch/instr>>M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
    //*rvfi_pc_wdata    = |fetch/instr$next_Pc;
    *rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b0};
    *rvfi_mem_addr    = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
