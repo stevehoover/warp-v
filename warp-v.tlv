@@ -244,7 +244,7 @@ m4+makerchip_header(['
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
    //   Stages:
-   //     M4_PC_MUX_STAGE: Determining fetch PC.
+   //     M4_NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
    //     M4_FETCH_STAGE: Instruction fetch.
    //     M4_DECODE_STAGE: Instruction decode.
    //     M4_REG_RD_STAGE: Register file read.
@@ -271,7 +271,7 @@ m4+makerchip_header(['
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
-            (M4_PC_MUX_STAGE, -1),
+            (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 1),
             (M4_REG_RD_STAGE, 1),
@@ -287,7 +287,7 @@ m4+makerchip_header(['
       ['1-stage'], ['
          // No pipeline
          m4_defines(
-            (M4_PC_MUX_STAGE, -1),
+            (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 0),
             (M4_REG_RD_STAGE, 0),
@@ -302,7 +302,7 @@ m4+makerchip_header(['
       ['
          // Deep pipeline
          m4_defines(
-            (M4_PC_MUX_STAGE, 0),
+            (M4_NEXT_STAGE, 1),
             (M4_FETCH_STAGE, 1),
             (M4_DECODE_STAGE, 3),
             (M4_REG_RD_STAGE, 4),
@@ -388,11 +388,11 @@ m4+makerchip_header(['
    // Latencies, calculated from latency parameters:
    m4_define(M4_REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
    m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
-   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
-   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
-   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_PC_MUX_STAGE + 1))
+   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
+   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
+   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
+   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))
 
    
    // ========================
@@ -408,7 +408,7 @@ m4+makerchip_header(['
                                                 ['m4_stage_order(['m4_shift($*)'])'])
       '])
    '])
-   m4_stage_order(PC_MUX, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
+   m4_stage_order(NEXT_PC, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
    m4_stage_order(EXECUTE, MEM_WR)
    
    // Check limit reg bypass
@@ -1028,7 +1028,7 @@ m4+makerchip_header(['
       $raw_s_imm[31:0] = {{21{$raw[31]}}, $raw[30:25], $raw[11:7]};
       $raw_b_imm[31:0] = {{20{$raw[31]}}, $raw[7], $raw[30:25], $raw[11:8], 1'b0};
       $raw_u_imm[31:0] = {$raw[31:12], {12{1'b0}}};
-      //$raw_j_imm[31:0] = {{12{$raw[31]}}, $raw[19:12], $raw[20], $raw[30:21], 1'b0};
+      $raw_j_imm[31:0] = {{12{$raw[31]}}, $raw[19:12], $raw[20], $raw[30:21], 1'b0};
       // Extract other type/instruction-specific fields.
       $raw_shamt[6:0] = $raw[26:20];
       $raw_aq = $raw[26];
@@ -1045,7 +1045,7 @@ m4+makerchip_header(['
       m4+riscv_decode_expr()
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
-      $jump = $is_jalr_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
+      $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
       $conditional_branch = $is_b_type;
       $branch = $is_b_type || $is_j_type;
       $ld = $raw[6:3] == 4'b0;
@@ -1089,14 +1089,14 @@ m4+makerchip_header(['
             ($is_bne_instr && ! $equal) ||
             (($is_blt_instr || $is_bltu_instr || $is_bge_instr || $is_bgeu_instr) &&
              (($is_bge_instr || $is_bgeu_instr) ^
-              ({($is_blt_instr ^ /src[1]$reg_value[M4_WORD_MAX]), /src[1]$reg_value[M4_WORD_MAX-1:0]} <
-               {($is_blt_instr ^ /src[2]$reg_value[M4_WORD_MAX]), /src[2]$reg_value[M4_WORD_MAX-1:0]}
+              (({($is_blt_instr ^ /src[1]$reg_value[M4_WORD_MAX]), /src[1]$reg_value[M4_WORD_MAX-1:0]} <
+               {($is_blt_instr ^ /src[2]$reg_value[M4_WORD_MAX]), /src[2]$reg_value[M4_WORD_MAX-1:0]}) ^ ((/src[1]$reg_value[M4_WORD_MAX] != /src[2]$reg_value[M4_WORD_MAX]) & $is_bge_instr)
               )
              )
             );
       ?$valid_jump
-         $jump_target[M4_PC_RANGE] = /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
-         // TODO: This assumes aligned addresses. Must deal with zeroing of byte bit and misaligned address.
+         $jump_target[M4_PC_RANGE] = $is_j_type ? $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE] : /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
+         $misaligned_jp_target = (| $raw_i_imm[1:0]) || (| $raw_j_imm[1:0]) || (| /src[1]$reg_value[1:0]);
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1116,30 +1116,15 @@ m4+makerchip_header(['
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
          $srli_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
 
-         \SV_plus //For operators woking on signed operands
-            logic signed [M4_WORD_RANGE] reg1_val;
-            logic signed [M4_WORD_RANGE] reg2_val;
-            logic signed [M4_WORD_RANGE] raw_i_imm;
-            logic signed [M4_WORD_RANGE] srai_rslt;
-            logic signed [M4_WORD_RANGE] sra_rslt;
-            logic slti_rslt;
-            logic slt_rslt;
-            assign slti_rslt  = (reg1_val < raw_i_imm) ? 1 : 0 ;
-            assign srai_rslt = reg1_val >>> $raw_i_imm[5:0];
-            assign sra_rslt  = reg1_val >>> /src[2]$reg_value[4:0];
-            assign slt_rslt  = (reg1_val < reg2_val) ? 1 : 0;
-         *raw_i_imm = $raw_i_imm;
-         *reg1_val = /src[1]$reg_value;
-         *reg2_val = /src[2]$reg_value;
-         $srai_rslt[M4_WORD_RANGE] = *srai_rslt;
-         $sra_rslt[M4_WORD_RANGE] = sra_rslt;
+         $srai_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_rslt;
+         $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
          $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
-         $slti_rslt[M4_WORD_RANGE] =  slti_rslt;
+         $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : /src[1]$reg_value[M4_WORD_MAX];
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
          $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_rslt : $srli_rslt;
          $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
-         $slt_rslt[M4_WORD_RANGE] = *slt_rslt;
+         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : /src[1]$reg_value[M4_WORD_MAX];
          $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
          $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_rslt : $srl_rslt;
@@ -1288,7 +1273,7 @@ m4+makerchip_header(['
 //      $pred_taken
 \TLV branch_pred_fallthrough()
    @M4_BRANCH_TARGET_CALC_STAGE
-      $pred_taken = $taken;
+      $pred_taken = 1'b0;
 
 \TLV branch_pred_two_bit()
    @M4_BRANCH_TARGET_CALC_STAGE
@@ -1343,23 +1328,22 @@ m4+makerchip_header(['
 
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
             
-         @m4_eval(M4_PC_MUX_STAGE + 1)
+         @M4_NEXT_PC_STAGE
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
             
             // =======
-            // Next PC
+            // next pc
+            
             // =======
             
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
-               //>>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>0$valid_pred_taken_branch ? >>0$branch_target[M4_PC_RANGE] :
-               //>>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>0$valid_mispred_branch ? >>0$branch_target[M4_PC_RANGE] :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
+               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
+               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
                >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
                >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
                $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
@@ -1427,7 +1411,7 @@ m4+makerchip_header(['
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
-            $trap = $illegal | $misaligned_pc;  // TODO: || $misaligned_pc...
+            $trap = $illegal | $misaligned_pc | $misaligned_jp_target;  // TODO: || $misaligned_pc...
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
@@ -1513,26 +1497,26 @@ end
 \TLV 
    m4_ifexpr(M4_FORMAL, ['
    //RVFI interface for formal verification
-   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$returning_ld; //
+   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>M4_NEXT_PC_STAGE$returning_ld; //
    *rvfi_insn        = |fetch/instr>>M4_FETCH_STAGE$raw;
    *rvfi_halt        = |fetch/instr>>M4_EXECUTE_STAGE$illegal;
    *rvfi_trap        = |fetch/instr>>M4_EXECUTE_STAGE$trap;
    *rvfi_order       = *rvfi_order_reg;
    *rvfi_intr        = 1'b0;
-   *rvfi_rs1_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_u_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs1;
-   *rvfi_rs2_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_i_type | |fetch/instr>>M4_DECODE_STAGE$is_u_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs2;
+   *rvfi_rs1_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_u_type | |fetch/instr>>M4_DECODE_STAGE$is_j_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs1;
+   *rvfi_rs2_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_i_type | |fetch/instr>>M4_DECODE_STAGE$is_u_type | |fetch/instr>>M4_DECODE_STAGE$is_j_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs2;
    *rvfi_rs1_rdata   = |fetch/instr/src[1]>>M4_REG_RD_STAGE$reg_value;
    *rvfi_rs2_rdata   = |fetch/instr/src[2]>>M4_REG_RD_STAGE$reg_value;
-   *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
+   *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_DECODE_STAGE$is_b_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
    *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr>>M4_RESULT_STAGE$rslt : 0;
-   *rvfi_pc_rdata    = {|fetch/instr>>m4_eval(M4_PC_MUX_STAGE + 1)$Pc[31:2], 2'b00};
+   *rvfi_pc_rdata    = {|fetch/instr>>M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
    //*rvfi_pc_wdata    = |fetch/instr$next_Pc;
    *rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b0};
-   *rvfi_mem_addr    = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
-   *rvfi_mem_rmask   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  4'b0 : (|fetch/instr>>M4_DECODE_STAGE$ld ) ? 4'b1111 : 4'b0000;
-   *rvfi_mem_wmask   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  4'b0 :|fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
+   *rvfi_mem_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
+   *rvfi_mem_rmask   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  4'b0 : (|fetch/instr>>M4_DECODE_STAGE$ld ) ? 4'b1111 : 4'b0000;
+   *rvfi_mem_wmask   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  4'b0 :|fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
    *rvfi_mem_rdata   = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
-   *rvfi_mem_wdata   = (|fetch/instr>>M4_EXECUTE_STAGE$branch) ?  0 : |fetch/instr>>M4_EXECUTE_STAGE$st_value;'])
+   *rvfi_mem_wdata   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  0 : |fetch/instr>>M4_EXECUTE_STAGE$st_value;'])
 
 
 \TLV
