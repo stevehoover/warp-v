@@ -267,7 +267,7 @@ m4+makerchip_header(['
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['5-stage'],
+   m4_case(['1-stage'],
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
@@ -1114,19 +1114,20 @@ m4+makerchip_header(['
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
-         $srli_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
-         $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
-         $sra_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_intermediate_rslt;
-         $srl_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $srli_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
+
+         $srai_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_rslt;
+         $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
+         $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
          $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : /src[1]$reg_value[M4_WORD_MAX];
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
-         $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_intermediate_rslt : $srli_intermediate_rslt;
+         $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_rslt : $srli_rslt;
          $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : /src[1]$reg_value[M4_WORD_MAX];
          $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
-         $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
+         $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_rslt : $srl_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
    @_exe_stage
@@ -1334,9 +1335,10 @@ m4+makerchip_header(['
             $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
             
             // =======
-            // Next Pc
+            // next pc
+            
             // =======
-                        
+            
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
                >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
@@ -1491,33 +1493,30 @@ begin
 end
 '])
    
-
+   
 \TLV 
-   |fetch
-      /instr
-         @m4_eval(M4_EXECUTE_STAGE + 1)
-            m4_ifexpr(M4_FORMAL, ['
-            //RVFI interface for formal verification
-            *rvfi_valid       = $retire && !$returning_ld; //
-            *rvfi_insn        = $raw;
-            *rvfi_halt        = $illegal;
-            *rvfi_trap        = $trap;
-            *rvfi_order       = *rvfi_order_reg;
-            *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $raw_rs2;
-            *rvfi_rs1_rdata   = /instr/src[1]$reg_value;
-            *rvfi_rs2_rdata   = /instr/src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
-            *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            *rvfi_pc_rdata    = {>>M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = {<<m4_eval(1 + M4_NEXT_PC_STAGE)$Pc[31:2], 2'b00};
-            //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
-            *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
-            *rvfi_mem_rmask   = ($is_b_type) ?  4'b0 : ($ld ) ? 4'b1111 : 4'b0000;
-            *rvfi_mem_wmask   = ($is_b_type) ?  4'b0 :$valid_st ? 4'b1111 : 4'b0000;
-            *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_rslt;
-            *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;'])
+   m4_ifexpr(M4_FORMAL, ['
+   //RVFI interface for formal verification
+   *rvfi_valid       = |fetch/instr>>M4_REG_WR_STAGE$retire && !|fetch/instr>>M4_NEXT_PC_STAGE$returning_ld; //
+   *rvfi_insn        = |fetch/instr>>M4_FETCH_STAGE$raw;
+   *rvfi_halt        = |fetch/instr>>M4_EXECUTE_STAGE$illegal;
+   *rvfi_trap        = |fetch/instr>>M4_EXECUTE_STAGE$trap;
+   *rvfi_order       = *rvfi_order_reg;
+   *rvfi_intr        = 1'b0;
+   *rvfi_rs1_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_u_type | |fetch/instr>>M4_DECODE_STAGE$is_j_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs1;
+   *rvfi_rs2_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_i_type | |fetch/instr>>M4_DECODE_STAGE$is_u_type | |fetch/instr>>M4_DECODE_STAGE$is_j_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rs2;
+   *rvfi_rs1_rdata   = |fetch/instr/src[1]>>M4_REG_RD_STAGE$reg_value;
+   *rvfi_rs2_rdata   = |fetch/instr/src[2]>>M4_REG_RD_STAGE$reg_value;
+   *rvfi_rd_addr     = (|fetch/instr>>M4_DECODE_STAGE$is_s_type | |fetch/instr>>M4_DECODE_STAGE$is_b_type) ? 0 : |fetch/instr>>M4_DECODE_STAGE$raw_rd;
+   *rvfi_rd_wdata    = *rvfi_rd_addr  ? |fetch/instr>>M4_RESULT_STAGE$rslt : 0;
+   *rvfi_pc_rdata    = {|fetch/instr>>M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
+   //*rvfi_pc_wdata    = |fetch/instr$next_Pc;
+   *rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b0};
+   *rvfi_mem_addr    = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ? 0 : |fetch/instr>>M4_EXECUTE_STAGE$addr[M4_ADDR_RANGE];
+   *rvfi_mem_rmask   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  4'b0 : (|fetch/instr>>M4_DECODE_STAGE$ld ) ? 4'b1111 : 4'b0000;
+   *rvfi_mem_wmask   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  4'b0 :|fetch/instr>>M4_EXECUTE_STAGE$valid_st ? 4'b1111 : 4'b0000;
+   *rvfi_mem_rdata   = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
+   *rvfi_mem_wdata   = (|fetch/instr>>M4_DECODE_STAGE$is_b_type) ?  0 : |fetch/instr>>M4_EXECUTE_STAGE$st_value;'])
 
 
 \TLV
