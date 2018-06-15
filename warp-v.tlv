@@ -267,7 +267,7 @@ m4+makerchip_header(['
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['1-stage'],
+   m4_case(['5-stage'],
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
@@ -1118,12 +1118,12 @@ m4+makerchip_header(['
          $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
          $sra_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_intermediate_rslt;
          $srl_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
-         $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : /src[1]$reg_value[M4_WORD_MAX];
+         $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
          $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_intermediate_rslt : $srli_intermediate_rslt;
          $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
-         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : /src[1]$reg_value[M4_WORD_MAX];
+         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
          $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
@@ -1466,7 +1466,7 @@ m4+makerchip_header(['
             // Currenty we fetch an instruction every cycle, and squash is the only
             //   mechanism to avoid retiring. Also loads issue in two parts, the $ld and the
             //   $returning_ld.
-            $retire = $commit && ! $ld;
+            $retire = $commit && ! $ld && ! $returning_ld;
             `BOGUS_USE($retire $good_path_trap)
          
          // There's no bypass on pending, so we must write the same cycle we read.
@@ -1498,7 +1498,7 @@ end
          @m4_eval(M4_EXECUTE_STAGE + 1)
             m4_ifexpr(M4_FORMAL, ['
             //RVFI interface for formal verification
-            *rvfi_valid       = $retire && !$returning_ld; //
+            *rvfi_valid       = $retire;
             *rvfi_insn        = $raw;
             *rvfi_halt        = $illegal;
             *rvfi_trap        = $trap;
@@ -1510,8 +1510,8 @@ end
             *rvfi_rs2_rdata   = /instr/src[2]$reg_value;
             *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            *rvfi_pc_rdata    = {>>M4_NEXT_PC_STAGE$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = {<<1$Pc[31:2], 2'b00};
+            *rvfi_pc_rdata    = {$Pc[31:2], 2'b00};
+            *rvfi_pc_wdata    = ($valid_jump || ($branch && $taken) || $replay) ? {<<m4_eval(M4_EXECUTE_STAGE + 1 - M4_NEXT_PC_STAGE)$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
             //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
             *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
             *rvfi_mem_rmask   = ($is_b_type) ?  4'b0 : ($ld ) ? 4'b1111 : 4'b0000;
@@ -1535,4 +1535,5 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
+
 
