@@ -28,40 +28,6 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
-   // ==========================================
-   // Configuration flag for formal verification
-   // ==========================================
-   m4_define(['M4_FORMAL'], 1)  // 0 to disable code for formal verification
-
-   m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
-            module warpv(input logic clk,
-            input logic reset,
-            output logic failed,
-            output logic passed,
-            output logic  rvfi_valid, 
-            output logic [31:0] rvfi_insn,
-            output logic [63 : 0] rvfi_order,
-            output logic rvfi_halt,
-            output logic rvfi_trap,       
-            output logic rvfi_halt,       
-            output logic rvfi_intr,       
-            output logic [4: 0] rvfi_rs1_addr,   
-            output logic [4: 0] rvfi_rs2_addr,   
-            output logic [31: 0] rvfi_rs1_rdata,  
-            output logic [31: 0] rvfi_rs2_rdata,  
-            output logic [4: 0] rvfi_rd_addr,    
-            output logic [31: 0] rvfi_rd_wdata,   
-            output logic [31:0] rvfi_pc_rdata,   
-            output logic [31:0] rvfi_pc_wdata ,   
-            output logic [31:0] rvfi_mem_addr,   
-            output logic [3: 0] rvfi_mem_rmask,  
-            output logic [3: 0] rvfi_mem_wmask,  
-            output logic [31: 0] rvfi_mem_rdata,  
-            output logic [31: 0] rvfi_mem_wdata);
-\SV'])'])
-
-
-
 m4+makerchip_header(['
 
     
@@ -226,7 +192,6 @@ m4+makerchip_header(['
    // Libraries
    // =========
    
-   m4_include(['pipeflow_tlv.m4'])
 
 
 
@@ -236,10 +201,17 @@ m4+makerchip_header(['
    
    // This is where you configure the CPU.
 
+   // ISA
    m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
-   
-   m4_define(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
-                     
+   // Include testbench (for Makerchip simulation) (defaulted to 1).
+   m4_ifelse(M4_TB, ['M4_TB'], ['
+     m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+   '])
+   // Build for formal verification (defaulted to 0).
+   m4_ifelse(M4_FORMAL, ['M4_FORMAL'], ['
+     m4_define(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
+   '])
+
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -333,7 +305,7 @@ m4+makerchip_header(['
          //   RV32I 2.0, w/ no ISA extensions.
 
          // Machine width
-            m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
+         m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
          // ISA extensions,  1, or 0 (following M4 boolean convention).
          m4_defines(
             (['M4_EXT_E'], 1),
@@ -480,6 +452,7 @@ m4+makerchip_header(['
    // Computed ISA uarch Parameters (based on ISA-specific parameters).
 
    m4_define(['M4_ADDRS_PER_WORD'], m4_eval(M4_WORD_CNT / M4_BITS_PER_ADDR))
+   m4_define(['M4_SUB_WORD_BITS'], m4_width(m4_eval(M4_ADDRS_PER_WORD - 1)))
    m4_define(['M4_ADDRS_PER_INSTR'], m4_eval(M4_INSTR_CNT / M4_BITS_PER_ADDR))
    m4_define(['M4_SUB_PC_BITS'], m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
    m4_define_vector(['M4_PC'], M4_ADDR_HIGH, M4_SUB_PC_BITS)
@@ -617,6 +590,36 @@ m4+makerchip_header(['
       //=========
    '], ['DUMMY'], ['
    '])
+   
+   
+   // Redefine m4_makerchip_module macro used by m4+makerchip_header to define the module interface
+   // to define a module as required for fomal verification. (It's a bit of a hack.)
+   m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
+            module warpv(input logic clk,
+            input logic reset,
+            output logic failed,
+            output logic passed,
+            output logic  rvfi_valid, 
+            output logic [31:0] rvfi_insn,
+            output logic [63 : 0] rvfi_order,
+            output logic rvfi_halt,
+            output logic rvfi_trap,       
+            output logic rvfi_halt,       
+            output logic rvfi_intr,       
+            output logic [4: 0] rvfi_rs1_addr,   
+            output logic [4: 0] rvfi_rs2_addr,   
+            output logic [31: 0] rvfi_rs1_rdata,  
+            output logic [31: 0] rvfi_rs2_rdata,  
+            output logic [4: 0] rvfi_rd_addr,    
+            output logic [31: 0] rvfi_rd_wdata,   
+            output logic [31:0] rvfi_pc_rdata,   
+            output logic [31:0] rvfi_pc_wdata ,   
+            output logic [31:0] rvfi_mem_addr,   
+            output logic [3: 0] rvfi_mem_rmask,  
+            output logic [3: 0] rvfi_mem_wmask,  
+            output logic [31: 0] rvfi_mem_rdata,  
+            output logic [31: 0] rvfi_mem_wdata);
+['']\SV'])'])
 '])
 \SV
 /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
@@ -1047,7 +1050,7 @@ m4+makerchip_header(['
       $illegal = 1'b1['']m4_illegal_instr_expr;
       $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
       $conditional_branch = $is_b_type;
-      $branch = $is_b_type || $is_j_type;
+      $branch = $is_b_type;
       $ld = $raw[6:3] == 4'b0;
       $st = $is_s_type;
       `BOGUS_USE($is___type $is_u_type)
@@ -1096,7 +1099,7 @@ m4+makerchip_header(['
             );
       ?$valid_jump
          $jump_target[M4_PC_RANGE] = $is_j_type ? $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE] : /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
-         $misaligned_jp_target = (| $raw_i_imm[1:0]) || (| $raw_j_imm[1:0]) || (| /src[1]$reg_value[1:0]);
+         $misaligned_jp_target = ($is_i_type &&(| $raw_i_imm[1:0])) || ($is_j_type && (| $raw_j_imm[1:0])) || ($is_i_type && (| /src[1]$reg_value[1:0]));
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1225,7 +1228,7 @@ m4+makerchip_header(['
          /mem[M4_DATA_MEM_WORDS_RANGE]
          ?$spec_ld
             @M4_MEM_WR_STAGE
-               $ld_rslt[M4_WORD_RANGE] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_RANGE]]$Word;
+               $ld_rslt[M4_WORD_RANGE] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Word;
          
          // Array writes are not currently permitted to use assignment
          // syntax, so \always_comb is used, and this must be outside of
@@ -1240,7 +1243,7 @@ m4+makerchip_header(['
             \SV_plus
                always @ (posedge clk) begin
                   if ($valid_st)
-                     /mem[$addr[M4_DATA_MEM_WORDS_INDEX_RANGE]]<<1$$Word[M4_WORD_RANGE] = $st_value;
+                     /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<1$$Word[M4_WORD_RANGE] = $st_value;
                end
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
@@ -1409,7 +1412,7 @@ m4+makerchip_header(['
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
-            $trap = $illegal | $misaligned_pc | $misaligned_jp_target;  // TODO: || $misaligned_pc...
+            $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
@@ -1498,7 +1501,7 @@ end
          @m4_eval(M4_EXECUTE_STAGE + 1)
             m4_ifexpr(M4_FORMAL, ['
             //RVFI interface for formal verification
-            *rvfi_valid       = $retire;
+            *rvfi_valid       = $retire || $trap;
             *rvfi_insn        = $raw;
             *rvfi_halt        = $illegal;
             *rvfi_trap        = $trap;
@@ -1535,5 +1538,4 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
-
 
