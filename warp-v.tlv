@@ -1050,7 +1050,7 @@ m4+makerchip_header(['
       $illegal = 1'b1['']m4_illegal_instr_expr;
       $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
       $conditional_branch = $is_b_type;
-      $branch = $is_b_type || $is_j_type;
+      $branch = $is_b_type;
       $ld = $raw[6:3] == 4'b0;
       $st = $is_s_type;
       `BOGUS_USE($is___type $is_u_type)
@@ -1099,7 +1099,7 @@ m4+makerchip_header(['
             );
       ?$valid_jump
          $jump_target[M4_PC_RANGE] = $is_j_type ? $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE] : /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
-         $misaligned_jp_target = (| $raw_i_imm[1:0]) || (| $raw_j_imm[1:0]) || (| /src[1]$reg_value[1:0]);
+         $misaligned_jp_target = ($is_i_type &&(| $raw_i_imm[1:0])) || ($is_j_type && (| $raw_j_imm[1:0])) || ($is_i_type && (| /src[1]$reg_value[1:0]));
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1412,7 +1412,9 @@ m4+makerchip_header(['
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
-            $trap = $illegal || ($branch && $misaligned_pc) || ($jump && $misaligned_jp_target);
+
+            $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
+
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
@@ -1501,7 +1503,7 @@ end
          @m4_eval(M4_EXECUTE_STAGE + 1)
             m4_ifexpr(M4_FORMAL, ['
             //RVFI interface for formal verification
-            *rvfi_valid       = $retire;
+            *rvfi_valid       = $retire || $trap;
             *rvfi_insn        = $raw;
             *rvfi_halt        = $illegal;
             *rvfi_trap        = $trap;
@@ -1538,3 +1540,4 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
+
