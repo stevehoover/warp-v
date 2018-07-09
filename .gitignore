@@ -2,3 +2,7 @@
 warpv_formal/build\.sv
 
 warpv_formal/build_gen\.sv
+
+warpv_formal/m4out
+
+warpv_formal/out\.html

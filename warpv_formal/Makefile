@@ -7,6 +7,6 @@ genchecks:
 	python3 ../../checks/genchecks.py
 
 verif:
-	$(MAKE) -i -k -C checks 
+	$(MAKE) -i -k -C checks -j4
 clean:
-	rm build.sv build_gen.sv
+#	rm build.sv build_gen.sv
