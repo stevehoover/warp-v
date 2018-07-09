@@ -205,11 +205,11 @@ m4+makerchip_header(['
    m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_ifelse(M4_TB, ['M4_TB'], ['
-     m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+     m4_define(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
    '])
    // Build for formal verification (defaulted to 0).
    m4_ifelse(M4_FORMAL, ['M4_FORMAL'], ['
-     m4_define(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
+     m4_define(['M4_FORMAL'], 1)  // 1 to enable code for formal verification
    '])
 
 
@@ -363,7 +363,7 @@ m4+makerchip_header(['
    m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
    m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
    m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
+   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
    m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))
 
    
@@ -1342,11 +1342,11 @@ m4+makerchip_header(['
                         
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
-               >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
-               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
                >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
-               >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
+               >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
+               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$taken ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] : >>M4_BRANCH_BUBBLES$Pc + M4_PC_CNT'b1 :
+               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
+               >>m4_eval(M4_REPLAY_LATENCY-1)$valid_replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
                $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
                         $Pc + M4_PC_CNT'b1;
             
@@ -1412,10 +1412,8 @@ m4+makerchip_header(['
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
-
             $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
-
-            $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
+            $mispred_branch = $branch && ! ($conditional_branch && (($taken && $pred_taken) || (! $taken && ! $pred_taken)));
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
 
@@ -1437,15 +1435,17 @@ m4+makerchip_header(['
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
             $valid_ld_st = $valid_ld || $valid_st;
+            
+            $valid_replay = $replay && ! $in_redirect_shadow;
 
             // Squash. Keep a count of the number of cycles remaining in the shadow of a mispredict.
             $RedirectShadowCnt[2:0] <=
                $reset                ? 3'b0 :
+               $good_path_trap       ? M4_TRAP_BUBBLES :
                $valid_pred_taken_branch ? M4_PRED_TAKEN_BUBBLES :
                $valid_mispred_branch ? M4_BRANCH_BUBBLES :
                $valid_jump           ? M4_JUMP_BUBBLES :
-               $good_path_trap       ? M4_TRAP_BUBBLES :
-               $replay               ? M4_REPLAY_LATENCY - 3'b1 :
+               $valid_replay               ? M4_REPLAY_LATENCY - 3'b1 :
                $RedirectShadowCnt == 3'b0    ? 3'b0 :
                                        $RedirectShadowCnt - 3'b1;
                                        
@@ -1471,7 +1471,7 @@ m4+makerchip_header(['
             // Currenty we fetch an instruction every cycle, and squash is the only
             //   mechanism to avoid retiring. Also loads issue in two parts, the $ld and the
             //   $returning_ld.
-            $retire = $commit && ! $ld && ! $returning_ld;
+            $retire = $commit;
             `BOGUS_USE($retire $good_path_trap)
          
          // There's no bypass on pending, so we must write the same cycle we read.
@@ -1500,13 +1500,13 @@ end
 \TLV 
    |fetch
       /instr
-         @m4_eval(M4_EXECUTE_STAGE + 1)
+         @m4_eval(M4_REG_WR_STAGE + 1)
             m4_ifexpr(M4_FORMAL, ['
             //RVFI interface for formal verification
-            *rvfi_valid       = $retire || $trap;
+            *rvfi_valid       = ($retire || $good_path_trap);
             *rvfi_insn        = $raw;
-            *rvfi_halt        = $illegal;
-            *rvfi_trap        = $trap;
+            *rvfi_halt        = $good_path_trap;
+            *rvfi_trap        = $good_path_trap;
             *rvfi_order       = *rvfi_order_reg;
             *rvfi_intr        = 1'b0;
             *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $raw_rs1;
@@ -1516,13 +1516,27 @@ end
             *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
             *rvfi_pc_rdata    = {$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = ($valid_jump || ($branch && $taken) || $replay) ? {<<m4_eval(M4_EXECUTE_STAGE + 1 - M4_NEXT_PC_STAGE)$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
+            *rvfi_pc_wdata    = $reset ? M4_PC_CNT'b0 :
+                                 $good_path_trap ? 0 :
+                                 $valid_jump ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
+                                 $valid_mispred_branch ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
+                                 $valid_pred_taken_branch ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
+                                 $replay ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
+                                 $returning_ld ? {<<1$Pc[31:2], 2'b00} :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
+                                    {<<1$Pc[31:2], 2'b00};
+            //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
             //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
             *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
             *rvfi_mem_rmask   = ($is_b_type) ?  4'b0 : ($ld ) ? 4'b1111 : 4'b0000;
             *rvfi_mem_wmask   = ($is_b_type) ?  4'b0 :$valid_st ? 4'b1111 : 4'b0000;
             *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_rslt;
-            *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;'])
+            *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;
+            \SV_plus
+               `ifndef PC_CHECK
+                  always @* restrict(! $returning_ld);
+               `endif'])
+            
+
 
 
 \TLV
@@ -1540,4 +1554,3 @@ end
 !  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
 \SV
    endmodule
-
