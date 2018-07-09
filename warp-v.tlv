@@ -1412,7 +1412,9 @@ m4+makerchip_header(['
             //   o illegal instructions
             //   o misaligned PC
             //   o ...
+
             $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
+
             $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
             $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
             $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
