@@ -696,7 +696,7 @@ m4+makerchip_header(['
    $dest_is_reg = ($dest_char >= "a" && $dest_char <= "h") || $returning_ld;
    $dest_reg_valid = $dest_is_reg;
    $fetch_instr_dest_reg[7:0] = $dest_char - "a";
-   $dest_reg[2:0] = $returning_ld ? $returning_ld_dest_reg : $fetch_instr_dest_reg[2:0];
+   $dest_reg[2:0] = $returning_ld ? /original_ld$dest_reg : $fetch_instr_dest_reg[2:0];
    $jump = $dest_char == "P";
    $branch = $dest_char == "p";
    $no_dest = $dest_char == "0";
@@ -805,7 +805,7 @@ m4+makerchip_header(['
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
-            $returning_ld ? $returning_ld_data :
+            $returning_ld ? /original_ld$ld_rslt :
             $st ? /src[1]$value :
             $op_full ? $op_full_rslt :
             $op_compare ? {12{$compare_rslt}} :
@@ -1014,7 +1014,7 @@ m4+makerchip_header(['
 
 \TLV riscv_rslt_mux_expr()
    $rslt[M4_WORD_RANGE] = 
-       $returning_ld ? $returning_ld_data :
+       $returning_ld ? /original_ld$ld_rslt :
        M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
@@ -1066,7 +1066,7 @@ m4+makerchip_header(['
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
    $valid_decode_branch = $valid_decode && $branch;
-   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $returning_ld) &&
                      | $dest_reg;   // r0 not valid.
    // Actually load.
@@ -1109,7 +1109,7 @@ m4+makerchip_header(['
          $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
          $lb_rslt[M4_WORD_RANGE] = 32'b0;
          $lh_rslt[M4_WORD_RANGE] = 32'b0;
-         $lw_rslt[M4_WORD_RANGE] = $returning_ld_data;
+         $lw_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
          $lbu_rslt[M4_WORD_RANGE] = 32'b0;
          $lhu_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
@@ -1165,7 +1165,7 @@ m4+makerchip_header(['
       $reg[M4_REGS_INDEX_RANGE] = 1'b1;
       $value[M4_WORD_RANGE] = 2'b1;
    $dest_reg_valid = 1'b1;
-   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : 1'b0;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : 1'b0;
    $ld = 1'b0;
    $spec_ld = $ld;
    $st = 1'b0;
@@ -1187,7 +1187,7 @@ m4+makerchip_header(['
       $taken = $rslt != 2'b0;
    @_rslt_stage
       $rslt[M4_WORD_RANGE] =
-         $returning_ld ? $returning_ld_data :
+         $returning_ld ? /original_ld$ld_rslt :
          $st ? /src[1]$value :
          $exe_rslt;
          
@@ -1334,7 +1334,11 @@ m4+makerchip_header(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
+            // This scope holds the original load for a returning load.
             $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
+            ?$returning_ld
+               /original_ld
+                  $ANY = /top|mem/data>>M4_LD_RETURN_ALIGN$ANY;
             
             // =======
             // Next Pc
@@ -1359,9 +1363,6 @@ m4+makerchip_header(['
             // Decode of the fetched instruction
             $valid_decode = $fetch;  // Always decode if we fetch.
             m4+indirect(M4_isa['_decode'])
-            
-            // Returning load doesn't decode the instruction. Provide value to force for dest reg. 
-            $returning_ld_dest_reg[M4_REGS_INDEX_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$dest_reg;
          
          m4+indirect(['branch_pred_']M4_BRANCH_PRED)
          
@@ -1449,7 +1450,6 @@ m4+makerchip_header(['
                $RedirectShadowCnt == 3'b0    ? 3'b0 :
                                        $RedirectShadowCnt - 3'b1;
                                        
-            $returning_ld_data[M4_WORD_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
    m4+fixed_latency_fake_memory(/top, 0)
    |fetch
       /instr
@@ -1497,13 +1497,23 @@ end
 '])
    
 
+m4_ifexpr(M4_FORMAL, ['
 \TLV 
    |fetch
-      /instr
-         @m4_eval(M4_REG_WR_STAGE + 1)
-            m4_ifexpr(M4_FORMAL, ['
+      @m4_eval(M4_REG_WR_STAGE + 1)
+         // To simplify checking, we hold the previous rvfi_valid instruction through the time of the next rvfi_valid one.
+         // When an instruction retires, we check the previous (held) instruction, and at this point we know information
+         // about the next instruction to retire (notably, its PC).
+         /prev_instr
+            $ANY = |fetch/instr>>1$rvfi_valid ? |fetch/instr>>1$ANY : >>1$ANY;
+            // ADD THIS:
+            ///src[2:1]
+            //   $ANY = |fetch/instr>>1$rvfi_valid ? |fetch/instr/src>>1$ANY : >>1$ANY;
+         /instr
             //RVFI interface for formal verification
-            *rvfi_valid       = ($retire || $good_path_trap);
+            $rvfi_valid = ($retire || $good_path_trap);
+            $pc[M4_PC_RANGE] = $Pc;  // This can be pulled through /prev_instr, $Pc cannot (I think).
+            *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = $raw;
             *rvfi_halt        = $good_path_trap;
             *rvfi_trap        = $good_path_trap;
@@ -1516,14 +1526,7 @@ end
             *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
             *rvfi_pc_rdata    = {$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = $reset ? M4_PC_CNT'b0 :
-                                 $good_path_trap ? 0 :
-                                 $valid_jump ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
-                                 $valid_mispred_branch ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
-                                 $valid_pred_taken_branch ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
-                                 $replay ? {<<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1)$Pc[31:2], 2'b00} :
-                                 $returning_ld ? {<<1$Pc[31:2], 2'b00} :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
-                                    {<<1$Pc[31:2], 2'b00};
+            *rvfi_pc_wdata    = |fetch/prev_instr$pc;
             //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
             //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
             *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
@@ -1531,11 +1534,11 @@ end
             *rvfi_mem_wmask   = ($is_b_type) ?  4'b0 :$valid_st ? 4'b1111 : 4'b0000;
             *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_rslt;
             *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;
-            \SV_plus
-               `ifndef PC_CHECK
-                  always @* restrict(! $returning_ld);
-               `endif'])
-            
+            //\SV_plus
+            //   `ifndef PC_CHECK
+            //      always @* restrict(! $returning_ld);
+            //   `endif
+   '])
 
 
 
