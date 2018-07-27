@@ -200,17 +200,18 @@ m4+makerchip_header(['
    // =============
    
    // This is where you configure the CPU.
+   // m4_default(..) allows external definition to take precedence.
 
-   // ISA
-   m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
+   // Machine:
+   // ISA:
+   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
+   // Select a standard configuration:
+   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_ifelse(M4_TB, ['M4_TB'], ['
-     m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
-   '])
+   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
-   m4_ifelse(M4_FORMAL, ['M4_FORMAL'], ['
-     m4_define(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-   '])
+   m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -240,7 +241,7 @@ m4+makerchip_header(['
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['5-stage'],
+   m4_case(M4_STANDARD_CONFIG,
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
@@ -273,7 +274,7 @@ m4+makerchip_header(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
       '],
-      ['
+      ['7-stage'], ['
          // Deep pipeline
          m4_defines(
             (M4_NEXT_PC_STAGE, 1),
@@ -366,12 +367,13 @@ m4+makerchip_header(['
 
    // Latencies/bubbles calculated from stage parameters and extra bubbles:
    // (zero bubbles minimum if triggered in next_pc; minumum bubbles = computed-stage - next_pc-stage)
-   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
-   m4_define(M4_REPLAY_BUBBLES,     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
-   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
-
+   m4_define(['M4_PRED_TAKEN_BUBBLES'], m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
+   m4_define(['M4_REPLAY_BUBBLES'],     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
+   m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
+   m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
+   m4_define(['M4_RETURNING_LD_BUBBLES'], 0)
+   // TODO: Make the returning_ld mechanism optional (where load instruction writes reg file).
    
    // ========================
    // Check Legality of Config
@@ -571,6 +573,7 @@ m4+makerchip_header(['
       // Instruction fields (User ISA Manual 2.2, Fig. 2.2)
       m4_define_fields(['M4_INSTR'], 32, FUNCT7, 25, RS2, 20, RS1, 15, FUNCT3, 12, RD, 7, OP5, 2, OP2, 0)
 
+
       // ---------
       // Redirects
       // ---------
@@ -578,7 +581,16 @@ m4+makerchip_header(['
       // TODO: It is possible to create a generic macro for a pipeline with redirects.
       //       The PC redirection would become $ANY redirection. Redirected transactions would come from subhierarchy of
       //       pipeline, eg: |fetch/branch_redir$pc (instead of |fetch$branch_target).
+      
+      // Redirects are described in the TLV code. Supporting macro definitions are here.
 
+      // m4_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
+      m4_define(['m4_redirect_list'], ['['-100']'])  // list fed to m4_ordered
+      m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow of a trigger that becomes visible.
+      m4_define(['m4_redirect_pc_terms'], [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
+      m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier ultimate triggers on the same instruction.
+                                                        // Each trigger uses this term as it is built to mask its effect, so ultimate triggers have the final say.
+      //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatination terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatination.
       // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
       // See redirection logic for more detail.
       // Create several defines with items per redirect condition.
@@ -586,68 +598,50 @@ m4+makerchip_header(['
       m4_define(['m4_process_redirect_conditions'],
                 ['m4_ifelse(['$@'], ['['']'],
                             [''],
-                            ['m4_define_redirect_condition($1)
-                              m4_add_to_redirect_list($1)
-                              m4_add_to_redirect_shadow_terms($1)
-                              m4_add_to_redirect_pc_terms($1)
-                              //m4_add_to_redirect_signal_list($1)
+                            ['m4_process_redirect_condition($1, M4_NUM_REDIRECT_CONDITIONS)
                               m4_process_redirect_conditions(m4_shift($@))
                             ']
                            )
                   m4_define(['M4_NUM_REDIRECT_CONDITIONS'], m4_eval(M4_NUM_REDIRECT_CONDITIONS + 1))
                 '])
-      m4_define(['M4_MAX_REDIRECT_BUBBLES'], M4_TRAP_BUBBLES)
+      // Max redirect bubbles. Minimum value is 1 to avoid declaring zero-size vectors.
+      m4_define(['M4_MAX_REDIRECT_BUBBLES'], m4_ifelse(M4_TRAP_BUBBLES, 0, 1, M4_TRAP_BUBBLES))
 
-      // The macros below are each invoked for each redirect condition from most bubbles to fewest with arguments:
+      // Called by m4_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
+      // to various definitions, initializes above.
+      // Args:
       //   $1: name of define of number of bubble cycles
       //   $2: condition signal of triggering instr
       //   $3: target PC signal of triggering instructiton
-      // Define M4_BRANCH_BUBBLES_redir, for example, as expression for redirect condition (qualified by good-path) for branch.
-      // TODO: Put all these into a single m4_process_redirect_condition macro.
-      m4_define(['m4_define_redirect_condition'],
-                ['m4_define(['$1_redir'],
-                            (>>m4_echo($1)$2 && $GoodPathMask[m4_echo($1)]))
-                  //m4_define(['$1_order'], $4)   // Order of this condition. (Not used, so commented)
+      m4_define(['m4_process_redirect_condition'],
+                // expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
+                // = instruction triggers && it's good-path to this cycle && it's not masked by an earlier "ultimate" redirect
+                //   of this instruction.
+                ['m4_pushdef(['m4_redir_cond'],
+                             ['(>>m4_echo($1)$2 && !(']m4_redirect_masking_triggers[') && $GoodPathMask[m4_echo($1)])'])
+                  //m4_define(['$1_order'], $5)   // Order of this condition. (Not used, so commented)
+                  m4_define(['m4_redirect_list'],
+                            m4_dquote(m4_redirect_list, ['$1']))
+                  m4_define(['m4_redirect_shadow_terms'],
+                            ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond[') ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
+                  m4_define(['m4_redirect_pc_terms'],
+                            ['m4_echo(']m4_redir_cond[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
+                  m4_ifelse(['$4'], ['1'],
+                     m4_define(['m4_redirect_masking_triggers'],
+                               ['']m4_redirect_masking_triggers[' || >>m4_echo($1)$2']))
+                  //m4_define(['m4_redirect_signal_list'],
+                  //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
+                  m4_popdef(['m4_redir_cond'])
                 '])
-      // Used to define m4_redirect_list as fed to m4_ordered.
-      m4_define(['m4_redirect_list'], ['['-100']'])
-      m4_define(['m4_add_to_redirect_list'],
-                ['m4_define(
-                   ['m4_redirect_list'],
-                   m4_dquote(m4_redirect_list, ['$1']))
-                ']
-               )
-      // Used to define m4_redirect_shadow_terms for determining history of instructions on current path.
-      m4_define(['m4_redirect_shadow_terms'], [''])
-      m4_define(['m4_add_to_redirect_shadow_terms'],
-                ['m4_define(
-                   ['m4_redirect_shadow_terms'],
-                   ['']m4_redirect_shadow_terms[' & (m4_echo($1_redir) ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
-                ']
-               )
-      // Used to define m4_redirect_pc_terms for redirecting PC (later-stage redirects must be first).
-      m4_define(['m4_redirect_pc_terms'], [''])
-      m4_define(['m4_add_to_redirect_pc_terms'],
-                ['m4_define(
-                   ['m4_redirect_pc_terms'],
-                   ['m4_echo($1_redir) ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
-                ']
-               )
-      // Unused:
-      //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // Start w/ a 0-bit term for concatination.
-      //m4_define(['m4_add_to_redirect_signal_list'],
-      //          ['m4_define(
-      //             ['m4_redirect_signal_list'],
-      //             ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
-      //          ']
-      //         )
+
       // Specify and process redirect conditions.
       m4_process_redirect_conditions(
-         ['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target'],
-         ['['M4_REPLAY_BUBBLES'], $replay, $Pc'],
-         ['['M4_JUMP_BUBBLES'], $jump, $jump_target'],
-         ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_target'],
-         ['['M4_TRAP_BUBBLES'], $trap, $trap_target'])
+         ['['M4_RETURNING_LD_BUBBLES'], $returning_ld, $Pc, 1'],
+         ['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],
+         ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
+         ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
+         ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
+         ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 0'])
                    
       // Ensure proper order.
       // TODO: It would be great to auto-sort.
@@ -925,7 +919,6 @@ m4+makerchip_header(['
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
-         
 
 
 
@@ -1126,6 +1119,7 @@ m4+makerchip_header(['
        M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
+   // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_valid_as_of(M4_BLAH_STAGE).
    ?$valid_decode
 
       // =================================
@@ -1422,14 +1416,13 @@ m4+makerchip_header(['
    // /=========\
    // | The CPU |
    // \=========/
-   
-   $reset = *reset;
 
    |fetch
       /instr
-         @M4_FETCH_STAGE
-            $reset = /top<>0$reset;
+         @m4_stage_eval(@M4_FETCH_STAGE<<1)
+            $reset = *reset;
          
+         @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
             ?$fetch
 
@@ -1478,7 +1471,7 @@ m4+makerchip_header(['
             //       oooooooo  Good-path Inst1
             // InstX  ooooooXo  (Not squashed by redirect, but maybe explicitly based on redirect condition.)
             //         ooooooxx
-            // InstY    ooYooxxx
+            // InstY    ooY-----  (Y is an "ultimate" redirect for InstY; any subsequent redirects on InstY are ignored.)
             // InstZ     ooyyxZxx
             // Redir'edY  oyyxxxxx
             // TargetY     ooxxxxxx
@@ -1500,16 +1493,22 @@ m4+makerchip_header(['
             // because their instructions are on the path of the redirected instructions. Z is not on the path of its
             // potentially-redirected instruction, so no redirection happens.
             //
+            // For simultaneous conditions on different instructions, the PC must redirect to the earlier instruction's
+            // redirect target, so later-stage redirects take priority in the PC-mux.
+            //
             // The triggering instruction is not itself squashed by this mechanism. It is up to the instruction logic to
             // determine whether the instruction should commit based on its own redirect triggers. A branch, for example, should
             // commit, but a replayed instruction should not.
             //
-            // For simultaneous conditions on different instructions, the PC must redirect to the earlier instruction's
-            // redirect target, so later-stage redirects take priority in the PC-mux.
-            //
             // A given instruction may trigger more than one redirection condition, and the later-staged (or later-ordered, even
-            // if within the same stage) will have priority. (If within the same stage, this is accomplished by the PC-mux
-            // prioritization.)
+            // if within the same stage) will have priority (unless the first is "ultimate"). (If within the same stage, this is
+            // accomplished by the PC-mux prioritization.)
+            //
+            // An "ultimate" trigger is the final authority for the instruction. Subsequent (later-ordered) triggers will
+            // be masked. Essentially, the trigger removes the instruction from the control flow of the program. This is
+            // used for replayed instructions (returning_ld and replay), which are both "ultimate" and aborted, to ensure
+            // they have no effect. It might be possible to argue that this mechanism isn't necessary for replays because
+            // it doesn't matter which occurance of the instruction produces the behavior, but it just seems cleaner this way.
             
             // Macros are defined elsewhere based on the ordered set of conditions that generate code here.
             
@@ -1521,13 +1520,14 @@ m4+makerchip_header(['
             // The LSB is fetch-valid. It only exists for m4_valid_as_of macro.
             $next_good_path_mask[M4_MAX_REDIRECT_BUBBLES:0] =
                // Shift up and mask w/ redirect conditions.
-               {$GoodPathMask[M4_MAX_REDIRECT_BUBBLES-1:0]
-                // && terms for each condition (order doesn't matter)
+               {
+                $GoodPathMask[M4_MAX_REDIRECT_BUBBLES-1:0]
+                // & terms for each condition (order doesn't matter since masks are the same within a cycle)
                 m4_redirect_shadow_terms,
                 1'b1}; // Shift in 1'b1 (fetch-valid).
             
             $GoodPathMask[M4_MAX_REDIRECT_BUBBLES:0] <=
-               $reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)'b1 :  // All bad-path on reset, except next instruction.
+               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
                $next_good_path_mask;
             
             
@@ -1545,7 +1545,6 @@ m4+makerchip_header(['
                $reset ? M4_PC_CNT'b0 :
                // ? : terms for each condition (order does matter)
                m4_redirect_pc_terms
-               $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless otherwise redirected).
                         $Pc + M4_PC_CNT'b1;
          @M4_DECODE_STAGE
 
@@ -1595,6 +1594,11 @@ m4+makerchip_header(['
             // Execute stage redirect conditions.
             $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
+            ?$valid_decode_branch
+               $branch_redir_pc[M4_PC_RANGE] =
+                  // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
+                  m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], ['(! $taken_branch) ? $Pc + M4_PC_CNT'b1 :'])
+                  $branch_target;
 
             $trap_target[M4_PC_RANGE] = '0;  // TODO: What should this be?
             
@@ -1654,6 +1658,16 @@ m4+makerchip_header(['
                   /instr$returning_ld && $reg_match ? 1'b0 :
                                $RETAIN;
    
+\TLV tb()
+   |fetch
+      /instr
+         @M4_REG_WR_STAGE
+            // Assert these to end simulation (before Makerchip cycle limit).
+            $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
+            $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$Value == M4_WORD_CNT'd45);
+            *passed = ! *reset && $ReachedEnd && $Reg4Became45;
+            *failed = ! *reset && (*cyc_cnt > 100 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
+
 
 \SV_plus
 m4_ifexpr(M4_FORMAL, ['
@@ -1694,9 +1708,18 @@ end
             *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;'])
 
 
-   // Assert these to end simulation (before Makerchip cycle limit).
-!  *passed = ! *reset['']m4_ifexpr(M4_TB, [' && |fetch/instr>>12$Pc == {M4_PC_CNT{1'b1}}']);
-!  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>12$commit && |fetch/instr>>12$illegal))']);
+\TLV
+   // =================
+   //
+   //    THE MODEL
+   //
+   // =================
+   
+   m4+cpu()
+      
+   m4_ifelse_block(M4_TB, 1, ['
+   m4+tb()
+   '])
 \SV
    endmodule
 
