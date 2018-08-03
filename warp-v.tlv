@@ -1649,6 +1649,7 @@ m4+makerchip_header(['
             $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
             ?$is_dest_condition
                $dest_pending =
+                  m4_ifelse(m4_isa, ['riscv'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
                   // Bypass stages. Both register and pending are bypassed.
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_reg_valid && >>1$ld && (>>1$dest_reg == $dest_reg)) || '])
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_reg_valid && >>2$ld && (>>2$dest_reg == $dest_reg)) || '])
