@@ -69,16 +69,17 @@ m4+makerchip_header(['
    //   o Instructions are in-order, but the uarch supports loads that return their
    //     data out of order (though, they don't).
    //
-   // Replays:
+   // Redirects:
    //
    // The PC is redirected, and inflight instructions are squashed (their results are
    // not committed) for:
    //   o jumps, which go to an absolute jump target address
-   //   o unconditioned and true-conditioned branches, which go to branch target
-   //   o instructions that consume a pending register, which replay instruction immediately
+   //   o predicted-taken branches, which speculatively redirect to the computed branch target
+   //   o unconditioned and mispredicted taken branches, which go to branch target
+   //   o mispredicted not-taken branches which go to the next sequential PC
+   //   o instructions that read or write a pending register
    //     (See "Loads", below.)
-   //   o loads that write to a pending register, which replay instruction immediately
-   //     (See "Loads", below.)
+   //   o traps, which go to a trap target
    //
    // Loads:
    //
@@ -1623,19 +1624,38 @@ m4+makerchip_header(['
             // Reg Rd
             // ======
             
+            // Obtain source register values and pending bit for source registers. Bypass up to 3
+            // stages.
+            // It is not necessary to bypass pending, as we could delay the replay, but we implement
+            // bypass for performance.
+            // Pending has an additional read for the dest register as we need to replay for write-after-write
+            // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
+            // bypass the dest reg's pending bit.
             /M4_REGS_HIER
             /src[2:1]
-               $is_reg_condition = $is_reg && /instr$valid_decode;
+               $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
                ?$is_reg_condition
-                  $reg_value[M4_WORD_RANGE] =
-                     m4_ifelse(m4_isa, ['riscv'], ['($reg == M4_REGS_INDEX_CNT'b0) ? M4_WORD_CNT'b0 :  // Read r0 as 0.'])
-                     // Bypass stages:
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr>>1$dest_reg == $reg)) ? /instr>>1$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr>>2$dest_reg == $reg)) ? /instr>>2$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr>>3$dest_reg == $reg)) ? /instr>>3$rslt :'])
-                     /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$Value;
-               $replay = $is_reg_condition && /instr/regs[$reg]>>1$next_pending;
-            $replay = | /src[*]$replay || ($dest_reg_valid && /regs[$dest_reg]>>1$next_pending);
+                  {$reg_value[M4_WORD_RANGE], $pending} =
+                     m4_ifelse(m4_isa, ['riscv'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
+                     // Bypass stages. Both register and pending are bypassed.
+                     // TODO: Use a differently-conditioned $valid_dest_reg_valid?
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>1$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>1$ld} :'])
+                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
+               // Replay if this source register is pending.
+               $replay = $is_reg_condition && $pending;
+            // Also replay for pending dest reg. Bypass dest reg pending to support this.
+            $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
+            ?$is_dest_condition
+               $dest_pending =
+                  // Bypass stages. Both register and pending are bypassed.
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_reg_valid && >>1$ld && (>>1$dest_reg == $dest_reg)) || '])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_reg_valid && >>2$ld && (>>2$dest_reg == $dest_reg)) || '])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$valid_dest_reg_valid && >>3$ld && (>>3$dest_reg == $dest_reg)) || '])
+                  /regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending;
+            // Combine replay conditions for pending source or dest registers.
+            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
          
          
          // =======
@@ -1704,20 +1724,10 @@ m4+makerchip_header(['
             \SV_plus
                always @ (posedge clk) begin
                   if ($reg_write)
-                     /regs[$dest_reg]<<0$$Value[M4_WORD_RANGE] <= $rslt;
+                     /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
+                     /regs[$dest_reg]<<0$$pending <= /instr$valid_ld;
                end
-            
-         // There's no bypass on pending, so we must write the same cycle we read.
-         @M4_EXECUTE_STAGE
-            /regs[*]
-               $reg_match = /instr$dest_reg == #regs;
-               $next_pending =  // Should be state, but need to consume prior to flop, which SandPiper doesn't support, yet.
-                  /instr$reset ? 1'b0 :
-                  // set for loads
-                  /instr$valid_ld && $reg_match   ? 1'b1 :
-                  // clear when load returns
-                  /instr$returning_ld && $reg_match ? 1'b0 :
-                               $RETAIN;
+
    
 \TLV tb()
    |fetch
@@ -1725,7 +1735,7 @@ m4+makerchip_header(['
          @M4_REG_WR_STAGE
             // Assert these to end simulation (before Makerchip cycle limit).
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
-            $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$Value == M4_WORD_CNT'd45);
+            $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             *passed = ! *reset && $ReachedEnd && $Reg4Became45;
             *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
 
