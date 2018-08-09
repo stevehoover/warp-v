@@ -4,3 +4,8 @@ complete
 /picorv32.v
 /disasm.s
 /disasm.o
+warp-v.tlv
+build\.sv
+build_gen\.sv
+m4out
+out\.html

@@ -69,16 +69,17 @@ m4+makerchip_header(['
    //   o Instructions are in-order, but the uarch supports loads that return their
    //     data out of order (though, they don't).
    //
-   // Replays:
+   // Redirects:
    //
    // The PC is redirected, and inflight instructions are squashed (their results are
    // not committed) for:
    //   o jumps, which go to an absolute jump target address
-   //   o unconditioned and true-conditioned branches, which go to branch target
-   //   o instructions that consume a pending register, which replay instruction immediately
+   //   o predicted-taken branches, which speculatively redirect to the computed branch target
+   //   o unconditioned and mispredicted taken branches, which go to branch target
+   //   o mispredicted not-taken branches which go to the next sequential PC
+   //   o instructions that read or write a pending register
    //     (See "Loads", below.)
-   //   o loads that write to a pending register, which replay instruction immediately
-   //     (See "Loads", below.)
+   //   o traps, which go to a trap target
    //
    // Loads:
    //
@@ -200,17 +201,18 @@ m4+makerchip_header(['
    // =============
    
    // This is where you configure the CPU.
+   // m4_default(..) allows external definition to take precedence.
 
-   // ISA
-   m4_define(['M4_ISA'], RISCV) // MINI, RISCV, DUMMY, etc.
+   // Machine:
+   // ISA:
+   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
+   // Select a standard configuration:
+   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_ifelse(M4_TB, ['M4_TB'], ['
-     m4_define(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
-   '])
+   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
-   m4_ifelse(M4_FORMAL, ['M4_FORMAL'], ['
-     m4_define(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-   '])
+   m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -219,6 +221,9 @@ m4+makerchip_header(['
    //     M4_NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
    //     M4_FETCH_STAGE: Instruction fetch.
    //     M4_DECODE_STAGE: Instruction decode.
+   //     M4_BRANCH_PRED_STAGE: Branch predict (taken/not-taken). Currently, we mispredict to a known branch target,
+   //                           so branch prediction is only relevant if target is computed before taken/not-taken is known.
+   //                           For other ISAs prediction is forced to fallthrough, and there is no pred-taken redirect.
    //     M4_REG_RD_STAGE: Register file read.
    //     M4_EXECUTE_STAGE: Operation execution.
    //     M4_RESULT_STAGE: Select execution result.
@@ -227,7 +232,7 @@ m4+makerchip_header(['
    //     M4_MEM_WR_STAGE: Memory write.
    //     M4_REG_WR_STAGE: Register file write.
    //     Deltas (default to 0):
-   //       M4_DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation from its nominal (ISA-specific) value.
+   //       M4_DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
    //   Latencies (default to 0):
    //     M4_LD_RETURN_ALIGN: Alignment of load return pseudo-instruction into |mem pipeline.
    //                         If |mem stages reflect nominal alignment w/ load instruction, this is the
@@ -239,19 +244,19 @@ m4+makerchip_header(['
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
-   m4_case(['5-stage'],
+   m4_case(M4_STANDARD_CONFIG,
       ['5-stage'], ['
          // A reasonable 5-stage pipeline.
          m4_defines(
             (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 1),
+            (M4_BRANCH_PRED_STAGE, 1),
             (M4_REG_RD_STAGE, 1),
             (M4_EXECUTE_STAGE, 2),
             (M4_RESULT_STAGE, 2),
             (M4_MEM_WR_STAGE, 3),
             (M4_REG_WR_STAGE, 3),
-            (M4_EXTRA_PRED_TAKEN_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 4))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
@@ -262,6 +267,7 @@ m4+makerchip_header(['
             (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
             (M4_DECODE_STAGE, 0),
+            (M4_BRANCH_PRED_STAGE, 0),
             (M4_REG_RD_STAGE, 0),
             (M4_EXECUTE_STAGE, 0),
             (M4_RESULT_STAGE, 0),
@@ -271,18 +277,19 @@ m4+makerchip_header(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
       '],
-      ['
+      ['7-stage'], ['
          // Deep pipeline
          m4_defines(
-            (M4_NEXT_STAGE, 1),
+            (M4_NEXT_PC_STAGE, 1),
             (M4_FETCH_STAGE, 1),
             (M4_DECODE_STAGE, 3),
+            (M4_BRANCH_PRED_STAGE, 4),
             (M4_REG_RD_STAGE, 4),
             (M4_EXECUTE_STAGE, 5),
             (M4_RESULT_STAGE, 5),
             (M4_MEM_WR_STAGE, 5),
             (M4_REG_WR_STAGE, 6),
-            (M4_EXTRA_PRED_TAKEN_BUBBLE, 1),
+            (M4_EXTRA_REPLAY_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 7))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
@@ -296,6 +303,8 @@ m4+makerchip_header(['
 
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Configuration:
+         // Force predictor to fallthrough, since we can't predict early enough to help.
+         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       '], ['RISCV'], ['
          // RISC-V Configuration:
 
@@ -326,6 +335,8 @@ m4+makerchip_header(['
       '], ['
          // Dummy "ISA".
          m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
+         // Force predictor to fallthrough, since we can't predict early enough to help.
+         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       ']
    )
    
@@ -352,20 +363,24 @@ m4+makerchip_header(['
    m4_defines(
       (M4_DELAY_BRANCH_TARGET_CALC, 0),
       (M4_EXTRA_JUMP_BUBBLE, 0),
-      (M4_EXTRA_BRANCH_BUBBLE, 0),
       (M4_EXTRA_PRED_TAKEN_BUBBLE, 0),
-      (M4_EXTRA_REPLAY_BUBBLE, 0)
+      (M4_EXTRA_REPLAY_BUBBLE, 0),
+      (M4_EXTRA_BRANCH_BUBBLE, 0)
    )
    
-   // Latencies, calculated from latency parameters:
+   // Calculated stages:
    m4_define(M4_REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
    m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
-   m4_define(M4_JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(M4_PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_TARGET_CALC_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
-   m4_define(M4_BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(M4_TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
-   m4_define(M4_REPLAY_LATENCY,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))
 
+   // Latencies/bubbles calculated from stage parameters and extra bubbles:
+   // (zero bubbles minimum if triggered in next_pc; minumum bubbles = computed-stage - next_pc-stage)
+   m4_define(['M4_PRED_TAKEN_BUBBLES'], m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
+   m4_define(['M4_REPLAY_BUBBLES'],     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
+   m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
+   m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
+   m4_define(['M4_RETURNING_LD_BUBBLES'], 0)
+   // TODO: Make the returning_ld mechanism optional (where load instruction writes reg file).
    
    // ========================
    // Check Legality of Config
@@ -373,17 +388,19 @@ m4+makerchip_header(['
    
    // (Not intended to be exhaustive.)
    
-   // Check stage order.
-   m4_define(['m4_stage_order'], ['
-      m4_ifelse($3, [''], [''], ['
-         m4_eval(M4_$1_STAGE > M4_$2_STAGE), 1, ['m4_errprint(['M4_$1_STAGE must precede M4_$2_STAGE.'])'],
-                                                ['m4_stage_order(['m4_shift($*)'])'])
+   // Check that expressions are ordered.
+   m4_define(['m4_ordered'], ['
+      m4_ifelse($2, [''], [''], ['
+         m4_ifelse(m4_eval(m4_echo($1) > m4_echo($2)), 1,
+                   ['m4_errprint(['$1 (']$1[') is greater than $2 (']$2[').']m4_new_line())'])
+         m4_ordered(m4_shift($@))
       '])
    '])
-   m4_stage_order(NEXT_PC, FETCH, DECODE, REG_RD, EXECUTE, RESULT, REG_WR)
-   m4_stage_order(EXECUTE, MEM_WR)
+   m4_ordered(['M4_NEXT_PC_STAGE'], ['M4_FETCH_STAGE'], ['M4_DECODE_STAGE'], ['M4_BRANCH_PRED_STAGE'], ['M4_REG_RD_STAGE'],
+              ['M4_EXECUTE_STAGE'], ['M4_RESULT_STAGE'], ['M4_REG_WR_STAGE'])
+   m4_ordered(['M4_EXECUTE_STAGE'], ['M4_MEM_WR_STAGE'])
    
-   // Check limit reg bypass
+   // Check reg bypass limit
    m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
    
 
@@ -440,7 +457,7 @@ m4+makerchip_header(['
          m4_define_vector(M4_ADDR, 2)
          m4_define(['M4_BITS_PER_ADDR'], 2)
          m4_define_vector(M4_WORD, 2)
-         m4_define_hier(M4_REGS, 2)
+         m4_define_hier(M4_REGS, 8)
 
          m4_define(M4_NUM_INSTRS, 2)  // (Must match program exactly.)
 
@@ -461,6 +478,115 @@ m4+makerchip_header(['
 
    
    
+   // =========
+   // Redirects
+   // =========
+
+   // TODO: It is possible to create a generic macro for a pipeline with redirects.
+   //       The PC redirection would become $ANY redirection. Redirected transactions would come from subhierarchy of
+   //       pipeline, eg: |fetch/branch_redir$pc (instead of |fetch$branch_target).
+   // TODO: The code would be a little cleaner to create a multi-line macro body for redirect conditions, such as
+   //     \TLV redirect_conditions()
+   //        m4_redirect_condition_logic
+   //   which becomes:
+   //     \TLV redirect_conditions()
+   //        @2
+   //           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Ultimate trigger.
+   //        @2
+   //           $trigger2_redir = $trigger2 && !(1'b0 || $trigger1) && >>2$GoodPath[2];
+   //        @3
+   //           $trigger3_redir = $trigger3 && !(1'b0 || $trigger1) && >>3$GoodPath[3];
+   //        ...
+   //   This would replace m4_redir_cond (and m4_redirect_masking_triggers).
+
+   // Redirects are described in the TLV code. Supporting macro definitions are here.
+
+   // m4_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
+   m4_define(['m4_redirect_list'], ['['-100']'])  // list fed to m4_ordered
+   m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow of a trigger that becomes visible.
+   m4_define(['m4_redirect_pc_terms'], [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
+   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier ultimate triggers on the same instruction, using "$1" for alignment.
+                                                         // Each trigger uses this term as it is built to mask its effect, so ultimate triggers have the final say.
+   //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatination terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatination.
+   // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
+   // See redirection logic for more detail.
+   // Create several defines with items per redirect condition.
+   m4_define(['M4_NUM_REDIRECT_CONDITIONS'], 0)  // Incremented for each condition.
+   m4_define(['m4_process_redirect_conditions'],
+             ['m4_ifelse(['$@'], ['['']'],
+                         [''],
+                         ['m4_process_redirect_condition($1, M4_NUM_REDIRECT_CONDITIONS)
+                           m4_process_redirect_conditions(m4_shift($@))
+                         ']
+                        )
+               m4_define(['M4_NUM_REDIRECT_CONDITIONS'], m4_eval(M4_NUM_REDIRECT_CONDITIONS + 1))
+             '])
+   // Max redirect bubbles. Minimum value is 1 to avoid declaring zero-size vectors.
+   m4_define(['M4_MAX_REDIRECT_BUBBLES'], m4_ifelse(M4_TRAP_BUBBLES, 0, 1, M4_TRAP_BUBBLES))
+
+   // Called by m4_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
+   // to various definitions, initializes above.
+   // Args:
+   //   $1: name of define of number of bubble cycles
+   //   $2: condition signal of triggering instr
+   //   $3: target PC signal of triggering instructiton
+   //   $4: 1 for an "ultimate" redirect (0 otherwise)
+   m4_define(['m4_process_redirect_condition'],
+             ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
+               // = instruction triggers this condition && it's good-path to this cycle && it's not masked by an earlier "ultimate" redirect
+               //   of this instruction.
+               // Params: $@ (m4_redirect_masking_triggers contains param use)
+               m4_pushdef(['m4_redir_cond'],
+                          ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
+               //m4_define(['$1_order'], $5)   // Order of this condition. (Not used, so commented)
+               m4_define(['m4_redirect_list'],
+                         m4_dquote(m4_redirect_list, ['$1']))
+               m4_define(['m4_redirect_shadow_terms'],
+                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
+               m4_define(['m4_redirect_pc_terms'],
+                         ['m4_echo(']m4_redir_cond($@)[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
+               m4_ifelse(['$4'], ['1'],
+                  ['m4_define(['m4_redirect_masking_triggers'],
+                              m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
+               //m4_define(['m4_redirect_signal_list'],
+               //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
+               m4_popdef(['m4_redir_cond'])
+             '])
+
+   // Specify and process redirect conditions.
+   m4_process_redirect_conditions(
+      ['['M4_RETURNING_LD_BUBBLES'], $returning_ld, $Pc, 1'],
+      m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
+      ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
+      ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
+      ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
+      ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 0'])
+
+   // Ensure proper order.
+   // TODO: It would be great to auto-sort.
+   m4_ordered(m4_redirect_list)
+
+      
+   // m4_valid_as_of(M4_BLAH_STAGE) can be used to determine if an instruction is known to be invalid at a certain pipeline stage.
+   // It can be used as the when condition for logic in the give stage (just for a bit of power savings). We probably won't
+   // bother using it, but it's available in any case. It can be used as:
+   // @M4_BLAH_STAGE
+   //    $blah_valid = m4_valid_as_of(M4_BLAH_STAGE)
+   //    ?$blah_valid
+   //       ...
+   // m4_valid_as_of(M4_NEXT_PC_STAGE) is fetch-valid (we know we need a new PC, but we don't know the PC or we know it can't
+   //    be fetched -- currently 1'b1).
+   // m4_valid_as_of(M4_NEXT_PC_STAGE + 1) is de-asserted by one-bubble redirects from previous instruction.
+   // m4_valid_as_of(M4_NEXT_PC_STAGE + 2) is de-asserted by one- and two-bubble redirects from previous instruction and
+   //    two-bubble redirects from previous previous instruction.
+   // etc.
+   // Since we can be looking back an arbitrary number of cycles, we'll force invalid if $reset.
+   m4_define(['m4_valid_as_of'],
+             ['(! $reset && >>m4_eval(M4_NEXT_PC_STAGE - ($1) + 1)$next_good_path_mask[($1) - M4_NEXT_PC_STAGE])'])
+   //same as >>m4_eval(M4_NEXT_PC_STAGE - $1)$GoodPathMask[$1 - M4_NEXT_PC_STAGE]), but accessible 1 cycle earlier and without $reset term.
+
+
+
    // ======================
    // Code Generation Macros
    // ======================
@@ -590,8 +716,8 @@ m4+makerchip_header(['
       //=========
    '], ['DUMMY'], ['
    '])
-   
-   
+
+
    // Redefine m4_makerchip_module macro used by m4+makerchip_header to define the module interface
    // to define a module as required for fomal verification. (It's a bit of a hack.)
    m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
@@ -645,11 +771,11 @@ m4+makerchip_header(['
       // (The program I wrote, within the model I wrote, within the program I wrote.)
       
       // Add 1,2,3,...,10 (in that order).
-      // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
+      // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
       //
       // Regs:
       // b: cnt
-      // c: ten
+      // c: nine
       // d: out
       // e: tmp
       // f: offset
@@ -658,14 +784,14 @@ m4+makerchip_header(['
       assign instrs = '{
          "g=0~0", //     store_addr = 0
          "b=0~1", //     cnt = 1
-         "c=1~2", //     ten = 10
+         "c=1~1", //     nine = 9
          "d=0~0", //     out = 0
          "f=0-6", //     offset = -6
          "d=d+b", //  -> out += cnt
-         "0=d}g", //     store out at store_addr
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
-         "e=c-b", //     tmp = 10 - cnt
+         "0=d}g", //     store out at store_addr
+         "e=c-b", //     tmp = nine - cnt
          "p=f?e", //  ^- branch back if tmp >= 0
          "e=0{c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
@@ -696,7 +822,7 @@ m4+makerchip_header(['
    $dest_is_reg = ($dest_char >= "a" && $dest_char <= "h") || $returning_ld;
    $dest_reg_valid = $dest_is_reg;
    $fetch_instr_dest_reg[7:0] = $dest_char - "a";
-   $dest_reg[2:0] = $returning_ld ? $returning_ld_dest_reg : $fetch_instr_dest_reg[2:0];
+   $dest_reg[2:0] = $returning_ld ? /original_ld$dest_reg : $fetch_instr_dest_reg[2:0];
    $jump = $dest_char == "P";
    $branch = $dest_char == "p";
    $no_dest = $dest_char == "0";
@@ -771,8 +897,6 @@ m4+makerchip_header(['
                                               $imm_value;
    // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
    @_exe_stage
-      $valid_exe = $valid_decode; // Execute if we decoded.
-      
       ?$op_compare
          $compare_rslt =
             /op$eq ? /src[1]$value == /src[2]$value :
@@ -796,28 +920,31 @@ m4+makerchip_header(['
                               12'b0;
       ?$valid_st
          $st_value[M4_WORD_RANGE] = /src[1]$value;
+
+      $valid_ld_st = $valid_ld || $valid_st;
       ?$valid_ld_st
          $addr[M4_ADDR_RANGE] = $ld ? (/src[1]$value + /src[2]$value) : /src[2]$value;
       // Always predict taken; mispredict if jump or unconditioned branch or
       //   conditioned branch with positive condition.
-      ?$valid_branch
+      ?$branch
          $taken = $rslt != 12'b0;
+      $st_mask[0:0] = 1'b1;
+      $isa_trap = 1'b0;
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
-            $returning_ld ? $returning_ld_data :
+            $returning_ld ? /original_ld$ld_value :
             $st ? /src[1]$value :
             $op_full ? $op_full_rslt :
             $op_compare ? {12{$compare_rslt}} :
                   12'b0;
          
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
-      ?$valid_jump
+      ?$jump
          $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
-         
 
 
 
@@ -863,8 +990,8 @@ m4+makerchip_header(['
          m4_asm_ADDI(r1, r1, 1),       //     cnt ++
          m4_asm_ADDI(r6, r6, 100),     //     store_addr++
          m4_asm_BLT(r1, r2, 1111111110000), //  ^- branch back if cnt < 10
-         m4_asm_LW(r4, r6, 0),         //     load the final value into tmp
-         m4_asm_BGE(r1, r2, 1111111010100) //     TERMINATE by branching to -1
+         m4_asm_LW(r4, r6,   111111111100), //     load the final value into tmp
+         m4_asm_BGE(r1, r2, 1111111010100)  //     TERMINATE by branching to -1
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
@@ -1013,11 +1140,12 @@ m4+makerchip_header(['
    m4_echo(m4_decode_expr)
 
 \TLV riscv_rslt_mux_expr()
-   $rslt[M4_WORD_RANGE] = 
-       $returning_ld ? $returning_ld_data :
+   $rslt[M4_WORD_RANGE] =
+       $returning_ld ? /original_ld$ld_rslt :
        M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
+   // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_valid_as_of(M4_BLAH_STAGE).
    ?$valid_decode
 
       // =================================
@@ -1048,11 +1176,16 @@ m4+makerchip_header(['
       m4+riscv_decode_expr()
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
-      $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
       $conditional_branch = $is_b_type;
-      $branch = $is_b_type;
+   $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
+   $branch = $is_b_type;
+   ?$valid_decode
       $ld = $raw[6:3] == 4'b0;
       $st = $is_s_type;
+      $ld_st = $ld || $st;
+      $ld_st_word = $ld_st && ($raw_funct3[1] == 1'b1);
+      $ld_st_half = $ld_st && ($raw_funct3[1:0] == 2'b01);
+      //$ld_st_byte = $ld_st && ($raw_funct3[1:0] == 2'b00);
       `BOGUS_USE($is___type $is_u_type)
 
       // Output signals.
@@ -1065,8 +1198,7 @@ m4+makerchip_header(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $valid_decode_branch = $valid_decode && $branch;
-   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $returning_ld) &&
                      | $dest_reg;   // r0 not valid.
    // Actually load.
@@ -1085,7 +1217,7 @@ m4+makerchip_header(['
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
-      ?$valid_branch
+      ?$branch
          $taken =
             $is_j_type ||
             ($is_beq_instr && $equal) ||
@@ -1097,9 +1229,9 @@ m4+makerchip_header(['
               )
              )
             );
-      ?$valid_jump
+      ?$jump
          $jump_target[M4_PC_RANGE] = $is_j_type ? $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE] : /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
-         $misaligned_jp_target = ($is_i_type &&(| $raw_i_imm[1:0])) || ($is_j_type && (| $raw_j_imm[1:0])) || ($is_i_type && (| /src[1]$reg_value[1:0]));
+         $misaligned_jump_target = ($is_i_type &&(| $raw_i_imm[1:0])) || ($is_j_type && (| $raw_j_imm[1:0])) || ($is_i_type && (| /src[1]$reg_value[1:0]));
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1107,9 +1239,9 @@ m4+makerchip_header(['
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
          $jal_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
          $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
-         $lb_rslt[M4_WORD_RANGE] = 32'b0;
-         $lh_rslt[M4_WORD_RANGE] = 32'b0;
-         $lw_rslt[M4_WORD_RANGE] = $returning_ld_data;
+         $lb_rslt[M4_WORD_RANGE] = 32'b0;    // Load results arrive w/ returning load.
+         $lh_rslt[M4_WORD_RANGE] = 32'b0;    // So, these are unused.
+         $lw_rslt[M4_WORD_RANGE] = 32'b0;
          $lbu_rslt[M4_WORD_RANGE] = 32'b0;
          $lhu_rslt[M4_WORD_RANGE] = 32'b0;
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
@@ -1133,11 +1265,52 @@ m4+makerchip_header(['
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
    @_exe_stage
-      ?$valid_ld_st
+      // Memory inputs.
+      ?$valid_exe
+         $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
+      $ld_st_cond = $ld_st && $valid_exe;
+      ?$ld_st_cond
          $addr[M4_ADDR_RANGE] = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
-      ?$valid_st
-         $st_value[M4_WORD_RANGE] = /src[2]$reg_value;
-
+         
+         // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
+      $st_cond = $st && $valid_exe;
+      ?$st_cond
+         // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
+         $st_reg_value[M4_WORD_RANGE] = /src[2]$reg_value;
+         $st_value[M4_WORD_RANGE] =
+              $ld_st_word ? $st_reg_value :            // word
+              $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
+                            {4{$st_reg_value[7:0]}};   // byte
+         $st_mask[3:0] =
+              $ld_st_word ? 4'hf :                     // word
+              $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
+                            (4'h1 << $addr[1:0]);      // byte
+      // Swizzle bytes for load result (assuming natural alignment).
+      ?$returning_ld
+         /original_ld
+            // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
+            $sign_bit =
+               ! $raw_funct3[2] && (  // Signed && ...
+                  $ld_st_word ? $ld_value[31] :
+                  $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
+                                (($addr[1:0] == 2'b00) ? $ld_value[7] :
+                                 ($addr[1:0] == 2'b01) ? $ld_value[15] :
+                                 ($addr[1:0] == 2'b10) ? $ld_value[23] :
+                                                         $ld_value[31]
+                                )
+               );
+            $ld_rslt[M4_WORD_RANGE] =
+                 $ld_st_word ? $ld_value :
+                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? $ld_value[31:16] : $ld_value[15:0]} :
+                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? $ld_value[7:0] :
+                                                 ($addr[1:0] == 2'b01) ? $ld_value[15:8] :
+                                                 ($addr[1:0] == 2'b10) ? $ld_value[23:16] :
+                                                                         $ld_value[31:24]};
+      // ISA-specific trap conditions:
+      $isa_trap = ($branch && $taken && $misaligned_pc) ||
+                  ($jump && $misaligned_jump_target) ||
+                  ($ld_st && $unnatural_addr_trap);
+      
    @_rslt_stage
       // Mux the correct result.
       m4+riscv_rslt_mux_expr()
@@ -1162,10 +1335,10 @@ m4+makerchip_header(['
    /src[2:1]
       `BOGUS_USE(/instr$raw[0])
       $is_reg = 1'b0;
-      $reg[M4_REGS_INDEX_RANGE] = 1'b1;
+      $reg[M4_REGS_INDEX_RANGE] = 3'b1;
       $value[M4_WORD_RANGE] = 2'b1;
    $dest_reg_valid = 1'b1;
-   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? $returning_ld_dest_reg : 1'b0;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : 3'b0;
    $ld = 1'b0;
    $spec_ld = $ld;
    $st = 1'b0;
@@ -1173,6 +1346,7 @@ m4+makerchip_header(['
    $branch = 1'b0;
    $jump = 1'b0;
    $conditional_branch = $branch;
+   ?$valid_decode_branch
 
 // Execution unit logic for RISC-V.
 // Context: pipeline
@@ -1181,13 +1355,14 @@ m4+makerchip_header(['
       $exe_rslt[M4_WORD_RANGE] = 2'b1;
    // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
    @_exe_stage
-      $valid_exe = $valid_decode;
       $st_value[M4_WORD_RANGE] = /src[1]$reg_value;
       $addr[M4_ADDR_RANGE] = /src[2]$reg_value;
       $taken = $rslt != 2'b0;
+      $st_mask[0:0] = 1'b1;
+      $isa_trap = 1'b0;
    @_rslt_stage
       $rslt[M4_WORD_RANGE] =
-         $returning_ld ? $returning_ld_data :
+         $returning_ld ? /original_ld$ld_value :
          $st ? /src[1]$value :
          $exe_rslt;
          
@@ -1206,45 +1381,49 @@ m4+makerchip_header(['
 //                         //
 //=========================//
 
-// A memory component provides a word-wide memory with an asynchronous out-of-order protocol, accepting
+// A memory component provides a word-wide memory striped in M4_ADDRS_PER_WORD independent banks to provide
+// address-granular write. The access protocol is asynchronous and out-of-order, accepting
 // a read or write (load or store) each cycle, where stores are visible to loads on the following cycle.
 // Relative to |fetch/instr:
-// On $valid_st, stores the word $st_value at $addr.
-// On $spec_ld, loads the word at $addr as $ld_rslt.
-// $ld_rslt and $ld are available as outputs in /cpu|mem/data$ANY (along w/ everything else in the
-// input instruction), with the provided <<M4_ALIGNMENT_VALUE (which must be non-negative).
-
+// On $valid_st, stores the data $st_value at $addr, masked by $st_mask.
+// On $spec_ld, loads the word at $addr (ignoring intra-word bits).
+// The returned load result can be accessed from /cpu|mem/data<<M4_ALIGNMENT_VALUE$ANY as $ld_value and $ld
+// (along w/ everything else in the input instruction).
 
 // A fake memory with fixed latency.
 // The memory is placed in the fetch pipeline.
 // TODO: (/_cpu, @_mem, @_align)
 \TLV fixed_latency_fake_memory(/cpu, M4_ALIGNMENT_VALUE)
+   // This macro assumes little-endian.
+   m4_ifelse(M4_BIG_ENDIAN, 0, [''], ['m4_errprint(['Error: fixed_latency_fake_memory macro only supports little-endian memory.'])'])
    |fetch
       /instr
          // ====
          // Load
          // ====
-         
-         /mem[M4_DATA_MEM_WORDS_RANGE]
-         ?$spec_ld
-            @M4_MEM_WR_STAGE
-               $ld_rslt[M4_WORD_RANGE] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Word;
-         
-         // Array writes are not currently permitted to use assignment
-         // syntax, so \always_comb is used, and this must be outside of
-         // when conditions, so we need to use if. <<1 because no <= support
-         // in this context. (This limitation will be lifted.)
-
          @M4_MEM_WR_STAGE
-            // =====
-            // Store
-            // =====
+            /bank[M4_ADDRS_PER_WORD-1:0]
+               $ANY = /instr$ANY; // Find signal from outside of /bank.
+               /mem[M4_DATA_MEM_WORDS_RANGE]
+               ?$spec_ld
+                  $ld_value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Value;
+         
+               // Array writes are not currently permitted to use assignment
+               // syntax, so \always_comb is used, and this must be outside of
+               // when conditions, so we need to use if. <<1 because no <= support
+               // in this context. (This limitation will be lifted.)
 
-            \SV_plus
-               always @ (posedge clk) begin
-                  if ($valid_st)
-                     /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<1$$Word[M4_WORD_RANGE] = $st_value;
-               end
+               // =====
+               // Store
+               // =====
+
+               \SV_plus
+                  always @ (posedge clk) begin
+                     if ($valid_st && $st_mask[#bank])
+                        /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
+                  end
+            // Combine $ld_value per bank, assuming little-endian.
+            $ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -1252,6 +1431,8 @@ m4+makerchip_header(['
       /data
          @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
             $ANY = /cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
+            /src[2:1]
+               $ANY = /cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
 
 
 
@@ -1271,16 +1452,16 @@ m4+makerchip_header(['
 //      ?$branch
 //         $taken: This branch is taken.
 // Outputs:
-//   @M4_BRANCH_TARGET_CALC_STAGE
+//   @M4_BRANCH_PRED_STAGE
 //      $pred_taken
 \TLV branch_pred_fallthrough()
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @M4_BRANCH_PRED_STAGE
       $pred_taken = 1'b0;
 
 \TLV branch_pred_two_bit()
-   @M4_BRANCH_TARGET_CALC_STAGE
-      //?$branch (but not known yet)
-      $pred_taken = >>M4_PRED_TAKEN_BUBBLES$BranchState[1];
+   @M4_BRANCH_PRED_STAGE
+      ?$branch
+         $pred_taken = >>m4_stage_eval(@M4_EXECUTE_STAGE + 1 - @M4_BRANCH_PRED_STAGE)$BranchState[1];
    @M4_EXECUTE_STAGE
       $branch_or_reset = $branch || $reset;
       ?$branch_or_reset
@@ -1313,14 +1494,13 @@ m4+makerchip_header(['
    // /=========\
    // | The CPU |
    // \=========/
-   
-   $reset = *reset;
 
    |fetch
       /instr
-         @M4_FETCH_STAGE
-            $reset = /top<>0$reset;
+         @m4_stage_eval(@M4_FETCH_STAGE<<1)
+            $reset = *reset;
          
+         @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
             ?$fetch
 
@@ -1331,25 +1511,121 @@ m4+makerchip_header(['
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
             
          @M4_NEXT_PC_STAGE
+            
+            // ========
+            // Overview
+            // ========
+            
+            // Terminology:
+            //
+            // Instruction: An instruction, as viewed by the CPU pipeline (i.e. ld and returning_ld are separate instructions,
+            //              and the returning_ld and the instruction it clobbers are one in the same).
+            // ISA Instruction: An instruction, as defined by the ISA.
+            // Good Path: On the proper flow of execution of the program.
+            // Redirect: Adjust the PC from the predicted next-PC.
+            // Redirect Shadow: Between the instruction causing the redirect and the redirect target instruction.
+            // Commit: Results are made visible to subsequent instructions.
+            // Retire: Commit results of an ISA instruction.
+            
+            // Control flow:
+            //
+            // Redirects include (earliest to latest):
+            //   o Predict-taken branch: A predicted-taken branch must determine the target before it can redirect the PC.
+            //                           (This might be followed up by a mispredition.)
+            //   o Replay: Replay the same instruction (because a source register is pending (awaiting a returning_ld))
+            //   o Jump: A jump instruction.
+            //   o Mispredicted branch: A branch condition was mispredicted.
+            //   o Traps: illegal instructions, misaligned PC, others?
+            
+            // ==============
+            // Redirect Logic
+            // ==============
+                            
+            // We redirect next PC for conditions on prior instructions which are not bad-path relative to this instruction.
+            //
+            //              $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
+            //              |
+            //              V
+            //       oooooooo  Good-path Inst1
+            // InstX  ooooooXo  (Not squashed by redirect, but maybe explicitly based on redirect condition.)
+            //         ooooooxx
+            // InstY    ooY-----  (Y is an "ultimate" redirect for InstY; any subsequent redirects on InstY are ignored.)
+            // InstZ     ooyyxZxx
+            // Redir'edY  oyyxxxxx
+            // TargetY     ooxxxxxx
+            // Redir'edX    oxxxxxxx
+            // TargetX       oooooooo Good-path Inst2
+            // Not redir'edZ  oooooooo ...
+            //
+            // Above depicts a waterfall diagram where three triggering redirection conditions X, Y, and Z are detected on three different
+            // instructions. A trigger in the 1st depicted stage, M4_NEXT_PC_STAGE, results in a zero-bubble redirect so it would be
+            // a condition that is factored directly into the next-PC logic of the triggering instruction, and it would have
+            // no impact on the $GoodPathMask.
+            //
+            // Terminology:
+            //   Triggering instruction: The instruction on which the condition is detected.
+            //   Redirected instruction: The instruction whose next PC is redirected.
+            //   Redirection target instruction: The first new-path instruction resulting from the redirection.
+            //
+            // Above, Y redirects first, though it is for a later instruction than X. The redirections for X and Y are taken
+            // because their instructions are on the path of the redirected instructions. Z is not on the path of its
+            // potentially-redirected instruction, so no redirection happens.
+            //
+            // For simultaneous conditions on different instructions, the PC must redirect to the earlier instruction's
+            // redirect target, so later-stage redirects take priority in the PC-mux.
+            //
+            // The triggering instruction is not itself squashed by this mechanism. It is up to the instruction logic to
+            // determine whether the instruction should commit based on its own redirect triggers. A branch, for example, should
+            // commit, but a replayed instruction should not.
+            //
+            // A given instruction may trigger more than one redirection condition, and the later-staged (or later-ordered, even
+            // if within the same stage) will have priority (unless the first is "ultimate"). (If within the same stage, this is
+            // accomplished by the PC-mux prioritization.)
+            //
+            // An "ultimate" trigger is the final authority for the instruction. Subsequent (later-ordered) triggers will
+            // be masked. Essentially, the trigger removes the instruction from the control flow of the program. This is
+            // used for replayed instructions (returning_ld and replay), which are both "ultimate" and aborted, to ensure
+            // they have no effect. It might be possible to argue that this mechanism isn't necessary for replays because
+            // it doesn't matter which occurance of the instruction produces the behavior, but it just seems cleaner this way.
+            
+            // Macros are defined elsewhere based on the ordered set of conditions that generate code here.
+            
+            // Redirect Shadow
+            // A mask of stages ahead of this one (older) in which instructions are on the path of this instruction.
+            // Index 1 is ahead by 1, etc.
+            // In the example above, $GoodPathMask for Redir'edX == {0,0,0,0,1,1,0,0}
+            //     (Looking up from its first "o", in reverse order {o,X,o,o,y,y,o,o}.)
+            // The LSB is fetch-valid. It only exists for m4_valid_as_of macro.
+            $next_good_path_mask[M4_MAX_REDIRECT_BUBBLES:0] =
+               // Shift up and mask w/ redirect conditions.
+               {
+                $GoodPathMask[M4_MAX_REDIRECT_BUBBLES-1:0]
+                // & terms for each condition (order doesn't matter since masks are the same within a cycle)
+                m4_redirect_shadow_terms,
+                1'b1}; // Shift in 1'b1 (fetch-valid).
+            
+            $GoodPathMask[M4_MAX_REDIRECT_BUBBLES:0] <=
+               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
+               $next_good_path_mask;
+            
+            
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
+            ?$returning_ld
+               // This scope holds the original load for a returning load.
+               /original_ld
+                  $ANY = /top|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  /src[2:1]
+                     $ANY = /top|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
-            // =======
-            // Next Pc
-            // =======
-                        
+            // Next PC
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
-               >>M4_JUMP_BUBBLES$valid_jump ? >>M4_JUMP_BUBBLES$jump_target :
-               >>M4_PRED_TAKEN_BUBBLES$valid_pred_taken_branch ? >>M4_PRED_TAKEN_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>M4_BRANCH_BUBBLES$valid_mispred_branch ? >>M4_BRANCH_BUBBLES$branch_target[M4_PC_RANGE] :
-               >>M4_TRAP_BUBBLES$good_path_trap ? 0 :  // TODO: trap target?
-               >>m4_eval(M4_REPLAY_LATENCY-1)$replay ? >>m4_eval(M4_REPLAY_LATENCY-1)$Pc :
-               $returning_ld ? $RETAIN :  // Returning load, so next PC is the previous next PC (unless there was a branch that wasn't visible yet)
+               // ? : terms for each condition (order does matter)
+               m4_redirect_pc_terms
                         $Pc + M4_PC_CNT'b1;
-            
          @M4_DECODE_STAGE
 
             // ======
@@ -1358,11 +1634,8 @@ m4+makerchip_header(['
 
             // Decode of the fetched instruction
             $valid_decode = $fetch;  // Always decode if we fetch.
+            $valid_decode_branch = $valid_decode && $branch;
             m4+indirect(M4_isa['_decode'])
-            
-            // Returning load doesn't decode the instruction. Provide value to force for dest reg. 
-            $returning_ld_dest_reg[M4_REGS_INDEX_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$dest_reg;
-         
          m4+indirect(['branch_pred_']M4_BRANCH_PRED)
          
          @M4_REG_RD_STAGE
@@ -1370,86 +1643,93 @@ m4+makerchip_header(['
             // Reg Rd
             // ======
             
+            // Obtain source register values and pending bit for source registers. Bypass up to 3
+            // stages.
+            // It is not necessary to bypass pending, as we could delay the replay, but we implement
+            // bypass for performance.
+            // Pending has an additional read for the dest register as we need to replay for write-after-write
+            // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
+            // bypass the dest reg's pending bit.
             /M4_REGS_HIER
             /src[2:1]
-               $is_reg_condition = $is_reg && /instr$valid_decode;
+               $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
                ?$is_reg_condition
-                  $reg_value[M4_WORD_RANGE] =
-                     m4_ifelse(m4_isa, ['riscv'], ['($reg == M4_REGS_INDEX_CNT'b0) ? M4_WORD_CNT'b0 :  // Read r0 as 0.'])
-                     // Bypass stages:
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr>>1$dest_reg == $reg)) ? /instr>>1$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr>>2$dest_reg == $reg)) ? /instr>>2$rslt :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr>>3$dest_reg == $reg)) ? /instr>>3$rslt :'])
-                     /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$Value;
-               $replay = $is_reg_condition && /instr/regs[$reg]>>1$next_pending;
-            $replay = | /src[*]$replay || ($dest_reg_valid && /regs[$dest_reg]>>1$next_pending);
+                  {$reg_value[M4_WORD_RANGE], $pending} =
+                     m4_ifelse(m4_isa, ['riscv'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
+                     // Bypass stages. Both register and pending are bypassed.
+                     // Bypassed registers must be from instructions that are good-path as of this instruction.
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && /instr$GoodPathMask[1] && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>1$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>1$ld} :'])
+                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
+               // Replay if this source register is pending.
+               $replay = $is_reg_condition && $pending;
+            // Also replay for pending dest reg. Bypass dest reg pending to support this.
+            $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
+            ?$is_dest_condition
+               $dest_pending =
+                  m4_ifelse(m4_isa, ['riscv'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
+                  // Bypass stages. Both register and pending are bypassed.
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && /instr$GoodPathMask[1] && >>1$ld && (>>1$dest_reg == $dest_reg)) || '])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && /instr$GoodPathMask[2] && >>2$ld && (>>2$dest_reg == $dest_reg)) || '])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && /instr$GoodPathMask[3] && >>3$ld && (>>3$dest_reg == $dest_reg)) || '])
+                  /regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending;
+            // Combine replay conditions for pending source or dest registers.
+            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
          
          
          // =======
          // Execute
          // =======
          m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
-               
+         
+         @M4_BRANCH_PRED_STAGE
+            m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
          @M4_EXECUTE_STAGE
 
-            // ============
-            // Control Flow
-            // ============
+            // =======
+            // Control
+            // =======
+
+            // Execute stage redirect conditions.
+            $trap = $valid_decode && (
+                       $illegal ||
+                       $isa_trap);
+            $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
+            ?$valid_decode_branch
+               $branch_redir_pc[M4_PC_RANGE] =
+                  // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
+                  m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], ['(! $taken_branch) ? $Pc + M4_PC_CNT'b1 :'])
+                  $branch_target;
+
+            $trap_target[M4_PC_RANGE] = 30'b0;  // TODO: What should this be?
             
-            // Terminology:
-            // Instruction: An instruction, as viewed by the CPU pipeline (i.e. ld and ld_return are separate instructions).
-            // ISA Instruction: An instruction, as defined by the ISA.
-            // Squash: Do not commit the results of this instruction.
-            // Good Path: On the proper flow of execution of the program.
-            // Redirect: Adjust the PC from the predicted next-PC.
-            // Redirect Shadow: Between the instruction causing the redirect and the redirect target instruction.
-            // Commit: Results are made visible to subsequent instructions.
-            // Retire: Commit and completes an ISA instruction.
-            
-            // Instruction control flow characterization:Next PC
+            // Determine whether the instruction should commit it's result.
             //
-            // Traps include:
-            //   o illegal instructions
-            //   o misaligned PC
-            //   o ...
-
-            $trap = $illegal || ($branch && $taken && $misaligned_pc) || ($jump && $misaligned_jp_target);
-
-            $mispred_branch = $branch && ! ($conditional_branch && ! $taken);
-            $redirecting_squash = $replay || $trap;  // Instruction would squash and redirect the PC (if good-path).
-            $in_redirect_shadow = | $RedirectShadowCnt;  // Instruction is in the shadow of a redirect (not the cause of it).
-
-            // Good path & squash.
-            $good_path = $valid_exe && ! $in_redirect_shadow;  // This instruction is on the good path (though it may be replayed).
-            $squash = ! $good_path || $redirecting_squash;  // Instruction will not commit results.
-            $commit = ! $squash;
-
-            // Trap conditions conditioned upon good-path.
-            $good_path_illegal = $illegal && $good_path;
-            $good_path_trap = $trap && $good_path;
-            `BOGUS_USE($good_path_illegal)
-            // Signals conditioned upon commit.
-            $valid_jump = $jump && $commit;
-            $valid_branch = $branch && $commit;
-            $valid_pred_taken_branch = $valid_branch && $pred_taken;
-            $valid_mispred_branch = $mispred_branch && $commit;
-            $valid_dest_reg_valid = $dest_reg_valid && $commit;
+            // Abort: Instruction triggers a condition causing a no-commit.
+            // Commit: Ultimate decision to commit results of this instruction, considering aborts and
+            //         prior-instruction redirects (good-path)
+            //
+            // Treatment of loads:
+            //    Loads will commit. They write a garbage value and "pending" to the register file.
+            //    Returning loads clobber an instruction. This instruction is $abort'ed (as is the
+            //    returning load, since they are one in the same). Returning load must explicitly
+            //    write results.
+            //
+            $good_path = m4_valid_as_of(M4_NEXT_PC_STAGE + M4_MAX_REDIRECT_BUBBLES);
+                // not in the redirect shadow of any prior instruction (determined after all redirect conditions of
+                // prior instructions have been factored in)
+            // For a legal $good_path: $ld, $returning_ld (instruction clobbered by it)
+            //     $abort:             no,  yes
+            //     $commit:            yes,  no
+            $abort = $replay || $trap || $returning_ld;  // Note that register bypass logic requires that abort conditions also redirect.
+            $commit = $good_path && ! $abort;
+            
+            // Conditions that commit results.
+            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || $returning_ld;
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
-            $valid_ld_st = $valid_ld || $valid_st;
 
-            // Squash. Keep a count of the number of cycles remaining in the shadow of a mispredict.
-            $RedirectShadowCnt[2:0] <=
-               $reset                ? 3'b0 :
-               $valid_pred_taken_branch ? M4_PRED_TAKEN_BUBBLES :
-               $valid_mispred_branch ? M4_BRANCH_BUBBLES :
-               $valid_jump           ? M4_JUMP_BUBBLES :
-               $good_path_trap       ? M4_TRAP_BUBBLES :
-               $replay               ? M4_REPLAY_LATENCY - 3'b1 :
-               $RedirectShadowCnt == 3'b0    ? 3'b0 :
-                                       $RedirectShadowCnt - 3'b1;
-                                       
-            $returning_ld_data[M4_WORD_RANGE] = /top|mem/data>>M4_LD_RETURN_ALIGN$ld_rslt;
    m4+fixed_latency_fake_memory(/top, 0)
    |fetch
       /instr
@@ -1462,30 +1742,21 @@ m4+makerchip_header(['
             \SV_plus
                always @ (posedge clk) begin
                   if ($reg_write)
-                     /regs[$dest_reg]<<1$$Value[M4_WORD_RANGE] = $rslt;
+                     /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
+                     /regs[$dest_reg]<<0$$pending <= /instr$valid_ld;
                end
-            
-            // =======================
-            // For Formal Verification
-            // =======================
-            // Currenty we fetch an instruction every cycle, and squash is the only
-            //   mechanism to avoid retiring. Also loads issue in two parts, the $ld and the
-            //   $returning_ld.
-            $retire = $commit && ! $ld && ! $returning_ld;
-            `BOGUS_USE($retire $good_path_trap)
-         
-         // There's no bypass on pending, so we must write the same cycle we read.
-         @M4_EXECUTE_STAGE
-            /regs[*]
-               $reg_match = /instr$dest_reg == #regs;
-               $next_pending =  // Should be state, but need to consume prior to flop, which SandPiper doesn't support, yet.
-                  /instr$reset ? 1'b0 :
-                  // set for loads
-                  /instr$valid_ld && $reg_match   ? 1'b1 :
-                  // clear when load returns
-                  /instr$returning_ld && $reg_match ? 1'b0 :
-                               $RETAIN;
+
    
+\TLV tb()
+   |fetch
+      /instr
+         @M4_REG_WR_STAGE
+            // Assert these to end simulation (before Makerchip cycle limit).
+            $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
+            $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
+            *passed = ! *reset && $ReachedEnd && $Reg4Became45;
+            *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
+
 
 \SV_plus
 m4_ifexpr(M4_FORMAL, ['
@@ -1497,32 +1768,55 @@ end
 '])
    
 
+
 \TLV 
    |fetch
-      /instr
-         @m4_eval(M4_EXECUTE_STAGE + 1)
+      @m4_eval(M4_REG_WR_STAGE )
+         /instr
             m4_ifexpr(M4_FORMAL, ['
+            // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
-            *rvfi_valid       = $retire || $trap;
-            *rvfi_insn        = $raw;
-            *rvfi_halt        = $illegal;
+            // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            $rvfi_order[63:0] = $reset ? 64'b0 :
+                               ($commit || ($trap && $good_path)) ? >>1$rvfi_order + 64'b1 :
+                                        64'b0;
+            $rvfi_valid       = (($commit && ! $ld) || ($trap && $good_path) || $returning_ld) && ! $unnatural_addr_trap;
+            *rvfi_valid       = $rvfi_valid;
+            *rvfi_insn        = $returning_ld ? |fetch/instr/original_ld$raw : $raw;
+            *rvfi_halt        = $trap;
             *rvfi_trap        = $trap;
-            *rvfi_order       = *rvfi_order_reg;
+            *rvfi_order       = $returning_ld ? |fetch/instr/original_ld$rvfi_order : $rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $raw_rs2;
-            *rvfi_rs1_rdata   = /instr/src[1]$reg_value;
-            *rvfi_rs2_rdata   = /instr/src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
+            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs1 : $raw_rs1;
+            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs2 : $raw_rs2;
+            *rvfi_rs1_rdata   = $returning_ld ? |fetch/instr/original_ld/src[1]$reg_value : /src[1]$reg_value;
+            *rvfi_rs2_rdata   = $returning_ld ? |fetch/instr/original_ld/src[2]$reg_value : /src[2]$reg_value;
+            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rd : $raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            *rvfi_pc_rdata    = {$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = ($valid_jump || ($branch && $taken) || $replay) ? {<<m4_eval(M4_EXECUTE_STAGE + 1 - M4_NEXT_PC_STAGE)$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
+            //*rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc, 2'b00};
+            *rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc[31:2], 2'b00};
+            *rvfi_pc_wdata    = {$reset ? M4_PC_CNT'b0 :
+                              $returning_ld ? |fetch/instr/original_ld$Pc + 1'b1 :
+                              $trap ? 0 :
+                              $jump ? $jump_target :
+                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $Pc + M4_PC_CNT'b1 :
+                              m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
+                                 $Pc[31:2] +1'b1, 2'b00};
+            //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
             //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
-            *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
-            *rvfi_mem_rmask   = ($is_b_type) ?  4'b0 : ($ld ) ? 4'b1111 : 4'b0000;
-            *rvfi_mem_wmask   = ($is_b_type) ?  4'b0 :$valid_st ? 4'b1111 : 4'b0000;
-            *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_rslt;
-            *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;'])
+            *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : |fetch/instr/original_ld$addr[M4_ADDR_RANGE];
+            *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : (|fetch/instr/original_ld$ld ) ? 4'b1111 : 4'b0000;
+            *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : |fetch/instr/original_ld$valid_st ? 4'b1111 : 4'b0000;
+            *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_value;
+            *rvfi_mem_wdata   = (! $is_s_type) ?  0 : |fetch/instr/original_ld$st_value;
+
+            \SV_plus
+              `ifndef PC_CHECK
+                 always @* restrict(! $returning_ld);
+              `endif
+               //always @* assume(! $unnatural_addr_trap);
+              '])
+
 
 
 \TLV
@@ -1533,11 +1827,10 @@ end
    // =================
    
    m4+cpu()
-
-   
-   // Assert these to end simulation (before Makerchip cycle limit).
-!  *passed = ! *reset['']m4_ifexpr(M4_TB, [' && |fetch/instr>>5$Pc == {M4_PC_CNT{1'b1}}']);
-!  *failed = ! *reset['']m4_ifexpr(M4_TB, [' && (*cyc_cnt > 1000 || (! |fetch/instr>>3$reset && |fetch/instr>>6$good_path_illegal))']);
+      
+   m4_ifelse_block(M4_TB, 1, ['
+   m4+tb()
+   '])
 \SV
    endmodule
 
