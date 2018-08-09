@@ -1746,8 +1746,10 @@ m4+makerchip_header(['
                always @ (posedge clk) begin
                   if ($reg_write)
                      /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
-                     /regs[$dest_reg]<<0$$pending <= /instr$valid_ld;
                end
+            // Write $pending along with $value, but coded differently because it must be reset.
+            /regs[*]
+               <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$valid_ld : $pending);
 
    
 \TLV tb()
@@ -1788,14 +1790,15 @@ end
             // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            $rvfi_trap        = $trap && $good_path && ! $replay;  // Good-path trap, not aborted for other reasons.
             $rvfi_order[63:0] = $reset ? 64'b0 :
-                               ($commit || ($trap && $good_path)) ? >>1$rvfi_order + 64'b1 :
+                               ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                          $RETAIN;
-            $rvfi_valid       = (($commit && ! $ld) || ($trap && $good_path) || $returning_ld) && ! $unnatural_addr_trap;
+            $rvfi_valid       = (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
             *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = /original$raw;
-            *rvfi_halt        = $trap;
-            *rvfi_trap        = $trap;
+            *rvfi_halt        = $rvfi_trap;
+            *rvfi_trap        = $rvfi_trap;
             *rvfi_order       = /original$rvfi_order;
             *rvfi_intr        = 1'b0;
             *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : /original$raw_rs1;
