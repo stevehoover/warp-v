@@ -1781,7 +1781,7 @@ end
             $pc = $Pc;  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
             /original
-               $ANY = $returning_ld ? /instr/original_ld$ANY : /instr$ANY;
+               $ANY = /instr$returning_ld ? /instr/original_ld$ANY : /instr$ANY;
                /src[2:1]
                   $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
             
