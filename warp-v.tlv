@@ -1778,6 +1778,7 @@ end
          /instr
             
             m4_ifelse_block(M4_FORMAL, ['1'], ['
+            $pc = $Pc;  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
             /original
                $ANY = $returning_ld ? /instr/original_ld$ANY : /instr$ANY;
@@ -1803,16 +1804,14 @@ end
             *rvfi_rs2_rdata   = $returning_ld ? /original/src[2]$reg_value;
             *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : /original$raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            *rvfi_pc_rdata    = {/original$Pc[31:2], 2'b00};
+            *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset ? M4_PC_CNT'b0 :
-                              $returning_ld ? /original_ld$Pc + 1'b1 :
+                              $returning_ld ? /original_ld$pc + 1'b1 :
                               $trap ? 0 :
                               $jump ? $jump_target :
-                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $Pc + M4_PC_CNT'b1 :
+                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1 :
                               m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
-                                 $Pc[31:2] +1'b1, 2'b00};
-            //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
-            //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
+                                 $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : /original$addr[M4_ADDR_RANGE];
             *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : /original$ld ? 4'b1111 : 4'b0000;
             *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : /original$valid_st ? 4'b1111 : 4'b0000;
