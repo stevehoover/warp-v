@@ -490,9 +490,14 @@ m4+makerchip_header(['
    //        m4_redirect_condition_logic
    //   which becomes:
    //     \TLV redirect_conditions()
+   //        @2
+   //           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Ultimate trigger.
+   //        @2
+   //           $trigger2_redir = $trigger2 && !(1'b0 || $trigger1) && >>2$GoodPath[2];
    //        @3
-   //           $branch_mispred_redir = ...;
+   //           $trigger3_redir = $trigger3 && !(1'b0 || $trigger1) && >>3$GoodPath[3];
    //        ...
+   //   This would replace m4_redir_cond (and m4_redirect_masking_triggers).
 
    // Redirects are described in the TLV code. Supporting macro definitions are here.
 
@@ -1697,30 +1702,28 @@ m4+makerchip_header(['
             
             // Determine whether the instruction should commit it's result.
             //
-            // Returning loads clobber an instruction. This instruction is $abort'ed (as is the
-            // returning load, since they are one in the same). Returning load must explicitly
-            // write results. (Considering returning_ld to be an abort case avoids difficult bugs
-            // related to inadvertent commits of results of the clobbered instruction.)
-            //
             // Abort: Instruction triggers a condition causing a no-commit.
-            // Commit: Ultimate decision to commit results of this instruction (considering prior-instruction redirects)
-            //         $commit reflects the action for this transaction, so it does not assert for $ld's, whereas
-            //         $will_commit will assert for good-path $ld's that will return.
+            // Commit: Ultimate decision to commit results of this instruction, considering aborts and
+            //         prior-instruction redirects (good-path)
+            //
+            // Treatment of loads:
+            //    Loads will commit. They write a garbage value and "pending" to the register file.
+            //    Returning loads clobber an instruction. This instruction is $abort'ed (as is the
+            //    returning load, since they are one in the same). Returning load must explicitly
+            //    write results.
             //
             $good_path = m4_valid_as_of(M4_NEXT_PC_STAGE + M4_MAX_REDIRECT_BUBBLES);
                 // not in the redirect shadow of any prior instruction (determined after all redirect conditions of
                 // prior instructions have been factored in)
             // For a legal $good_path: $ld, $returning_ld (instruction clobbered by it)
             //     $abort:             no,  yes
-            //     $will_commit:       yes, no
-            //     $commit:            no,  no
+            //     $commit:            yes,  no
             $abort = $replay || $trap || $returning_ld;  // Note that register bypass logic requires that abort conditions also redirect.
-            $will_commit = $good_path && ! $abort;
-            $commit = $will_commit && ! $ld;
+            $commit = $good_path && ! $abort;
             
             // Conditions that commit results.
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || $returning_ld;
-            $valid_ld = $ld && $will_commit;
+            $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
    m4+fixed_latency_fake_memory(/top, 0)
