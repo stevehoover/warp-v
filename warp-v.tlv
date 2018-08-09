@@ -1789,7 +1789,7 @@ end
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
             $rvfi_order[63:0] = $reset ? 64'b0 :
                                ($commit || ($trap && $good_path)) ? >>1$rvfi_order + 64'b1 :
-                                        64'b0;
+                                         $RETAIN;
             $rvfi_valid       = (($commit && ! $ld) || ($trap && $good_path) || $returning_ld) && ! $unnatural_addr_trap;
             *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = /original$raw;
