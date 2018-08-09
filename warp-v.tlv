@@ -210,9 +210,9 @@ m4+makerchip_header(['
    m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_default(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
+   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
-   m4_default(['M4_FORMAL'], 1)  // 1 to enable code for formal verification
+   m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -1423,7 +1423,7 @@ m4+makerchip_header(['
                         /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
                   end
             // Combine $ld_value per bank, assuming little-endian.
-            $ld_value[M4_WORD_RANGE] = {/bank[3]$ld_value, /bank[2]$ld_value, /bank[1]$ld_value, /bank[0]$ld_value};
+            $ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -1498,8 +1498,7 @@ m4+makerchip_header(['
    |fetch
       /instr
          @m4_stage_eval(@M4_FETCH_STAGE<<1)
-            $reset_in = *reset;
-            $reset = $reset_in || >>1$reset_in || >>2$reset_in || >>3$reset_in || >>4$reset_in || >>5$reset_in || >>6$reset_in || >>7$reset_in || >>8$reset_in || >>9$reset_in || >>10$reset_in;
+            $reset = *reset;
          
          @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
@@ -1775,6 +1774,7 @@ end
       @m4_eval(M4_REG_WR_STAGE )
          /instr
             m4_ifexpr(M4_FORMAL, ['
+            // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
             $rvfi_order[63:0] = $reset ? 64'b0 :
