@@ -485,6 +485,14 @@ m4+makerchip_header(['
    // TODO: It is possible to create a generic macro for a pipeline with redirects.
    //       The PC redirection would become $ANY redirection. Redirected transactions would come from subhierarchy of
    //       pipeline, eg: |fetch/branch_redir$pc (instead of |fetch$branch_target).
+   // TODO: The code would be a little cleaner to create a multi-line macro body for redirect conditions, such as
+   //     \TLV redirect_conditions()
+   //        m4_redirect_condition_logic
+   //   which becomes:
+   //     \TLV redirect_conditions()
+   //        @3
+   //           $branch_mispred_redir = ...;
+   //        ...
 
    // Redirects are described in the TLV code. Supporting macro definitions are here.
 
@@ -492,8 +500,8 @@ m4+makerchip_header(['
    m4_define(['m4_redirect_list'], ['['-100']'])  // list fed to m4_ordered
    m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow of a trigger that becomes visible.
    m4_define(['m4_redirect_pc_terms'], [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
-   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier ultimate triggers on the same instruction.
-                                                     // Each trigger uses this term as it is built to mask its effect, so ultimate triggers have the final say.
+   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier ultimate triggers on the same instruction, using "$1" for alignment.
+                                                         // Each trigger uses this term as it is built to mask its effect, so ultimate triggers have the final say.
    //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatination terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatination.
    // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
    // See redirection logic for more detail.
@@ -517,22 +525,24 @@ m4+makerchip_header(['
    //   $1: name of define of number of bubble cycles
    //   $2: condition signal of triggering instr
    //   $3: target PC signal of triggering instructiton
+   //   $4: 1 for an "ultimate" redirect (0 otherwise)
    m4_define(['m4_process_redirect_condition'],
-             // expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
-             // = instruction triggers && it's good-path to this cycle && it's not masked by an earlier "ultimate" redirect
-             //   of this instruction.
-             ['m4_pushdef(['m4_redir_cond'],
-                          ['(>>m4_echo($1)$2 && !(']m4_redirect_masking_triggers[') && $GoodPathMask[m4_echo($1)])'])
+             ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
+               // = instruction triggers this condition && it's good-path to this cycle && it's not masked by an earlier "ultimate" redirect
+               //   of this instruction.
+               // Params: $@ (m4_redirect_masking_triggers contains param use)
+               m4_pushdef(['m4_redir_cond'],
+                          ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
                //m4_define(['$1_order'], $5)   // Order of this condition. (Not used, so commented)
                m4_define(['m4_redirect_list'],
                          m4_dquote(m4_redirect_list, ['$1']))
                m4_define(['m4_redirect_shadow_terms'],
-                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond[') ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
+                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
                m4_define(['m4_redirect_pc_terms'],
-                         ['m4_echo(']m4_redir_cond[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
+                         ['m4_echo(']m4_redir_cond($@)[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
                m4_ifelse(['$4'], ['1'],
-                  m4_define(['m4_redirect_masking_triggers'],
-                            ['']m4_redirect_masking_triggers[' || >>m4_echo($1)$2']))
+                  ['m4_define(['m4_redirect_masking_triggers'],
+                              m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
                //m4_define(['m4_redirect_signal_list'],
                //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
                m4_popdef(['m4_redir_cond'])
