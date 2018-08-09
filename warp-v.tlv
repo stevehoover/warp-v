@@ -1431,6 +1431,8 @@ m4+makerchip_header(['
       /data
          @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
             $ANY = /cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
+            /src[2:1]
+               $ANY = /cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
 
 
 
@@ -1615,6 +1617,8 @@ m4+makerchip_header(['
                // This scope holds the original load for a returning load.
                /original_ld
                   $ANY = /top|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  /src[2:1]
+                     $ANY = /top|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
             // Next PC
             $Pc[M4_PC_RANGE] <=
@@ -1698,7 +1702,7 @@ m4+makerchip_header(['
                   m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], ['(! $taken_branch) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
-            $trap_target[M4_PC_RANGE] = '0;  // TODO: What should this be?
+            $trap_target[M4_PC_RANGE] = 30'b0;  // TODO: What should this be?
             
             // Determine whether the instruction should commit it's result.
             //
@@ -1764,34 +1768,55 @@ end
 '])
    
 
+
 \TLV 
    |fetch
-      /instr
-         // TODO: Need to exclude $unnatural_addr_trap from checking.
-         @m4_eval(M4_EXECUTE_STAGE + 1)
-            // Formal checks, if enabled.
+      @m4_eval(M4_REG_WR_STAGE )
+         /instr
             m4_ifexpr(M4_FORMAL, ['
+            // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
-            *rvfi_valid       = $commit || $returning_ld || $trap;
-            *rvfi_insn        = $raw;
-            *rvfi_halt        = $illegal;  // && *rvfi_valid?
-            *rvfi_trap        = $trap;     // && *rvfi_valid?
-            *rvfi_order       = *rvfi_order_reg;
+            // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            $rvfi_order[63:0] = $reset ? 64'b0 :
+                               ($commit || ($trap && $good_path)) ? >>1$rvfi_order + 64'b1 :
+                                        64'b0;
+            $rvfi_valid       = (($commit && ! $ld) || ($trap && $good_path) || $returning_ld) && ! $unnatural_addr_trap;
+            *rvfi_valid       = $rvfi_valid;
+            *rvfi_insn        = $returning_ld ? |fetch/instr/original_ld$raw : $raw;
+            *rvfi_halt        = $trap;
+            *rvfi_trap        = $trap;
+            *rvfi_order       = $returning_ld ? |fetch/instr/original_ld$rvfi_order : $rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $raw_rs2;
-            *rvfi_rs1_rdata   = /instr/src[1]$reg_value;
-            *rvfi_rs2_rdata   = /instr/src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $raw_rd;
+            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs1 : $raw_rs1;
+            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs2 : $raw_rs2;
+            *rvfi_rs1_rdata   = $returning_ld ? |fetch/instr/original_ld/src[1]$reg_value : /src[1]$reg_value;
+            *rvfi_rs2_rdata   = $returning_ld ? |fetch/instr/original_ld/src[2]$reg_value : /src[2]$reg_value;
+            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rd : $raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            *rvfi_pc_rdata    = {$Pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = ($jump || ($branch && $taken) || $replay) ? {<<m4_eval(M4_EXECUTE_STAGE + 1 - M4_NEXT_PC_STAGE)$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
+            //*rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc, 2'b00};
+            *rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc[31:2], 2'b00};
+            *rvfi_pc_wdata    = {$reset ? M4_PC_CNT'b0 :
+                              $returning_ld ? |fetch/instr/original_ld$Pc + 1'b1 :
+                              $trap ? 0 :
+                              $jump ? $jump_target :
+                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $Pc + M4_PC_CNT'b1 :
+                              m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
+                                 $Pc[31:2] +1'b1, 2'b00};
+            //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
             //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
-            *rvfi_mem_addr    = ($is_b_type) ? 0 : $addr[M4_ADDR_RANGE];
-            *rvfi_mem_rmask   = ($is_b_type) ?  4'b0 : ($ld ) ? 4'b1111 : 4'b0000;
-            *rvfi_mem_wmask   = ($is_b_type) ?  4'b0 :$valid_st ? 4'b1111 : 4'b0000;
+            *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : |fetch/instr/original_ld$addr[M4_ADDR_RANGE];
+            *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : (|fetch/instr/original_ld$ld ) ? 4'b1111 : 4'b0000;
+            *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : |fetch/instr/original_ld$valid_st ? 4'b1111 : 4'b0000;
             *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_value;
-            *rvfi_mem_wdata   = ($is_b_type) ?  0 : $st_value;'])
+            *rvfi_mem_wdata   = (! $is_s_type) ?  0 : |fetch/instr/original_ld$st_value;
+
+            \SV_plus
+              `ifndef PC_CHECK
+                 always @* restrict(! $returning_ld);
+              `endif
+               //always @* assume(! $unnatural_addr_trap);
+              '])
+
 
 
 \TLV
