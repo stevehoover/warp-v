@@ -1664,6 +1664,7 @@ m4+makerchip_header(['
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
+               $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
             // Also replay for pending dest reg. Bypass dest reg pending to support this.
             $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
             ?$is_dest_condition
@@ -1773,7 +1774,7 @@ end
    |fetch
       @m4_eval(M4_REG_WR_STAGE )
          /instr
-            m4_ifexpr(M4_FORMAL, ['
+            m4_ifelse_block(M4_FORMAL, ['1'], ['
             // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
@@ -1815,7 +1816,9 @@ end
                  always @* restrict(! $returning_ld);
               `endif
                //always @* assume(! $unnatural_addr_trap);
-              '])
+              '], ['
+            `BOGUS_USE(|fetch/instr/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
+            '])
 
 
 
