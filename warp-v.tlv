@@ -1703,7 +1703,7 @@ m4+makerchip_header(['
             ?$valid_decode_branch
                $branch_redir_pc[M4_PC_RANGE] =
                   // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
-                  m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], [''], ['(! $taken_branch) ? $Pc + M4_PC_CNT'b1 :'])
+                  m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
             $trap_target[M4_PC_RANGE] = 30'b0;  // TODO: What should this be?
