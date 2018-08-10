@@ -1298,13 +1298,15 @@ m4+makerchip_header(['
                                                          $ld_value[31]
                                 )
                );
-            $ld_rslt[M4_WORD_RANGE] =
-                 $ld_st_word ? $ld_value :
-                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? $ld_value[31:16] : $ld_value[15:0]} :
-                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? $ld_value[7:0] :
-                                                 ($addr[1:0] == 2'b01) ? $ld_value[15:8] :
-                                                 ($addr[1:0] == 2'b10) ? $ld_value[23:16] :
-                                                                         $ld_value[31:24]};
+            {$ld_rslt[M4_WORD_RANGE], $ld_mask[3:0]} =
+                 $ld_st_word ? {$ld_value, 4'b1111} :
+                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? {$ld_value[31:16], 4'b1100} :
+                                                            {$ld_value[15:0] , 4'b0011}} :
+                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? {$ld_value[7:0]  , 4'b0001} :
+                                                 ($addr[1:0] == 2'b01) ? {$ld_value[15:8] , 4'b0010} :
+                                                 ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
+                                                                         {$ld_value[31:24], 4'b1000}};
+            `BOGUS_USE($ld_mask) // It's only for formal verification.
       // ISA-specific trap conditions:
       $isa_trap = ($branch && $taken && $misaligned_pc) ||
                   ($jump && $misaligned_jump_target) ||
@@ -1422,7 +1424,10 @@ m4+makerchip_header(['
                         /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
                   end
             // Combine $ld_value per bank, assuming little-endian.
-            $ld_value[M4_WORD_RANGE] = {/bank[3]$ld_value, /bank[2]$ld_value, /bank[1]$ld_value, /bank[0]$ld_value};
+            //$ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
+            // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
+            // build the concatination.
+            $ld_value[M4_WORD_RANGE] = {m4_forloop(['m4_ind'], 0, M4_ADDRS_PER_WORD, ['m4_ifelse(m4_ind, 0, [''], [', '])/bank[m4_eval(M4_ADDRS_PER_WORD - m4_ind - 1)]$ld_value'])};
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -1496,9 +1501,12 @@ m4+makerchip_header(['
 
    |fetch
       /instr
+         // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_FETCH_STAGE<<1)
-            $reset_in = *reset;
-            $reset = $reset_in || >>1$reset_in || >>2$reset_in || >>3$reset_in || >>4$reset_in || >>5$reset_in || >>6$reset_in || >>7$reset_in || >>8$reset_in || >>9$reset_in || >>10$reset_in;
+            $Cnt[7:0] <= *reset        ? 8'b0 :       // reset
+                         $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
+                                         $Cnt + 8'b1; // increment
+            $reset = $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
          
          @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
@@ -1791,9 +1799,9 @@ end
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
             $rvfi_trap        = $trap && $good_path && ! $replay;  // Good-path trap, not aborted for other reasons.
-            $rvfi_order[63:0] = $reset ? 64'b0 :
-                               ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
-                                         $RETAIN;
+            $rvfi_order[63:0] = $reset                  ? 64'b0 :
+                                ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
+                                                          $RETAIN;
             $rvfi_valid       = (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
             *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = /original$raw;
@@ -1801,25 +1809,25 @@ end
             *rvfi_trap        = $rvfi_trap;
             *rvfi_order       = /original$rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : /original$raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : /original$raw_rs2;
+            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 32'0 : /original$raw_rs1;
+            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 32'0 : /original$raw_rs2;
             *rvfi_rs1_rdata   = /original/src[1]$reg_value;
             *rvfi_rs2_rdata   = /original/src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : /original$raw_rd;
-            *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
+            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 32'0 : /original$raw_rd;
+            *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = {$reset ? M4_PC_CNT'b0 :
-                              $returning_ld ? /original_ld$pc + 1'b1 :
-                              $trap ? 0 :
-                              $jump ? $jump_target :
-                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1 :
-                              m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
-                                 $pc[31:2] +1'b1, 2'b00};
-            *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : /original$addr[M4_ADDR_RANGE];
-            *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : /original$ld ? 4'b1111 : 4'b0000;
-            *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : /original$valid_st ? 4'b1111 : 4'b0000;
+            *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
+                                $returning_ld   ? /original_ld$pc + 1'b1 :
+                                $trap           ? M4_PC_CNT'b0 :
+                                $jump           ? $jump_target :
+                                $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
+                                m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
+                                                  $pc[31:2] +1'b1, 2'b00};
+            *rvfi_mem_addr    = /original$addr[M4_ADDR_RANGE];
+            *rvfi_mem_rmask   = /original_ld$ld_mask;
+            *rvfi_mem_wmask   = $st_mask;
             *rvfi_mem_rdata   = /original_ld$ld_value;
-            *rvfi_mem_wdata   = (! $is_s_type) ?  0 : $st_value;
+            *rvfi_mem_wdata   = $st_value;
 
             \SV_plus
               `ifndef PC_CHECK
@@ -1845,5 +1853,3 @@ end
    '])
 \SV
    endmodule
-
-
