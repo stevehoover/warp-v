@@ -1769,19 +1769,12 @@ m4+makerchip_header(['
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             *passed = ! *reset && $ReachedEnd && $Reg4Became45;
             *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
-
-
-\SV_plus
-m4_ifexpr(M4_FORMAL, ['
- (* keep *)   reg [63:0] rvfi_order_reg;
-always @(posedge clk)
-begin
-   rvfi_order_reg      <= reset ? 0 : rvfi_order_reg + rvfi_valid;
-end
-'])
    
 
-
+// ===================
+// Formal Verification
+// ===================
+//
 \TLV 
    |fetch
       @M4_REG_WR_STAGE
@@ -1809,11 +1802,11 @@ end
             *rvfi_trap        = $rvfi_trap;
             *rvfi_order       = /original$rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 32'0 : /original$raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 32'0 : /original$raw_rs2;
+            *rvfi_rs1_addr    = /src[1]$is_reg ? /original$raw_rs1 : 5'b0;
+            *rvfi_rs2_addr    = /src[2]$is_reg ? /original$raw_rs2 : 5'b0;
             *rvfi_rs1_rdata   = /original/src[1]$reg_value;
             *rvfi_rs2_rdata   = /original/src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 32'0 : /original$raw_rd;
+            *rvfi_rd_addr     = $dest_reg_valid ? /original$raw_rd : 5'b0;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
@@ -1834,6 +1827,7 @@ end
                  always @* restrict(! $returning_ld);
               `endif
                //always @* assume(! $unnatural_addr_trap);
+            `BOGUS_USE($dummy)
             '], ['
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
             '])
