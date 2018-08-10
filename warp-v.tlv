@@ -255,8 +255,8 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 1),
             (M4_EXECUTE_STAGE, 2),
             (M4_RESULT_STAGE, 2),
-            (M4_MEM_WR_STAGE, 3),
             (M4_REG_WR_STAGE, 3),
+            (M4_MEM_WR_STAGE, 3),
             (M4_LD_RETURN_ALIGN, 4))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
@@ -271,8 +271,8 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 0),
             (M4_EXECUTE_STAGE, 0),
             (M4_RESULT_STAGE, 0),
-            (M4_MEM_WR_STAGE, 0),
             (M4_REG_WR_STAGE, 0),
+            (M4_MEM_WR_STAGE, 0),
             (M4_LD_RETURN_ALIGN, 1))
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(M4_DATA_MEM_WORDS, 32)
@@ -287,8 +287,8 @@ m4+makerchip_header(['
             (M4_REG_RD_STAGE, 4),
             (M4_EXECUTE_STAGE, 5),
             (M4_RESULT_STAGE, 5),
-            (M4_MEM_WR_STAGE, 5),
             (M4_REG_WR_STAGE, 6),
+            (M4_MEM_WR_STAGE, 7),
             (M4_EXTRA_REPLAY_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 7))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
@@ -397,8 +397,7 @@ m4+makerchip_header(['
       '])
    '])
    m4_ordered(['M4_NEXT_PC_STAGE'], ['M4_FETCH_STAGE'], ['M4_DECODE_STAGE'], ['M4_BRANCH_PRED_STAGE'], ['M4_REG_RD_STAGE'],
-              ['M4_EXECUTE_STAGE'], ['M4_RESULT_STAGE'], ['M4_REG_WR_STAGE'])
-   m4_ordered(['M4_EXECUTE_STAGE'], ['M4_MEM_WR_STAGE'])
+              ['M4_EXECUTE_STAGE'], ['M4_RESULT_STAGE'], ['M4_REG_WR_STAGE'], ['M4_MEM_WR_STAGE'])
    
    // Check reg bypass limit
    m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
@@ -1819,7 +1818,7 @@ end
             *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : /original$addr[M4_ADDR_RANGE];
             *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : /original$ld ? 4'b1111 : 4'b0000;
             *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : /original$valid_st ? 4'b1111 : 4'b0000;
-            *rvfi_mem_rdata   = $ld_value;
+            *rvfi_mem_rdata   = /original_ld$ld_value;
             *rvfi_mem_wdata   = (! $is_s_type) ?  0 : $st_value;
 
             \SV_plus
