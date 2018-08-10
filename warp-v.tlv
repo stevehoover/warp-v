@@ -1827,9 +1827,9 @@ end
                  always @* restrict(! $returning_ld);
               `endif
                //always @* assume(! $unnatural_addr_trap);
-              '])
+            '], ['
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
-
+            '])
 
 
 \TLV
