@@ -1423,7 +1423,7 @@ m4+makerchip_header(['
                         /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
                   end
             // Combine $ld_value per bank, assuming little-endian.
-            $ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
+            $ld_value[M4_WORD_RANGE] = {/bank[3]$ld_value, /bank[2]$ld_value, /bank[1]$ld_value, /bank[0]$ld_value};
 
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -1498,7 +1498,8 @@ m4+makerchip_header(['
    |fetch
       /instr
          @m4_stage_eval(@M4_FETCH_STAGE<<1)
-            $reset = *reset;
+            $reset_in = *reset;
+            $reset = $reset_in || >>1$reset_in || >>2$reset_in || >>3$reset_in || >>4$reset_in || >>5$reset_in || >>6$reset_in || >>7$reset_in || >>8$reset_in || >>9$reset_in || >>10$reset_in;
          
          @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
@@ -1780,7 +1781,7 @@ end
          /instr
             
             m4_ifelse_block(M4_FORMAL, ['1'], ['
-            $pc = $Pc;  // A version of PC we can pull through $ANYs.
+            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
             /original
                $ANY = /instr$returning_ld ? /instr/original_ld$ANY : /instr$ANY;
@@ -1803,8 +1804,8 @@ end
             *rvfi_intr        = 1'b0;
             *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : /original$raw_rs1;
             *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : /original$raw_rs2;
-            *rvfi_rs1_rdata   = $returning_ld ? /original/src[1]$reg_value;
-            *rvfi_rs2_rdata   = $returning_ld ? /original/src[2]$reg_value;
+            *rvfi_rs1_rdata   = /original/src[1]$reg_value;
+            *rvfi_rs2_rdata   = /original/src[2]$reg_value;
             *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : /original$raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
@@ -1826,9 +1827,8 @@ end
                  always @* restrict(! $returning_ld);
               `endif
                //always @* assume(! $unnatural_addr_trap);
-              '], ['
+              '])
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
-            '])
 
 
 
@@ -1846,4 +1846,5 @@ end
    '])
 \SV
    endmodule
+
 
