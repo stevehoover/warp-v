@@ -210,9 +210,9 @@ m4+makerchip_header(['
    m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_default(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
+   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
-   m4_default(['M4_FORMAL'], 1)  // 1 to enable code for formal verification
+   m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -1614,6 +1614,7 @@ m4+makerchip_header(['
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
+            // Recirculate returning load.
             ?$returning_ld
                // This scope holds the original load for a returning load.
                /original_ld
@@ -1627,6 +1628,7 @@ m4+makerchip_header(['
                // ? : terms for each condition (order does matter)
                m4_redirect_pc_terms
                         $Pc + M4_PC_CNT'b1;
+         
          @M4_DECODE_STAGE
 
             // ======
@@ -1665,6 +1667,7 @@ m4+makerchip_header(['
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
+               $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
             // Also replay for pending dest reg. Bypass dest reg pending to support this.
             $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
             ?$is_dest_condition
@@ -1744,8 +1747,10 @@ m4+makerchip_header(['
                always @ (posedge clk) begin
                   if ($reg_write)
                      /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
-                     /regs[$dest_reg]<<0$$pending <= /instr$valid_ld;
                end
+            // Write $pending along with $value, but coded differently because it must be reset.
+            /regs[*]
+               <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$valid_ld : $pending);
 
    
 \TLV tb()
@@ -1772,43 +1777,50 @@ end
 
 \TLV 
    |fetch
-      @m4_eval(M4_REG_WR_STAGE )
+      @M4_REG_WR_STAGE
          /instr
-            m4_ifexpr(M4_FORMAL, ['
+            
+            m4_ifelse_block(M4_FORMAL, ['1'], ['
+            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
+            // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
+            /original
+               $ANY = /instr$returning_ld ? /instr/original_ld$ANY : /instr$ANY;
+               /src[2:1]
+                  $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
+            
+            // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            $rvfi_trap        = $trap && $good_path && ! $replay;  // Good-path trap, not aborted for other reasons.
             $rvfi_order[63:0] = $reset ? 64'b0 :
-                               ($commit || ($trap && $good_path)) ? >>1$rvfi_order + 64'b1 :
-                                        64'b0;
-            $rvfi_valid       = (($commit && ! $ld) || ($trap && $good_path) || $returning_ld) && ! $unnatural_addr_trap;
+                               ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
+                                         $RETAIN;
+            $rvfi_valid       = (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
             *rvfi_valid       = $rvfi_valid;
-            *rvfi_insn        = $returning_ld ? |fetch/instr/original_ld$raw : $raw;
-            *rvfi_halt        = $trap;
-            *rvfi_trap        = $trap;
-            *rvfi_order       = $returning_ld ? |fetch/instr/original_ld$rvfi_order : $rvfi_order;
+            *rvfi_insn        = /original$raw;
+            *rvfi_halt        = $rvfi_trap;
+            *rvfi_trap        = $rvfi_trap;
+            *rvfi_order       = /original$rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs1 : $raw_rs1;
-            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rs2 : $raw_rs2;
-            *rvfi_rs1_rdata   = $returning_ld ? |fetch/instr/original_ld/src[1]$reg_value : /src[1]$reg_value;
-            *rvfi_rs2_rdata   = $returning_ld ? |fetch/instr/original_ld/src[2]$reg_value : /src[2]$reg_value;
-            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : $returning_ld ? |fetch/instr/original_ld$raw_rd : $raw_rd;
+            *rvfi_rs1_addr    = ($is_u_type | $is_j_type) ? 0 : /original$raw_rs1;
+            *rvfi_rs2_addr    = ($is_i_type | $is_u_type | $is_j_type) ? 0 : /original$raw_rs2;
+            *rvfi_rs1_rdata   = /original/src[1]$reg_value;
+            *rvfi_rs2_rdata   = /original/src[2]$reg_value;
+            *rvfi_rd_addr     = ($is_s_type | $is_b_type) ? 0 : /original$raw_rd;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 0;
-            //*rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc, 2'b00};
-            *rvfi_pc_rdata    = {$returning_ld ? |fetch/instr/original_ld$Pc[31:2] : $Pc[31:2], 2'b00};
+            *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset ? M4_PC_CNT'b0 :
-                              $returning_ld ? |fetch/instr/original_ld$Pc + 1'b1 :
+                              $returning_ld ? /original_ld$pc + 1'b1 :
                               $trap ? 0 :
                               $jump ? $jump_target :
-                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $Pc + M4_PC_CNT'b1 :
+                              $mispred_branch ?  $taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1 :
                               m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
-                                 $Pc[31:2] +1'b1, 2'b00};
-            //*rvfi_pc_wdata    = ($valid_jump || $valid_pred_taken_branch || $valid_mispred_branch || $good_path_trap || $replay || $returning_ld) ? {<<4$Pc[31:2], 2'b00} : {<<1$Pc[31:2], 2'b00};
-            //*rvfi_pc_wdata    = {*FETCH_Instr_Pc_n1, 2'b00};
-            *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : |fetch/instr/original_ld$addr[M4_ADDR_RANGE];
-            *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : (|fetch/instr/original_ld$ld ) ? 4'b1111 : 4'b0000;
-            *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : |fetch/instr/original_ld$valid_st ? 4'b1111 : 4'b0000;
-            *rvfi_mem_rdata   = /top|mem/data>>M4_EXECUTE_STAGE$ld_value;
-            *rvfi_mem_wdata   = (! $is_s_type) ?  0 : |fetch/instr/original_ld$st_value;
+                                 $pc[31:2] +1'b1, 2'b00};
+            *rvfi_mem_addr    = (! $is_i_type || ! $is_s_type) ? 0 : /original$addr[M4_ADDR_RANGE];
+            *rvfi_mem_rmask   = (! $is_i_type) ?  4'b0 : /original$ld ? 4'b1111 : 4'b0000;
+            *rvfi_mem_wmask   = (! $is_s_type) ?  4'b0 : /original$valid_st ? 4'b1111 : 4'b0000;
+            *rvfi_mem_rdata   = $ld_value;
+            *rvfi_mem_wdata   = (! $is_s_type) ?  0 : $st_value;
 
             \SV_plus
               `ifndef PC_CHECK
@@ -1816,6 +1828,7 @@ end
               `endif
                //always @* assume(! $unnatural_addr_trap);
               '])
+            `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
 
 
 
@@ -1833,4 +1846,5 @@ end
    '])
 \SV
    endmodule
+
 
