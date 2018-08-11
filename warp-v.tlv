@@ -378,6 +378,7 @@ m4+makerchip_header(['
    m4_define(['M4_REPLAY_BUBBLES'],     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
    m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
    m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
+   m4_define(['M4_INDIRECT_JUMP_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE))
    m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
    m4_define(['M4_RETURNING_LD_BUBBLES'], 0)
    // TODO: Make the returning_ld mechanism optional (where load instruction writes reg file).
@@ -559,6 +560,7 @@ m4+makerchip_header(['
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
+      m4_ifelse(M4_ISA, ['riscv'], ['['['M4_INDIRECT_JUMP'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
       ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 0'])
 
    // Ensure proper order.
@@ -1176,8 +1178,9 @@ m4+makerchip_header(['
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
       $conditional_branch = $is_b_type;
-   $jump = $is_jalr_instr | $is_jal_instr;  // "Jump" in this code means absolute. "Jump" in RISC-V means unconditional.
+   $jump = $is_jal_instr;  // "Jump" in RISC-V means unconditional. (JALR is a separate redirect condition.)
    $branch = $is_b_type;
+   $indirect_jump = $is_jalr_instr;
    ?$valid_decode
       $ld = $raw[6:3] == 4'b0;
       $st = $is_s_type;
@@ -1209,6 +1212,8 @@ m4+makerchip_header(['
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
          // TODO: Deal with misaligned address.
          $misaligned_pc = | $raw_b_imm[1:0];
+      ?$jump
+         $jump_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE];
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
@@ -1228,9 +1233,12 @@ m4+makerchip_header(['
               )
              )
             );
-      ?$jump
-         $jump_target[M4_PC_RANGE] = $is_j_type ? $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE] : /src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE];
-         $misaligned_jump_target = ($is_i_type &&(| $raw_i_imm[1:0])) || ($is_j_type && (| $raw_j_imm[1:0])) || ($is_i_type && (| /src[1]$reg_value[1:0]));
+      ?$indirect_jump
+         $indirect_jump_target[M4_PC_RANGE] = (/src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE]) && ~ 32'b1;
+      $either_jump = $jump || $indirect_jump;
+      ?$either_jump
+         $misaligned_jump_target = ($jump && $jump_target[1]) ||
+                                   ($indirect_jump && $indirect_jump_target[1]);
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1788,10 +1796,11 @@ m4+makerchip_header(['
                /src[2:1]
                   $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
             
-            // TODO: Need to exclude $unnatural_addr_trap from checking.
-            //RVFI interface for formal verification
-            // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            
+            // RVFI interface for formal verification.
+            
             $rvfi_trap        = $trap && $good_path && ! $replay && ! $returning_ld;  // Good-path trap, not aborted for other reasons.
+            // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
@@ -1822,11 +1831,6 @@ m4+makerchip_header(['
             *rvfi_mem_rdata   = /original_ld$ld_value;
             *rvfi_mem_wdata   = $st_value;
 
-            \SV_plus
-              `ifndef PC_CHECK
-                 always @* restrict(! $returning_ld);
-              `endif
-               //always @* assume(! $unnatural_addr_trap);
             `BOGUS_USE($dummy)
             '], ['
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
