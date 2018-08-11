@@ -240,8 +240,10 @@ m4+makerchip_header(['
    //     Deltas (default to 0):
    //       M4 EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
    //       M4_EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
-   //       M4_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
+   //       M4_EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
+   //       M4_EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
    //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
+   //       M4_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(M4_STANDARD_CONFIG,
@@ -364,6 +366,7 @@ m4+makerchip_header(['
       (M4_DELAY_BRANCH_TARGET_CALC, 0),
       (M4_EXTRA_JUMP_BUBBLE, 0),
       (M4_EXTRA_PRED_TAKEN_BUBBLE, 0),
+      (M4_EXTRA_INDIRECT_JUMP_BUBBLE, 0),
       (M4_EXTRA_REPLAY_BUBBLE, 0),
       (M4_EXTRA_BRANCH_BUBBLE, 0)
    )
@@ -560,7 +563,7 @@ m4+makerchip_header(['
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
-      m4_ifelse(M4_ISA, ['riscv'], ['['['M4_INDIRECT_JUMP'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
+      m4_ifelse(M4_ISA, ['RISCV'], ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
       ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 0'])
 
    // Ensure proper order.
@@ -1212,7 +1215,7 @@ m4+makerchip_header(['
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
          // TODO: Deal with misaligned address.
          $misaligned_pc = | $raw_b_imm[1:0];
-      ?$jump
+      ?$jump  // (JAL, not JALR)
          $jump_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE];
    @_exe_stage
       // Execution.
@@ -1233,12 +1236,13 @@ m4+makerchip_header(['
               )
              )
             );
-      ?$indirect_jump
-         $indirect_jump_target[M4_PC_RANGE] = (/src[1]$reg_value[M4_PC_RANGE] + $raw_i_imm[M4_PC_RANGE]) && ~ 32'b1;
+      ?$indirect_jump  // (JALR)
+         $indirect_jump_full_target[31:0] = /src[1]$reg_value + $raw_i_imm;
+         $indirect_jump_target[M4_PC_RANGE] = $indirect_jump_full_target[M4_PC_RANGE];
       $either_jump = $jump || $indirect_jump;
       ?$either_jump
-         $misaligned_jump_target = ($jump && $jump_target[1]) ||
-                                   ($indirect_jump && $indirect_jump_target[1]);
+         $misaligned_jump_target = ($jump && $raw_j_imm[1]) ||
+                                   ($indirect_jump && $indirect_jump_full_target[1]);
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1721,7 +1725,7 @@ m4+makerchip_header(['
                   m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
-            $trap_target[M4_PC_RANGE] = 30'b0;  // TODO: What should this be?
+            $trap_target[M4_PC_RANGE] = M4_PC_CNT'b0;  // TODO: What should this be?
             
             // Determine whether the instruction should commit it's result.
             //
@@ -1824,6 +1828,7 @@ m4+makerchip_header(['
                                 $jump           ? $jump_target :
                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
                                 m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
+                                $indirect_jump  ? $indirect_jump_target :
                                                   $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = {/original$addr[M4_ADDR_MAX:2], 2'b0};
             *rvfi_mem_rmask   = /original_ld$ld_mask;
