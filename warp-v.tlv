@@ -1791,7 +1791,7 @@ m4+makerchip_header(['
             // TODO: Need to exclude $unnatural_addr_trap from checking.
             //RVFI interface for formal verification
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
-            $rvfi_trap        = $trap && $good_path && ! $replay;  // Good-path trap, not aborted for other reasons.
+            $rvfi_trap        = $trap && $good_path && ! $replay && ! $returning_ld;  // Good-path trap, not aborted for other reasons.
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
