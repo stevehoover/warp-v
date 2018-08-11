@@ -1816,7 +1816,7 @@ m4+makerchip_header(['
                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
                                 m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
                                                   $pc[31:2] +1'b1, 2'b00};
-            *rvfi_mem_addr    = /original$addr[M4_ADDR_RANGE];
+            *rvfi_mem_addr    = {/original$addr[M4_ADDR_MAX:2], 2'b0};
             *rvfi_mem_rmask   = /original_ld$ld_mask;
             *rvfi_mem_wmask   = $st_mask;
             *rvfi_mem_rdata   = /original_ld$ld_value;
