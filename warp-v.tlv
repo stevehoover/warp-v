@@ -1680,8 +1680,8 @@ m4+makerchip_header(['
                      // Bypass stages. Both register and pending are bypassed.
                      // Bypassed registers must be from instructions that are good-path as of this instruction.
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && /instr$GoodPathMask[1] && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$ld} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>1$ld} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>1$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$ld} :'])
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
