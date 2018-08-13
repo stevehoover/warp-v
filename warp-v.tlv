@@ -1217,6 +1217,7 @@ m4+makerchip_header(['
          $misaligned_pc = | $raw_b_imm[1:0];
       ?$jump  // (JAL, not JALR)
          $jump_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE];
+         $misaligned_jump_target = $raw_j_imm[1];
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
@@ -1239,10 +1240,7 @@ m4+makerchip_header(['
       ?$indirect_jump  // (JALR)
          $indirect_jump_full_target[31:0] = /src[1]$reg_value + $raw_i_imm;
          $indirect_jump_target[M4_PC_RANGE] = $indirect_jump_full_target[M4_PC_RANGE];
-      $either_jump = $jump || $indirect_jump;
-      ?$either_jump
-         $misaligned_jump_target = ($jump && $raw_j_imm[1]) ||
-                                   ($indirect_jump && $indirect_jump_full_target[1]);
+         $misaligned_indirect_jump_target = $indirect_jump_full_target[1];
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
          
@@ -1322,6 +1320,7 @@ m4+makerchip_header(['
       // ISA-specific trap conditions:
       $isa_trap = ($branch && $taken && $misaligned_pc) ||
                   ($jump && $misaligned_jump_target) ||
+                  ($indirect_jump && $misaligned_indirect_jump_target) ||
                   ($ld_st && $unnatural_addr_trap);
       
    @_rslt_stage
