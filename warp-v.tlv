@@ -1782,6 +1782,7 @@ m4+makerchip_header(['
             *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
    
 
+
 // ===================
 // Formal Verification
 // ===================
@@ -1798,7 +1799,6 @@ m4+makerchip_header(['
                $ANY = /instr$returning_ld ? /instr/original_ld$ANY : /instr$ANY;
                /src[2:1]
                   $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
-            
             
             // RVFI interface for formal verification.
             
@@ -1822,28 +1822,23 @@ m4+makerchip_header(['
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
-                                $returning_ld   ? /original_ld$pc + 1'b1 :
-                                $trap           ? M4_PC_CNT'b0 :
-                                $jump           ? $jump_target :
-                                $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
-                                m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
-                                $indirect_jump  ? $indirect_jump_target :
-                                                  $pc[31:2] +1'b1, 2'b00};
+                                 $returning_ld   ? /original_ld$pc + 1'b1 :
+                                 $trap           ? M4_PC_CNT'b0 :
+                                 $jump           ? $jump_target :
+                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
+                                 m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
+                                 $indirect_jump  ? $indirect_jump_target :
+                                 $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[M4_ADDR_MAX:2], 2'b0} : 0;
             *rvfi_mem_rmask   = /original$ld ? /original_ld$ld_mask : 0;
             *rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
             *rvfi_mem_rdata   = /original$ld ? /original_ld$ld_value : 0;
             *rvfi_mem_wdata   = $valid_st ? $st_value : 0;
 
-<<<<<<< refs/remotes/origin/master
-            `BOGUS_USE($dummy)
-=======
             `BOGUS_USE(/src[2]$dummy)
->>>>>>> Added back conditioning on RVFI signals based on instruction type
             '], ['
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
             '])
-
 
 \TLV
    // =================
