@@ -1,11 +1,19 @@
 
 # WARP-V Formal Testbench
 
+WARP-V uses riscv-formal for formal verification. You'll need to satisfy all of the prerequisits
+of this environment, as described in the <a href="" target="_blank">QuickStart Guide</a>.
 
-WARP-V uses riscv-formal for the formal verification procedure: https://github.com/cliffordwolf/riscv-formal
+You'll also need an installation of SandPiper(TM), which can be obtained from [www.redwoodeda.com].
 
-To use the framwork copy the riscv_formal directory into the cores directory in the riscv-formal directory structure and put the latest warp-v.tlv into the riscv_formal directory as well.
+In a clean directory:
 
+```sh
+git clone https://github.com/cliffordwolf/riscv-formal.git
+git clone https://github.com/stevehoover/warp-v.git
+cp -rf warp-v/warpv_formal riscv-formal/cores/
+cp warp-v/warp-v.tlv riscv-formal/cores/warpv_formal/
+```
 
 There are some modifications you have to make in the configuration section of the code:
 
@@ -19,8 +27,8 @@ m4_default(['M4_FORMAL'], 1) // 1 to enable code for formal verification
 The checks you want to run can be selected in the checks.cfg file
 
 Running the verification:
-```
-cd cores/warpv_formal
+```sh
+cd riscv-formal/cores/warpv_formal
 make compile
 make genchecks
 make verif -j$(nproc)
