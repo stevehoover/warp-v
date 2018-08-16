@@ -1513,11 +1513,11 @@ m4+makerchip_header(['
    |fetch
       /instr
          // Provide a longer reset to cover the pipeline depth.
-         @m4_stage_eval(@M4_FETCH_STAGE<<1)
+         @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $Cnt[7:0] <= *reset        ? 8'b0 :       // reset
                          $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
                                          $Cnt + 8'b1; // increment
-            $reset = $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
+            $reset = *reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
          
          @M4_FETCH_STAGE
             $fetch = 1'b1;  // always fetch
@@ -1807,7 +1807,8 @@ m4+makerchip_header(['
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
-            $rvfi_valid       = (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
+            $rvfi_valid       = ! <<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
+                                (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
             *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = /original$raw;
             *rvfi_halt        = $rvfi_trap;
