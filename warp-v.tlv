@@ -1520,7 +1520,7 @@ m4+makerchip_header(['
             $reset = *reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
          
          @M4_FETCH_STAGE
-            $fetch = 1'b1;  // always fetch
+            $fetch = ! $reset;  // always fetch
             ?$fetch
 
                // =====
@@ -1660,6 +1660,9 @@ m4+makerchip_header(['
          m4+indirect(['branch_pred_']M4_BRANCH_PRED)
          
          @M4_REG_RD_STAGE
+            // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
+            $reg_wr_pending = $ld && ! $returning_ld;
+            
             // ======
             // Reg Rd
             // ======
@@ -1679,22 +1682,22 @@ m4+makerchip_header(['
                      m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
                      // Bypass stages. Both register and pending are bypassed.
                      // Bypassed registers must be from instructions that are good-path as of this instruction.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && /instr$GoodPathMask[1] && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$ld} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$ld} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$ld} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && /instr$GoodPathMask[1] && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
-            // Also replay for pending dest reg. Bypass dest reg pending to support this.
+            // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
             $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
             ?$is_dest_condition
                $dest_pending =
                   m4_ifelse(M4_ISA, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
                   // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && /instr$GoodPathMask[1] && >>1$ld && (>>1$dest_reg == $dest_reg)) || '])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && /instr$GoodPathMask[2] && >>2$ld && (>>2$dest_reg == $dest_reg)) || '])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && /instr$GoodPathMask[3] && >>3$ld && (>>3$dest_reg == $dest_reg)) || '])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && $GoodPathMask[1] && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && $GoodPathMask[2] && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && $GoodPathMask[3] && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
                   /regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending;
             // Combine replay conditions for pending source or dest registers.
             $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
@@ -1768,7 +1771,7 @@ m4+makerchip_header(['
                end
             // Write $pending along with $value, but coded differently because it must be reset.
             /regs[*]
-               <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$valid_ld : $pending);
+               <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
 
    
 \TLV tb()
@@ -1808,7 +1811,7 @@ m4+makerchip_header(['
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
             $rvfi_valid       = ! <<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
-                                (($commit && ! $ld) || $rvfi_trap || $returning_ld) && ! $unnatural_addr_trap;
+                                (($commit && ! $ld) || $rvfi_trap || $returning_ld);
             *rvfi_valid       = $rvfi_valid;
             *rvfi_insn        = /original$raw;
             *rvfi_halt        = $rvfi_trap;
