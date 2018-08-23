@@ -1863,16 +1863,16 @@ m4+makerchip_header(['
             *rvfi_trap        = $rvfi_trap;
             *rvfi_order       = /original$rvfi_order;
             *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = (/original$is_u_type | /original$is_j_type) ? 0 : /original/src[1]$is_reg ? /original$raw_rs1 : 5'b0;
-            *rvfi_rs2_addr    = (/original$is_i_type | /original$is_u_type | /original$is_j_type) ? 0 : /original/src[2]$is_reg ? /original$raw_rs2 : 5'b0;
+            *rvfi_rs1_addr    = /original/src[1]$is_reg ? /original$raw_rs1 : 5'b0;
+            *rvfi_rs2_addr    = /original/src[2]$is_reg ? /original$raw_rs2 : 5'b0;
             *rvfi_rs1_rdata   = /original/src[1]$is_reg ? /original/src[1]$reg_value : M4_WORD_CNT'b0;
             *rvfi_rs2_rdata   = /original/src[2]$is_reg ? /original/src[2]$reg_value : M4_WORD_CNT'b0;
-            *rvfi_rd_addr     = (/original$is_s_type | /original$is_b_type) ? 0 : /original$dest_reg_valid ? /original$raw_rd : 5'b0;
+            *rvfi_rd_addr     = (/original$dest_reg_valid && ! $abort) ? /original$raw_rd : 5'b0;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
                                  $returning_ld   ? /original_ld$pc + 1'b1 :
-                                 $trap           ? M4_PC_CNT'b0 :
+                                 $trap           ? $trap_target :
                                  $jump           ? $jump_target :
                                  $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
                                  m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
