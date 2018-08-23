@@ -2,7 +2,7 @@
 # WARP-V Formal Testbench
 
 WARP-V uses riscv-formal for formal verification. You'll need to satisfy all of the prerequisits
-of this environment, as described in the <a href="" target="_blank">QuickStart Guide</a>.
+of this environment, as described in the <a href="https://github.com/cliffordwolf/riscv-formal/blob/master/docs/quickstart.md" target="_blank">QuickStart Guide</a>.
 
 You'll also need an installation of SandPiper(TM), which can be obtained from [www.redwoodeda.com].
 

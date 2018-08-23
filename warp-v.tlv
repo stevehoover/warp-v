@@ -579,7 +579,8 @@ m4+makerchip_header(['
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
       m4_ifelse(M4_ISA, ['RISCV'], ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
-      ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 1'])
+      ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
+      ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
 
    // Ensure proper order.
    // TODO: It would be great to auto-sort.
@@ -1228,7 +1229,6 @@ m4+makerchip_header(['
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
-         // TODO: Deal with misaligned address.
          $misaligned_pc = | $raw_b_imm[1:0];
       ?$jump  // (JAL, not JALR)
          $jump_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_j_imm[M4_PC_RANGE];
@@ -1577,7 +1577,8 @@ m4+makerchip_header(['
             //   o Replay: (aborting) Replay the same instruction (because a source register is pending (awaiting a returning_ld))
             //   o Jump: A jump instruction.
             //   o Mispredicted branch: A branch condition was mispredicted.
-            //   o Traps: (aborting) illegal instructions, misaligned PC, others?
+            //   o Aborting traps: (aborting) illegal instructions, others?
+            //   o Non-aborting traps: misaligned PC target
             
             // ==============
             // Redirect Logic
@@ -1762,9 +1763,8 @@ m4+makerchip_header(['
             // =======
 
             // Execute stage redirect conditions.
-            $trap = $valid_decode && (
-                       $illegal ||
-                       $isa_trap);
+            $aborting_trap = $illegal;
+            $non_aborting_trap = $isa_trap;
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
             ?$valid_decode_branch
                $branch_redir_pc[M4_PC_RANGE] =
@@ -1847,7 +1847,8 @@ m4+makerchip_header(['
                   $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
             
             // RVFI interface for formal verification.
-            
+            $trap = $aborting_trap ||
+                    $non_aborting_trap;
             $rvfi_trap        = ! $reset && >>m4_eval(-M4_MAX_REDIRECT_BUBBLES + 1)$next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES] &&
                                 $trap && ! $replay && ! $returning_ld;  // Good-path trap, not aborted for other reasons.
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
@@ -1864,8 +1865,8 @@ m4+makerchip_header(['
             *rvfi_intr        = 1'b0;
             *rvfi_rs1_addr    = (/original$is_u_type | /original$is_j_type) ? 0 : /original/src[1]$is_reg ? /original$raw_rs1 : 5'b0;
             *rvfi_rs2_addr    = (/original$is_i_type | /original$is_u_type | /original$is_j_type) ? 0 : /original/src[2]$is_reg ? /original$raw_rs2 : 5'b0;
-            *rvfi_rs1_rdata   = /original/src[1]$reg_value;
-            *rvfi_rs2_rdata   = /original/src[2]$reg_value;
+            *rvfi_rs1_rdata   = /original/src[1]$is_reg ? /original/src[1]$reg_value : M4_WORD_CNT'b0;
+            *rvfi_rs2_rdata   = /original/src[2]$is_reg ? /original/src[2]$reg_value : M4_WORD_CNT'b0;
             *rvfi_rd_addr     = (/original$is_s_type | /original$is_b_type) ? 0 : /original$dest_reg_valid ? /original$raw_rd : 5'b0;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
