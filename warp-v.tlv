@@ -110,6 +110,16 @@ m4+makerchip_header(['
    // Data memory is separate.
    //
    
+   // TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
+   //       /fetch_instr reflects the instruction fetched from i-memory, and /commit_instr reflects the
+   //       instruction that will be committed. The difference is returning_ld instructions which commit
+   //       in place of the fetch instruction. There have been several subtle bugs where the fetch
+   //       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
+   //       avoid them.
+   // TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
+   //       already have the raw instruction bits to inject. The replay mechanism can be separated from
+   //       redirects.
+   
    
    // ============
    // Mini-CPU ISA
@@ -376,7 +386,7 @@ m4+makerchip_header(['
    m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
 
    // Latencies/bubbles calculated from stage parameters and extra bubbles:
-   // (zero bubbles minimum if triggered in next_pc; minumum bubbles = computed-stage - next_pc-stage)
+   // (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
    m4_define(['M4_PRED_TAKEN_BUBBLES'], m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
    m4_define(['M4_REPLAY_BUBBLES'],     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
    m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
@@ -494,7 +504,7 @@ m4+makerchip_header(['
    //   which becomes:
    //     \TLV redirect_conditions()
    //        @2
-   //           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Ultimate trigger.
+   //           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Aborting trigger.
    //        @2
    //           $trigger2_redir = $trigger2 && !(1'b0 || $trigger1) && >>2$GoodPath[2];
    //        @3
@@ -506,10 +516,12 @@ m4+makerchip_header(['
 
    // m4_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
    m4_define(['m4_redirect_list'], ['['-100']'])  // list fed to m4_ordered
-   m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow of a trigger that becomes visible.
+   m4_define(['m4_redirect_squash_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
+   m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
    m4_define(['m4_redirect_pc_terms'], [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
-   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier ultimate triggers on the same instruction, using "$1" for alignment.
-                                                         // Each trigger uses this term as it is built to mask its effect, so ultimate triggers have the final say.
+   m4_define(['m4_abort_terms'], ['1'b0'])        // || terms for an instruction's abort condition
+   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
+                                                         // Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
    //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatination terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatination.
    // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
    // See redirection logic for more detail.
@@ -524,8 +536,7 @@ m4+makerchip_header(['
                         )
                m4_define(['M4_NUM_REDIRECT_CONDITIONS'], m4_eval(M4_NUM_REDIRECT_CONDITIONS + 1))
              '])
-   // Max redirect bubbles. Minimum value is 1 to avoid declaring zero-size vectors.
-   m4_define(['M4_MAX_REDIRECT_BUBBLES'], m4_ifelse(M4_TRAP_BUBBLES, 0, 1, M4_TRAP_BUBBLES))
+   m4_define(['M4_MAX_REDIRECT_BUBBLES'], M4_TRAP_BUBBLES)
 
    // Called by m4_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
    // to various definitions, initializes above.
@@ -533,10 +544,10 @@ m4+makerchip_header(['
    //   $1: name of define of number of bubble cycles
    //   $2: condition signal of triggering instr
    //   $3: target PC signal of triggering instructiton
-   //   $4: 1 for an "ultimate" redirect (0 otherwise)
+   //   $4: 1 for an aborting redirect (0 otherwise)
    m4_define(['m4_process_redirect_condition'],
              ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
-               // = instruction triggers this condition && it's good-path to this cycle && it's not masked by an earlier "ultimate" redirect
+               // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
                //   of this instruction.
                // Params: $@ (m4_redirect_masking_triggers contains param use)
                m4_pushdef(['m4_redir_cond'],
@@ -544,12 +555,16 @@ m4+makerchip_header(['
                //m4_define(['$1_order'], $5)   // Order of this condition. (Not used, so commented)
                m4_define(['m4_redirect_list'],
                          m4_dquote(m4_redirect_list, ['$1']))
+               m4_define(['m4_redirect_squash_terms'],
+                         ['']m4_redirect_squash_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_TRAP_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_TRAP_BUBBLES + 1){1'b1}})'])
                m4_define(['m4_redirect_shadow_terms'],
-                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{(M4_TRAP_BUBBLES - m4_echo($1)){1'b1}}, {(m4_echo($1)){1'b0}}} : {M4_TRAP_BUBBLES{1'b1}})'])
+                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_TRAP_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_TRAP_BUBBLES + 1){1'b1}})'])
                m4_define(['m4_redirect_pc_terms'],
                          ['m4_echo(']m4_redir_cond($@)[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
                m4_ifelse(['$4'], ['1'],
-                  ['m4_define(['m4_redirect_masking_triggers'],
+                  ['m4_define(['m4_abort_terms'],
+                              m4_dquote(m4_abort_terms)['[' || $2']'])
+                    m4_define(['m4_redirect_masking_triggers'],
                               m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
                //m4_define(['m4_redirect_signal_list'],
                //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
@@ -564,7 +579,7 @@ m4+makerchip_header(['
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
       m4_ifelse(M4_ISA, ['RISCV'], ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
-      ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 0'])
+      ['['M4_TRAP_BUBBLES'], $trap, $trap_target, 1'])
 
    // Ensure proper order.
    // TODO: It would be great to auto-sort.
@@ -1540,46 +1555,74 @@ m4+makerchip_header(['
             // Instruction: An instruction, as viewed by the CPU pipeline (i.e. ld and returning_ld are separate instructions,
             //              and the returning_ld and the instruction it clobbers are one in the same).
             // ISA Instruction: An instruction, as defined by the ISA.
-            // Good Path: On the proper flow of execution of the program.
+            // Good-Path (vs. Bad-Path): On the proper flow of execution of the program, excluding aborted instructions.
+            // Path (of an instruction): The sequence of instructions that led to a particular instruction.
+            // Current Path: The sequence of instructions fetched by next-PC logic that are not known to be bad-path.
             // Redirect: Adjust the PC from the predicted next-PC.
             // Redirect Shadow: Between the instruction causing the redirect and the redirect target instruction.
+            // Bubbles: The cycles in the redirect shadow.
             // Commit: Results are made visible to subsequent instructions.
+            // Abort: Do not commit. All aborts are also redirects and put the instruction on bad path. Non-aborting
+            //        redirects do not mark the triggering instruction as bad-path. Aborts mask future redirects on the
+            //        aborted instruction.
             // Retire: Commit results of an ISA instruction.
             
             // Control flow:
             //
             // Redirects include (earliest to latest):
+            //   o Returning load: (aborting) A returning load clobbers an instruction and takes its slot, resulting in a
+            //                     one-cycle redirect to repeat the clobbered instruction.
             //   o Predict-taken branch: A predicted-taken branch must determine the target before it can redirect the PC.
             //                           (This might be followed up by a mispredition.)
-            //   o Replay: Replay the same instruction (because a source register is pending (awaiting a returning_ld))
+            //   o Replay: (aborting) Replay the same instruction (because a source register is pending (awaiting a returning_ld))
             //   o Jump: A jump instruction.
             //   o Mispredicted branch: A branch condition was mispredicted.
-            //   o Traps: illegal instructions, misaligned PC, others?
+            //   o Traps: (aborting) illegal instructions, misaligned PC, others?
             
             // ==============
             // Redirect Logic
             // ==============
                             
-            // We redirect next PC for conditions on prior instructions which are not bad-path relative to this instruction.
+            // PC logic will redirect the PC for conditions on current-path instructions. PC logic keeps track of which
+            // instructions are on the current path with a $GoodPathMask. $GoodPathMask[n] of an instruction indicates
+            // whether the instruction n instructions prior to this instruction is on its path.
             //
-            //              $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
-            //              |
-            //              V
-            //       oooooooo  Good-path Inst1
-            // InstX  ooooooXo  (Not squashed by redirect, but maybe explicitly based on redirect condition.)
-            //         ooooooxx
-            // InstY    ooY-----  (Y is an "ultimate" redirect for InstY; any subsequent redirects on InstY are ignored.)
-            // InstZ     ooyyxZxx
-            // Redir'edY  oyyxxxxx
-            // TargetY     ooxxxxxx
-            // Redir'edX    oxxxxxxx
-            // TargetX       oooooooo Good-path Inst2
-            // Not redir'edZ  oooooooo ...
+            //                 $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
+            // Waterfall View: |
+            //                 V
+            // 0)       oooooooo                  Good-path
+            // 1) InstX  ooooooXo  (Non-aborting) Good-path
+            // 2)         ooooooxx
+            // 3) InstY    ooYyyxxx  (Aborting)
+            // 4) InstZ     ooyyxZxx
+            // 5) Redir'edY  oyyxxxxx
+            // 6) TargetY     ooxxxxxx
+            // 7) Redir'edX    oxxxxxxx
+            // 8) TargetX       oooooooo          Good-path
+            // 9) Not redir'edZ  oooooooo         Good-path
             //
             // Above depicts a waterfall diagram where three triggering redirection conditions X, Y, and Z are detected on three different
             // instructions. A trigger in the 1st depicted stage, M4_NEXT_PC_STAGE, results in a zero-bubble redirect so it would be
             // a condition that is factored directly into the next-PC logic of the triggering instruction, and it would have
             // no impact on the $GoodPathMask.
+            //
+            // Waveform View:
+            //
+            //   Inst 0123456789
+            //        ---------- /
+            // GPM[7]        ooxxxxxxoo
+            // GPM[6]       oXxxxxxxoo
+            // GPM[5]      oooxZxxxoo
+            // GPM[4]     oooyxxxxoo
+            // GPM[3]    oooyyxxxoo
+            // GPM[2]   oooYyyxxoo
+            // GPM[1]  oooooyoxoo
+            // GPM[0] oooooooooo
+            //          /
+            //         Triggers for Inst 3
+            //
+            // In the waveform view, the mask shifts up each cycle, as instructions age, and trigger conditions mask instructions
+            // in the shadow, down to the redirect target (GPM[0]).
             //
             // Terminology:
             //   Triggering instruction: The instruction on which the condition is detected.
@@ -1593,19 +1636,10 @@ m4+makerchip_header(['
             // For simultaneous conditions on different instructions, the PC must redirect to the earlier instruction's
             // redirect target, so later-stage redirects take priority in the PC-mux.
             //
-            // The triggering instruction is not itself squashed by this mechanism. It is up to the instruction logic to
-            // determine whether the instruction should commit based on its own redirect triggers. A branch, for example, should
-            // commit, but a replayed instruction should not.
-            //
-            // A given instruction may trigger more than one redirection condition, and the later-staged (or later-ordered, even
-            // if within the same stage) will have priority (unless the first is "ultimate"). (If within the same stage, this is
-            // accomplished by the PC-mux prioritization.)
-            //
-            // An "ultimate" trigger is the final authority for the instruction. Subsequent (later-ordered) triggers will
-            // be masked. Essentially, the trigger removes the instruction from the control flow of the program. This is
-            // used for replayed instructions (returning_ld and replay), which are both "ultimate" and aborted, to ensure
-            // they have no effect. It might be possible to argue that this mechanism isn't necessary for replays because
-            // it doesn't matter which occurance of the instruction produces the behavior, but it just seems cleaner this way.
+            // Aborting redirects result in the aborting instruction being marked as bad-path. Aborted instructions will
+            // not commit. Subsequent redirect conditions on aborting instructions are ignored. (For conditions within the
+            // same stage, this is accomplished by the PC-mux prioritization.)
+            
             
             // Macros are defined elsewhere based on the ordered set of conditions that generate code here.
             
@@ -1613,19 +1647,30 @@ m4+makerchip_header(['
             // A mask of stages ahead of this one (older) in which instructions are on the path of this instruction.
             // Index 1 is ahead by 1, etc.
             // In the example above, $GoodPathMask for Redir'edX == {0,0,0,0,1,1,0,0}
-            //     (Looking up from its first "o", in reverse order {o,X,o,o,y,y,o,o}.)
+            //     (Looking up in the waterfall diagram from its first "o", in reverse order {o,X,o,o,y,y,o,o}.)
             // The LSB is fetch-valid. It only exists for m4_valid_as_of macro.
-            $next_good_path_mask[M4_MAX_REDIRECT_BUBBLES:0] =
+            $next_good_path_mask[M4_MAX_REDIRECT_BUBBLES+1:0] =
                // Shift up and mask w/ redirect conditions.
-               {
-                $GoodPathMask[M4_MAX_REDIRECT_BUBBLES-1:0]
+               {$GoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
                 // & terms for each condition (order doesn't matter since masks are the same within a cycle)
-                m4_redirect_shadow_terms,
+                m4_redirect_squash_terms,
                 1'b1}; // Shift in 1'b1 (fetch-valid).
             
-            $GoodPathMask[M4_MAX_REDIRECT_BUBBLES:0] <=
-               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
+            $GoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
+               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
                $next_good_path_mask;
+            
+            m4_ifelse_block(M4_FORMAL, ['1'], ['
+            // Formal verfication must consider trapping instructions. For this, we need to maintain $RvfiGoodPathMask, which is similar to
+            // $GoodPathMask, except that it does not mask out aborted instructions.
+            $next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES+1:0] =
+               {$RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
+                m4_redirect_shadow_terms,
+                1'b1};
+            $RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
+               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :
+               $next_rvfi_good_path_mask;
+            '])
             
             
             // A returning load clobbers the instruction.
@@ -1681,10 +1726,10 @@ m4+makerchip_header(['
                   {$reg_value[M4_WORD_RANGE], $pending} =
                      m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
                      // Bypass stages. Both register and pending are bypassed.
-                     // Bypassed registers must be from instructions that are good-path as of this instruction.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && /instr$GoodPathMask[1] && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && /instr$GoodPathMask[2] && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && /instr$GoodPathMask[3] && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                     // Bypassed registers must be from instructions that are good-path as of this instruction or are returning_ld.
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$returning_ld) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$returning_ld) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$returning_ld) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
@@ -1695,9 +1740,9 @@ m4+makerchip_header(['
                $dest_pending =
                   m4_ifelse(M4_ISA, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
                   // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && $GoodPathMask[1] && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && $GoodPathMask[2] && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && $GoodPathMask[3] && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && ($GoodPathMask[1] || /instr>>1$returning_ld) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && ($GoodPathMask[2] || /instr>>2$returning_ld) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$returning_ld) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
                   /regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending;
             // Combine replay conditions for pending source or dest registers.
             $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
@@ -1741,14 +1786,12 @@ m4+makerchip_header(['
             //    returning load, since they are one in the same). Returning load must explicitly
             //    write results.
             //
-            $good_path = m4_valid_as_of(M4_NEXT_PC_STAGE + M4_MAX_REDIRECT_BUBBLES);
-                // not in the redirect shadow of any prior instruction (determined after all redirect conditions of
-                // prior instructions have been factored in)
-            // For a legal $good_path: $ld, $returning_ld (instruction clobbered by it)
-            //     $abort:             no,  yes
-            //     $commit:            yes,  no
-            $abort = $replay || $trap || $returning_ld;  // Note that register bypass logic requires that abort conditions also redirect.
-            $commit = $good_path && ! $abort;
+            
+            $abort = m4_abort_terms;  // Note that register bypass logic requires that abort conditions also redirect.
+            // $commit = m4_valid_as_of(M4_NEXT_PC_STAGE + M4_MAX_REDIRECT_BUBBLES + 1), where +1 accounts for this
+            // instruction's redirects. However, to meet timing, we consider this instruction separately, so,
+            // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
+            $commit = m4_valid_as_of(M4_NEXT_PC_STAGE + M4_MAX_REDIRECT_BUBBLES) && ! $abort;
             
             // Conditions that commit results.
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || $returning_ld;
@@ -1805,7 +1848,8 @@ m4+makerchip_header(['
             
             // RVFI interface for formal verification.
             
-            $rvfi_trap        = $trap && $good_path && ! $replay && ! $returning_ld;  // Good-path trap, not aborted for other reasons.
+            $rvfi_trap        = ! $reset && >>m4_eval(-M4_MAX_REDIRECT_BUBBLES + 1)$next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES] &&
+                                $trap && ! $replay && ! $returning_ld;  // Good-path trap, not aborted for other reasons.
             // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
