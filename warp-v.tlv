@@ -949,7 +949,8 @@ m4+makerchip_header(['
       ?$branch
          $taken = $rslt != 12'b0;
       $st_mask[0:0] = 1'b1;
-      $isa_trap = 1'b0;
+      $non_aborting_isa_trap = 1'b0;
+      $aborting_isa_trap = 1'b0;
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
@@ -1333,10 +1334,11 @@ m4+makerchip_header(['
                                                                          {$ld_value[31:24], 4'b1000}};
             `BOGUS_USE($ld_mask) // It's only for formal verification.
       // ISA-specific trap conditions:
-      $isa_trap = ($branch && $taken && $misaligned_pc) ||
-                  ($jump && $misaligned_jump_target) ||
-                  ($indirect_jump && $misaligned_indirect_jump_target) ||
-                  ($ld_st && $unnatural_addr_trap);
+      // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
+      $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
+                               ($jump && $misaligned_jump_target) ||
+                               ($indirect_jump && $misaligned_indirect_jump_target);
+      $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap);
       
    @_rslt_stage
       // Mux the correct result.
@@ -1386,7 +1388,8 @@ m4+makerchip_header(['
       $addr[M4_ADDR_RANGE] = /src[2]$reg_value;
       $taken = $rslt != 2'b0;
       $st_mask[0:0] = 1'b1;
-      $isa_trap = 1'b0;
+      $non_aborting_isa_trap = 1'b0;
+      $aborting_isa_trap = 1'b0;
    @_rslt_stage
       $rslt[M4_WORD_RANGE] =
          $returning_ld ? /original_ld$ld_value :
@@ -1763,8 +1766,8 @@ m4+makerchip_header(['
             // =======
 
             // Execute stage redirect conditions.
-            $aborting_trap = $illegal;
-            $non_aborting_trap = $isa_trap;
+            $aborting_trap = $illegal || $aborting_isa_trap;
+            $non_aborting_trap = $non_aborting_isa_trap;
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
             ?$valid_decode_branch
                $branch_redir_pc[M4_PC_RANGE] =
