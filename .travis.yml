@@ -1,7 +1,3 @@
-export $PATH=/usr/bin:warp-v_ci_env/env/bin
-git clone https://github.com/stevehoover/warp-v_ci_env.git
-git clone https://github.com/cliffordwolf/riscv-formal.git
-
 before_install:
   - echo "before_install"
   - pwd
