@@ -1,0 +1,17 @@
+export $PATH=/usr/bin:warp-v_ci_env/env/bin
+git clone https://github.com/stevehoover/warp-v_ci_env.git
+git clone https://github.com/cliffordwolf/riscv-formal.git
+
+before_install:
+  - echo "before_install"
+  - pwd
+install:
+  - git clone https://github.com/stevehoover/warp-v_ci_env.git
+  - git clone https://github.com/cliffordwolf/riscv-formal.git
+  
+before_script: echo "Echoing before_script"
+script:
+  - cd riscv-formal/cores/warpv_formal && make genchecks && make verif -j8
+after_success: echo "SUCCESS!"
+after_failure: echo "FAILURE!!!"
+after_script: echo "after_script"
