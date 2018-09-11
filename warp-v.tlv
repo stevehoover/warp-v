@@ -1870,7 +1870,7 @@ m4+makerchip_header(['
             *rvfi_rs2_addr    = /original/src[2]$is_reg ? /original$raw_rs2 : 5'b0;
             *rvfi_rs1_rdata   = /original/src[1]$is_reg ? /original/src[1]$reg_value : M4_WORD_CNT'b0;
             *rvfi_rs2_rdata   = /original/src[2]$is_reg ? /original/src[2]$reg_value : M4_WORD_CNT'b0;
-            *rvfi_rd_addr     = (/original$dest_reg_valid && ! $abort) ? /original$raw_rd : 5'b0;
+            *rvfi_rd_addr     = ($dest_reg_valid && ! /original$abort) ? /original$raw_rd : 5'b0;
             *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
