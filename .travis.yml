@@ -15,6 +15,7 @@ before_script:
 script:
   - pwd
   - ls
+  - ls ../../../warp-v_ci_env/env/bin
   - PATH=../../../warp-v_ci_env/env/bin:$PATH bash -c 'make genchecks && make verif -j$(nproc)'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
