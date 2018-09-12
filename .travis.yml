@@ -1,13 +1,16 @@
+language: generic
 before_install:
   - echo "before_install"
   - pwd
 install:
-  - git clone https://github.com/stevehoover/warp-v_ci_env.git
-  - git clone https://github.com/cliffordwolf/riscv-formal.git
+  - cd .. && git clone https://github.com/stevehoover/warp-v_ci_env.git
+  - cd .. && git clone https://github.com/cliffordwolf/riscv-formal.git
   
-before_script: echo "Echoing before_script"
+before_script:
+  - echo "Echoing before_script"
+  - cp -rf warpv_formal ../riscv-formal/cores/
 script:
-  - cd riscv-formal/cores/warpv_formal && make genchecks && make verif -j8
+  - cd ../riscv-formal/cores/warpv_formal && PATH=../warp-v_ci_env/env/bin:$PATH bash -c 'make genchecks && make verif -j$(nproc)'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
 after_script: echo "after_script"

@@ -1,7 +1,7 @@
 all: compile genchecks verif clean
 
 compile:
-	- sandpiper -i warp-v.tlv -o build.sv --html out.html --m4out m4out -p verilog
+	- sandpiper -i ../../../riscv-formal/cores/warpv_formal/warp-v_formal.tlv -o build.sv --m4out m4out -p verilog
 
 genchecks:
 	python3 ../../checks/genchecks.py
