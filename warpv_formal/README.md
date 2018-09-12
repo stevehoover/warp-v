@@ -4,7 +4,7 @@
 WARP-V uses riscv-formal for formal verification. You'll need to satisfy all of the prerequisits
 of this environment, as described in the <a href="https://github.com/cliffordwolf/riscv-formal/blob/master/docs/quickstart.md" target="_blank">QuickStart Guide</a>.
 
-You'll also need an installation of SandPiper(TM), which can be obtained from [www.redwoodeda.com].
+You'll also need an installation of SandPiper(TM), which can be obtained from http://www.redwoodeda.com.
 
 In a clean directory:
 
@@ -15,7 +15,7 @@ cp -rf warp-v/warpv_formal riscv-formal/cores/
 cp warp-v/warp-v.tlv riscv-formal/cores/warpv_formal/
 ```
 
-There are some modifications you have to make in the configuration section of the code:
+There are some modifications you have to make in the configuration section of the code (riscv-formal/cores/warpv_formal/warp-v.tlv):
 
 ```
 // Include testbench (for Makerchip simulation) (defaulted to 1).
