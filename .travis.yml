@@ -8,11 +8,10 @@ install:
   
 before_script:
   - echo "Echoing before_script"
+script:
   - pwd
   - ls
-  - cp -rf warpv_formal ../riscv-formal/cores/
-script:
-  - cd ../riscv-formal/cores/warpv_formal && PATH=../warp-v_ci_env/env/bin:$PATH bash -c 'make genchecks && make verif -j$(nproc)'
+  - cp -rf warpv_formal ../riscv-formal/cores/ && cd ../riscv-formal/cores/warpv_formal && PATH=../warp-v_ci_env/env/bin:$PATH bash -c 'make genchecks && make verif -j$(nproc)'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
 after_script: echo "after_script"
