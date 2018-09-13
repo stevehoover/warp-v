@@ -11,8 +11,9 @@ install:
   
 before_script:
   - echo "Echoing before_script"
-  - pwd
-  - ls
+  - python --version
+  - python3 --version
+  - make -v
   - cp -rf warp-v/warpv_formal riscv-formal/cores/ && cd riscv-formal/cores/warpv_formal
 script:
   - pwd
