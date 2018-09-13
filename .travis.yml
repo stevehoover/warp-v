@@ -3,7 +3,7 @@ sudo: true
 language: generic
 before_install:
   - echo "before_install"
-  - sudo add-apt-repository ppa:saltmakrell/ppa
+  - sudo add-apt-repository ppa:saltmakrell/ppa -y
   - sudo apt-get update
   - sudo apt-get install yosys
   - cd ..
