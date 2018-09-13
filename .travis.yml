@@ -1,8 +1,11 @@
 dist: trusty
-sudo: false
+sudo: true
 language: generic
 before_install:
   - echo "before_install"
+  - sudo add-apt-repository ppa:saltmakrell/ppa
+  - sudo apt-get update
+  - sudo apt-get install yosys
   - cd ..
 install:
   - pwd
@@ -19,7 +22,7 @@ script:
   - pwd
   - ls
   - ls -l /home/travis/build/stevehoover/warp-v_ci_env/env/bin
-  - PATH=/home/travis/build/stevehoover/warp-v_ci_env/env/bin:$PATH bash -c 'echo $PATH && make genchecks && make verif -j4'
+  - PATH=$PATH:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
 after_script: echo "after_script"
