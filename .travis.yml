@@ -19,7 +19,7 @@ script:
   - pwd
   - ls
   - ls -l /home/travis/build/stevehoover/warp-v_ci_env/env/bin
-  - PATH=$PATH:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
+  - PATH=/home/travis/build/stevehoover/yosys:$PATH:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
 after_script: echo "after_script"
