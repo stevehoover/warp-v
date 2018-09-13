@@ -7,7 +7,7 @@ before_install:
 install:
   - pwd
   - git clone https://github.com/stevehoover/warp-v_ci_env.git
-  - git clone https://github.com/cliffordwolf/riscv-formal.git && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5
+  - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 && popd
   
 before_script:
   - echo "Echoing before_script"
