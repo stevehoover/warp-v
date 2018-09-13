@@ -2,7 +2,7 @@ dist: trusty
 sudo: true
 language: generic
 before_install:
-  - sudo apt-get install libstdc++6
+  - sudo apt-get install libstdc++6 && cd ..
 install:
   - pwd
   - git clone https://github.com/stevehoover/warp-v_ci_env.git
