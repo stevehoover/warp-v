@@ -9,5 +9,6 @@ complete
 # These are pre-compiled by pre-commit so CI can run without SandPiper.
 #build\.sv
 #build_gen\.sv
-m4out
-out\.html
+
+# Intermediate files for SandPiper pre-build
+/sp_obj/

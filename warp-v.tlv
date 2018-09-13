@@ -28,7 +28,7 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
-m4+makerchip_header(['
+m4+definitions(['
 
     
    // A highly-parameterized CPU generator, configurable for:
@@ -46,12 +46,12 @@ m4+makerchip_header(['
    //   o A tiny test program for each ISA
 
    // Notes:
-   //   o This code makes heavy use of macro preprocessing with M4 (https://www.gnu.org/software/m4/manual/m4.html),
-   //     as well as "m4+" macros supported by Perl preprocessing. Neither of these are
-   //     currently documented or supported for general use. This design is shared to illustrate
-   //     the potential, not with the expectation that folks will evolve the design on their own.
-   //     (If you are interested in doing so, please contact me at steve.hoover@redwoodeda.com,
-   //     and I would be happy to provide assistance.)
+   //   o THIS CODE MAKES HEAVY USE OF MACRO PREPROCESSING WITH M4 (https://www.gnu.org/software/m4/manual/m4.html),
+   //     AS WELL AS "M4+" MACROS SUPPORTED BY PERL PREPROCESSING. NEITHER OF THESE ARE
+   //     CURRENTLY DOCUMENTED OR SUPPORTED FOR GENERAL USE. This design is shared to illustrate
+   //     the potential. While we openly welcome collaboration, there are no current expectations that folks
+   //     will be able to evolve the design independently. If you are interested in collaboration,
+   //     please contact steve.hoover@redwoodeda.com.
    //   o The preprocessed code is represented in the "Nav-TLV" tab. You can debug using
    //     Nav-TLV and find corresponding source lines by clicking Nav-TLV line numbers.
    //   o The "Diagram" may fail to generate due to the size of the design.
@@ -738,10 +738,12 @@ m4+makerchip_header(['
    '])
 
 
-   // Redefine m4_makerchip_module macro used by m4+makerchip_header to define the module interface
-   // to define a module as required for fomal verification. (It's a bit of a hack.)
-   m4_ifexpr(M4_FORMAL,['m4_define(['m4_makerchip_module'], ['
-            module warpv(input logic clk,
+   // Define m4+module_def macro to be used as a region line providing the module definition, either inside makerchip,
+   // or outside for formal.
+   m4_define(['m4_module_def'],
+             ['m4_ifelse(M4_FORMAL, 0,
+                         ['\SV['']m4_new_line['']m4_makerchip_module'],
+                         ['   module warpv(input logic clk,
             input logic reset,
             output logic failed,
             output logic passed,
@@ -764,8 +766,7 @@ m4+makerchip_header(['
             output logic [3: 0] rvfi_mem_rmask,  
             output logic [3: 0] rvfi_mem_wmask,  
             output logic [31: 0] rvfi_mem_rdata,  
-            output logic [31: 0] rvfi_mem_wdata);
-['']\SV'])'])
+            output logic [31: 0] rvfi_mem_wdata);'])'])
 '])
 \SV
 /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
@@ -1819,7 +1820,9 @@ m4+makerchip_header(['
             /regs[*]
                <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
 
-   
+         @M4_REG_WR_STAGE
+            `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
+
 \TLV tb()
    |fetch
       /instr
@@ -1829,26 +1832,18 @@ m4+makerchip_header(['
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             *passed = ! *reset && $ReachedEnd && $Reg4Became45;
             *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
-   
 
-
-// ===================
-// Formal Verification
-// ===================
-//
-\TLV 
+\TLV formal()
    |fetch
       @M4_REG_WR_STAGE
          /instr
-            
-            m4_ifelse_block(M4_FORMAL, ['1'], ['
             $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
             /original
                $ANY = /instr$returning_ld ? /instr/original_ld$ANY : /instr$ANY;
                /src[2:1]
                   $ANY = /instr$returning_ld ? /instr/original_ld/src$ANY : /instr/src$ANY;
-            
+
             // RVFI interface for formal verification.
             $trap = $aborting_trap ||
                     $non_aborting_trap;
@@ -1888,9 +1883,8 @@ m4+makerchip_header(['
             *rvfi_mem_wdata   = $valid_st ? $st_value : 0;
 
             `BOGUS_USE(/src[2]$dummy)
-            '], ['
-            `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions.
-            '])
+
+m4+module_def
 
 \TLV
    // =================
@@ -1900,7 +1894,6 @@ m4+makerchip_header(['
    // =================
    
    m4+cpu()
-      
    m4_ifelse_block(M4_TB, 1, ['
    m4+tb()
    '])
