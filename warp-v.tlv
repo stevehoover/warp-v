@@ -1,7 +1,7 @@
 \m4_TLV_version 1d: tl-x.org
 \SV
    // -----------------------------------------------------------------------------
-   // Copyright (c) 2017, Steven F. Hoover
+   // Copyright (c) 2018, Steven F. Hoover
    // 
    // Redistribution and use in source and binary forms, with or without
    // modification, are permitted provided that the following conditions are met:
