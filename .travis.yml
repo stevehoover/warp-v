@@ -2,9 +2,10 @@ dist: trusty
 sudo: true
 language: generic
 before_install:
-  - sudo apt-get install libstdc++6 && cd ..
+  - cd ..
 install:
   - pwd
+  - git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && make config-clang && make && popd
   - git clone https://github.com/stevehoover/warp-v_ci_env.git
   - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 && popd
   
