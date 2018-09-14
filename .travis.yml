@@ -4,7 +4,7 @@ language: generic
 
 cache:
   directories:
-    /home/travis/stevehoover/yosys/
+    /home/travis/build/stevehoover/yosys/
 
 before_install:
   - cd ..
