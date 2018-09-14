@@ -183,11 +183,19 @@
       //_\end_source
       `line 1521 "../warpv.tlv" 2
    
-      
-      
-      
+         // FIXME
+      // The program in an instruction memory.
+      /*SV_plus*/
+         logic [31:0] instrs [0:11-1];
+      `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 14 as: m4+indirect(M4_isa['_cnt10_prog'])
+         `line 985 "../warpv.tlv" 1   // Instantiated from built-in definition.
+            
          
+         //_\end_source
+         `line 3 "<builtin>" 2
       
+      //_\end_source
+      `line 1527 "../warpv.tlv" 2
       
    
    
@@ -213,7 +221,7 @@
                   // =====
    
                   // Fetch the raw instruction from program memory (or, for formal, tie it off).
-                  assign FETCH_Instr_raw_a0[31:0] = 32'b0;
+                  assign FETCH_Instr_raw_a0[31:0] = instrs[FETCH_Instr_Pc_a0[5:2]];
                
             //_@0
                
