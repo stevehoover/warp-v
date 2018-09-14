@@ -11,7 +11,7 @@ before_install:
 install:
   - pwd
   - if [ ! -e yosys ]; then git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && (git rev-parse HEAD > commit_id.txt) && make config-clang && make && popd; fi
-  - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt && if cmp -s yosys_latest_commit_id.txt yosys/commit_id.txt; then echo ******** Using the following cached Yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. ********** && cat yosys/commit_id.txt && echo '**********'; fi
+  - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt && if cmp -s yosys_latest_commit_id.txt yosys/commit_id.txt; then echo '******** Using the following cached Yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. **********' && cat yosys/commit_id.txt && echo '**********'; fi
   - git clone https://github.com/stevehoover/warp-v_ci_env.git && pushd warp-v_ci_env/env/bin && gunzip yosys.gz && popd
   - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 && popd
   
