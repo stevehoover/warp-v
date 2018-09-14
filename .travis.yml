@@ -5,7 +5,7 @@ before_install:
   - cd ..
 install:
   - pwd
-  - #git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && make config-clang && make && popd
+  - git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && make config-clang && make && popd
   - git clone https://github.com/stevehoover/warp-v_ci_env.git && pushd warp-v_ci_env/env/bin && gunzip yosys.gz && popd
   - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 && popd
   
@@ -19,8 +19,7 @@ script:
   - pwd
   - ls
   - ls -l /home/travis/build/stevehoover/warp-v_ci_env/env/bin
-  - #PATH=/home/travis/build/stevehoover/yosys:
-  - PATH=$PATH:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
+  - PATH=$PATH:/home/travis/build/stevehoover/yosys:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
 after_success: echo "SUCCESS!"
 after_failure: echo "FAILURE!!!"
 after_script: echo "after_script"
