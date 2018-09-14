@@ -1519,10 +1519,12 @@ m4+definitions(['
    // Generated logic
    m4+indirect(M4_isa['_gen'])
 
+   m4_ifelse_block(M4_FORMAL, 0, ['
    // The program in an instruction memory.
    \SV_plus
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
    m4+indirect(M4_isa['_cnt10_prog'])
+   '])
 
 
    // /=========\
@@ -1546,7 +1548,8 @@ m4+definitions(['
                // Fetch
                // =====
 
-               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+               // Fetch the raw instruction from program memory (or, for formal, tie it off).
+               $raw[M4_INSTR_RANGE] = m4_ifelse(M4_FORMAL, 1, ['32'b0'], ['*instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\]']);
             
          @M4_NEXT_PC_STAGE
             
