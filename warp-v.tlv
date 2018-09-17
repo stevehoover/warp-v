@@ -1549,7 +1549,7 @@ m4+definitions(['
                // =====
 
                // Fetch the raw instruction from program memory (or, for formal, tie it off).
-               $raw[M4_INSTR_RANGE] = m4_ifelse(M4_TB, 0, ['32'b0'], ['*instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\]']);
+               $raw[M4_INSTR_RANGE] = m4_ifelse(M4_TB, 0, ['32'bx'], ['*instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\]']);
             
          @M4_NEXT_PC_STAGE
             
