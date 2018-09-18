@@ -213,7 +213,7 @@
                   // =====
    
                   // Fetch the raw instruction from program memory (or, for formal, tie it off).
-                  assign FETCH_Instr_raw_a0[31:0] = 32'b0;
+                  assign FETCH_Instr_raw_a0[31:0] = 32'bx;
                
             //_@0
                

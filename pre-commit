@@ -4,7 +4,7 @@
 # automatically.
 
 # Configure local repo with .git/pre-commit script.
-if [[ ! -e .git/pre-commit ]] then
+if [[ ! -e .git/pre-commit ]]; then
   cp _git_pre-commit .git/pre-commit
   echo "Configured local repo to build SV prior to commit."
 fi
