@@ -29,7 +29,7 @@ script:
 after_success: echo "SUCCESS!"
 after_failure:
   - echo "FAILURE!!!"
-  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/stevehoover/riscv-formal/cores/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd ; done
+  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/stevehoover/riscv-formal/cores/checks/*/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd ; done
 after_script:
   - echo "after_script"
   - if cmp -s yosys_latest_commit_id.txt yosys/commit_id.txt; then echo '******** Using the following cached Yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. **********' && cat yosys/commit_id.txt && echo '**********'; fi
