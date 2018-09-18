@@ -1,2 +1,3 @@
 #!/bin/bash
-../pre-commit
+# This script is copied by pre-commit into .git/hooks.
+./pre-commit
