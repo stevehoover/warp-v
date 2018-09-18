@@ -213,8 +213,11 @@
                   // =====
    
                   // Fetch the raw instruction from program memory (or, for formal, tie it off).
-                  assign FETCH_Instr_raw_a0[31:0] = 32'bx;
-               
+                  
+                  `BOGUS_USE(FETCH_Instr_raw_a0[31:0])
+                  
+                  
+                  
             //_@0
                
                // ========
@@ -373,7 +376,7 @@
                // Decode of the fetched instruction
                assign FETCH_Instr_valid_decode_a1 = FETCH_Instr_fetch_a1;  // Always decode if we fetch.
                assign FETCH_Instr_valid_decode_branch_a1 = FETCH_Instr_valid_decode_a1 && FETCH_Instr_branch_a1;
-               `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1712 as: m4+indirect(M4_isa['_decode'])
+               `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1715 as: m4+indirect(M4_isa['_decode'])
                   `line 1170 "../warpv.tlv" 1   // Instantiated from built-in definition.
                      // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_valid_as_of(M4_BLAH_STAGE).
                      //_?$valid_decode
@@ -478,8 +481,8 @@
                   `line 3 "<builtin>" 2
                
                //_\end_source
-               `line 1713 "../warpv.tlv" 2
-            `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1713 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
+               `line 1716 "../warpv.tlv" 2
+            `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1716 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
                `line 1496 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$branch
@@ -496,7 +499,7 @@
                `line 3 "<builtin>" 2
             
             //_\end_source
-            `line 1714 "../warpv.tlv" 2
+            `line 1717 "../warpv.tlv" 2
             
             //_@1
                // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
@@ -545,7 +548,7 @@
             // =======
             // Execute
             // =======
-            `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1762 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
+            `line 2 "<builtin>" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1765 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
                `line 1231 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$valid_decode_branch
@@ -700,7 +703,7 @@
                `line 3 "<builtin>" 2
             
             //_\end_source
-            `line 1763 "../warpv.tlv" 2
+            `line 1766 "../warpv.tlv" 2
             
             //_@1
                assign FETCH_Instr_pred_taken_branch_a1 = FETCH_Instr_pred_taken_a1 && FETCH_Instr_branch_a1;
@@ -746,7 +749,7 @@
                assign FETCH_Instr_valid_ld_a2 = FETCH_Instr_ld_a2 && FETCH_Instr_commit_a2;
                assign FETCH_Instr_valid_st_a2 = FETCH_Instr_st_a2 && FETCH_Instr_commit_a2;
    
-      `line 1428 "../warpv.tlv" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1808 as: m4+fixed_latency_fake_memory(/top, 0)
+      `line 1428 "../warpv.tlv" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 1811 as: m4+fixed_latency_fake_memory(/top, 0)
          // This macro assumes little-endian.
          
          //_|fetch
@@ -791,7 +794,7 @@
                      assign {L1_dummy_a3, L1_is_reg_a3, L1_reg_value_a3[31:0]} = {L1b_FETCH_Instr_Src[src].L1_dummy_a3, L1_FETCH_Instr_Src[src].L1_is_reg_a3, L1b_FETCH_Instr_Src[src].L1_reg_value_a3}; end
       
       //_\end_source
-      `line 1809 "../warpv.tlv" 2
+      `line 1812 "../warpv.tlv" 2
       //_|fetch
          //_/instr
             //_@3
@@ -814,7 +817,7 @@
    
    //_\end_source
    `line 15 "warpv_formal/warp-v_formal_local.tlv" 2
-   `line 1840 "../warpv.tlv" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 15 as: m4+formal()
+   `line 1843 "../warpv.tlv" 1   // Instantiated from warpv_formal/warp-v_formal_local.tlv, 15 as: m4+formal()
       //_|fetch
          //_@3
             //_/instr
