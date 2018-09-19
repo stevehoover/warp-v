@@ -47,3 +47,9 @@ Work in a fork and submit push requests that have passed continuous integration 
 
 <a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank">WARP-V Travis CI</a>. CI runs formal verification tests, created using <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank">riscv-formal</a>, by Clifford Wolf.
 
+**`pre-commit`**: Currently, SandPiper is not available for public download due to export restrictions, so it cannot be available in the CI environment. SV sources must be pre-built and included in the repository. Run the `pre-commit` script to run sandpiper locally. This will also configure your local repo to run `pre-commit` as a pre-commit hook in the future.
+
+**CI Environment**: Some of the tools used by CI are provided as pre-built binaries in <a href="https://github.com/stevehoover/warp-v_ci_env" target="_blank">this repo</a>. Others are built from source and cached between builds using a <a href="https://docs.travis-ci.com/user/caching" target="_blank">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to changes in sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
+
+**CI Debug**: <a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
+
