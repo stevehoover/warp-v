@@ -1,11 +1,14 @@
+# These ignores shouldn't matter since builds should only be done in this directory after it is copied to a clone
+# of the riscv-formal repo (that will not be committed).
 cover
 complete
 /checks/
 /picorv32.v
 /disasm.s
 /disasm.o
-warp-v.tlv
-build\.sv
-build_gen\.sv
-m4out
-out\.html
+# These are pre-compiled by pre-commit so CI can run without SandPiper.
+#build\.sv
+#build_gen\.sv
+
+# Intermediate files for SandPiper pre-build
+/sp_obj/
