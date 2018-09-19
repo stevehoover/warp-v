@@ -9,27 +9,24 @@ cache:
 before_install:
   - cd ..
 install:
-  - pwd
-  - ls && ls yosys && if [ ! -e yosys/yosys ]; then git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && (git rev-parse HEAD > commit_id.txt) && make config-clang && make && popd; fi
+  # If yosys is not provided by the cache, build it. Also record its commit ID.
+  - if [ ! -e yosys/yosys ]; then git clone https://github.com/cliffordwolf/yosys.git && pushd yosys && (git rev-parse HEAD > commit_id.txt) && make config-clang && make && popd; fi
+  # Record the commit ID of the latest yosys.
   - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt
+  # Clone some prebuilt binaries we'll need.
   - git clone https://github.com/stevehoover/warp-v_ci_env.git && pushd warp-v_ci_env/env/bin && gunzip yosys.gz && popd
+  # Clone riscv-formal.
   - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 && popd
   
 before_script:
-  - echo "Echoing before_script"
-  - python --version
-  - python3 --version
-  - make -v
   - cp -rf warp-v/warpv_formal riscv-formal/cores/ && cd riscv-formal/cores/warpv_formal
 script:
-  - pwd
-  - ls
-  - ls -l /home/travis/build/stevehoover/warp-v_ci_env/env/bin
+  # Run riscv-formal for WARP-V.
   - PATH=$PATH:/home/travis/build/stevehoover/yosys:/home/travis/build/stevehoover/warp-v_ci_env/env/bin bash -c 'echo $PATH && make genchecks && make verif -j4'
-after_success: echo "SUCCESS!"
+after_success:
 after_failure:
-  - echo "FAILURE!!!"
+  # Upload files for debug.
   - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/stevehoover/riscv-formal/cores/warpv_formal/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`engine_0/trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd && echo; done
 after_script:
-  - echo "after_script"
+  # Report a message if we didn't use the latest commit of yosys.
   - if cmp -s yosys_latest_commit_id.txt yosys/commit_id.txt; then echo '******** Using the following cached Yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. **********' && cat yosys/commit_id.txt && echo '**********'; fi
