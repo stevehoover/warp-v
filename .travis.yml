@@ -12,7 +12,7 @@ install:
   # If env is not provided by the cache, build it.
   - ( cd warp-v/warpv_formal && if [ ! -e env ]; then ./make_env.sh; fi )
   # Clone riscv-formal.
-  - git clone https://github.com/cliffordwolf/riscv-formal.git && pushd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5
+  - ( git clone https://github.com/cliffordwolf/riscv-formal.git && cd riscv-formal && git checkout 51076e93d70648cf813ef00d7e4cd93b94ea55f5 )
   
 before_script:
   - cp -rf warp-v/warpv_formal riscv-formal/cores/ && cd riscv-formal/cores/warpv_formal
