@@ -57,6 +57,12 @@ if [ $? -eq 1 ]; then
   mv yosys* ../../env/bin && \
   mv share/* ../../env/share && \
   comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.' && \
+  echo "ls ../../env/share:" && \
+  ls ../../env/share && \
+  echo "ls ../../env/share/python3:" && \
+  ls ../../env/share/python3 && \
+  echo "ls ../../env/share/yosys/python3:" && \
+  ls ../../env/share/yosys/python3 && \
   mv ../../env/share/python3/* ../../env/share/yosys/python3 && \
   touch PASSED
   STATUS[yosys]=$?
