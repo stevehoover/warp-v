@@ -4,13 +4,16 @@
 # The build is performed in a 'env_build' directory within the current working directory, and
 # installed in an 'env' directory also within the current working directory. Each tool is built
 # in its own directory within 'env_build'. If this directory already exists, the tool will not
-# be built. Each tool is built sequentially even if preceding builds failed.
+# be built. Each tool is built sequentially even if preceding builds failed. Passing tools will
+# touch a "PASSED" file in their directory.
 
 die() { echo "$*" 1>&2 ; exit 1; }
 skip() { true; }  # Use this to skip a command.
 comment() { true; } # This can be used for comments within multiline commands.
 
 
+# Check to see whether the given tool has already been built, and whether it passed.
+# Return 1 if the tool must be built (o.w. 0).
 check_previous_build() {
   cd "$BUILD_DIR"
   if [ -e "$1" ]; then
@@ -52,6 +55,9 @@ if [ $? -eq 1 ]; then
   make && \
   echo "pwd of env_build/yosys: $PWD"
   mv yosys* ../../env/bin && \
+  mv share/* ../../env/share && \
+  comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.'
+  mv ../../env/share/python3/* ../../env/share/yosys/python3 && \
   touch PASSED
   STATUS[yosys]=$?
 fi
