@@ -53,10 +53,10 @@ if [ $? -eq 1 ]; then
   (git rev-parse HEAD > ../../env/yosys_commit_id.txt) && \
   make config-clang && \
   make && \
-  echo "pwd of env_build/yosys: $PWD"
+  echo "pwd of env_build/yosys: $PWD" && \
   mv yosys* ../../env/bin && \
   mv share/* ../../env/share && \
-  comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.'
+  comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.' && \
   mv ../../env/share/python3/* ../../env/share/yosys/python3 && \
   touch PASSED
   STATUS[yosys]=$?
