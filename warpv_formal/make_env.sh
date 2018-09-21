@@ -42,7 +42,7 @@ check_previous_build() {
 cd env_build
 
 BUILD_DIR=`pwd`
-echo "$BUILD_DIR"
+echo "Build dir: $BUILD_DIR"
 
 # Yosys:
 check_previous_build "yosys"
@@ -56,14 +56,6 @@ if [ $? -eq 1 ]; then
   echo "pwd of env_build/yosys: $PWD" && \
   mv yosys* ../../env/bin && \
   mv share/* ../../env/share && \
-  comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.' && \
-  echo "ls ../../env/share:" && \
-  ls ../../env/share && \
-  echo "ls ../../env/share/python3:" && \
-  ls ../../env/share/python3 && \
-  echo "ls ../../env/share/yosys/python3:" && \
-  ls ../../env/share/yosys/python3 && \
-  mv ../../env/share/python3/* ../../env/share/yosys/python3 && \
   touch PASSED
   STATUS[yosys]=$?
 fi
@@ -85,6 +77,14 @@ if [ $? -eq 1 ]; then
   comment 'Capture the commit ID' && \
   (git rev-parse HEAD > ../../env/SymbiYosys_commit_id.txt) && \
   make install PREFIX=../../env && \
+  comment 'Stuff in share/python3 is not in a standard include path. Seems to work in share/yosys, so move it.' && \
+  echo "ls ../../env/share:" && \
+  ls ../../env/share && \
+  echo "ls ../../env/share/python3:" && \
+  ls ../../env/share/python3 && \
+  echo "ls ../../env/share/yosys/python3:" && \
+  ls ../../env/share/yosys/python3 && \
+  mv ../../env/share/python3/* ../../env/share/yosys/python3 && \
   touch PASSED
   STATUS[SymbiYosys]=$?
 fi
