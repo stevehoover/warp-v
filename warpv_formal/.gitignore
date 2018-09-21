@@ -12,3 +12,7 @@ complete
 
 # Intermediate files for SandPiper pre-build
 /sp_obj/
+
+# Environment directories built by make_env
+/env
+/env_build
