@@ -5,7 +5,7 @@
 # installed in an 'env' directory also within the current working directory. Each tool is built
 # in its own directory within 'env_build'. If this directory already exists, the tool will not
 # be built. Each tool is built sequentially even if preceding builds failed. Passing tools will
-# touch a "PASSED" file in their directory.
+# touch a "PASSED" file in their directory, and the entire script will touch "PASSED" in /env.
 
 die() { echo "$*" 1>&2 ; exit 1; }
 skip() { true; }  # Use this to skip a command.
@@ -107,12 +107,16 @@ if [ $? -eq 1 ]; then
 fi
 
 cd "$BUILD_DIR"
-if [[ $STATUS[yosys] || $STATUS[SymbiYosys] || $STATUS[boolector] ]]; then
+if (( ${STATUS[yosys]} || $STATUS[SymbiYosys] || $STATUS[boolector] )); then
   echo && \
   echo "*********************" && \
   echo "Some build(s) FAILED." && \
   echo "*********************" && \
-  echo "($STATUS[yosys], $STATUS[SymbiYosys], $STATUS[boolector])"
+  echo "(${STATUS[yosys]}, ${STATUS[SymbiYosys]}, ${STATUS[boolector]})"
   echo `ls */PASSED` && \
   echo
+  touch ../env/PASSED
+  exit 1
+else
+  exit 0
 fi
