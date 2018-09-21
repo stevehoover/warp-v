@@ -107,12 +107,12 @@ if [ $? -eq 1 ]; then
 fi
 
 cd "$BUILD_DIR"
-if (( $STATUS[yosys] || $STATUS[SymbiYosys] || $STATUS[boolector] )); then
+if (( ${STATUS[yosys]} || $STATUS[SymbiYosys] || $STATUS[boolector] )); then
   echo && \
   echo "*********************" && \
   echo "Some build(s) FAILED." && \
   echo "*********************" && \
-  echo "($STATUS[yosys], $STATUS[SymbiYosys], $STATUS[boolector])"
+  echo "(${STATUS[yosys]}, ${STATUS[SymbiYosys]}, ${STATUS[boolector]})"
   echo `ls */PASSED` && \
   echo
   touch ../env/PASSED
