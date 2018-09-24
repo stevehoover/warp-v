@@ -20,7 +20,7 @@ before_script:
   - cd formal
 script:
   # Run riscv-formal for WARP-V.
-  - PATH=/home/travis/build/stevehoover/warp-v/formal/env/bin:$PATH bash -c 'make genchecks && make verif -j4'
+  - PATH=/home/travis/build/stevehoover/warp-v/formal/env/bin:$PATH bash -c 'make verif'
 after_success:
 after_failure:
   # Upload files for debug.
