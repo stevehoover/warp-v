@@ -16,6 +16,9 @@ There is a <a href="https://gitter.im/librecores/warp-v" target="_blank">public 
 Steve Hoover presented early work at DAC 2018:
   - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank">Slides</a>
   - <a href="http://localhost:8080/module/pane/DAC2018_WARP-V_Poster.pdf" target="_blank">Poster</a>
+  
+Akos Hadnagy presented formal verification at ORConf 2018:
+  - <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank">Slides</a>
 
 ## Goals
 
