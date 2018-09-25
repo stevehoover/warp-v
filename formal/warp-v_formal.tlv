@@ -3,9 +3,9 @@ m4+definitions
    // Configure for formal verification.
    m4_define(['M4_TB'], 0)
    m4_define(['M4_FORMAL'], 1)
-   
+\SV
    // Include WARP-V.
-   m4_include_lib(['../../../warp-v/warp-v.tlv'])  // This path assumes use according to the warpv_formal/README.md.
+   m4_include_lib(['../warp-v.tlv'])
 m4+module_def
 \TLV
    m4+cpu()

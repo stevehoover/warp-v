@@ -27,6 +27,22 @@ WARP-V has attracted interest for academic exploration of both the design method
 
 WARP-V includes core components only. There is no memory hierarchy, CSR infrastructure, TLB, IO, etc. The design is formally verified, and formal verification is run for continuous integration testing. There is interest in integrating WARP-V with other RISC-V SoC infrastructure to leverage these environments while providing greater flexibility in the CPU. There is also interest in characterizing and optimizing the implementation, and performance. For a detailed understanding of project status, consult the Google Drive and chat room.
 
+## Installation
+
+In a clean directory:
+
+```sh
+git clone --recurse-submodules https://github.com/stevehoover/warp-v.git
+```
+
+Note the use of `--recurse-submodules`. If you already cloned without it, you can:
+
+```sh
+cd warp-v
+git submodule init
+git submodule update
+```
+
 ## Contributing to WARP-V
 
 ### Considerations
@@ -43,13 +59,17 @@ There is a clear distinction between these layers, and Makerchip helps to work w
 
 Work in a fork and submit push requests that have passed continuous integration (CI) testing (below). Your work is much more likely to be accepted if it is aligned with the community and doesn't risk patent infringement.
 
+### Formal Verification
+
+WARP-V is verified using the <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank">riscv-formal</a> open-source formal verification framework. Everything for formal verification is in the `formal` directory. See the <a href="https://github.com/stevehoover/warp-v/tree/master/formal" target="_blank">README.md</a> file there.
+
 ### CI
 
-<a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank">WARP-V Travis CI</a>. CI runs formal verification tests, created using <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank">riscv-formal</a>, by Clifford Wolf.
+<a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank">WARP-V Travis CI</a>. CI runs formal verification tests.
 
 **`pre-commit`**: Currently, SandPiper is not available for public download due to export restrictions, so it cannot be available in the CI environment. SV sources must be pre-built and included in the repository. Run the `pre-commit` script to run sandpiper locally. This will also configure your local repo to run `pre-commit` as a pre-commit hook in the future.
 
-**CI Environment**: Some of the tools used by CI are provided as pre-built binaries in <a href="https://github.com/stevehoover/warp-v_ci_env" target="_blank">this repo</a>. Others are built from source and cached between builds using a <a href="https://docs.travis-ci.com/user/caching" target="_blank">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to changes in sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
+**CI Environment**: CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
 
 **CI Debug**: <a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
 

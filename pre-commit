@@ -13,6 +13,6 @@ fi
 # copy of SandPiper (which is why it cannot be done by CI). It cannot be run automatically
 # because client-side hooks in git are not part of repo, and the server does not have
 # SandPiper.
-mkdir -p warpv_formal/sp_obj && \
-  sandpiper -i warpv_formal/warp-v_formal_local.tlv -o warpv_formal/build.sv -p verilog --obj warpv_formal/sp_obj && \
-  git add warpv_formal/build.sv warpv_formal/build_gen.sv
+mkdir -p formal/sp_obj && \
+  sandpiper -i formal/warp-v_formal.tlv -o formal/build.sv -p verilog --obj formal/sp_obj && \
+  git add formal/build.sv formal/build_gen.sv
