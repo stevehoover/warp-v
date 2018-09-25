@@ -121,8 +121,8 @@ if (( ${STATUS[yosys]} || ${STATUS[SymbiYosys]} || ${STATUS[boolector]} )); then
   echo "(${STATUS[yosys]}, ${STATUS[SymbiYosys]}, ${STATUS[boolector]})"
   echo `ls */PASSED` && \
   echo
-  touch ../env/PASSED
   exit 1
 else
+  touch ../env/PASSED
   exit 0
 fi

@@ -7,7 +7,6 @@ cache:
     /home/travis/build/stevehoover/warp-v/formal/env
 
 before_install:
-  - git submodule init && git submodule update
 install:
   # If env is not provided by the cache and marked passed, remove any cached env results and build it.
   - ( cd formal && if [[ ! -e env/PASSED ]]; then rm -rf env/* && ./make_env.sh; fi )
@@ -15,7 +14,7 @@ install:
   - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt
   # Record the commit ID of the latest SymbiYosys.
   - git ls-remote --heads https://github.com/cliffordwolf/SymbiYosys.git refs/heads/master > SymbiYosys_latest_commit_id.txt && sed -i 's/\s.*//' SymbiYosys_latest_commit_id.txt
-  
+
 before_script:
   - cd formal
 script:
