@@ -30,7 +30,6 @@
 
 m4+definitions(['
 
-    
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -219,6 +218,9 @@ m4+definitions(['
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
+   m4_define_hier(['M4_CORE'], 2)  // Cores. If > 1, cores will be connected with a NoC.
+   m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
+   
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
@@ -271,7 +273,7 @@ m4+definitions(['
             (M4_MEM_WR_STAGE, 3),
             (M4_LD_RETURN_ALIGN, 4))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
-         m4_define_hier(M4_DATA_MEM_WORDS, 32)
+         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
       ['1-stage'], ['
          // No pipeline
@@ -287,7 +289,7 @@ m4+definitions(['
             (M4_MEM_WR_STAGE, 0),
             (M4_LD_RETURN_ALIGN, 1))
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
-         m4_define_hier(M4_DATA_MEM_WORDS, 32)
+         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
       ['7-stage'], ['
          // Deep pipeline
@@ -304,7 +306,7 @@ m4+definitions(['
             (M4_EXTRA_REPLAY_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 7))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
-         m4_define_hier(M4_DATA_MEM_WORDS, 32)
+         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       ']
    )
    
@@ -361,7 +363,7 @@ m4+definitions(['
    //                                  can be available.
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Characterization:
-         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE']
       '], ['RISCV'], ['
          // RISC-V Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
@@ -605,11 +607,69 @@ m4+definitions(['
              ['(! $reset && >>m4_eval(M4_NEXT_PC_STAGE - ($1) + 1)$next_good_path_mask[($1) - M4_NEXT_PC_STAGE])'])
    //same as >>m4_eval(M4_NEXT_PC_STAGE - $1)$GoodPathMask[$1 - M4_NEXT_PC_STAGE]), but accessible 1 cycle earlier and without $reset term.
 
+   
+   // ====
+   // CSRs
+   // ====
+   
+   // Macro to define a new CSR.
+   // Eg: m4_define_csr(['mycsr'], ['12'b123'], ['12, NIBBLE_FIELD, 8, BYTE_FIELD'], ['12'b0'], ['12'hFFF'], 1)
+   //  $1: CSR name (lowercase)
+   //  $2: CSR index
+   //  $3: CSR fields (as in m4_define_fields)
+   //  $4: Reset value
+   //  $5: Writable bits mask
+   //  $6: 1 or 0 indicating whether to allow side-effect writes; if 1, signals in scope |fetch@M4_EXECUTE_STAGE
+   //      must provide a write value. Signals are:
+   //        o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
+   //        o $csr_<csr_name>_hw_wr_value: the value to write
+   //        o $csr_<csr_name>_hw_wr_mask: mask of bits to write
+   //      Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
+   //      rare that a bit can be written by both hardware and software.
 
+   // Variables set by this macro:
+   // List of CSRs.
+   m4_define(['m4_csrs'], [''])
+   // Arguments given to this macro for each CSR.
+   // Initial value of CSR read result expression, initialized to ternary default case (X).
+   m4_define(['m4_csrrx_rslt_expr'], ['M4_WORD_CNT'bx'])
+   // Initial value of OR expression for whether CSR index is valid.
+   m4_define(['m4_valid_csr_expr'], ['1'b0'])
+   m4_define(
+      ['m4_define_csr'],
+      ['m4_define_vector_with_fields(['M4_CSR_']m4_to_upper(['$1']), $3)
+        m4_define(['m4_csrs'], 
+                  m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
+        m4_define(['m4_csr_']$1['_args'], ['$@'])
+        m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? $csr_']$1[' : ']m4_csrrx_rslt_expr))
+        m4_define(['m4_valid_csr_expr'], m4_dquote(m4_csrrx_rslt_expr[' || $is_csr_']$1))
+      ']
+   )
+   
+   m4_case(M4_ISA, ['RISCV'], ['
+      // Define CSRs for NoC support.
+      m4_ifexpr(M4_CORE_CNT > 1, ['
+         // As defined in: https://docs.google.com/document/d/1cDUv8cuYF2kha8r6DSv-8pwszsrSP3vXsTiAugRkI1k/edit?usp=sharing
+         // TODO: Find appropriate indices.
+         //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
+         m4_define_csr(['pktdest'],    12'h800,    ['M4_CORE_INDEX_HIGH, DEST, 0'],    ['M4_CORE_INDEX_HIGH'b0'],     ['{M4_CORE_INDEX_HIGH{1'b1}}'],      0)
+         m4_define_csr(['pktwrvc'],    12'h801,    ['M4_VC_INDEX_HIGH, VC, 0'],        ['M4_VC_INDEX_HIGH'b0'],       ['{M4_VC_INDEX_HIGH{1'b1}}'],        0)
+         m4_define_csr(['pktwr'],      12'h802,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b1}}'],            0)
+         m4_define_csr(['pkttail'],    12'h803,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b1}}'],            0)
+         m4_define_csr(['pktctrl'],    12'h804,    ['1, BLOCK, 0'],                    ['1'b0'],                      ['1'b1'],                            0)
+         m4_define_csr(['pktrdvc'],    12'h808,    ['M4_VC_INDEX_HIGH, VC, 0'],        ['M4_VC_INDEX_HIGH'b0'],       ['{M4_VC_INDEX_HIGH{1'b1}}'],        0)
+         m4_define_csr(['pktavail'],   12'h809,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
+         m4_define_csr(['pktcomp'],    12'h80a,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
+         m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_VC_HIGH'b0'],             ['{M4_WORD_HIGH{1'b0}}'],            1)
+         m4_define_csr(['pktinfo'],    12'h80c,    ['m4_eval(M4_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
+                                                                            ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b100'], ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b0'], 1)
+         // Unimplemented: pkthead, pktfree, pktmax, pktmin.
+      '])
+   '])
 
-   // ======================
-   // Code Generation Macros
-   // ======================
+   // ==========================
+   // ISA Code Generation Macros
+   // ==========================
    //
    m4_case(M4_ISA, ['MINI'], ['
       // An out-of-place correction for the fact that in Mini-CPU, instruction
@@ -644,8 +704,8 @@ m4+definitions(['
                 ['m4_define(['M4_OP5_$1_TYPE'], $2)['localparam [4:0] OP5_$3 = 5'b$1;']m4_define(['m4_instr_type_$2_mask_expr'], m4_quote(m4_instr_type_$2_mask_expr)[' | (1 << 5'b$1)'])'])
       // Return 1 if the given instruction is supported, [''] otherwise.
       m4_define(['m4_instr_supported'],
-                ['m4_ifelse(M4_EXT_$3, 1, ['m4_ifelse(M4_WORD_CNT, ['$2'], 1,
-                                                    [''])'],
+                ['m4_ifelse(M4_EXT_$3, 1,
+                            ['m4_ifelse(M4_WORD_CNT, ['$2'], 1, [''])'],
                             [''])'])
       // Instantiated (in \SV_plus context) for each instruction.
       m4_define_hide(['m4_instr'],
@@ -1061,7 +1121,7 @@ m4+definitions(['
       m4_op5(11001, I, JALR)
       m4_op5(11010, _, RESERVED_2)
       m4_op5(11011, J, JAL)
-      m4_op5(11100, _, SYSTEM)
+      m4_op5(11100, I, SYSTEM)
       m4_op5(11101, _, RESERVED_3)
       m4_op5(11110, _, CUSTOM_3_RV128)
       m4_op5(11111, _, 80B)
@@ -1116,12 +1176,12 @@ m4+definitions(['
       //m4_instr(_, 32, I, 00011, 000, FENCE)
       //m4_instr(_, 32, I, 00011, 001, FENCE_I)
       //m4_instr(_, 32, I, 11100, 000, ECALL_EBREAK)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      //m4_instr(_, 32, I, 11100, 001, CSRRW)
-      //m4_instr(_, 32, I, 11100, 010, CSRRS)
-      //m4_instr(_, 32, I, 11100, 011, CSRRC)
-      //m4_instr(_, 32, I, 11100, 101, CSRRWI)
-      //m4_instr(_, 32, I, 11100, 110, CSRRSI)
-      //m4_instr(_, 32, I, 11100, 111, CSRRCI)
+      m4_instr(I, 32, I, 11100, 001, CSRRW)
+      m4_instr(I, 32, I, 11100, 010, CSRRS)
+      m4_instr(I, 32, I, 11100, 011, CSRRC)
+      m4_instr(I, 32, I, 11100, 101, CSRRWI)
+      m4_instr(I, 32, I, 11100, 110, CSRRSI)
+      m4_instr(I, 32, I, 11100, 111, CSRRCI)
       m4_instr(I, 64, I, 00000, 110, LWU)
       m4_instr(I, 64, I, 00000, 011, LD)
       m4_instr(S, 64, I, 01000, 011, SD)
@@ -1155,6 +1215,62 @@ m4+definitions(['
 
 
    // ^---------------------
+   
+
+// Logic for a single CSR.
+\TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, #side_effects)
+   @M4_DECODE_STAGE
+      $is_csr_['']csr_name = $raw[31:20] == csr_index;
+      $is_csrrw_['']csr_name = $is_csrrw_instr && $is_csr_['']csr_name;
+      $is_csrrs_['']csr_name = $is_csrrs_instr && $is_csr_['']csr_name;
+      $is_csrrc_['']csr_name = $is_csrrc_instr && $is_csr_['']csr_name;
+      $is_csrrwi_['']csr_name = $is_csrrwi_instr && $is_csr_['']csr_name;
+      $is_csrrsi_['']csr_name = $is_csrrsi_instr && $is_csr_['']csr_name;
+      $is_csrrci_['']csr_name = $is_csrrci_instr && $is_csr_['']csr_name;
+   @M4_EXECUTE_STAGE
+      // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
+      m4_define(['M4_THIS_CSR_RANGE'], m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
+      
+      // hw_wr_mask conditioned by hw_wr.
+      m4_ifexpr(#side_effects, ['$csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;'])
+      // The CSR value, updated by side-effect writes (if #side_effects).
+      $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] =
+           m4_ifexpr(#side_effects, ['($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (! $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name)'], ['$csr_['']csr_name']);
+      // Next value of the CSR.
+      $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
+           $masked_csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
+      <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
+           $reset                     ? reset_value :
+           ($is_csrrw_['']csr_name ||
+            $is_csrrwi_['']csr_name)  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ! writable_mask):
+           ($is_csrrs_['']csr_name ||
+            $is_csrrsi_['']csr_name)  ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
+           ($is_csrrc_['']csr_name ||
+            $is_csrrci_['']csr_name)  ? $upd_csr_['']csr_name & ! $csr_['']csr_name['']_masked_wr_value :
+                                        $upd_csr_['']csr_name;
+
+// Define all CSRs.
+\TLV riscv_csrs(csrs)
+   m4_foreach(csr, csrs, ['
+   m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+   '])
+
+\TLV riscv_csr_writes()
+   // CSR write value for CSR write instructions.
+   $masked_csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
+   // CSR write signals.
+   $csr_pktavail_hw_wr = 1'b0;
+   $csr_pktavail_hw_wr_mask = {M4_VC_HIGH{1'b1}};
+   $csr_pktavail_hw_wr_value = {M4_VC_HIGH{1'b1}};
+   $csr_pktcomp_hw_wr = 1'b0;
+   $csr_pktcomp_hw_wr_mask = {M4_VC_HIGH{1'b1}};
+   $csr_pktcomp_hw_wr_value = {M4_VC_HIGH{1'b1}};
+   $csr_pktrd_hw_wr = 1'b0;
+   $csr_pktrd_hw_wr_mask = {M4_WORD_HIGH{1'b1}};
+   $csr_pktrd_hw_wr_value = {M4_WORD_HIGH{1'b0}};
+   $csr_pktinfo_hw_wr = 1'b0;
+   $csr_pktinfo_hw_wr_mask = {M4_WORD_HIGH{1'b1}};
+   $csr_pktinfo_hw_wr_value = {M4_WORD_HIGH{1'b0}};
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
 // This keeps the implications contained.
@@ -1290,7 +1406,29 @@ m4+definitions(['
          $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
+         // TODO: CSR read instructions have the same result expression. Synthesis might not optimize optimally.
+         $csrrw_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
+         $csrrs_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
+         $csrrc_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
+         $csrrwi_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
+         $csrrsi_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
+         $csrrci_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
+         
+   // CSR logic
+   // ---------
+   m4+riscv_csrs((m4_csrs))
    @_exe_stage
+      m4+riscv_csr_writes()
+      // CSR trap.
+      $is_csr_instr = $is_csrrw_instr ||
+                      $is_csrrs_instr ||
+                      $is_csrrc_instr ||
+                      $is_csrrwi_instr ||
+                      $is_csrrsi_instr ||
+                      $is_csrrci_instr;
+      $valid_csr = m4_valid_csr_expr;
+      $csr_trap = $is_csr_instr && $valid_csr;
+      
       // Memory inputs.
       ?$valid_exe
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
@@ -1339,7 +1477,8 @@ m4+definitions(['
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
                                ($jump && $misaligned_jump_target) ||
                                ($indirect_jump && $misaligned_indirect_jump_target);
-      $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap);
+      $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap) ||
+                               $csr_trap;
       
    @_rslt_stage
       // Mux the correct result.

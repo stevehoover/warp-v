@@ -92,6 +92,145 @@ reg  FETCH_Instr_commit_a3;
 wire FETCH_Instr_conditional_branch_a1;
 reg  FETCH_Instr_conditional_branch_a2;
 
+// For |fetch/instr$csr_pktavail.
+wire [1:0] FETCH_Instr_csr_pktavail_a1;
+reg  [1:0] FETCH_Instr_csr_pktavail_a2;
+
+// For |fetch/instr$csr_pktavail_hw_wr.
+wire FETCH_Instr_csr_pktavail_hw_wr_a2;
+
+// For |fetch/instr$csr_pktavail_hw_wr_en_mask.
+wire [1:0] FETCH_Instr_csr_pktavail_hw_wr_en_mask_a2;
+
+// For |fetch/instr$csr_pktavail_hw_wr_mask.
+wire FETCH_Instr_csr_pktavail_hw_wr_mask_a2;
+
+// For |fetch/instr$csr_pktavail_hw_wr_value.
+wire FETCH_Instr_csr_pktavail_hw_wr_value_a2;
+
+// For |fetch/instr$csr_pktavail_masked_wr_value.
+wire [1:0] FETCH_Instr_csr_pktavail_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktcomp.
+wire [1:0] FETCH_Instr_csr_pktcomp_a1;
+reg  [1:0] FETCH_Instr_csr_pktcomp_a2;
+
+// For |fetch/instr$csr_pktcomp_hw_wr.
+wire FETCH_Instr_csr_pktcomp_hw_wr_a2;
+
+// For |fetch/instr$csr_pktcomp_hw_wr_en_mask.
+wire [1:0] FETCH_Instr_csr_pktcomp_hw_wr_en_mask_a2;
+
+// For |fetch/instr$csr_pktcomp_hw_wr_mask.
+wire FETCH_Instr_csr_pktcomp_hw_wr_mask_a2;
+
+// For |fetch/instr$csr_pktcomp_hw_wr_value.
+wire FETCH_Instr_csr_pktcomp_hw_wr_value_a2;
+
+// For |fetch/instr$csr_pktcomp_masked_wr_value.
+wire [1:0] FETCH_Instr_csr_pktcomp_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktctrl.
+wire [0:0] FETCH_Instr_csr_pktctrl_a1;
+reg  [0:0] FETCH_Instr_csr_pktctrl_a2;
+
+// For |fetch/instr$csr_pktctrl_masked_wr_value.
+wire [0:0] FETCH_Instr_csr_pktctrl_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktdest.
+wire [0:0] FETCH_Instr_csr_pktdest_a1;
+reg  [0:0] FETCH_Instr_csr_pktdest_a2;
+
+// For |fetch/instr$csr_pktdest_masked_wr_value.
+wire [0:0] FETCH_Instr_csr_pktdest_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktinfo.
+wire [3:0] FETCH_Instr_csr_pktinfo_a1;
+reg  [3:0] FETCH_Instr_csr_pktinfo_a2;
+
+// For |fetch/instr$csr_pktinfo_hw_wr.
+wire FETCH_Instr_csr_pktinfo_hw_wr_a2;
+
+// For |fetch/instr$csr_pktinfo_hw_wr_en_mask.
+wire [3:0] FETCH_Instr_csr_pktinfo_hw_wr_en_mask_a2;
+
+// For |fetch/instr$csr_pktinfo_hw_wr_mask.
+wire FETCH_Instr_csr_pktinfo_hw_wr_mask_a2;
+
+// For |fetch/instr$csr_pktinfo_hw_wr_value.
+wire FETCH_Instr_csr_pktinfo_hw_wr_value_a2;
+
+// For |fetch/instr$csr_pktinfo_masked_wr_value.
+wire [3:0] FETCH_Instr_csr_pktinfo_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktrd.
+wire [31:0] FETCH_Instr_csr_pktrd_a1;
+reg  [31:0] FETCH_Instr_csr_pktrd_a2;
+
+// For |fetch/instr$csr_pktrd_hw_wr.
+wire FETCH_Instr_csr_pktrd_hw_wr_a2;
+
+// For |fetch/instr$csr_pktrd_hw_wr_en_mask.
+wire [31:0] FETCH_Instr_csr_pktrd_hw_wr_en_mask_a2;
+
+// For |fetch/instr$csr_pktrd_hw_wr_mask.
+wire FETCH_Instr_csr_pktrd_hw_wr_mask_a2;
+
+// For |fetch/instr$csr_pktrd_hw_wr_value.
+wire FETCH_Instr_csr_pktrd_hw_wr_value_a2;
+
+// For |fetch/instr$csr_pktrd_masked_wr_value.
+wire [31:0] FETCH_Instr_csr_pktrd_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktrdvc.
+wire [0:0] FETCH_Instr_csr_pktrdvc_a1;
+reg  [0:0] FETCH_Instr_csr_pktrdvc_a2;
+
+// For |fetch/instr$csr_pktrdvc_masked_wr_value.
+wire [0:0] FETCH_Instr_csr_pktrdvc_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pkttail.
+wire [31:0] FETCH_Instr_csr_pkttail_a1;
+reg  [31:0] FETCH_Instr_csr_pkttail_a2;
+
+// For |fetch/instr$csr_pkttail_masked_wr_value.
+wire [31:0] FETCH_Instr_csr_pkttail_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktwr.
+wire [31:0] FETCH_Instr_csr_pktwr_a1;
+reg  [31:0] FETCH_Instr_csr_pktwr_a2;
+
+// For |fetch/instr$csr_pktwr_masked_wr_value.
+wire [31:0] FETCH_Instr_csr_pktwr_masked_wr_value_a2;
+
+// For |fetch/instr$csr_pktwrvc.
+wire [0:0] FETCH_Instr_csr_pktwrvc_a1;
+reg  [0:0] FETCH_Instr_csr_pktwrvc_a2;
+
+// For |fetch/instr$csr_pktwrvc_masked_wr_value.
+wire [0:0] FETCH_Instr_csr_pktwrvc_masked_wr_value_a2;
+
+// For |fetch/instr$csr_trap.
+wire FETCH_Instr_csr_trap_a2;
+
+// For |fetch/instr$csrrc_rslt.
+wire [31:0] FETCH_Instr_csrrc_rslt_a2;
+
+// For |fetch/instr$csrrci_rslt.
+wire [31:0] FETCH_Instr_csrrci_rslt_a2;
+
+// For |fetch/instr$csrrs_rslt.
+wire [31:0] FETCH_Instr_csrrs_rslt_a2;
+
+// For |fetch/instr$csrrsi_rslt.
+wire [31:0] FETCH_Instr_csrrsi_rslt_a2;
+
+// For |fetch/instr$csrrw_rslt.
+wire [31:0] FETCH_Instr_csrrw_rslt_a2;
+
+// For |fetch/instr$csrrwi_rslt.
+wire [31:0] FETCH_Instr_csrrwi_rslt_a2;
+
 // For |fetch/instr$dest_pending.
 wire FETCH_Instr_dest_pending_a1;
 
@@ -178,6 +317,313 @@ reg  FETCH_Instr_is_bltu_instr_a2;
 // For |fetch/instr$is_bne_instr.
 wire FETCH_Instr_is_bne_instr_a1;
 reg  FETCH_Instr_is_bne_instr_a2;
+
+// For |fetch/instr$is_csr_instr.
+wire FETCH_Instr_is_csr_instr_a2;
+
+// For |fetch/instr$is_csr_pktavail.
+wire FETCH_Instr_is_csr_pktavail_a1;
+reg  FETCH_Instr_is_csr_pktavail_a2;
+
+// For |fetch/instr$is_csr_pktcomp.
+wire FETCH_Instr_is_csr_pktcomp_a1;
+reg  FETCH_Instr_is_csr_pktcomp_a2;
+
+// For |fetch/instr$is_csr_pktctrl.
+wire FETCH_Instr_is_csr_pktctrl_a1;
+reg  FETCH_Instr_is_csr_pktctrl_a2;
+
+// For |fetch/instr$is_csr_pktdest.
+wire FETCH_Instr_is_csr_pktdest_a1;
+reg  FETCH_Instr_is_csr_pktdest_a2;
+
+// For |fetch/instr$is_csr_pktinfo.
+wire FETCH_Instr_is_csr_pktinfo_a1;
+reg  FETCH_Instr_is_csr_pktinfo_a2;
+
+// For |fetch/instr$is_csr_pktrd.
+wire FETCH_Instr_is_csr_pktrd_a1;
+reg  FETCH_Instr_is_csr_pktrd_a2;
+
+// For |fetch/instr$is_csr_pktrdvc.
+wire FETCH_Instr_is_csr_pktrdvc_a1;
+reg  FETCH_Instr_is_csr_pktrdvc_a2;
+
+// For |fetch/instr$is_csr_pkttail.
+wire FETCH_Instr_is_csr_pkttail_a1;
+reg  FETCH_Instr_is_csr_pkttail_a2;
+
+// For |fetch/instr$is_csr_pktwr.
+wire FETCH_Instr_is_csr_pktwr_a1;
+reg  FETCH_Instr_is_csr_pktwr_a2;
+
+// For |fetch/instr$is_csr_pktwrvc.
+wire FETCH_Instr_is_csr_pktwrvc_a1;
+reg  FETCH_Instr_is_csr_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrc_instr.
+wire FETCH_Instr_is_csrrc_instr_a1;
+reg  FETCH_Instr_is_csrrc_instr_a2;
+
+// For |fetch/instr$is_csrrc_pktavail.
+wire FETCH_Instr_is_csrrc_pktavail_a1;
+reg  FETCH_Instr_is_csrrc_pktavail_a2;
+
+// For |fetch/instr$is_csrrc_pktcomp.
+wire FETCH_Instr_is_csrrc_pktcomp_a1;
+reg  FETCH_Instr_is_csrrc_pktcomp_a2;
+
+// For |fetch/instr$is_csrrc_pktctrl.
+wire FETCH_Instr_is_csrrc_pktctrl_a1;
+reg  FETCH_Instr_is_csrrc_pktctrl_a2;
+
+// For |fetch/instr$is_csrrc_pktdest.
+wire FETCH_Instr_is_csrrc_pktdest_a1;
+reg  FETCH_Instr_is_csrrc_pktdest_a2;
+
+// For |fetch/instr$is_csrrc_pktinfo.
+wire FETCH_Instr_is_csrrc_pktinfo_a1;
+reg  FETCH_Instr_is_csrrc_pktinfo_a2;
+
+// For |fetch/instr$is_csrrc_pktrd.
+wire FETCH_Instr_is_csrrc_pktrd_a1;
+reg  FETCH_Instr_is_csrrc_pktrd_a2;
+
+// For |fetch/instr$is_csrrc_pktrdvc.
+wire FETCH_Instr_is_csrrc_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrc_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrc_pkttail.
+wire FETCH_Instr_is_csrrc_pkttail_a1;
+reg  FETCH_Instr_is_csrrc_pkttail_a2;
+
+// For |fetch/instr$is_csrrc_pktwr.
+wire FETCH_Instr_is_csrrc_pktwr_a1;
+reg  FETCH_Instr_is_csrrc_pktwr_a2;
+
+// For |fetch/instr$is_csrrc_pktwrvc.
+wire FETCH_Instr_is_csrrc_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrc_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrci_instr.
+wire FETCH_Instr_is_csrrci_instr_a1;
+reg  FETCH_Instr_is_csrrci_instr_a2;
+
+// For |fetch/instr$is_csrrci_pktavail.
+wire FETCH_Instr_is_csrrci_pktavail_a1;
+reg  FETCH_Instr_is_csrrci_pktavail_a2;
+
+// For |fetch/instr$is_csrrci_pktcomp.
+wire FETCH_Instr_is_csrrci_pktcomp_a1;
+reg  FETCH_Instr_is_csrrci_pktcomp_a2;
+
+// For |fetch/instr$is_csrrci_pktctrl.
+wire FETCH_Instr_is_csrrci_pktctrl_a1;
+reg  FETCH_Instr_is_csrrci_pktctrl_a2;
+
+// For |fetch/instr$is_csrrci_pktdest.
+wire FETCH_Instr_is_csrrci_pktdest_a1;
+reg  FETCH_Instr_is_csrrci_pktdest_a2;
+
+// For |fetch/instr$is_csrrci_pktinfo.
+wire FETCH_Instr_is_csrrci_pktinfo_a1;
+reg  FETCH_Instr_is_csrrci_pktinfo_a2;
+
+// For |fetch/instr$is_csrrci_pktrd.
+wire FETCH_Instr_is_csrrci_pktrd_a1;
+reg  FETCH_Instr_is_csrrci_pktrd_a2;
+
+// For |fetch/instr$is_csrrci_pktrdvc.
+wire FETCH_Instr_is_csrrci_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrci_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrci_pkttail.
+wire FETCH_Instr_is_csrrci_pkttail_a1;
+reg  FETCH_Instr_is_csrrci_pkttail_a2;
+
+// For |fetch/instr$is_csrrci_pktwr.
+wire FETCH_Instr_is_csrrci_pktwr_a1;
+reg  FETCH_Instr_is_csrrci_pktwr_a2;
+
+// For |fetch/instr$is_csrrci_pktwrvc.
+wire FETCH_Instr_is_csrrci_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrci_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrs_instr.
+wire FETCH_Instr_is_csrrs_instr_a1;
+reg  FETCH_Instr_is_csrrs_instr_a2;
+
+// For |fetch/instr$is_csrrs_pktavail.
+wire FETCH_Instr_is_csrrs_pktavail_a1;
+reg  FETCH_Instr_is_csrrs_pktavail_a2;
+
+// For |fetch/instr$is_csrrs_pktcomp.
+wire FETCH_Instr_is_csrrs_pktcomp_a1;
+reg  FETCH_Instr_is_csrrs_pktcomp_a2;
+
+// For |fetch/instr$is_csrrs_pktctrl.
+wire FETCH_Instr_is_csrrs_pktctrl_a1;
+reg  FETCH_Instr_is_csrrs_pktctrl_a2;
+
+// For |fetch/instr$is_csrrs_pktdest.
+wire FETCH_Instr_is_csrrs_pktdest_a1;
+reg  FETCH_Instr_is_csrrs_pktdest_a2;
+
+// For |fetch/instr$is_csrrs_pktinfo.
+wire FETCH_Instr_is_csrrs_pktinfo_a1;
+reg  FETCH_Instr_is_csrrs_pktinfo_a2;
+
+// For |fetch/instr$is_csrrs_pktrd.
+wire FETCH_Instr_is_csrrs_pktrd_a1;
+reg  FETCH_Instr_is_csrrs_pktrd_a2;
+
+// For |fetch/instr$is_csrrs_pktrdvc.
+wire FETCH_Instr_is_csrrs_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrs_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrs_pkttail.
+wire FETCH_Instr_is_csrrs_pkttail_a1;
+reg  FETCH_Instr_is_csrrs_pkttail_a2;
+
+// For |fetch/instr$is_csrrs_pktwr.
+wire FETCH_Instr_is_csrrs_pktwr_a1;
+reg  FETCH_Instr_is_csrrs_pktwr_a2;
+
+// For |fetch/instr$is_csrrs_pktwrvc.
+wire FETCH_Instr_is_csrrs_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrs_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrsi_instr.
+wire FETCH_Instr_is_csrrsi_instr_a1;
+reg  FETCH_Instr_is_csrrsi_instr_a2;
+
+// For |fetch/instr$is_csrrsi_pktavail.
+wire FETCH_Instr_is_csrrsi_pktavail_a1;
+reg  FETCH_Instr_is_csrrsi_pktavail_a2;
+
+// For |fetch/instr$is_csrrsi_pktcomp.
+wire FETCH_Instr_is_csrrsi_pktcomp_a1;
+reg  FETCH_Instr_is_csrrsi_pktcomp_a2;
+
+// For |fetch/instr$is_csrrsi_pktctrl.
+wire FETCH_Instr_is_csrrsi_pktctrl_a1;
+reg  FETCH_Instr_is_csrrsi_pktctrl_a2;
+
+// For |fetch/instr$is_csrrsi_pktdest.
+wire FETCH_Instr_is_csrrsi_pktdest_a1;
+reg  FETCH_Instr_is_csrrsi_pktdest_a2;
+
+// For |fetch/instr$is_csrrsi_pktinfo.
+wire FETCH_Instr_is_csrrsi_pktinfo_a1;
+reg  FETCH_Instr_is_csrrsi_pktinfo_a2;
+
+// For |fetch/instr$is_csrrsi_pktrd.
+wire FETCH_Instr_is_csrrsi_pktrd_a1;
+reg  FETCH_Instr_is_csrrsi_pktrd_a2;
+
+// For |fetch/instr$is_csrrsi_pktrdvc.
+wire FETCH_Instr_is_csrrsi_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrsi_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrsi_pkttail.
+wire FETCH_Instr_is_csrrsi_pkttail_a1;
+reg  FETCH_Instr_is_csrrsi_pkttail_a2;
+
+// For |fetch/instr$is_csrrsi_pktwr.
+wire FETCH_Instr_is_csrrsi_pktwr_a1;
+reg  FETCH_Instr_is_csrrsi_pktwr_a2;
+
+// For |fetch/instr$is_csrrsi_pktwrvc.
+wire FETCH_Instr_is_csrrsi_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrsi_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrw_instr.
+wire FETCH_Instr_is_csrrw_instr_a1;
+reg  FETCH_Instr_is_csrrw_instr_a2;
+
+// For |fetch/instr$is_csrrw_pktavail.
+wire FETCH_Instr_is_csrrw_pktavail_a1;
+reg  FETCH_Instr_is_csrrw_pktavail_a2;
+
+// For |fetch/instr$is_csrrw_pktcomp.
+wire FETCH_Instr_is_csrrw_pktcomp_a1;
+reg  FETCH_Instr_is_csrrw_pktcomp_a2;
+
+// For |fetch/instr$is_csrrw_pktctrl.
+wire FETCH_Instr_is_csrrw_pktctrl_a1;
+reg  FETCH_Instr_is_csrrw_pktctrl_a2;
+
+// For |fetch/instr$is_csrrw_pktdest.
+wire FETCH_Instr_is_csrrw_pktdest_a1;
+reg  FETCH_Instr_is_csrrw_pktdest_a2;
+
+// For |fetch/instr$is_csrrw_pktinfo.
+wire FETCH_Instr_is_csrrw_pktinfo_a1;
+reg  FETCH_Instr_is_csrrw_pktinfo_a2;
+
+// For |fetch/instr$is_csrrw_pktrd.
+wire FETCH_Instr_is_csrrw_pktrd_a1;
+reg  FETCH_Instr_is_csrrw_pktrd_a2;
+
+// For |fetch/instr$is_csrrw_pktrdvc.
+wire FETCH_Instr_is_csrrw_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrw_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrw_pkttail.
+wire FETCH_Instr_is_csrrw_pkttail_a1;
+reg  FETCH_Instr_is_csrrw_pkttail_a2;
+
+// For |fetch/instr$is_csrrw_pktwr.
+wire FETCH_Instr_is_csrrw_pktwr_a1;
+reg  FETCH_Instr_is_csrrw_pktwr_a2;
+
+// For |fetch/instr$is_csrrw_pktwrvc.
+wire FETCH_Instr_is_csrrw_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrw_pktwrvc_a2;
+
+// For |fetch/instr$is_csrrwi_instr.
+wire FETCH_Instr_is_csrrwi_instr_a1;
+reg  FETCH_Instr_is_csrrwi_instr_a2;
+
+// For |fetch/instr$is_csrrwi_pktavail.
+wire FETCH_Instr_is_csrrwi_pktavail_a1;
+reg  FETCH_Instr_is_csrrwi_pktavail_a2;
+
+// For |fetch/instr$is_csrrwi_pktcomp.
+wire FETCH_Instr_is_csrrwi_pktcomp_a1;
+reg  FETCH_Instr_is_csrrwi_pktcomp_a2;
+
+// For |fetch/instr$is_csrrwi_pktctrl.
+wire FETCH_Instr_is_csrrwi_pktctrl_a1;
+reg  FETCH_Instr_is_csrrwi_pktctrl_a2;
+
+// For |fetch/instr$is_csrrwi_pktdest.
+wire FETCH_Instr_is_csrrwi_pktdest_a1;
+reg  FETCH_Instr_is_csrrwi_pktdest_a2;
+
+// For |fetch/instr$is_csrrwi_pktinfo.
+wire FETCH_Instr_is_csrrwi_pktinfo_a1;
+reg  FETCH_Instr_is_csrrwi_pktinfo_a2;
+
+// For |fetch/instr$is_csrrwi_pktrd.
+wire FETCH_Instr_is_csrrwi_pktrd_a1;
+reg  FETCH_Instr_is_csrrwi_pktrd_a2;
+
+// For |fetch/instr$is_csrrwi_pktrdvc.
+wire FETCH_Instr_is_csrrwi_pktrdvc_a1;
+reg  FETCH_Instr_is_csrrwi_pktrdvc_a2;
+
+// For |fetch/instr$is_csrrwi_pkttail.
+wire FETCH_Instr_is_csrrwi_pkttail_a1;
+reg  FETCH_Instr_is_csrrwi_pkttail_a2;
+
+// For |fetch/instr$is_csrrwi_pktwr.
+wire FETCH_Instr_is_csrrwi_pktwr_a1;
+reg  FETCH_Instr_is_csrrwi_pktwr_a2;
+
+// For |fetch/instr$is_csrrwi_pktwrvc.
+wire FETCH_Instr_is_csrrwi_pktwrvc_a1;
+reg  FETCH_Instr_is_csrrwi_pktwrvc_a2;
 
 // For |fetch/instr$is_dest_condition.
 wire FETCH_Instr_is_dest_condition_a1;
@@ -351,6 +797,9 @@ wire [31:0] FETCH_Instr_lui_rslt_a2;
 
 // For |fetch/instr$lw_rslt.
 wire [31:0] FETCH_Instr_lw_rslt_a2;
+
+// For |fetch/instr$masked_csr_wr_value.
+wire [31:0] FETCH_Instr_masked_csr_wr_value_a2;
 
 // For |fetch/instr$misaligned_indirect_jump_target.
 wire FETCH_Instr_misaligned_indirect_jump_target_a2;
@@ -583,6 +1032,39 @@ reg  [31:2] FETCH_Instr_trap_target_a3;
 
 // For |fetch/instr$unnatural_addr_trap.
 wire FETCH_Instr_unnatural_addr_trap_a2;
+
+// For |fetch/instr$upd_csr_pktavail.
+wire [1:0] FETCH_Instr_upd_csr_pktavail_a2;
+
+// For |fetch/instr$upd_csr_pktcomp.
+wire [1:0] FETCH_Instr_upd_csr_pktcomp_a2;
+
+// For |fetch/instr$upd_csr_pktctrl.
+wire [0:0] FETCH_Instr_upd_csr_pktctrl_a2;
+
+// For |fetch/instr$upd_csr_pktdest.
+wire [0:0] FETCH_Instr_upd_csr_pktdest_a2;
+
+// For |fetch/instr$upd_csr_pktinfo.
+wire [3:0] FETCH_Instr_upd_csr_pktinfo_a2;
+
+// For |fetch/instr$upd_csr_pktrd.
+wire [31:0] FETCH_Instr_upd_csr_pktrd_a2;
+
+// For |fetch/instr$upd_csr_pktrdvc.
+wire [0:0] FETCH_Instr_upd_csr_pktrdvc_a2;
+
+// For |fetch/instr$upd_csr_pkttail.
+wire [31:0] FETCH_Instr_upd_csr_pkttail_a2;
+
+// For |fetch/instr$upd_csr_pktwr.
+wire [31:0] FETCH_Instr_upd_csr_pktwr_a2;
+
+// For |fetch/instr$upd_csr_pktwrvc.
+wire [0:0] FETCH_Instr_upd_csr_pktwrvc_a2;
+
+// For |fetch/instr$valid_csr.
+wire FETCH_Instr_valid_csr_a2;
 
 // For |fetch/instr$valid_decode.
 wire FETCH_Instr_valid_decode_a1;
@@ -895,6 +1377,36 @@ generate
          // For $conditional_branch.
          always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_conditional_branch_a2 <= FETCH_Instr_conditional_branch_a1;
 
+         // For $csr_pktavail.
+         always @(posedge clk) FETCH_Instr_csr_pktavail_a2[1:0] <= FETCH_Instr_csr_pktavail_a1[1:0];
+
+         // For $csr_pktcomp.
+         always @(posedge clk) FETCH_Instr_csr_pktcomp_a2[1:0] <= FETCH_Instr_csr_pktcomp_a1[1:0];
+
+         // For $csr_pktctrl.
+         always @(posedge clk) FETCH_Instr_csr_pktctrl_a2[0:0] <= FETCH_Instr_csr_pktctrl_a1[0:0];
+
+         // For $csr_pktdest.
+         always @(posedge clk) FETCH_Instr_csr_pktdest_a2[0:0] <= FETCH_Instr_csr_pktdest_a1[0:0];
+
+         // For $csr_pktinfo.
+         always @(posedge clk) FETCH_Instr_csr_pktinfo_a2[3:0] <= FETCH_Instr_csr_pktinfo_a1[3:0];
+
+         // For $csr_pktrd.
+         always @(posedge clk) FETCH_Instr_csr_pktrd_a2[31:0] <= FETCH_Instr_csr_pktrd_a1[31:0];
+
+         // For $csr_pktrdvc.
+         always @(posedge clk) FETCH_Instr_csr_pktrdvc_a2[0:0] <= FETCH_Instr_csr_pktrdvc_a1[0:0];
+
+         // For $csr_pkttail.
+         always @(posedge clk) FETCH_Instr_csr_pkttail_a2[31:0] <= FETCH_Instr_csr_pkttail_a1[31:0];
+
+         // For $csr_pktwr.
+         always @(posedge clk) FETCH_Instr_csr_pktwr_a2[31:0] <= FETCH_Instr_csr_pktwr_a1[31:0];
+
+         // For $csr_pktwrvc.
+         always @(posedge clk) FETCH_Instr_csr_pktwrvc_a2[0:0] <= FETCH_Instr_csr_pktwrvc_a1[0:0];
+
          // For $dest_reg.
          always @(posedge clk) FETCH_Instr_dest_reg_a2[4:0] <= FETCH_Instr_dest_reg_a1[4:0];
          always @(posedge clk) FETCH_Instr_dest_reg_a3[4:0] <= FETCH_Instr_dest_reg_a2[4:0];
@@ -949,6 +1461,234 @@ generate
 
          // For $is_bne_instr.
          always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_bne_instr_a2 <= FETCH_Instr_is_bne_instr_a1;
+
+         // For $is_csr_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csr_pktavail_a2 <= FETCH_Instr_is_csr_pktavail_a1;
+
+         // For $is_csr_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csr_pktcomp_a2 <= FETCH_Instr_is_csr_pktcomp_a1;
+
+         // For $is_csr_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csr_pktctrl_a2 <= FETCH_Instr_is_csr_pktctrl_a1;
+
+         // For $is_csr_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csr_pktdest_a2 <= FETCH_Instr_is_csr_pktdest_a1;
+
+         // For $is_csr_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csr_pktinfo_a2 <= FETCH_Instr_is_csr_pktinfo_a1;
+
+         // For $is_csr_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csr_pktrd_a2 <= FETCH_Instr_is_csr_pktrd_a1;
+
+         // For $is_csr_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csr_pktrdvc_a2 <= FETCH_Instr_is_csr_pktrdvc_a1;
+
+         // For $is_csr_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csr_pkttail_a2 <= FETCH_Instr_is_csr_pkttail_a1;
+
+         // For $is_csr_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csr_pktwr_a2 <= FETCH_Instr_is_csr_pktwr_a1;
+
+         // For $is_csr_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csr_pktwrvc_a2 <= FETCH_Instr_is_csr_pktwrvc_a1;
+
+         // For $is_csrrc_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrc_instr_a2 <= FETCH_Instr_is_csrrc_instr_a1;
+
+         // For $is_csrrc_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktavail_a2 <= FETCH_Instr_is_csrrc_pktavail_a1;
+
+         // For $is_csrrc_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktcomp_a2 <= FETCH_Instr_is_csrrc_pktcomp_a1;
+
+         // For $is_csrrc_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktctrl_a2 <= FETCH_Instr_is_csrrc_pktctrl_a1;
+
+         // For $is_csrrc_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktdest_a2 <= FETCH_Instr_is_csrrc_pktdest_a1;
+
+         // For $is_csrrc_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktinfo_a2 <= FETCH_Instr_is_csrrc_pktinfo_a1;
+
+         // For $is_csrrc_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktrd_a2 <= FETCH_Instr_is_csrrc_pktrd_a1;
+
+         // For $is_csrrc_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktrdvc_a2 <= FETCH_Instr_is_csrrc_pktrdvc_a1;
+
+         // For $is_csrrc_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pkttail_a2 <= FETCH_Instr_is_csrrc_pkttail_a1;
+
+         // For $is_csrrc_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktwr_a2 <= FETCH_Instr_is_csrrc_pktwr_a1;
+
+         // For $is_csrrc_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrc_pktwrvc_a2 <= FETCH_Instr_is_csrrc_pktwrvc_a1;
+
+         // For $is_csrrci_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrci_instr_a2 <= FETCH_Instr_is_csrrci_instr_a1;
+
+         // For $is_csrrci_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktavail_a2 <= FETCH_Instr_is_csrrci_pktavail_a1;
+
+         // For $is_csrrci_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktcomp_a2 <= FETCH_Instr_is_csrrci_pktcomp_a1;
+
+         // For $is_csrrci_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktctrl_a2 <= FETCH_Instr_is_csrrci_pktctrl_a1;
+
+         // For $is_csrrci_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktdest_a2 <= FETCH_Instr_is_csrrci_pktdest_a1;
+
+         // For $is_csrrci_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktinfo_a2 <= FETCH_Instr_is_csrrci_pktinfo_a1;
+
+         // For $is_csrrci_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktrd_a2 <= FETCH_Instr_is_csrrci_pktrd_a1;
+
+         // For $is_csrrci_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktrdvc_a2 <= FETCH_Instr_is_csrrci_pktrdvc_a1;
+
+         // For $is_csrrci_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pkttail_a2 <= FETCH_Instr_is_csrrci_pkttail_a1;
+
+         // For $is_csrrci_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktwr_a2 <= FETCH_Instr_is_csrrci_pktwr_a1;
+
+         // For $is_csrrci_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrci_pktwrvc_a2 <= FETCH_Instr_is_csrrci_pktwrvc_a1;
+
+         // For $is_csrrs_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrs_instr_a2 <= FETCH_Instr_is_csrrs_instr_a1;
+
+         // For $is_csrrs_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktavail_a2 <= FETCH_Instr_is_csrrs_pktavail_a1;
+
+         // For $is_csrrs_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktcomp_a2 <= FETCH_Instr_is_csrrs_pktcomp_a1;
+
+         // For $is_csrrs_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktctrl_a2 <= FETCH_Instr_is_csrrs_pktctrl_a1;
+
+         // For $is_csrrs_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktdest_a2 <= FETCH_Instr_is_csrrs_pktdest_a1;
+
+         // For $is_csrrs_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktinfo_a2 <= FETCH_Instr_is_csrrs_pktinfo_a1;
+
+         // For $is_csrrs_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktrd_a2 <= FETCH_Instr_is_csrrs_pktrd_a1;
+
+         // For $is_csrrs_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktrdvc_a2 <= FETCH_Instr_is_csrrs_pktrdvc_a1;
+
+         // For $is_csrrs_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pkttail_a2 <= FETCH_Instr_is_csrrs_pkttail_a1;
+
+         // For $is_csrrs_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktwr_a2 <= FETCH_Instr_is_csrrs_pktwr_a1;
+
+         // For $is_csrrs_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrs_pktwrvc_a2 <= FETCH_Instr_is_csrrs_pktwrvc_a1;
+
+         // For $is_csrrsi_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrsi_instr_a2 <= FETCH_Instr_is_csrrsi_instr_a1;
+
+         // For $is_csrrsi_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktavail_a2 <= FETCH_Instr_is_csrrsi_pktavail_a1;
+
+         // For $is_csrrsi_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktcomp_a2 <= FETCH_Instr_is_csrrsi_pktcomp_a1;
+
+         // For $is_csrrsi_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktctrl_a2 <= FETCH_Instr_is_csrrsi_pktctrl_a1;
+
+         // For $is_csrrsi_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktdest_a2 <= FETCH_Instr_is_csrrsi_pktdest_a1;
+
+         // For $is_csrrsi_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktinfo_a2 <= FETCH_Instr_is_csrrsi_pktinfo_a1;
+
+         // For $is_csrrsi_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktrd_a2 <= FETCH_Instr_is_csrrsi_pktrd_a1;
+
+         // For $is_csrrsi_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktrdvc_a2 <= FETCH_Instr_is_csrrsi_pktrdvc_a1;
+
+         // For $is_csrrsi_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pkttail_a2 <= FETCH_Instr_is_csrrsi_pkttail_a1;
+
+         // For $is_csrrsi_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktwr_a2 <= FETCH_Instr_is_csrrsi_pktwr_a1;
+
+         // For $is_csrrsi_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrsi_pktwrvc_a2 <= FETCH_Instr_is_csrrsi_pktwrvc_a1;
+
+         // For $is_csrrw_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrw_instr_a2 <= FETCH_Instr_is_csrrw_instr_a1;
+
+         // For $is_csrrw_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktavail_a2 <= FETCH_Instr_is_csrrw_pktavail_a1;
+
+         // For $is_csrrw_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktcomp_a2 <= FETCH_Instr_is_csrrw_pktcomp_a1;
+
+         // For $is_csrrw_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktctrl_a2 <= FETCH_Instr_is_csrrw_pktctrl_a1;
+
+         // For $is_csrrw_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktdest_a2 <= FETCH_Instr_is_csrrw_pktdest_a1;
+
+         // For $is_csrrw_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktinfo_a2 <= FETCH_Instr_is_csrrw_pktinfo_a1;
+
+         // For $is_csrrw_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktrd_a2 <= FETCH_Instr_is_csrrw_pktrd_a1;
+
+         // For $is_csrrw_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktrdvc_a2 <= FETCH_Instr_is_csrrw_pktrdvc_a1;
+
+         // For $is_csrrw_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pkttail_a2 <= FETCH_Instr_is_csrrw_pkttail_a1;
+
+         // For $is_csrrw_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktwr_a2 <= FETCH_Instr_is_csrrw_pktwr_a1;
+
+         // For $is_csrrw_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrw_pktwrvc_a2 <= FETCH_Instr_is_csrrw_pktwrvc_a1;
+
+         // For $is_csrrwi_instr.
+         always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_csrrwi_instr_a2 <= FETCH_Instr_is_csrrwi_instr_a1;
+
+         // For $is_csrrwi_pktavail.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktavail_a2 <= FETCH_Instr_is_csrrwi_pktavail_a1;
+
+         // For $is_csrrwi_pktcomp.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktcomp_a2 <= FETCH_Instr_is_csrrwi_pktcomp_a1;
+
+         // For $is_csrrwi_pktctrl.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktctrl_a2 <= FETCH_Instr_is_csrrwi_pktctrl_a1;
+
+         // For $is_csrrwi_pktdest.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktdest_a2 <= FETCH_Instr_is_csrrwi_pktdest_a1;
+
+         // For $is_csrrwi_pktinfo.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktinfo_a2 <= FETCH_Instr_is_csrrwi_pktinfo_a1;
+
+         // For $is_csrrwi_pktrd.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktrd_a2 <= FETCH_Instr_is_csrrwi_pktrd_a1;
+
+         // For $is_csrrwi_pktrdvc.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktrdvc_a2 <= FETCH_Instr_is_csrrwi_pktrdvc_a1;
+
+         // For $is_csrrwi_pkttail.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pkttail_a2 <= FETCH_Instr_is_csrrwi_pkttail_a1;
+
+         // For $is_csrrwi_pktwr.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktwr_a2 <= FETCH_Instr_is_csrrwi_pktwr_a1;
+
+         // For $is_csrrwi_pktwrvc.
+         always @(posedge clk) FETCH_Instr_is_csrrwi_pktwrvc_a2 <= FETCH_Instr_is_csrrwi_pktwrvc_a1;
 
          // For $is_j_type.
          always @(posedge clkP_FETCH_Instr_valid_decode_a2) FETCH_Instr_is_j_type_a2 <= FETCH_Instr_is_j_type_a1;
