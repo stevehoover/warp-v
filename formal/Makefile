@@ -22,12 +22,12 @@ riscv-formal/README.md:
 
 compile: build.sv
 
-build.sv:
+build.sv: warp-v_formal.tlv
 	rm -rf sp_obj
 	@# Invoke SandPiper. Need to provide input path reaching up the hierarchy to permit higher-level file inclusion.
 	sandpiper -i ../formal/warp-v_formal.tlv -o build.sv --obj sp_obj -p verilog
 
-verif: build.sv env riscv-formal
+verif: checks.cfg genchecks.py build.sv env riscv-formal
 	@# Should use this, but until Clifford accepts pull request, we have a local copy of genchecks.py.
 	@#python3 riscv-formal/checks/genchecks.py --basedir ../riscv-formal
 	python3 ./genchecks.py --basedir ./riscv-formal
