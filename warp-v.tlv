@@ -1979,9 +1979,15 @@ m4+definitions(['
             *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
 
 \TLV formal()
+   // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
+   // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
+   // is provided in /instr/original. RVFI inputs are generally connected from this context,
+   // except for the returning ld data. Also signals which are not relevant to loads are pulled straight from
+   // /instr to avoid unnecessary recirculation.
    |fetch
-      @M4_REG_WR_STAGE
-         /instr
+      /instr
+         @M4_REG_WR_STAGE
+            
             $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
             /original
@@ -2001,17 +2007,18 @@ m4+definitions(['
             $rvfi_valid       = ! <<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
                                 (($commit && ! $ld) || $rvfi_trap || $returning_ld);
             *rvfi_valid       = $rvfi_valid;
-            *rvfi_insn        = /original$raw;
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
-            *rvfi_order       = /original$rvfi_order;
-            *rvfi_intr        = 1'b0;
-            *rvfi_rs1_addr    = /original/src[1]$is_reg ? /original$raw_rs1 : 5'b0;
-            *rvfi_rs2_addr    = /original/src[2]$is_reg ? /original$raw_rs2 : 5'b0;
-            *rvfi_rs1_rdata   = /original/src[1]$is_reg ? /original/src[1]$reg_value : M4_WORD_CNT'b0;
-            *rvfi_rs2_rdata   = /original/src[2]$is_reg ? /original/src[2]$reg_value : M4_WORD_CNT'b0;
-            *rvfi_rd_addr     = ($dest_reg_valid && ! /original$abort) ? /original$raw_rd : 5'b0;
-            *rvfi_rd_wdata    = *rvfi_rd_addr  ? $rslt : 32'b0;
+            /original
+               *rvfi_insn        = $raw;
+               *rvfi_order       = $rvfi_order;
+               *rvfi_intr        = 1'b0;
+               *rvfi_rs1_addr    = /src[1]$is_reg ? $raw_rs1 : 5'b0;
+               *rvfi_rs2_addr    = /src[2]$is_reg ? $raw_rs2 : 5'b0;
+               *rvfi_rs1_rdata   = /src[1]$is_reg ? /src[1]$reg_value : M4_WORD_CNT'b0;
+               *rvfi_rs2_rdata   = /src[2]$is_reg ? /src[2]$reg_value : M4_WORD_CNT'b0;
+               *rvfi_rd_addr     = (/instr$dest_reg_valid && ! $abort) ? $raw_rd : 5'b0;
+               *rvfi_rd_wdata    = *rvfi_rd_addr  ? /instr$rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
                                  $returning_ld   ? /original_ld$pc + 1'b1 :

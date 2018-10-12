@@ -1189,9 +1189,15 @@
    //_\end_source
    `line 12 "formal/warp-v_formal.tlv" 2
    `line 1982 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
+      // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
+      // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
+      // is provided in /instr/original. RVFI inputs are generally connected from this context,
+      // except for the returning ld data. Also signals which are not relevant to loads are pulled straight from
+      // /instr to avoid unnecessary recirculation.
       //_|fetch
-         //_@3
-            //_/instr
+         //_/instr
+            //_@3
+               
                assign FETCH_Instr_pc_a3[31:2] = FETCH_Instr_Pc_a3[31:2];  // A version of PC we can pull through $ANYs.
                // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
                //_/original
@@ -1211,17 +1217,18 @@
                assign FETCH_Instr_rvfi_valid_a3       = ! FETCH_Instr_reset_n1 &&    // Avoid asserting before $reset propagates to this stage.
                                    ((FETCH_Instr_commit_a3 && ! FETCH_Instr_ld_a3) || FETCH_Instr_rvfi_trap_a3 || FETCH_Instr_returning_ld_a3);
                assign rvfi_valid       = FETCH_Instr_rvfi_valid_a3;
-               assign rvfi_insn        = FETCH_Instr_Original_raw_a3;
                assign rvfi_halt        = FETCH_Instr_rvfi_trap_a3;
                assign rvfi_trap        = FETCH_Instr_rvfi_trap_a3;
-               assign rvfi_order       = FETCH_Instr_Original_rvfi_order_a3;
-               assign rvfi_intr        = 1'b0;
-               assign rvfi_rs1_addr    = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs1_a3 : 5'b0;
-               assign rvfi_rs2_addr    = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs2_a3 : 5'b0;
-               assign rvfi_rs1_rdata   = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[1].L1_reg_value_a3 : 32'b0;
-               assign rvfi_rs2_rdata   = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[2].L1_reg_value_a3 : 32'b0;
-               assign rvfi_rd_addr     = (FETCH_Instr_dest_reg_valid_a3 && ! FETCH_Instr_Original_abort_a3) ? FETCH_Instr_Original_raw_rd_a3 : 5'b0;
-               assign rvfi_rd_wdata    = rvfi_rd_addr  ? FETCH_Instr_rslt_a3 : 32'b0;
+               //_/original
+                  assign rvfi_insn        = FETCH_Instr_Original_raw_a3;
+                  assign rvfi_order       = FETCH_Instr_Original_rvfi_order_a3;
+                  assign rvfi_intr        = 1'b0;
+                  assign rvfi_rs1_addr    = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs1_a3 : 5'b0;
+                  assign rvfi_rs2_addr    = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs2_a3 : 5'b0;
+                  assign rvfi_rs1_rdata   = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[1].L1_reg_value_a3 : 32'b0;
+                  assign rvfi_rs2_rdata   = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[2].L1_reg_value_a3 : 32'b0;
+                  assign rvfi_rd_addr     = (FETCH_Instr_dest_reg_valid_a3 && ! FETCH_Instr_Original_abort_a3) ? FETCH_Instr_Original_raw_rd_a3 : 5'b0;
+                  assign rvfi_rd_wdata    = rvfi_rd_addr  ? FETCH_Instr_rslt_a3 : 32'b0;
                assign rvfi_pc_rdata    = {FETCH_Instr_Original_pc_a3[31:2], 2'b00};
                assign rvfi_pc_wdata    = {FETCH_Instr_reset_a3         ? 30'b0 :
                                     FETCH_Instr_returning_ld_a3   ? FETCH_Instr_OriginalLd_pc_a3 + 1'b1 :
