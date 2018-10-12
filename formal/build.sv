@@ -174,7 +174,6 @@
          
             // ^---------------------
             
-         
          //_\end_source
          `line 3 "<builtin>" 2
       //_\end_source
@@ -445,7 +444,6 @@
                            assign FETCH_Instr_is_csrrsi_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11100 && FETCH_Instr_raw_funct3_a1 == 3'b110;
                            assign FETCH_Instr_is_csrrci_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11100 && FETCH_Instr_raw_funct3_a1 == 3'b111;
                            
-                        
                         //_\end_source
                         `line 1315 "../warpv.tlv" 2
                   
@@ -479,7 +477,6 @@
                      // Actually load.
                      assign FETCH_Instr_spec_ld_a1 = FETCH_Instr_valid_decode_a1 && FETCH_Instr_ld_a1;
                      
-                  
                   //_\end_source
                   `line 3 "<builtin>" 2
                //_\end_source
@@ -496,7 +493,6 @@
                            FETCH_Instr_reset_a2 ? 2'b01 :
                            FETCH_Instr_taken_a2 ? (FETCH_Instr_BranchState_a2 == 2'b11 ? FETCH_Instr_BranchState_a2[1:0] : FETCH_Instr_BranchState_a2 + 2'b1) :
                                     (FETCH_Instr_BranchState_a2 == 2'b00 ? FETCH_Instr_BranchState_a2[1:0] : FETCH_Instr_BranchState_a2 - 2'b1);
-               
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
@@ -655,7 +651,6 @@
                                 (FETCH_Instr_is_csrrc_pktdest_a2 ||
                                  FETCH_Instr_is_csrrci_pktdest_a2)  ? FETCH_Instr_upd_csr_pktdest_a2 & ! FETCH_Instr_csr_pktdest_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktdest_a2;
-                     
                      //_\end_source
                      `line 1256 "../warpv.tlv" 2
                      
@@ -689,7 +684,6 @@
                                 (FETCH_Instr_is_csrrc_pktwrvc_a2 ||
                                  FETCH_Instr_is_csrrci_pktwrvc_a2)  ? FETCH_Instr_upd_csr_pktwrvc_a2 & ! FETCH_Instr_csr_pktwrvc_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktwrvc_a2;
-                     
                      //_\end_source
                      `line 1258 "../warpv.tlv" 2
                      
@@ -723,7 +717,6 @@
                                 (FETCH_Instr_is_csrrc_pktwr_a2 ||
                                  FETCH_Instr_is_csrrci_pktwr_a2)  ? FETCH_Instr_upd_csr_pktwr_a2 & ! FETCH_Instr_csr_pktwr_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktwr_a2;
-                     
                      //_\end_source
                      `line 1260 "../warpv.tlv" 2
                      
@@ -757,7 +750,6 @@
                                 (FETCH_Instr_is_csrrc_pkttail_a2 ||
                                  FETCH_Instr_is_csrrci_pkttail_a2)  ? FETCH_Instr_upd_csr_pkttail_a2 & ! FETCH_Instr_csr_pkttail_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pkttail_a2;
-                     
                      //_\end_source
                      `line 1262 "../warpv.tlv" 2
                      
@@ -791,7 +783,6 @@
                                 (FETCH_Instr_is_csrrc_pktctrl_a2 ||
                                  FETCH_Instr_is_csrrci_pktctrl_a2)  ? FETCH_Instr_upd_csr_pktctrl_a2 & ! FETCH_Instr_csr_pktctrl_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktctrl_a2;
-                     
                      //_\end_source
                      `line 1264 "../warpv.tlv" 2
                      
@@ -825,7 +816,6 @@
                                 (FETCH_Instr_is_csrrc_pktrdvc_a2 ||
                                  FETCH_Instr_is_csrrci_pktrdvc_a2)  ? FETCH_Instr_upd_csr_pktrdvc_a2 & ! FETCH_Instr_csr_pktrdvc_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktrdvc_a2;
-                     
                      //_\end_source
                      `line 1266 "../warpv.tlv" 2
                      
@@ -859,7 +849,6 @@
                                 (FETCH_Instr_is_csrrc_pktavail_a2 ||
                                  FETCH_Instr_is_csrrci_pktavail_a2)  ? FETCH_Instr_upd_csr_pktavail_a2 & ! FETCH_Instr_csr_pktavail_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktavail_a2;
-                     
                      //_\end_source
                      `line 1268 "../warpv.tlv" 2
                      
@@ -893,7 +882,6 @@
                                 (FETCH_Instr_is_csrrc_pktcomp_a2 ||
                                  FETCH_Instr_is_csrrci_pktcomp_a2)  ? FETCH_Instr_upd_csr_pktcomp_a2 & ! FETCH_Instr_csr_pktcomp_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktcomp_a2;
-                     
                      //_\end_source
                      `line 1270 "../warpv.tlv" 2
                      
@@ -927,7 +915,6 @@
                                 (FETCH_Instr_is_csrrc_pktrd_a2 ||
                                  FETCH_Instr_is_csrrci_pktrd_a2)  ? FETCH_Instr_upd_csr_pktrd_a2 & ! FETCH_Instr_csr_pktrd_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktrd_a2;
-                     
                      //_\end_source
                      `line 1272 "../warpv.tlv" 2
                      
@@ -961,11 +948,9 @@
                                 (FETCH_Instr_is_csrrc_pktinfo_a2 ||
                                  FETCH_Instr_is_csrrci_pktinfo_a2)  ? FETCH_Instr_upd_csr_pktinfo_a2 & ! FETCH_Instr_csr_pktinfo_masked_wr_value_a2 :
                                                              FETCH_Instr_upd_csr_pktinfo_a2;
-                     
                      //_\end_source
                      `line 1274 "../warpv.tlv" 2
                      
-                  
                   //_\end_source
                   `line 1420 "../warpv.tlv" 2
                   //_@2
@@ -985,7 +970,6 @@
                         assign FETCH_Instr_csr_pktinfo_hw_wr_a2 = 1'b0;
                         assign FETCH_Instr_csr_pktinfo_hw_wr_mask_a2 = {32{1'b1}};
                         assign FETCH_Instr_csr_pktinfo_hw_wr_value_a2 = {32{1'b0}};
-                     
                      //_\end_source
                      `line 1422 "../warpv.tlv" 2
                      // CSR trap.
@@ -1086,11 +1070,9 @@
                             ({32{FETCH_Instr_is_csrrwi_instr_a2}} & FETCH_Instr_csrrwi_rslt_a2) |
                             ({32{FETCH_Instr_is_csrrsi_instr_a2}} & FETCH_Instr_csrrsi_rslt_a2) |
                             ({32{FETCH_Instr_is_csrrci_instr_a2}} & FETCH_Instr_csrrci_rslt_a2);
-                     
                      //_\end_source
                      `line 1486 "../warpv.tlv" 2
                   
-               
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
@@ -1183,7 +1165,6 @@
                   assign {MEM_Data_abort_a3, MEM_Data_addr_a3[31:0], MEM_Data_dest_reg_a3[4:0], MEM_Data_ld_a3, MEM_Data_ld_st_half_a3, MEM_Data_ld_st_word_a3, MEM_Data_ld_value_a3[31:0], MEM_Data_pc_a3[31:2], MEM_Data_raw_a3[31:0], MEM_Data_raw_funct3_a3[2], MEM_Data_raw_rd_a3[4:0], MEM_Data_raw_rs1_a3[4:0], MEM_Data_raw_rs2_a3[4:0], MEM_Data_rvfi_order_a3[63:0], MEM_Data_valid_ld_a3} = {FETCH_Instr_abort_a3, FETCH_Instr_addr_a3, FETCH_Instr_dest_reg_a3, FETCH_Instr_ld_a3, FETCH_Instr_ld_st_half_a3, FETCH_Instr_ld_st_word_a3, FETCH_Instr_ld_value_a3, FETCH_Instr_pc_a3, FETCH_Instr_raw_a3, FETCH_Instr_raw_funct3_a3[2], FETCH_Instr_raw_rd_a3, FETCH_Instr_raw_rs1_a3, FETCH_Instr_raw_rs2_a3, FETCH_Instr_rvfi_order_a3, FETCH_Instr_valid_ld_a3};
                   for (src = 1; src <= 2; src++) begin : L1_MEM_Data_Src wire L1_dummy_a3; reg  L1_dummy_a4; wire L1_is_reg_a3; reg  L1_is_reg_a4; wire [31:0] L1_reg_value_a3; reg  [31:0] L1_reg_value_a4; //_/src
                      assign {L1_dummy_a3, L1_is_reg_a3, L1_reg_value_a3[31:0]} = {L1b_FETCH_Instr_Src[src].L1_dummy_a3, L1_FETCH_Instr_Src[src].L1_is_reg_a3, L1b_FETCH_Instr_Src[src].L1_reg_value_a3}; end
-      
       //_\end_source
       `line 1951 "../warpv.tlv" 2
       //_|fetch
@@ -1205,13 +1186,18 @@
    
             //_@3
                `BOGUS_USE(L1_FETCH_Instr_OriginalLd_Src[2].L1_dummy_a3) // To pull $dummy through $ANY expressions, avoiding empty expressions.
-   
    //_\end_source
    `line 12 "formal/warp-v_formal.tlv" 2
    `line 1982 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
+      // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
+      // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
+      // is provided in /instr/original. RVFI inputs are generally connected from this context,
+      // except for the returning ld data. Also signals which are not relevant to loads are pulled straight from
+      // /instr to avoid unnecessary recirculation.
       //_|fetch
-         //_@3
-            //_/instr
+         //_/instr
+            //_@3
+               
                assign FETCH_Instr_pc_a3[31:2] = FETCH_Instr_Pc_a3[31:2];  // A version of PC we can pull through $ANYs.
                // This scope is a copy of /instr or /instr/original_ld if $returning_ld.
                //_/original
@@ -1231,17 +1217,18 @@
                assign FETCH_Instr_rvfi_valid_a3       = ! FETCH_Instr_reset_n1 &&    // Avoid asserting before $reset propagates to this stage.
                                    ((FETCH_Instr_commit_a3 && ! FETCH_Instr_ld_a3) || FETCH_Instr_rvfi_trap_a3 || FETCH_Instr_returning_ld_a3);
                assign rvfi_valid       = FETCH_Instr_rvfi_valid_a3;
-               assign rvfi_insn        = FETCH_Instr_Original_raw_a3;
                assign rvfi_halt        = FETCH_Instr_rvfi_trap_a3;
                assign rvfi_trap        = FETCH_Instr_rvfi_trap_a3;
-               assign rvfi_order       = FETCH_Instr_Original_rvfi_order_a3;
-               assign rvfi_intr        = 1'b0;
-               assign rvfi_rs1_addr    = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs1_a3 : 5'b0;
-               assign rvfi_rs2_addr    = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs2_a3 : 5'b0;
-               assign rvfi_rs1_rdata   = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[1].L1_reg_value_a3 : 32'b0;
-               assign rvfi_rs2_rdata   = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[2].L1_reg_value_a3 : 32'b0;
-               assign rvfi_rd_addr     = (FETCH_Instr_dest_reg_valid_a3 && ! FETCH_Instr_Original_abort_a3) ? FETCH_Instr_Original_raw_rd_a3 : 5'b0;
-               assign rvfi_rd_wdata    = rvfi_rd_addr  ? FETCH_Instr_rslt_a3 : 32'b0;
+               //_/original
+                  assign rvfi_insn        = FETCH_Instr_Original_raw_a3;
+                  assign rvfi_order       = FETCH_Instr_Original_rvfi_order_a3;
+                  assign rvfi_intr        = 1'b0;
+                  assign rvfi_rs1_addr    = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs1_a3 : 5'b0;
+                  assign rvfi_rs2_addr    = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? FETCH_Instr_Original_raw_rs2_a3 : 5'b0;
+                  assign rvfi_rs1_rdata   = L1_FETCH_Instr_Original_Src[1].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[1].L1_reg_value_a3 : 32'b0;
+                  assign rvfi_rs2_rdata   = L1_FETCH_Instr_Original_Src[2].L1_is_reg_a3 ? L1_FETCH_Instr_Original_Src[2].L1_reg_value_a3 : 32'b0;
+                  assign rvfi_rd_addr     = (FETCH_Instr_dest_reg_valid_a3 && ! FETCH_Instr_Original_abort_a3) ? FETCH_Instr_Original_raw_rd_a3 : 5'b0;
+                  assign rvfi_rd_wdata    = rvfi_rd_addr  ? FETCH_Instr_rslt_a3 : 32'b0;
                assign rvfi_pc_rdata    = {FETCH_Instr_Original_pc_a3[31:2], 2'b00};
                assign rvfi_pc_wdata    = {FETCH_Instr_reset_a3         ? 30'b0 :
                                     FETCH_Instr_returning_ld_a3   ? FETCH_Instr_OriginalLd_pc_a3 + 1'b1 :
@@ -1258,7 +1245,6 @@
                assign rvfi_mem_wdata   = FETCH_Instr_valid_st_a3 ? FETCH_Instr_st_value_a3 : 0;
    
                `BOGUS_USE(L1b_FETCH_Instr_Src[2].L1_dummy_a3)
-   
    endgenerate //_\end_source
    `line 13 "formal/warp-v_formal.tlv" 2
 //_\SV
