@@ -33,11 +33,11 @@
             output logic [31: 0] rvfi_mem_wdata);
 `line 10 "formal/warp-v_formal.tlv" 1
 `include "build_gen.sv" //_\TLV
-   `line 1657 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+cpu()
+   `line 1734 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+cpu()
       
       // Generated logic
-      `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1659 as: m4+indirect(M4_isa['_gen'])
-         `line 1083 "../warpv.tlv" 1   // Instantiated from built-in definition.
+      `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1736 as: m4+indirect(M4_isa['_gen'])
+         `line 1122 "../warpv.tlv" 1   // Instantiated from built-in definition.
             
             // v---------------------
             // Instruction characterization
@@ -177,7 +177,7 @@
          //_\end_source
          `line 3 "<builtin>" 2
       //_\end_source
-      `line 1660 "../warpv.tlv" 2
+      `line 1737 "../warpv.tlv" 2
    
       
       
@@ -372,8 +372,8 @@
                // Decode of the fetched instruction
                assign FETCH_Instr_valid_decode_a1 = FETCH_Instr_fetch_a1;  // Always decode if we fetch.
                assign FETCH_Instr_valid_decode_branch_a1 = FETCH_Instr_valid_decode_a1 && FETCH_Instr_branch_a1;
-               `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1854 as: m4+indirect(M4_isa['_decode'])
-                  `line 1286 "../warpv.tlv" 1   // Instantiated from built-in definition.
+               `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1931 as: m4+indirect(M4_isa['_decode'])
+                  `line 1363 "../warpv.tlv" 1   // Instantiated from built-in definition.
                      // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_valid_as_of(M4_BLAH_STAGE).
                      //_?$valid_decode
                   
@@ -402,7 +402,7 @@
                            assign FETCH_Instr_is_i_type_a1 = INSTR_TYPE_I_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_r_type_a1 = INSTR_TYPE_R_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_ri_type_a1 = INSTR_TYPE_RI_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_r4_type_a1 = INSTR_TYPE_R4_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_s_type_a1 = INSTR_TYPE_S_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_b_type_a1 = INSTR_TYPE_B_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_j_type_a1 = INSTR_TYPE_J_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_u_type_a1 = INSTR_TYPE_U_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is___type_a1 = INSTR_TYPE___MASK[FETCH_Instr_raw_op5_a1]; 
                   
                         // Instruction decode.
-                        `line 1278 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1314 as: m4+riscv_decode_expr()
+                        `line 1355 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1391 as: m4+riscv_decode_expr()
                            assign FETCH_Instr_is_lui_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b01101;
                            assign FETCH_Instr_is_auipc_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b00101;
                            assign FETCH_Instr_is_jal_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11011;
@@ -445,7 +445,7 @@
                            assign FETCH_Instr_is_csrrci_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11100 && FETCH_Instr_raw_funct3_a1 == 3'b111;
                            
                         //_\end_source
-                        `line 1315 "../warpv.tlv" 2
+                        `line 1392 "../warpv.tlv" 2
                   
                         assign FETCH_Instr_illegal_a1 = 1'b1 && ! FETCH_Instr_is_lui_instr_a1 && ! FETCH_Instr_is_auipc_instr_a1 && ! FETCH_Instr_is_jal_instr_a1 && ! FETCH_Instr_is_jalr_instr_a1 && ! FETCH_Instr_is_beq_instr_a1 && ! FETCH_Instr_is_bne_instr_a1 && ! FETCH_Instr_is_blt_instr_a1 && ! FETCH_Instr_is_bge_instr_a1 && ! FETCH_Instr_is_bltu_instr_a1 && ! FETCH_Instr_is_bgeu_instr_a1 && ! FETCH_Instr_is_lb_instr_a1 && ! FETCH_Instr_is_lh_instr_a1 && ! FETCH_Instr_is_lw_instr_a1 && ! FETCH_Instr_is_lbu_instr_a1 && ! FETCH_Instr_is_lhu_instr_a1 && ! FETCH_Instr_is_sb_instr_a1 && ! FETCH_Instr_is_sh_instr_a1 && ! FETCH_Instr_is_sw_instr_a1 && ! FETCH_Instr_is_addi_instr_a1 && ! FETCH_Instr_is_slti_instr_a1 && ! FETCH_Instr_is_sltiu_instr_a1 && ! FETCH_Instr_is_xori_instr_a1 && ! FETCH_Instr_is_ori_instr_a1 && ! FETCH_Instr_is_andi_instr_a1 && ! FETCH_Instr_is_slli_instr_a1 && ! FETCH_Instr_is_srli_srai_instr_a1 && ! FETCH_Instr_is_add_sub_instr_a1 && ! FETCH_Instr_is_sll_instr_a1 && ! FETCH_Instr_is_slt_instr_a1 && ! FETCH_Instr_is_sltu_instr_a1 && ! FETCH_Instr_is_xor_instr_a1 && ! FETCH_Instr_is_srl_sra_instr_a1 && ! FETCH_Instr_is_or_instr_a1 && ! FETCH_Instr_is_and_instr_a1 && ! FETCH_Instr_is_csrrw_instr_a1 && ! FETCH_Instr_is_csrrs_instr_a1 && ! FETCH_Instr_is_csrrc_instr_a1 && ! FETCH_Instr_is_csrrwi_instr_a1 && ! FETCH_Instr_is_csrrsi_instr_a1 && ! FETCH_Instr_is_csrrci_instr_a1;
                         assign FETCH_Instr_conditional_branch_a1 = FETCH_Instr_is_b_type_a1;
@@ -480,9 +480,9 @@
                   //_\end_source
                   `line 3 "<builtin>" 2
                //_\end_source
-               `line 1855 "../warpv.tlv" 2
-            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1855 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
-               `line 1635 "../warpv.tlv" 1   // Instantiated from built-in definition.
+               `line 1932 "../warpv.tlv" 2
+            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1932 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
+               `line 1712 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$branch
                         assign FETCH_Instr_pred_taken_a1 = FETCH_Instr_BranchState_a3[1];
@@ -496,7 +496,7 @@
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
-            `line 1856 "../warpv.tlv" 2
+            `line 1933 "../warpv.tlv" 2
             
             //_@1
                // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
@@ -545,8 +545,8 @@
             // =======
             // Execute
             // =======
-            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1904 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
-               `line 1347 "../warpv.tlv" 1   // Instantiated from built-in definition.
+            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1981 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
+               `line 1424 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$valid_decode_branch
                         assign FETCH_Instr_branch_target_a1[31:2] = FETCH_Instr_Pc_a1[31:2] + FETCH_Instr_raw_b_imm_a1[31:2];
@@ -610,368 +610,264 @@
                         assign FETCH_Instr_or_rslt_a2[31:0] = L1b_FETCH_Instr_Src[1].L1_reg_value_a2 | L1b_FETCH_Instr_Src[2].L1_reg_value_a2;
                         assign FETCH_Instr_and_rslt_a2[31:0] = L1b_FETCH_Instr_Src[1].L1_reg_value_a2 & L1b_FETCH_Instr_Src[2].L1_reg_value_a2;
                         // TODO: CSR read instructions have the same result expression. Synthesis might not optimize optimally.
-                        assign FETCH_Instr_csrrw_rslt_a2[31:0]  = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
-                        assign FETCH_Instr_csrrs_rslt_a2[31:0]  = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
-                        assign FETCH_Instr_csrrc_rslt_a2[31:0]  = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
-                        assign FETCH_Instr_csrrwi_rslt_a2[31:0] = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
-                        assign FETCH_Instr_csrrsi_rslt_a2[31:0] = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
-                        assign FETCH_Instr_csrrci_rslt_a2[31:0] = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx;
+                        assign FETCH_Instr_csrrw_rslt_a2[31:0]  = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
+                        assign FETCH_Instr_csrrs_rslt_a2[31:0]  = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
+                        assign FETCH_Instr_csrrc_rslt_a2[31:0]  = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
+                        assign FETCH_Instr_csrrwi_rslt_a2[31:0] = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
+                        assign FETCH_Instr_csrrsi_rslt_a2[31:0] = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
+                        assign FETCH_Instr_csrrci_rslt_a2[31:0] = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx;
                         
                   // CSR logic
                   // ---------
-                  `line 1254 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1419 as: m4+riscv_csrs((m4_csrs))
+                  `line 1291 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1496 as: m4+riscv_csrs((m4_csrs))
                      
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR CYCLE
+                        //--------------
                         //_@1
-                           assign FETCH_Instr_is_csr_pktdest_a1 = FETCH_Instr_raw_a1[31:20] == 12'h800;
-                           assign FETCH_Instr_is_csrrw_pktdest_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
-                           assign FETCH_Instr_is_csrrs_pktdest_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
-                           assign FETCH_Instr_is_csrrc_pktdest_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
-                           assign FETCH_Instr_is_csrrwi_pktdest_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
-                           assign FETCH_Instr_is_csrrsi_pktdest_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
-                           assign FETCH_Instr_is_csrrci_pktdest_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktdest_a1;
+                           assign FETCH_Instr_is_csr_cycle_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC00;
                         //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_CORE_INDEX_HIGH{1'b1}}.
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
                            
                            
                            // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pktdest_a2[0:0] =
-                                FETCH_Instr_csr_pktdest_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktdest_masked_wr_value_a2[0:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[0:0] & {1{1'b1}};
-                           assign FETCH_Instr_csr_pktdest_a1[0:0] =
-                                FETCH_Instr_reset_a2                     ? 1'b0 :
-                                (FETCH_Instr_is_csrrw_pktdest_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktdest_a2)  ? FETCH_Instr_csr_pktdest_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktdest_a2 & ! {1{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktdest_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktdest_a2)  ? FETCH_Instr_upd_csr_pktdest_a2 |   FETCH_Instr_csr_pktdest_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktdest_a2 ||
-                                 FETCH_Instr_is_csrrci_pktdest_a2)  ? FETCH_Instr_upd_csr_pktdest_a2 & ! FETCH_Instr_csr_pktdest_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktdest_a2;
-                     //_\end_source
-                     `line 1256 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pktwrvc_a1 = FETCH_Instr_raw_a1[31:20] == 12'h801;
-                           assign FETCH_Instr_is_csrrw_pktwrvc_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                           assign FETCH_Instr_is_csrrs_pktwrvc_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                           assign FETCH_Instr_is_csrrc_pktwrvc_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                           assign FETCH_Instr_is_csrrwi_pktwrvc_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                           assign FETCH_Instr_is_csrrsi_pktwrvc_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                           assign FETCH_Instr_is_csrrci_pktwrvc_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktwrvc_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_VC_INDEX_HIGH{1'b1}}.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pktwrvc_a2[0:0] =
-                                FETCH_Instr_csr_pktwrvc_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktwrvc_masked_wr_value_a2[0:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[0:0] & {1{1'b1}};
-                           assign FETCH_Instr_csr_pktwrvc_a1[0:0] =
-                                FETCH_Instr_reset_a2                     ? 1'b0 :
-                                (FETCH_Instr_is_csrrw_pktwrvc_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktwrvc_a2)  ? FETCH_Instr_csr_pktwrvc_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktwrvc_a2 & ! {1{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktwrvc_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktwrvc_a2)  ? FETCH_Instr_upd_csr_pktwrvc_a2 |   FETCH_Instr_csr_pktwrvc_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktwrvc_a2 ||
-                                 FETCH_Instr_is_csrrci_pktwrvc_a2)  ? FETCH_Instr_upd_csr_pktwrvc_a2 & ! FETCH_Instr_csr_pktwrvc_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktwrvc_a2;
-                     //_\end_source
-                     `line 1258 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pktwr_a1 = FETCH_Instr_raw_a1[31:20] == 12'h802;
-                           assign FETCH_Instr_is_csrrw_pktwr_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                           assign FETCH_Instr_is_csrrs_pktwr_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                           assign FETCH_Instr_is_csrrc_pktwr_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                           assign FETCH_Instr_is_csrrwi_pktwr_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                           assign FETCH_Instr_is_csrrsi_pktwr_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                           assign FETCH_Instr_is_csrrci_pktwr_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktwr_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_WORD_HIGH{1'b1}}.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pktwr_a2[31:0] =
-                                FETCH_Instr_csr_pktwr_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktwr_masked_wr_value_a2[31:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & {32{1'b1}};
-                           assign FETCH_Instr_csr_pktwr_a1[31:0] =
-                                FETCH_Instr_reset_a2                     ? 32'b0 :
-                                (FETCH_Instr_is_csrrw_pktwr_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktwr_a2)  ? FETCH_Instr_csr_pktwr_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktwr_a2 & ! {32{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktwr_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktwr_a2)  ? FETCH_Instr_upd_csr_pktwr_a2 |   FETCH_Instr_csr_pktwr_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktwr_a2 ||
-                                 FETCH_Instr_is_csrrci_pktwr_a2)  ? FETCH_Instr_upd_csr_pktwr_a2 & ! FETCH_Instr_csr_pktwr_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktwr_a2;
-                     //_\end_source
-                     `line 1260 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pkttail_a1 = FETCH_Instr_raw_a1[31:20] == 12'h803;
-                           assign FETCH_Instr_is_csrrw_pkttail_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                           assign FETCH_Instr_is_csrrs_pkttail_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                           assign FETCH_Instr_is_csrrc_pkttail_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                           assign FETCH_Instr_is_csrrwi_pkttail_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                           assign FETCH_Instr_is_csrrsi_pkttail_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                           assign FETCH_Instr_is_csrrci_pkttail_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pkttail_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_WORD_HIGH{1'b1}}.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pkttail_a2[31:0] =
-                                FETCH_Instr_csr_pkttail_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pkttail_masked_wr_value_a2[31:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & {32{1'b1}};
-                           assign FETCH_Instr_csr_pkttail_a1[31:0] =
-                                FETCH_Instr_reset_a2                     ? 32'b0 :
-                                (FETCH_Instr_is_csrrw_pkttail_a2 ||
-                                 FETCH_Instr_is_csrrwi_pkttail_a2)  ? FETCH_Instr_csr_pkttail_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pkttail_a2 & ! {32{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pkttail_a2 ||
-                                 FETCH_Instr_is_csrrsi_pkttail_a2)  ? FETCH_Instr_upd_csr_pkttail_a2 |   FETCH_Instr_csr_pkttail_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pkttail_a2 ||
-                                 FETCH_Instr_is_csrrci_pkttail_a2)  ? FETCH_Instr_upd_csr_pkttail_a2 & ! FETCH_Instr_csr_pkttail_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pkttail_a2;
-                     //_\end_source
-                     `line 1262 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pktctrl_a1 = FETCH_Instr_raw_a1[31:20] == 12'h804;
-                           assign FETCH_Instr_is_csrrw_pktctrl_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                           assign FETCH_Instr_is_csrrs_pktctrl_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                           assign FETCH_Instr_is_csrrc_pktctrl_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                           assign FETCH_Instr_is_csrrwi_pktctrl_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                           assign FETCH_Instr_is_csrrsi_pktctrl_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                           assign FETCH_Instr_is_csrrci_pktctrl_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktctrl_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on 1'b1.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pktctrl_a2[0:0] =
-                                FETCH_Instr_csr_pktctrl_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktctrl_masked_wr_value_a2[0:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[0:0] & 1'b1;
-                           assign FETCH_Instr_csr_pktctrl_a1[0:0] =
-                                FETCH_Instr_reset_a2                     ? 1'b0 :
-                                (FETCH_Instr_is_csrrw_pktctrl_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktctrl_a2)  ? FETCH_Instr_csr_pktctrl_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktctrl_a2 & ! 1'b1):
-                                (FETCH_Instr_is_csrrs_pktctrl_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktctrl_a2)  ? FETCH_Instr_upd_csr_pktctrl_a2 |   FETCH_Instr_csr_pktctrl_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktctrl_a2 ||
-                                 FETCH_Instr_is_csrrci_pktctrl_a2)  ? FETCH_Instr_upd_csr_pktctrl_a2 & ! FETCH_Instr_csr_pktctrl_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktctrl_a2;
-                     //_\end_source
-                     `line 1264 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pktrdvc_a1 = FETCH_Instr_raw_a1[31:20] == 12'h808;
-                           assign FETCH_Instr_is_csrrw_pktrdvc_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                           assign FETCH_Instr_is_csrrs_pktrdvc_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                           assign FETCH_Instr_is_csrrc_pktrdvc_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                           assign FETCH_Instr_is_csrrwi_pktrdvc_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                           assign FETCH_Instr_is_csrrsi_pktrdvc_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                           assign FETCH_Instr_is_csrrci_pktrdvc_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktrdvc_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_VC_INDEX_HIGH{1'b1}}.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           
-                           // The CSR value, updated by side-effect writes (if 0).
-                           assign FETCH_Instr_upd_csr_pktrdvc_a2[0:0] =
-                                FETCH_Instr_csr_pktrdvc_a2;
-                           // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktrdvc_masked_wr_value_a2[0:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[0:0] & {1{1'b1}};
-                           assign FETCH_Instr_csr_pktrdvc_a1[0:0] =
-                                FETCH_Instr_reset_a2                     ? 1'b0 :
-                                (FETCH_Instr_is_csrrw_pktrdvc_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktrdvc_a2)  ? FETCH_Instr_csr_pktrdvc_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktrdvc_a2 & ! {1{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktrdvc_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktrdvc_a2)  ? FETCH_Instr_upd_csr_pktrdvc_a2 |   FETCH_Instr_csr_pktrdvc_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktrdvc_a2 ||
-                                 FETCH_Instr_is_csrrci_pktrdvc_a2)  ? FETCH_Instr_upd_csr_pktrdvc_a2 & ! FETCH_Instr_csr_pktrdvc_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktrdvc_a2;
-                     //_\end_source
-                     `line 1266 "../warpv.tlv" 2
-                     
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
-                        //_@1
-                           assign FETCH_Instr_is_csr_pktavail_a1 = FETCH_Instr_raw_a1[31:20] == 12'h809;
-                           assign FETCH_Instr_is_csrrw_pktavail_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                           assign FETCH_Instr_is_csrrs_pktavail_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                           assign FETCH_Instr_is_csrrc_pktavail_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                           assign FETCH_Instr_is_csrrwi_pktavail_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                           assign FETCH_Instr_is_csrrsi_pktavail_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                           assign FETCH_Instr_is_csrrci_pktavail_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktavail_a1;
-                        //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_VC_HIGH{1'b1}}.
-                           
-                           
-                           // hw_wr_mask conditioned by hw_wr.
-                           assign FETCH_Instr_csr_pktavail_hw_wr_en_mask_a2[1:0] = {2{FETCH_Instr_csr_pktavail_hw_wr_a2}} & FETCH_Instr_csr_pktavail_hw_wr_mask_a2;
+                           assign FETCH_Instr_csr_cycle_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_cycle_hw_wr_a2}} & FETCH_Instr_csr_cycle_hw_wr_mask_a2;
                            // The CSR value, updated by side-effect writes (if 1).
-                           assign FETCH_Instr_upd_csr_pktavail_a2[1:0] =
-                                (FETCH_Instr_csr_pktavail_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktavail_hw_wr_value_a2) | (! FETCH_Instr_csr_pktavail_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktavail_a2);
+                           assign FETCH_Instr_upd_csr_cycle_a2[31:0] =
+                                (FETCH_Instr_csr_cycle_hw_wr_en_mask_a2 & FETCH_Instr_csr_cycle_hw_wr_value_a2) | (! FETCH_Instr_csr_cycle_hw_wr_en_mask_a2 & FETCH_Instr_csr_cycle_a2);
                            // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktavail_masked_wr_value_a2[1:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[1:0] & {2{1'b1}};
-                           assign FETCH_Instr_csr_pktavail_a1[1:0] =
-                                FETCH_Instr_reset_a2                     ? 2'b0 :
-                                (FETCH_Instr_is_csrrw_pktavail_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktavail_a2)  ? FETCH_Instr_csr_pktavail_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktavail_a2 & ! {2{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktavail_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktavail_a2)  ? FETCH_Instr_upd_csr_pktavail_a2 |   FETCH_Instr_csr_pktavail_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktavail_a2 ||
-                                 FETCH_Instr_is_csrrci_pktavail_a2)  ? FETCH_Instr_upd_csr_pktavail_a2 & ! FETCH_Instr_csr_pktavail_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktavail_a2;
+                           assign FETCH_Instr_csr_cycle_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_cycle_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_cycle_a2)
+                                       ? FETCH_Instr_csr_cycle_masked_wr_value_a2 | (FETCH_Instr_upd_csr_cycle_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_cycle_a2)
+                                       ? FETCH_Instr_upd_csr_cycle_a2 |   FETCH_Instr_csr_cycle_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_cycle_a2)
+                                       ? FETCH_Instr_upd_csr_cycle_a2 & ~ FETCH_Instr_csr_cycle_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_cycle_a2;
                      //_\end_source
-                     `line 1268 "../warpv.tlv" 2
+                     `line 1293 "../warpv.tlv" 2
                      
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR CYCLEH
+                        //--------------
                         //_@1
-                           assign FETCH_Instr_is_csr_pktcomp_a1 = FETCH_Instr_raw_a1[31:20] == 12'h80a;
-                           assign FETCH_Instr_is_csrrw_pktcomp_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
-                           assign FETCH_Instr_is_csrrs_pktcomp_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
-                           assign FETCH_Instr_is_csrrc_pktcomp_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
-                           assign FETCH_Instr_is_csrrwi_pktcomp_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
-                           assign FETCH_Instr_is_csrrsi_pktcomp_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
-                           assign FETCH_Instr_is_csrrci_pktcomp_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktcomp_a1;
+                           assign FETCH_Instr_is_csr_cycleh_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC80;
                         //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_VC_HIGH{1'b1}}.
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
                            
                            
                            // hw_wr_mask conditioned by hw_wr.
-                           assign FETCH_Instr_csr_pktcomp_hw_wr_en_mask_a2[1:0] = {2{FETCH_Instr_csr_pktcomp_hw_wr_a2}} & FETCH_Instr_csr_pktcomp_hw_wr_mask_a2;
+                           assign FETCH_Instr_csr_cycleh_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_cycleh_hw_wr_a2}} & FETCH_Instr_csr_cycleh_hw_wr_mask_a2;
                            // The CSR value, updated by side-effect writes (if 1).
-                           assign FETCH_Instr_upd_csr_pktcomp_a2[1:0] =
-                                (FETCH_Instr_csr_pktcomp_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktcomp_hw_wr_value_a2) | (! FETCH_Instr_csr_pktcomp_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktcomp_a2);
+                           assign FETCH_Instr_upd_csr_cycleh_a2[31:0] =
+                                (FETCH_Instr_csr_cycleh_hw_wr_en_mask_a2 & FETCH_Instr_csr_cycleh_hw_wr_value_a2) | (! FETCH_Instr_csr_cycleh_hw_wr_en_mask_a2 & FETCH_Instr_csr_cycleh_a2);
                            // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktcomp_masked_wr_value_a2[1:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[1:0] & {2{1'b1}};
-                           assign FETCH_Instr_csr_pktcomp_a1[1:0] =
-                                FETCH_Instr_reset_a2                     ? 2'b0 :
-                                (FETCH_Instr_is_csrrw_pktcomp_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktcomp_a2)  ? FETCH_Instr_csr_pktcomp_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktcomp_a2 & ! {2{1'b1}}):
-                                (FETCH_Instr_is_csrrs_pktcomp_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktcomp_a2)  ? FETCH_Instr_upd_csr_pktcomp_a2 |   FETCH_Instr_csr_pktcomp_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktcomp_a2 ||
-                                 FETCH_Instr_is_csrrci_pktcomp_a2)  ? FETCH_Instr_upd_csr_pktcomp_a2 & ! FETCH_Instr_csr_pktcomp_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktcomp_a2;
+                           assign FETCH_Instr_csr_cycleh_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_cycleh_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_cycleh_a2)
+                                       ? FETCH_Instr_csr_cycleh_masked_wr_value_a2 | (FETCH_Instr_upd_csr_cycleh_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_cycleh_a2)
+                                       ? FETCH_Instr_upd_csr_cycleh_a2 |   FETCH_Instr_csr_cycleh_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_cycleh_a2)
+                                       ? FETCH_Instr_upd_csr_cycleh_a2 & ~ FETCH_Instr_csr_cycleh_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_cycleh_a2;
                      //_\end_source
-                     `line 1270 "../warpv.tlv" 2
+                     `line 1295 "../warpv.tlv" 2
                      
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR TIME
+                        //--------------
                         //_@1
-                           assign FETCH_Instr_is_csr_pktrd_a1 = FETCH_Instr_raw_a1[31:20] == 12'h80b;
-                           assign FETCH_Instr_is_csrrw_pktrd_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
-                           assign FETCH_Instr_is_csrrs_pktrd_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
-                           assign FETCH_Instr_is_csrrc_pktrd_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
-                           assign FETCH_Instr_is_csrrwi_pktrd_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
-                           assign FETCH_Instr_is_csrrsi_pktrd_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
-                           assign FETCH_Instr_is_csrrci_pktrd_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktrd_a1;
+                           assign FETCH_Instr_is_csr_time_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC01;
                         //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on {M4_WORD_HIGH{1'b0}}.
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
                            
                            
                            // hw_wr_mask conditioned by hw_wr.
-                           assign FETCH_Instr_csr_pktrd_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_pktrd_hw_wr_a2}} & FETCH_Instr_csr_pktrd_hw_wr_mask_a2;
+                           assign FETCH_Instr_csr_time_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_time_hw_wr_a2}} & FETCH_Instr_csr_time_hw_wr_mask_a2;
                            // The CSR value, updated by side-effect writes (if 1).
-                           assign FETCH_Instr_upd_csr_pktrd_a2[31:0] =
-                                (FETCH_Instr_csr_pktrd_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktrd_hw_wr_value_a2) | (! FETCH_Instr_csr_pktrd_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktrd_a2);
+                           assign FETCH_Instr_upd_csr_time_a2[31:0] =
+                                (FETCH_Instr_csr_time_hw_wr_en_mask_a2 & FETCH_Instr_csr_time_hw_wr_value_a2) | (! FETCH_Instr_csr_time_hw_wr_en_mask_a2 & FETCH_Instr_csr_time_a2);
                            // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktrd_masked_wr_value_a2[31:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & {32{1'b0}};
-                           assign FETCH_Instr_csr_pktrd_a1[31:0] =
-                                FETCH_Instr_reset_a2                     ? 2'b0 :
-                                (FETCH_Instr_is_csrrw_pktrd_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktrd_a2)  ? FETCH_Instr_csr_pktrd_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktrd_a2 & ! {32{1'b0}}):
-                                (FETCH_Instr_is_csrrs_pktrd_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktrd_a2)  ? FETCH_Instr_upd_csr_pktrd_a2 |   FETCH_Instr_csr_pktrd_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktrd_a2 ||
-                                 FETCH_Instr_is_csrrci_pktrd_a2)  ? FETCH_Instr_upd_csr_pktrd_a2 & ! FETCH_Instr_csr_pktrd_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktrd_a2;
+                           assign FETCH_Instr_csr_time_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_time_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_time_a2)
+                                       ? FETCH_Instr_csr_time_masked_wr_value_a2 | (FETCH_Instr_upd_csr_time_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_time_a2)
+                                       ? FETCH_Instr_upd_csr_time_a2 |   FETCH_Instr_csr_time_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_time_a2)
+                                       ? FETCH_Instr_upd_csr_time_a2 & ~ FETCH_Instr_csr_time_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_time_a2;
                      //_\end_source
-                     `line 1272 "../warpv.tlv" 2
+                     `line 1297 "../warpv.tlv" 2
                      
-                     `line 1222 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR TIMEH
+                        //--------------
                         //_@1
-                           assign FETCH_Instr_is_csr_pktinfo_a1 = FETCH_Instr_raw_a1[31:20] == 12'h80c;
-                           assign FETCH_Instr_is_csrrw_pktinfo_a1 = FETCH_Instr_is_csrrw_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
-                           assign FETCH_Instr_is_csrrs_pktinfo_a1 = FETCH_Instr_is_csrrs_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
-                           assign FETCH_Instr_is_csrrc_pktinfo_a1 = FETCH_Instr_is_csrrc_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
-                           assign FETCH_Instr_is_csrrwi_pktinfo_a1 = FETCH_Instr_is_csrrwi_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
-                           assign FETCH_Instr_is_csrrsi_pktinfo_a1 = FETCH_Instr_is_csrrsi_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
-                           assign FETCH_Instr_is_csrrci_pktinfo_a1 = FETCH_Instr_is_csrrci_instr_a1 && FETCH_Instr_is_csr_pktinfo_a1;
+                           assign FETCH_Instr_is_csr_timeh_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC81;
                         //_@2
-                           // CSR update. Counting on synthesis to optimize each bit, based on m4_eval(M4_CORE_INDEX_HIGH + 3)'b0.
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
                            
                            
                            // hw_wr_mask conditioned by hw_wr.
-                           assign FETCH_Instr_csr_pktinfo_hw_wr_en_mask_a2[3:0] = {4{FETCH_Instr_csr_pktinfo_hw_wr_a2}} & FETCH_Instr_csr_pktinfo_hw_wr_mask_a2;
+                           assign FETCH_Instr_csr_timeh_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_timeh_hw_wr_a2}} & FETCH_Instr_csr_timeh_hw_wr_mask_a2;
                            // The CSR value, updated by side-effect writes (if 1).
-                           assign FETCH_Instr_upd_csr_pktinfo_a2[3:0] =
-                                (FETCH_Instr_csr_pktinfo_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktinfo_hw_wr_value_a2) | (! FETCH_Instr_csr_pktinfo_hw_wr_en_mask_a2 & FETCH_Instr_csr_pktinfo_a2);
+                           assign FETCH_Instr_upd_csr_timeh_a2[31:0] =
+                                (FETCH_Instr_csr_timeh_hw_wr_en_mask_a2 & FETCH_Instr_csr_timeh_hw_wr_value_a2) | (! FETCH_Instr_csr_timeh_hw_wr_en_mask_a2 & FETCH_Instr_csr_timeh_a2);
                            // Next value of the CSR.
-                           assign FETCH_Instr_csr_pktinfo_masked_wr_value_a2[3:0] =
-                                FETCH_Instr_masked_csr_wr_value_a2[3:0] & 4'b0;
-                           assign FETCH_Instr_csr_pktinfo_a1[3:0] =
-                                FETCH_Instr_reset_a2                     ? 4'b100 :
-                                (FETCH_Instr_is_csrrw_pktinfo_a2 ||
-                                 FETCH_Instr_is_csrrwi_pktinfo_a2)  ? FETCH_Instr_csr_pktinfo_masked_wr_value_a2 | (FETCH_Instr_upd_csr_pktinfo_a2 & ! 4'b0):
-                                (FETCH_Instr_is_csrrs_pktinfo_a2 ||
-                                 FETCH_Instr_is_csrrsi_pktinfo_a2)  ? FETCH_Instr_upd_csr_pktinfo_a2 |   FETCH_Instr_csr_pktinfo_masked_wr_value_a2 :
-                                (FETCH_Instr_is_csrrc_pktinfo_a2 ||
-                                 FETCH_Instr_is_csrrci_pktinfo_a2)  ? FETCH_Instr_upd_csr_pktinfo_a2 & ! FETCH_Instr_csr_pktinfo_masked_wr_value_a2 :
-                                                             FETCH_Instr_upd_csr_pktinfo_a2;
+                           assign FETCH_Instr_csr_timeh_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_timeh_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_timeh_a2)
+                                       ? FETCH_Instr_csr_timeh_masked_wr_value_a2 | (FETCH_Instr_upd_csr_timeh_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_timeh_a2)
+                                       ? FETCH_Instr_upd_csr_timeh_a2 |   FETCH_Instr_csr_timeh_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_timeh_a2)
+                                       ? FETCH_Instr_upd_csr_timeh_a2 & ~ FETCH_Instr_csr_timeh_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_timeh_a2;
                      //_\end_source
-                     `line 1274 "../warpv.tlv" 2
+                     `line 1299 "../warpv.tlv" 2
+                     
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR INSTRET
+                        //--------------
+                        //_@1
+                           assign FETCH_Instr_is_csr_instret_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC02;
+                        //_@2
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
+                           
+                           
+                           // hw_wr_mask conditioned by hw_wr.
+                           assign FETCH_Instr_csr_instret_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_instret_hw_wr_a2}} & FETCH_Instr_csr_instret_hw_wr_mask_a2;
+                           // The CSR value, updated by side-effect writes (if 1).
+                           assign FETCH_Instr_upd_csr_instret_a2[31:0] =
+                                (FETCH_Instr_csr_instret_hw_wr_en_mask_a2 & FETCH_Instr_csr_instret_hw_wr_value_a2) | (! FETCH_Instr_csr_instret_hw_wr_en_mask_a2 & FETCH_Instr_csr_instret_a2);
+                           // Next value of the CSR.
+                           assign FETCH_Instr_csr_instret_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_instret_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_instret_a2)
+                                       ? FETCH_Instr_csr_instret_masked_wr_value_a2 | (FETCH_Instr_upd_csr_instret_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_instret_a2)
+                                       ? FETCH_Instr_upd_csr_instret_a2 |   FETCH_Instr_csr_instret_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_instret_a2)
+                                       ? FETCH_Instr_upd_csr_instret_a2 & ~ FETCH_Instr_csr_instret_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_instret_a2;
+                     //_\end_source
+                     `line 1301 "../warpv.tlv" 2
+                     
+                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                        //--------------
+                        // CSR INSTRETH
+                        //--------------
+                        //_@1
+                           assign FETCH_Instr_is_csr_instreth_a1 = FETCH_Instr_raw_a1[31:20] == 12'hC82;
+                        //_@2
+                           // CSR update. Counting on synthesis to optimize each bit, based on 32'b1.
+                           
+                           
+                           // hw_wr_mask conditioned by hw_wr.
+                           assign FETCH_Instr_csr_instreth_hw_wr_en_mask_a2[31:0] = {32{FETCH_Instr_csr_instreth_hw_wr_a2}} & FETCH_Instr_csr_instreth_hw_wr_mask_a2;
+                           // The CSR value, updated by side-effect writes (if 1).
+                           assign FETCH_Instr_upd_csr_instreth_a2[31:0] =
+                                (FETCH_Instr_csr_instreth_hw_wr_en_mask_a2 & FETCH_Instr_csr_instreth_hw_wr_value_a2) | (! FETCH_Instr_csr_instreth_hw_wr_en_mask_a2 & FETCH_Instr_csr_instreth_a2);
+                           // Next value of the CSR.
+                           assign FETCH_Instr_csr_instreth_masked_wr_value_a2[31:0] =
+                                FETCH_Instr_masked_csr_wr_value_a2[31:0] & 32'b1;
+                           assign FETCH_Instr_csr_instreth_a1[31:0] =
+                                FETCH_Instr_reset_a2 ? 32'b0 :
+                                ((FETCH_Instr_is_csrrw_instr_a2 || FETCH_Instr_is_csrrwi_instr_a2) && FETCH_Instr_is_csr_instreth_a2)
+                                       ? FETCH_Instr_csr_instreth_masked_wr_value_a2 | (FETCH_Instr_upd_csr_instreth_a2 & ! 32'b1) :
+                                ((FETCH_Instr_is_csrrs_instr_a2 || FETCH_Instr_is_csrrsi_instr_a2) && FETCH_Instr_is_csr_instreth_a2)
+                                       ? FETCH_Instr_upd_csr_instreth_a2 |   FETCH_Instr_csr_instreth_masked_wr_value_a2 :
+                                ((FETCH_Instr_is_csrrc_instr_a2 || FETCH_Instr_is_csrrci_instr_a2) && FETCH_Instr_is_csr_instreth_a2)
+                                       ? FETCH_Instr_upd_csr_instreth_a2 & ~ FETCH_Instr_csr_instreth_masked_wr_value_a2 :
+                                // retain
+                                         FETCH_Instr_upd_csr_instreth_a2;
+                     //_\end_source
+                     `line 1303 "../warpv.tlv" 2
                      
                   //_\end_source
-                  `line 1420 "../warpv.tlv" 2
+                  `line 1497 "../warpv.tlv" 2
                   //_@2
-                     `line 1259 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1421 as: m4+riscv_csr_writes()
+                     `line 1296 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1498 as: m4+riscv_csr_logic()
+                        
                         // CSR write value for CSR write instructions.
                         assign FETCH_Instr_masked_csr_wr_value_a2[31:0] = FETCH_Instr_raw_funct3_a2[2] ? {27'b0, FETCH_Instr_raw_rs1_a2} : L1b_FETCH_Instr_Src[1].L1_reg_value_a2;
+                        
+                     
+                        // Counter CSR
+                        //
+                        
+                        // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
+                        assign FETCH_Instr_RemainingCyclesWithinTimeUnit_a1[30-1:0] =
+                             (FETCH_Instr_reset_a2 || FETCH_Instr_time_unit_expires_a2) ?
+                                    30'd999999999 :
+                                    FETCH_Instr_RemainingCyclesWithinTimeUnit_a2 - 30'b1;
+                        assign FETCH_Instr_time_unit_expires_a2 = !( | FETCH_Instr_RemainingCyclesWithinTimeUnit_a2);  // reaches zero
+                        
+                        assign FETCH_Instr_full_csr_cycle_hw_wr_value_a2[63:0]   = {FETCH_Instr_csr_cycleh_a2,   FETCH_Instr_csr_cycle_a2  } + 64'b1;
+                        assign FETCH_Instr_full_csr_time_hw_wr_value_a2[63:0]    = {FETCH_Instr_csr_timeh_a2,    FETCH_Instr_csr_time_a2   } + 64'b1;
+                        assign FETCH_Instr_full_csr_instret_hw_wr_value_a2[63:0] = {FETCH_Instr_csr_instreth_a2, FETCH_Instr_csr_instret_a2} + 64'b1;
+                     
                         // CSR write signals.
-                        assign FETCH_Instr_csr_pktavail_hw_wr_a2 = 1'b0;
-                        assign FETCH_Instr_csr_pktavail_hw_wr_mask_a2 = {2{1'b1}};
-                        assign FETCH_Instr_csr_pktavail_hw_wr_value_a2 = {2{1'b1}};
-                        assign FETCH_Instr_csr_pktcomp_hw_wr_a2 = 1'b0;
-                        assign FETCH_Instr_csr_pktcomp_hw_wr_mask_a2 = {2{1'b1}};
-                        assign FETCH_Instr_csr_pktcomp_hw_wr_value_a2 = {2{1'b1}};
-                        assign FETCH_Instr_csr_pktrd_hw_wr_a2 = 1'b0;
-                        assign FETCH_Instr_csr_pktrd_hw_wr_mask_a2 = {32{1'b1}};
-                        assign FETCH_Instr_csr_pktrd_hw_wr_value_a2 = {32{1'b0}};
-                        assign FETCH_Instr_csr_pktinfo_hw_wr_a2 = 1'b0;
-                        assign FETCH_Instr_csr_pktinfo_hw_wr_mask_a2 = {32{1'b1}};
-                        assign FETCH_Instr_csr_pktinfo_hw_wr_value_a2 = {32{1'b0}};
+                        assign FETCH_Instr_csr_cycle_hw_wr_a2 = 1'b1;
+                        assign FETCH_Instr_csr_cycle_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_cycle_hw_wr_value_a2 = FETCH_Instr_full_csr_cycle_hw_wr_value_a2[31:0];
+                        assign FETCH_Instr_csr_cycleh_hw_wr_a2 = 1'b1;
+                        assign FETCH_Instr_csr_cycleh_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_cycleh_hw_wr_value_a2 = FETCH_Instr_full_csr_cycle_hw_wr_value_a2[63:32];
+                        assign FETCH_Instr_csr_time_hw_wr_a2 = FETCH_Instr_time_unit_expires_a2;
+                        assign FETCH_Instr_csr_time_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_time_hw_wr_value_a2 = FETCH_Instr_full_csr_time_hw_wr_value_a2[31:0];
+                        assign FETCH_Instr_csr_timeh_hw_wr_a2 = FETCH_Instr_time_unit_expires_a2;
+                        assign FETCH_Instr_csr_timeh_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_timeh_hw_wr_value_a2 = FETCH_Instr_full_csr_time_hw_wr_value_a2[63:32];
+                        assign FETCH_Instr_csr_instret_hw_wr_a2 = FETCH_Instr_commit_a2;
+                        assign FETCH_Instr_csr_instret_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_instret_hw_wr_value_a2 = FETCH_Instr_full_csr_instret_hw_wr_value_a2[31:0];
+                        assign FETCH_Instr_csr_instreth_hw_wr_a2 = FETCH_Instr_commit_a2;
+                        assign FETCH_Instr_csr_instreth_hw_wr_mask_a2 = {32{1'b1}};
+                        assign FETCH_Instr_csr_instreth_hw_wr_value_a2 = FETCH_Instr_full_csr_instret_hw_wr_value_a2[63:32];
+                        
+                        
+                        // For multicore CSRs:
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
+                        
                      //_\end_source
-                     `line 1422 "../warpv.tlv" 2
+                     `line 1499 "../warpv.tlv" 2
                      // CSR trap.
                      assign FETCH_Instr_is_csr_instr_a2 = FETCH_Instr_is_csrrw_instr_a2 ||
                                      FETCH_Instr_is_csrrs_instr_a2 ||
@@ -979,7 +875,7 @@
                                      FETCH_Instr_is_csrrwi_instr_a2 ||
                                      FETCH_Instr_is_csrrsi_instr_a2 ||
                                      FETCH_Instr_is_csrrci_instr_a2;
-                     assign FETCH_Instr_valid_csr_a2 = FETCH_Instr_is_csr_pktinfo_a2 ? FETCH_Instr_csr_pktinfo_a2 : FETCH_Instr_is_csr_pktrd_a2 ? FETCH_Instr_csr_pktrd_a2 : FETCH_Instr_is_csr_pktcomp_a2 ? FETCH_Instr_csr_pktcomp_a2 : FETCH_Instr_is_csr_pktavail_a2 ? FETCH_Instr_csr_pktavail_a2 : FETCH_Instr_is_csr_pktrdvc_a2 ? FETCH_Instr_csr_pktrdvc_a2 : FETCH_Instr_is_csr_pktctrl_a2 ? FETCH_Instr_csr_pktctrl_a2 : FETCH_Instr_is_csr_pkttail_a2 ? FETCH_Instr_csr_pkttail_a2 : FETCH_Instr_is_csr_pktwr_a2 ? FETCH_Instr_csr_pktwr_a2 : FETCH_Instr_is_csr_pktwrvc_a2 ? FETCH_Instr_csr_pktwrvc_a2 : FETCH_Instr_is_csr_pktdest_a2 ? FETCH_Instr_csr_pktdest_a2 : 32'bx || FETCH_Instr_is_csr_pktinfo_a2;
+                     assign FETCH_Instr_valid_csr_a2 = FETCH_Instr_is_csr_instreth_a2 ? FETCH_Instr_csr_instreth_a2 : FETCH_Instr_is_csr_instret_a2 ? FETCH_Instr_csr_instret_a2 : FETCH_Instr_is_csr_timeh_a2 ? FETCH_Instr_csr_timeh_a2 : FETCH_Instr_is_csr_time_a2 ? FETCH_Instr_csr_time_a2 : FETCH_Instr_is_csr_cycleh_a2 ? FETCH_Instr_csr_cycleh_a2 : FETCH_Instr_is_csr_cycle_a2 ? FETCH_Instr_csr_cycle_a2 : 32'bx || FETCH_Instr_is_csr_instreth_a2;
                      assign FETCH_Instr_csr_trap_a2 = FETCH_Instr_is_csr_instr_a2 && FETCH_Instr_valid_csr_a2;
                      
                      // Memory inputs.
@@ -1035,7 +931,7 @@
                      
                   //_@2
                      // Mux the correct result.
-                     `line 1281 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1485 as: m4+riscv_rslt_mux_expr()
+                     `line 1358 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1562 as: m4+riscv_rslt_mux_expr()
                         assign FETCH_Instr_rslt_a2[31:0] =
                             FETCH_Instr_returning_ld_a2 ? FETCH_Instr_OriginalLd_ld_rslt_a2 :
                             32'b0 |
@@ -1071,12 +967,12 @@
                             ({32{FETCH_Instr_is_csrrsi_instr_a2}} & FETCH_Instr_csrrsi_rslt_a2) |
                             ({32{FETCH_Instr_is_csrrci_instr_a2}} & FETCH_Instr_csrrci_rslt_a2);
                      //_\end_source
-                     `line 1486 "../warpv.tlv" 2
+                     `line 1563 "../warpv.tlv" 2
                   
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
-            `line 1905 "../warpv.tlv" 2
+            `line 1982 "../warpv.tlv" 2
             
             //_@1
                assign FETCH_Instr_pred_taken_branch_a1 = FETCH_Instr_pred_taken_a1 && FETCH_Instr_branch_a1;
@@ -1122,7 +1018,7 @@
                assign FETCH_Instr_valid_ld_a2 = FETCH_Instr_ld_a2 && FETCH_Instr_commit_a2;
                assign FETCH_Instr_valid_st_a2 = FETCH_Instr_st_a2 && FETCH_Instr_commit_a2;
    
-      `line 1567 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1950 as: m4+fixed_latency_fake_memory(/top, 0)
+      `line 1644 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 2027 as: m4+fixed_latency_fake_memory(/top, 0)
          // This macro assumes little-endian.
          
          //_|fetch
@@ -1166,7 +1062,7 @@
                   for (src = 1; src <= 2; src++) begin : L1_MEM_Data_Src wire L1_dummy_a3; reg  L1_dummy_a4; wire L1_is_reg_a3; reg  L1_is_reg_a4; wire [31:0] L1_reg_value_a3; reg  [31:0] L1_reg_value_a4; //_/src
                      assign {L1_dummy_a3, L1_is_reg_a3, L1_reg_value_a3[31:0]} = {L1b_FETCH_Instr_Src[src].L1_dummy_a3, L1_FETCH_Instr_Src[src].L1_is_reg_a3, L1b_FETCH_Instr_Src[src].L1_reg_value_a3}; end
       //_\end_source
-      `line 1951 "../warpv.tlv" 2
+      `line 2028 "../warpv.tlv" 2
       //_|fetch
          //_/instr
             //_@3
@@ -1188,7 +1084,7 @@
                `BOGUS_USE(L1_FETCH_Instr_OriginalLd_Src[2].L1_dummy_a3) // To pull $dummy through $ANY expressions, avoiding empty expressions.
    //_\end_source
    `line 12 "formal/warp-v_formal.tlv" 2
-   `line 1982 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
+   `line 2059 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
       // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
       // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
       // is provided in /instr/original. RVFI inputs are generally connected from this context,
