@@ -218,7 +218,7 @@ m4+definitions(['
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
-   m4_define_hier(['M4_CORE'], 2)  // Cores. If > 1, cores will be connected with a NoC.
+   m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
@@ -259,21 +259,26 @@ m4+definitions(['
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(M4_STANDARD_CONFIG,
-      ['5-stage'], ['
-         // A reasonable 5-stage pipeline.
+      ['min_area'], ['
+         // TODO:
+         //   - Ability to exclude returning_ld, pending, and replay logic.
+         //   - Ability to exclude branch mispredicts.
+         //   - Ability to exclude misaligned traps logic.
+         // No pipeline
          m4_defines(
             (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
-            (M4_DECODE_STAGE, 1),
-            (M4_BRANCH_PRED_STAGE, 1),
-            (M4_REG_RD_STAGE, 1),
-            (M4_EXECUTE_STAGE, 2),
-            (M4_RESULT_STAGE, 2),
-            (M4_REG_WR_STAGE, 3),
-            (M4_MEM_WR_STAGE, 3),
-            (M4_LD_RETURN_ALIGN, 4))
-         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
+            (M4_DECODE_STAGE, 0),
+            (M4_BRANCH_PRED_STAGE, 0),
+            (M4_REG_RD_STAGE, 0),
+            (M4_EXECUTE_STAGE, 0),
+            (M4_RESULT_STAGE, 0),
+            (M4_REG_WR_STAGE, 0),
+            (M4_MEM_WR_STAGE, 0),
+            (M4_LD_RETURN_ALIGN, 1))
+         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+         m4_define(['M4_NO_COUNTER_CSRS'], 1)
       '],
       ['1-stage'], ['
          // No pipeline
@@ -289,6 +294,22 @@ m4+definitions(['
             (M4_MEM_WR_STAGE, 0),
             (M4_LD_RETURN_ALIGN, 1))
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
+         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+      '],
+      ['5-stage'], ['
+         // A reasonable 5-stage pipeline.
+         m4_defines(
+            (M4_NEXT_PC_STAGE, 0),
+            (M4_FETCH_STAGE, 0),
+            (M4_DECODE_STAGE, 1),
+            (M4_BRANCH_PRED_STAGE, 1),
+            (M4_REG_RD_STAGE, 1),
+            (M4_EXECUTE_STAGE, 2),
+            (M4_RESULT_STAGE, 2),
+            (M4_REG_WR_STAGE, 3),
+            (M4_MEM_WR_STAGE, 3),
+            (M4_LD_RETURN_ALIGN, 4))
+         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
       ['7-stage'], ['
@@ -346,6 +367,9 @@ m4+definitions(['
             (['M4_EXT_P'], 0),
             (['M4_EXT_V'], 0),
             (['M4_EXT_N'], 0))
+         
+         // For the time[h] CSR register, after this many cycles, time increments.
+         m4_define_vector(M4_CYCLES_PER_TIME_UNIT, 1000000000)
       '], ['
          // Dummy "ISA".
          m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
@@ -635,6 +659,10 @@ m4+definitions(['
    m4_define(['m4_csrrx_rslt_expr'], ['M4_WORD_CNT'bx'])
    // Initial value of OR expression for whether CSR index is valid.
    m4_define(['m4_valid_csr_expr'], ['1'b0'])
+
+   // m4_define_csr(name, index (12-bit SV-value), fields (as in m4_define_vector), reset_value (SV-value), writable_mask (SV-value), side-effect_writes (bool))
+   // Adds a CSR.
+   // Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    m4_define(
       ['m4_define_csr'],
       ['m4_define_vector_with_fields(['M4_CSR_']m4_to_upper(['$1']), $3)
@@ -647,7 +675,18 @@ m4+definitions(['
    )
    
    m4_case(M4_ISA, ['RISCV'], ['
-      // Define CSRs for NoC support.
+      m4_ifelse(M4_NO_COUNTER_CSRS, ['1'], [''], ['
+         // Define Counter CSRs
+         //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
+         m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['time'],       12'hC01,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET_LOW, 0'],             ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH_LOW, 0'],            ['32'b0'],                     ['32'b1'],                          1)
+      '])
+      
+      // For NoC support
       m4_ifexpr(M4_CORE_CNT > 1, ['
          // As defined in: https://docs.google.com/document/d/1cDUv8cuYF2kha8r6DSv-8pwszsrSP3vXsTiAugRkI1k/edit?usp=sharing
          // TODO: Find appropriate indices.
@@ -1219,14 +1258,11 @@ m4+definitions(['
 
 // Logic for a single CSR.
 \TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, #side_effects)
+   //--------------
+   /['']/ CSR m4_to_upper(csr_name)
+   //--------------
    @M4_DECODE_STAGE
       $is_csr_['']csr_name = $raw[31:20] == csr_index;
-      $is_csrrw_['']csr_name = $is_csrrw_instr && $is_csr_['']csr_name;
-      $is_csrrs_['']csr_name = $is_csrrs_instr && $is_csr_['']csr_name;
-      $is_csrrc_['']csr_name = $is_csrrc_instr && $is_csr_['']csr_name;
-      $is_csrrwi_['']csr_name = $is_csrrwi_instr && $is_csr_['']csr_name;
-      $is_csrrsi_['']csr_name = $is_csrrsi_instr && $is_csr_['']csr_name;
-      $is_csrrci_['']csr_name = $is_csrrci_instr && $is_csr_['']csr_name;
    @M4_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
       m4_define(['M4_THIS_CSR_RANGE'], m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
@@ -1240,14 +1276,15 @@ m4+definitions(['
       $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
            $masked_csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
       <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
-           $reset                     ? reset_value :
-           ($is_csrrw_['']csr_name ||
-            $is_csrrwi_['']csr_name)  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ! writable_mask):
-           ($is_csrrs_['']csr_name ||
-            $is_csrrsi_['']csr_name)  ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
-           ($is_csrrc_['']csr_name ||
-            $is_csrrci_['']csr_name)  ? $upd_csr_['']csr_name & ! $csr_['']csr_name['']_masked_wr_value :
-                                        $upd_csr_['']csr_name;
+           $reset ? reset_value :
+           (($is_csrrw_instr || $is_csrrwi_instr) && $is_csr_['']csr_name)
+                  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ! writable_mask) :
+           (($is_csrrs_instr || $is_csrrsi_instr) && $is_csr_['']csr_name)
+                  ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
+           (($is_csrrc_instr || $is_csrrci_instr) && $is_csr_['']csr_name)
+                  ? $upd_csr_['']csr_name & ~ $csr_['']csr_name['']_masked_wr_value :
+           // retain
+                    $upd_csr_['']csr_name;
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
@@ -1255,10 +1292,49 @@ m4+definitions(['
    m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
    '])
 
-\TLV riscv_csr_writes()
+\TLV riscv_csr_logic()
+   m4_ifelse_block(m4_csrs, [''], [''], ['
    // CSR write value for CSR write instructions.
    $masked_csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
+   '])
+
+   // Counter CSR
+   //
+   m4_ifelse_block(M4_NO_COUNTER_CSRS, ['1'], [''], ['
+   // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
+   $RemainingCyclesWithinTimeUnit[m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)-1:0] <=
+        ($reset || $time_unit_expires) ?
+               m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)'d['']m4_eval(M4_CYCLES_PER_TIME_UNIT_CNT - 1) :
+               $RemainingCyclesWithinTimeUnit - m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)'b1;
+   $time_unit_expires = !( | $RemainingCyclesWithinTimeUnit);  // reaches zero
+   
+   $full_csr_cycle_hw_wr_value[63:0]   = {$csr_cycleh,   $csr_cycle  } + 64'b1;
+   $full_csr_time_hw_wr_value[63:0]    = {$csr_timeh,    $csr_time   } + 64'b1;
+   $full_csr_instret_hw_wr_value[63:0] = {$csr_instreth, $csr_instret} + 64'b1;
+
    // CSR write signals.
+   $csr_cycle_hw_wr = 1'b1;
+   $csr_cycle_hw_wr_mask = {32{1'b1}};
+   $csr_cycle_hw_wr_value = $full_csr_cycle_hw_wr_value[31:0];
+   $csr_cycleh_hw_wr = 1'b1;
+   $csr_cycleh_hw_wr_mask = {32{1'b1}};
+   $csr_cycleh_hw_wr_value = $full_csr_cycle_hw_wr_value[63:32];
+   $csr_time_hw_wr = $time_unit_expires;
+   $csr_time_hw_wr_mask = {32{1'b1}};
+   $csr_time_hw_wr_value = $full_csr_time_hw_wr_value[31:0];
+   $csr_timeh_hw_wr = $time_unit_expires;
+   $csr_timeh_hw_wr_mask = {32{1'b1}};
+   $csr_timeh_hw_wr_value = $full_csr_time_hw_wr_value[63:32];
+   $csr_instret_hw_wr = $commit;
+   $csr_instret_hw_wr_mask = {32{1'b1}};
+   $csr_instret_hw_wr_value = $full_csr_instret_hw_wr_value[31:0];
+   $csr_instreth_hw_wr = $commit;
+   $csr_instreth_hw_wr_mask = {32{1'b1}};
+   $csr_instreth_hw_wr_value = $full_csr_instret_hw_wr_value[63:32];
+   '])
+   
+   // For multicore CSRs:
+   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    $csr_pktavail_hw_wr = 1'b0;
    $csr_pktavail_hw_wr_mask = {M4_VC_HIGH{1'b1}};
    $csr_pktavail_hw_wr_value = {M4_VC_HIGH{1'b1}};
@@ -1271,6 +1347,7 @@ m4+definitions(['
    $csr_pktinfo_hw_wr = 1'b0;
    $csr_pktinfo_hw_wr_mask = {M4_WORD_HIGH{1'b1}};
    $csr_pktinfo_hw_wr_value = {M4_WORD_HIGH{1'b0}};
+   '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
 // This keeps the implications contained.
@@ -1418,7 +1495,7 @@ m4+definitions(['
    // ---------
    m4+riscv_csrs((m4_csrs))
    @_exe_stage
-      m4+riscv_csr_writes()
+      m4+riscv_csr_logic()
       // CSR trap.
       $is_csr_instr = $is_csrrw_instr ||
                       $is_csrrs_instr ||
