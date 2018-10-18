@@ -216,7 +216,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
    m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
@@ -251,17 +251,19 @@ m4+definitions(['
    //                         nominal load latency.
    //     Deltas (default to 0):
    //       M4 EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
+   //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
    //       M4_EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
    //       M4_EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
    //       M4_EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
-   //       M4_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for replays.
    //       M4_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
+   //       M4_EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(M4_STANDARD_CONFIG,
       ['min_area'], ['
+         // A minimum-area RISC-V for the 2018 RISC-V Foundation Contest.
+         // This may not be a 100% complete, compliant implementation. Logic may be stripped that isn't needed to pass tests.
          // TODO:
-         //   - Ability to exclude returning_ld, pending, and replay logic.
          //   - Ability to exclude branch mispredicts.
          //   - Ability to exclude misaligned traps logic.
          // No pipeline
@@ -275,7 +277,8 @@ m4+definitions(['
             (M4_RESULT_STAGE, 0),
             (M4_REG_WR_STAGE, 0),
             (M4_MEM_WR_STAGE, 0),
-            (M4_LD_RETURN_ALIGN, 1))
+            (M4_LD_RETURN_ALIGN, 0))
+         m4_define(['M4_EXTRA_TRAP_BUBBLE'], 0)
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
          m4_define(['M4_NO_COUNTER_CSRS'], 1)
@@ -400,11 +403,12 @@ m4+definitions(['
    // Supply defaults for extra cycles.
    m4_defines(
       (M4_DELAY_BRANCH_TARGET_CALC, 0),
-      (M4_EXTRA_JUMP_BUBBLE, 0),
       (M4_EXTRA_PRED_TAKEN_BUBBLE, 0),
-      (M4_EXTRA_INDIRECT_JUMP_BUBBLE, 0),
       (M4_EXTRA_REPLAY_BUBBLE, 0),
-      (M4_EXTRA_BRANCH_BUBBLE, 0)
+      (M4_EXTRA_JUMP_BUBBLE, 0),
+      (M4_EXTRA_BRANCH_BUBBLE, 0),
+      (M4_EXTRA_INDIRECT_JUMP_BUBBLE, 0),
+      (M4_EXTRA_TRAP_BUBBLE, 1)  // Not perf-critical, so 1 is a good choice.
    )
    
    // Calculated stages:
@@ -418,9 +422,8 @@ m4+definitions(['
    m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
    m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
    m4_define(['M4_INDIRECT_JUMP_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE))
-   m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + 1))  // Could parameterize w/ M4_EXTRA_TRAP_BUBBLE (rather than always 1), but not perf-critical.
-   m4_define(['M4_RETURNING_LD_BUBBLES'], 0)
-   // TODO: Make the returning_ld mechanism optional (where load instruction writes reg file).
+   m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE))
+   m4_define(['M4_RETURNING_LD_BUBBLES'], 0)  // Bubbles between returning ld and the replay of the instruction it squashed (so always zero).
    
    // ========================
    // Check Legality of Config
@@ -514,7 +517,8 @@ m4+definitions(['
    m4_define_vector(['M4_PC'], M4_ADDR_HIGH, M4_SUB_PC_BITS)
    m4_define(['M4_FULL_PC'], ['{$Pc, M4_SUB_PC_BITS'b0}'])
    m4_define_hier(M4_DATA_MEM_ADDRS, m4_eval(M4_DATA_MEM_WORDS_HIGH * M4_ADDRS_PER_WORD))  // Addressable data memory locations.
-
+   m4_define(['M4_INJECT_RETURNING_LD'], m4_eval(M4_LD_RETURN_ALIGN > 0))
+   m4_define(['M4_PENDING_ENABLED'], M4_INJECT_RETURNING_LD)
    
    
    // =========
@@ -1458,11 +1462,20 @@ m4+definitions(['
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
          $jal_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
          $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
-         $lb_rslt[M4_WORD_RANGE] = 32'b0;    // Load results arrive w/ returning load.
-         $lh_rslt[M4_WORD_RANGE] = 32'b0;    // So, these are unused.
+         // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
+         m4_ifelse_block(M4_INJECT_RETURNING_LD, 1, ['
+         $lb_rslt[M4_WORD_RANGE] = 32'b0;
+         $lh_rslt[M4_WORD_RANGE] = 32'b0;
          $lw_rslt[M4_WORD_RANGE] = 32'b0;
          $lbu_rslt[M4_WORD_RANGE] = 32'b0;
          $lhu_rslt[M4_WORD_RANGE] = 32'b0;
+         '], ['
+         $lb_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
+         $lh_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
+         $lw_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
+         $lbu_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
+         $lhu_rslt[M4_WORD_RANGE] = /original_ld$ld_rslt;
+         '])
          $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
          $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
@@ -1903,7 +1916,7 @@ m4+definitions(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld;
+            $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             // Recirculate returning load.
             ?$returning_ld
                // This scope holds the original load for a returning load.
@@ -1933,7 +1946,8 @@ m4+definitions(['
          
          @M4_REG_RD_STAGE
             // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
-            $reg_wr_pending = $ld && ! $returning_ld;
+            $reg_wr_pending = $ld && ! $returning_ld && 1'b['']M4_INJECT_RETURNING_LD;
+            `BOGUS_USE($reg_wr_pending)  // Not used if no bypass and no pending.
             
             // ======
             // Reg Rd
@@ -1957,7 +1971,7 @@ m4+definitions(['
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$returning_ld) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$returning_ld) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$returning_ld) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending};
+                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
@@ -1970,7 +1984,7 @@ m4+definitions(['
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && ($GoodPathMask[1] || /instr>>1$returning_ld) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && ($GoodPathMask[2] || /instr>>2$returning_ld) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$returning_ld) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
-                  /regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending;
+                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
             $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
          
@@ -1995,7 +2009,7 @@ m4+definitions(['
             ?$valid_decode_branch
                $branch_redir_pc[M4_PC_RANGE] =
                   // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
-                  m4_ifelse(['M4_BRANCH_PRED'], ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
+                  m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
             $trap_target[M4_PC_RANGE] = M4_PC_CNT'b0;  // TODO: What should this be?
@@ -2038,10 +2052,12 @@ m4+definitions(['
                   if ($reg_write)
                      /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
                end
+            m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
             // Write $pending along with $value, but coded differently because it must be reset.
             /regs[*]
                <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
-
+            '])
+            
          @M4_REG_WR_STAGE
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
