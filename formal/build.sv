@@ -33,11 +33,11 @@
             output logic [31: 0] rvfi_mem_wdata);
 `line 10 "formal/warp-v_formal.tlv" 1
 `include "build_gen.sv" //_\TLV
-   `line 1734 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+cpu()
+   `line 1747 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+cpu()
       
       // Generated logic
-      `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1736 as: m4+indirect(M4_isa['_gen'])
-         `line 1122 "../warpv.tlv" 1   // Instantiated from built-in definition.
+      `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1749 as: m4+indirect(M4_isa['_gen'])
+         `line 1126 "../warpv.tlv" 1   // Instantiated from built-in definition.
             
             // v---------------------
             // Instruction characterization
@@ -177,7 +177,7 @@
          //_\end_source
          `line 3 "<builtin>" 2
       //_\end_source
-      `line 1737 "../warpv.tlv" 2
+      `line 1750 "../warpv.tlv" 2
    
       
       
@@ -347,7 +347,7 @@
                // A returning load clobbers the instruction.
                // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
                //  it is non-speculative. Both could easily be fixed.)
-               assign FETCH_Instr_returning_ld_a0 = MEM_Data_valid_ld_a4;
+               assign FETCH_Instr_returning_ld_a0 = MEM_Data_valid_ld_a4 && 1'b1;
                // Recirculate returning load.
                //_?$returning_ld
                   // This scope holds the original load for a returning load.
@@ -372,8 +372,8 @@
                // Decode of the fetched instruction
                assign FETCH_Instr_valid_decode_a1 = FETCH_Instr_fetch_a1;  // Always decode if we fetch.
                assign FETCH_Instr_valid_decode_branch_a1 = FETCH_Instr_valid_decode_a1 && FETCH_Instr_branch_a1;
-               `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1931 as: m4+indirect(M4_isa['_decode'])
-                  `line 1363 "../warpv.tlv" 1   // Instantiated from built-in definition.
+               `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1944 as: m4+indirect(M4_isa['_decode'])
+                  `line 1367 "../warpv.tlv" 1   // Instantiated from built-in definition.
                      // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_valid_as_of(M4_BLAH_STAGE).
                      //_?$valid_decode
                   
@@ -402,7 +402,7 @@
                            assign FETCH_Instr_is_i_type_a1 = INSTR_TYPE_I_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_r_type_a1 = INSTR_TYPE_R_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_ri_type_a1 = INSTR_TYPE_RI_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_r4_type_a1 = INSTR_TYPE_R4_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_s_type_a1 = INSTR_TYPE_S_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_b_type_a1 = INSTR_TYPE_B_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_j_type_a1 = INSTR_TYPE_J_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is_u_type_a1 = INSTR_TYPE_U_MASK[FETCH_Instr_raw_op5_a1]; assign FETCH_Instr_is___type_a1 = INSTR_TYPE___MASK[FETCH_Instr_raw_op5_a1]; 
                   
                         // Instruction decode.
-                        `line 1355 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1391 as: m4+riscv_decode_expr()
+                        `line 1359 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1395 as: m4+riscv_decode_expr()
                            assign FETCH_Instr_is_lui_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b01101;
                            assign FETCH_Instr_is_auipc_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b00101;
                            assign FETCH_Instr_is_jal_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11011;
@@ -445,7 +445,7 @@
                            assign FETCH_Instr_is_csrrci_instr_a1 = FETCH_Instr_raw_op5_a1 == 5'b11100 && FETCH_Instr_raw_funct3_a1 == 3'b111;
                            
                         //_\end_source
-                        `line 1392 "../warpv.tlv" 2
+                        `line 1396 "../warpv.tlv" 2
                   
                         assign FETCH_Instr_illegal_a1 = 1'b1 && ! FETCH_Instr_is_lui_instr_a1 && ! FETCH_Instr_is_auipc_instr_a1 && ! FETCH_Instr_is_jal_instr_a1 && ! FETCH_Instr_is_jalr_instr_a1 && ! FETCH_Instr_is_beq_instr_a1 && ! FETCH_Instr_is_bne_instr_a1 && ! FETCH_Instr_is_blt_instr_a1 && ! FETCH_Instr_is_bge_instr_a1 && ! FETCH_Instr_is_bltu_instr_a1 && ! FETCH_Instr_is_bgeu_instr_a1 && ! FETCH_Instr_is_lb_instr_a1 && ! FETCH_Instr_is_lh_instr_a1 && ! FETCH_Instr_is_lw_instr_a1 && ! FETCH_Instr_is_lbu_instr_a1 && ! FETCH_Instr_is_lhu_instr_a1 && ! FETCH_Instr_is_sb_instr_a1 && ! FETCH_Instr_is_sh_instr_a1 && ! FETCH_Instr_is_sw_instr_a1 && ! FETCH_Instr_is_addi_instr_a1 && ! FETCH_Instr_is_slti_instr_a1 && ! FETCH_Instr_is_sltiu_instr_a1 && ! FETCH_Instr_is_xori_instr_a1 && ! FETCH_Instr_is_ori_instr_a1 && ! FETCH_Instr_is_andi_instr_a1 && ! FETCH_Instr_is_slli_instr_a1 && ! FETCH_Instr_is_srli_srai_instr_a1 && ! FETCH_Instr_is_add_sub_instr_a1 && ! FETCH_Instr_is_sll_instr_a1 && ! FETCH_Instr_is_slt_instr_a1 && ! FETCH_Instr_is_sltu_instr_a1 && ! FETCH_Instr_is_xor_instr_a1 && ! FETCH_Instr_is_srl_sra_instr_a1 && ! FETCH_Instr_is_or_instr_a1 && ! FETCH_Instr_is_and_instr_a1 && ! FETCH_Instr_is_csrrw_instr_a1 && ! FETCH_Instr_is_csrrs_instr_a1 && ! FETCH_Instr_is_csrrc_instr_a1 && ! FETCH_Instr_is_csrrwi_instr_a1 && ! FETCH_Instr_is_csrrsi_instr_a1 && ! FETCH_Instr_is_csrrci_instr_a1;
                         assign FETCH_Instr_conditional_branch_a1 = FETCH_Instr_is_b_type_a1;
@@ -480,9 +480,9 @@
                   //_\end_source
                   `line 3 "<builtin>" 2
                //_\end_source
-               `line 1932 "../warpv.tlv" 2
-            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1932 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
-               `line 1712 "../warpv.tlv" 1   // Instantiated from built-in definition.
+               `line 1945 "../warpv.tlv" 2
+            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1945 as: m4+indirect(['branch_pred_']M4_BRANCH_PRED)
+               `line 1725 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$branch
                         assign FETCH_Instr_pred_taken_a1 = FETCH_Instr_BranchState_a3[1];
@@ -496,11 +496,12 @@
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
-            `line 1933 "../warpv.tlv" 2
+            `line 1946 "../warpv.tlv" 2
             
             //_@1
                // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
-               assign FETCH_Instr_reg_wr_pending_a1 = FETCH_Instr_ld_a1 && ! FETCH_Instr_returning_ld_a1;
+               assign FETCH_Instr_reg_wr_pending_a1 = FETCH_Instr_ld_a1 && ! FETCH_Instr_returning_ld_a1 && 1'b1;
+               `BOGUS_USE(FETCH_Instr_reg_wr_pending_a1)  // Not used if no bypass and no pending.
                
                // ======
                // Reg Rd
@@ -545,8 +546,8 @@
             // =======
             // Execute
             // =======
-            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1981 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
-               `line 1424 "../warpv.tlv" 1   // Instantiated from built-in definition.
+            `line 2 "<builtin>" 1   // Instantiated from formal/warp-v_formal.tlv, 1995 as: m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
+               `line 1428 "../warpv.tlv" 1   // Instantiated from built-in definition.
                   //_@1
                      //_?$valid_decode_branch
                         assign FETCH_Instr_branch_target_a1[31:2] = FETCH_Instr_Pc_a1[31:2] + FETCH_Instr_raw_b_imm_a1[31:2];
@@ -584,11 +585,20 @@
                         assign FETCH_Instr_auipc_rslt_a2[31:0] = {FETCH_Instr_Pc_a2, 2'b0} + FETCH_Instr_raw_u_imm_a2;
                         assign FETCH_Instr_jal_rslt_a2[31:0] = {FETCH_Instr_Pc_a2, 2'b0} + 4;
                         assign FETCH_Instr_jalr_rslt_a2[31:0] = {FETCH_Instr_Pc_a2, 2'b0} + 4;
-                        assign FETCH_Instr_lb_rslt_a2[31:0] = 32'b0;    // Load results arrive w/ returning load.
-                        assign FETCH_Instr_lh_rslt_a2[31:0] = 32'b0;    // So, these are unused.
+                        // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
+                        
+                        assign FETCH_Instr_lb_rslt_a2[31:0] = 32'b0;
+                        assign FETCH_Instr_lh_rslt_a2[31:0] = 32'b0;
                         assign FETCH_Instr_lw_rslt_a2[31:0] = 32'b0;
                         assign FETCH_Instr_lbu_rslt_a2[31:0] = 32'b0;
                         assign FETCH_Instr_lhu_rslt_a2[31:0] = 32'b0;
+                        
+                        
+                        
+                        
+                        
+                        
+                        
                         assign FETCH_Instr_addi_rslt_a2[31:0] = L1b_FETCH_Instr_Src[1].L1_reg_value_a2 + FETCH_Instr_raw_i_imm_a2;  // Note: this has its own adder; could share w/ add/sub.
                         assign FETCH_Instr_xori_rslt_a2[31:0] = L1b_FETCH_Instr_Src[1].L1_reg_value_a2 ^ FETCH_Instr_raw_i_imm_a2;
                         assign FETCH_Instr_ori_rslt_a2[31:0] = L1b_FETCH_Instr_Src[1].L1_reg_value_a2 | FETCH_Instr_raw_i_imm_a2;
@@ -619,9 +629,9 @@
                         
                   // CSR logic
                   // ---------
-                  `line 1291 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1496 as: m4+riscv_csrs((m4_csrs))
+                  `line 1295 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1509 as: m4+riscv_csrs((m4_csrs))
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR CYCLE
                         //--------------
@@ -650,9 +660,9 @@
                                 // retain
                                          FETCH_Instr_upd_csr_cycle_a2;
                      //_\end_source
-                     `line 1293 "../warpv.tlv" 2
+                     `line 1297 "../warpv.tlv" 2
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR CYCLEH
                         //--------------
@@ -681,9 +691,9 @@
                                 // retain
                                          FETCH_Instr_upd_csr_cycleh_a2;
                      //_\end_source
-                     `line 1295 "../warpv.tlv" 2
+                     `line 1299 "../warpv.tlv" 2
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR TIME
                         //--------------
@@ -712,9 +722,9 @@
                                 // retain
                                          FETCH_Instr_upd_csr_time_a2;
                      //_\end_source
-                     `line 1297 "../warpv.tlv" 2
+                     `line 1301 "../warpv.tlv" 2
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR TIMEH
                         //--------------
@@ -743,9 +753,9 @@
                                 // retain
                                          FETCH_Instr_upd_csr_timeh_a2;
                      //_\end_source
-                     `line 1299 "../warpv.tlv" 2
+                     `line 1303 "../warpv.tlv" 2
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR INSTRET
                         //--------------
@@ -774,9 +784,9 @@
                                 // retain
                                          FETCH_Instr_upd_csr_instret_a2;
                      //_\end_source
-                     `line 1301 "../warpv.tlv" 2
+                     `line 1305 "../warpv.tlv" 2
                      
-                     `line 1261 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
+                     `line 1265 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 11 as: m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
                         //--------------
                         // CSR INSTRETH
                         //--------------
@@ -805,12 +815,12 @@
                                 // retain
                                          FETCH_Instr_upd_csr_instreth_a2;
                      //_\end_source
-                     `line 1303 "../warpv.tlv" 2
+                     `line 1307 "../warpv.tlv" 2
                      
                   //_\end_source
-                  `line 1497 "../warpv.tlv" 2
+                  `line 1510 "../warpv.tlv" 2
                   //_@2
-                     `line 1296 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1498 as: m4+riscv_csr_logic()
+                     `line 1300 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1511 as: m4+riscv_csr_logic()
                         
                         // CSR write value for CSR write instructions.
                         assign FETCH_Instr_masked_csr_wr_value_a2[31:0] = FETCH_Instr_raw_funct3_a2[2] ? {27'b0, FETCH_Instr_raw_rs1_a2} : L1b_FETCH_Instr_Src[1].L1_reg_value_a2;
@@ -867,7 +877,7 @@
                         
                         
                      //_\end_source
-                     `line 1499 "../warpv.tlv" 2
+                     `line 1512 "../warpv.tlv" 2
                      // CSR trap.
                      assign FETCH_Instr_is_csr_instr_a2 = FETCH_Instr_is_csrrw_instr_a2 ||
                                      FETCH_Instr_is_csrrs_instr_a2 ||
@@ -931,7 +941,7 @@
                      
                   //_@2
                      // Mux the correct result.
-                     `line 1358 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1562 as: m4+riscv_rslt_mux_expr()
+                     `line 1362 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 1575 as: m4+riscv_rslt_mux_expr()
                         assign FETCH_Instr_rslt_a2[31:0] =
                             FETCH_Instr_returning_ld_a2 ? FETCH_Instr_OriginalLd_ld_rslt_a2 :
                             32'b0 |
@@ -967,12 +977,12 @@
                             ({32{FETCH_Instr_is_csrrsi_instr_a2}} & FETCH_Instr_csrrsi_rslt_a2) |
                             ({32{FETCH_Instr_is_csrrci_instr_a2}} & FETCH_Instr_csrrci_rslt_a2);
                      //_\end_source
-                     `line 1563 "../warpv.tlv" 2
+                     `line 1576 "../warpv.tlv" 2
                   
                //_\end_source
                `line 3 "<builtin>" 2
             //_\end_source
-            `line 1982 "../warpv.tlv" 2
+            `line 1996 "../warpv.tlv" 2
             
             //_@1
                assign FETCH_Instr_pred_taken_branch_a1 = FETCH_Instr_pred_taken_a1 && FETCH_Instr_branch_a1;
@@ -1018,7 +1028,7 @@
                assign FETCH_Instr_valid_ld_a2 = FETCH_Instr_ld_a2 && FETCH_Instr_commit_a2;
                assign FETCH_Instr_valid_st_a2 = FETCH_Instr_st_a2 && FETCH_Instr_commit_a2;
    
-      `line 1644 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 2027 as: m4+fixed_latency_fake_memory(/top, 0)
+      `line 1657 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 2041 as: m4+fixed_latency_fake_memory(/top, 0)
          // This macro assumes little-endian.
          
          //_|fetch
@@ -1062,7 +1072,7 @@
                   for (src = 1; src <= 2; src++) begin : L1_MEM_Data_Src wire L1_dummy_a3; reg  L1_dummy_a4; wire L1_is_reg_a3; reg  L1_is_reg_a4; wire [31:0] L1_reg_value_a3; reg  [31:0] L1_reg_value_a4; //_/src
                      assign {L1_dummy_a3, L1_is_reg_a3, L1_reg_value_a3[31:0]} = {L1b_FETCH_Instr_Src[src].L1_dummy_a3, L1_FETCH_Instr_Src[src].L1_is_reg_a3, L1b_FETCH_Instr_Src[src].L1_reg_value_a3}; end
       //_\end_source
-      `line 2028 "../warpv.tlv" 2
+      `line 2042 "../warpv.tlv" 2
       //_|fetch
          //_/instr
             //_@3
@@ -1076,15 +1086,17 @@
                      if (FETCH_Instr_reg_write_a3)
                         FETCH_Instr_Regs_value_a3[FETCH_Instr_dest_reg_a3][31:0] <= FETCH_Instr_rslt_a3;
                   end
+               
                // Write $pending along with $value, but coded differently because it must be reset.
                for (regs = 1; regs <= 31; regs++) begin : L1b_FETCH_Instr_Regs //_/regs
                   assign FETCH_Instr_Regs_pending_a2[regs] = ! FETCH_Instr_reset_a3 && (((regs == FETCH_Instr_dest_reg_a3) && FETCH_Instr_valid_dest_reg_valid_a3) ? FETCH_Instr_reg_wr_pending_a3 : FETCH_Instr_Regs_pending_a3[regs]); end
-   
+               
+               
             //_@3
                `BOGUS_USE(L1_FETCH_Instr_OriginalLd_Src[2].L1_dummy_a3) // To pull $dummy through $ANY expressions, avoiding empty expressions.
    //_\end_source
    `line 12 "formal/warp-v_formal.tlv" 2
-   `line 2059 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
+   `line 2075 "../warpv.tlv" 1   // Instantiated from formal/warp-v_formal.tlv, 12 as: m4+formal()
       // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
       // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
       // is provided in /instr/original. RVFI inputs are generally connected from this context,
