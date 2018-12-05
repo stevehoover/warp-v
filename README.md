@@ -2,7 +2,7 @@
 
 ## Overview
 
-WARP-V is an open-source RISC-V CPU core generator written in TL-Verilog. It demonstrates a "transaction-level design" methodology providing an unprecedented level of flexibility. It can implement a single-stage, low-power microcontroller or a mid-range 7-stage CPU. It can even implement other instruction-set architectures (ISAs). WARP-V is an evolving library of CPU components as well as various compositions of them. It is a community interested in transforming the silicon industry through open-source hardware and revolutionary design methodology.
+WARP-V is an open-source RISC-V CPU core generator that is quickly getting a lot of attention. It is written in TL-Verilog and demonstrates a "transaction-level design" methodology providing an unprecedented level of flexibility. It can implement a single-stage, low-power microcontroller or a mid-range 7-stage CPU. It can even implement other instruction-set architectures (ISAs). WARP-V is an evolving library of CPU components as well as various compositions of them. It is driven by a community interested in transforming the silicon industry through open-source hardware and revolutionary design methodology.
 
 ## Links
 
@@ -15,10 +15,13 @@ There is a <a href="https://gitter.im/librecores/warp-v" target="_blank">public 
 
 Steve Hoover presented early work at DAC 2018:
   - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank">Slides</a>
-  - <a href="http://localhost:8080/module/pane/DAC2018_WARP-V_Poster.pdf" target="_blank">Poster</a>
+  - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Poster.pdf" target="_blank">Poster</a>
   
-Akos Hadnagy presented formal verification at ORConf 2018:
+Akos Hadnagy presented formal verification of WARP-V at ORConf 2018 and VSDOpen 2018:
   - <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank">Slides</a>
+  - <a href="https://www.youtube.com/watch?v=fqr4Z9wLNvQ&list=PLUg3wIOWD8yoZLznLfhXjlICGlx2tuwvT&index=14&t=21s" target="_blank">Presentation</a>
+  - <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank">Paper</a>
+  - Article: "Verifying a RISC-V in 1 Page of Code!" published on <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank">SemiWiki</a>, by Steve Hoover
 
 ## Goals
 
@@ -50,7 +53,7 @@ git submodule update
 
 ### Considerations
 
-Contributions are welcomed, however, WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced capabilities that are not yet officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
+Contributions are welcomed. Be aware, however, that WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced capabilities that are not yet officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
 
 With a clear understanding of where to tread, you can navigate WARP-V and contribute successfully. WARP-V is a library with plenty of room to grow. Be aware, however, that working with CPU microarchitecture means walking in a minefield of patents. Work with the community to define your contributions.
 
