@@ -21,7 +21,7 @@ Akos Hadnagy presented formal verification of WARP-V at ORConf 2018 and VSDOpen 
   - <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank">Slides</a>
   - <a href="https://www.youtube.com/watch?v=fqr4Z9wLNvQ&list=PLUg3wIOWD8yoZLznLfhXjlICGlx2tuwvT&index=14&t=21s" target="_blank">Presentation</a>
   - <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank">Paper</a>
-  - Article: "Verifying a RISC-V in 1 Page of Code!" published on <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank">SemiWiki</a>
+  - Article: "Verifying a RISC-V in 1 Page of Code!" published on <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank">SemiWiki</a>, by Steve Hoover
 
 ## Goals
 
@@ -53,7 +53,7 @@ git submodule update
 
 ### Considerations
 
-Contributions are welcomed, however, WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced capabilities that are not yet officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
+Contributions are welcomed. Be aware, however, that WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced capabilities that are not yet officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
 
 With a clear understanding of where to tread, you can navigate WARP-V and contribute successfully. WARP-V is a library with plenty of room to grow. Be aware, however, that working with CPU microarchitecture means walking in a minefield of patents. Work with the community to define your contributions.
 
