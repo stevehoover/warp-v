@@ -106,7 +106,8 @@ end
 
 //_\source top.tlv 2131
 //_\SV
-module top(input logic clk, input logic reset, input logic [31:0] cyc_cnt, output logic passed, output logic failed);    /* verilator lint_save */ /* verilator lint_off UNOPTFLAT */  bit [256:0] RW_rand_raw; bit [256+63:0] RW_rand_vect; pseudo_rand #(.WIDTH(257)) pseudo_rand (clk, reset, RW_rand_raw[256:0]); assign RW_rand_vect[256+63:0] = {RW_rand_raw[62:0], RW_rand_raw};  /* verilator lint_restore */  /* verilator lint_off WIDTH */ /* verilator lint_off UNOPTFLAT */
+module top(input logic clk, input logic reset, input logic [31:0] cyc_cnt, output logic passed, output logic failed);   
+// /* verilator lint_save */ /* verilator lint_off UNOPTFLAT */  bit [256:0] RW_rand_raw; bit [256+63:0] RW_rand_vect; pseudo_rand #(.WIDTH(257)) pseudo_rand (clk, reset, RW_rand_raw[256:0]); assign RW_rand_vect[256+63:0] = {RW_rand_raw[62:0], RW_rand_raw};  /* verilator lint_restore */  /* verilator lint_off WIDTH */ /* verilator lint_off UNOPTFLAT */
 
 //_\source top.tlv 2133
 
@@ -985,7 +986,7 @@ wire FETCH_Instr_Regs_pending_a2 [31:1];
 reg  FETCH_Instr_Regs_pending_a3 [31:1];
 
 // For |fetch/instr/regs$value.
-wire [31:0] FETCH_Instr_Regs_value_a3 [31:1];
+reg [31:0] FETCH_Instr_Regs_value_a3 [31:1];
 
 // For |fetch/instr/src$replay.
 wire [2:1] FETCH_Instr_Src_replay_a1;
@@ -2605,7 +2606,7 @@ generate
                // Load
                // ====
                //_@3
-                  for (bank = 0; bank <= 4-1; bank++) begin : L1_FETCH_Instr_Bank wire [31:0] L1_addr_a3; wire [(32 / 4) - 1 : 0] L1_ld_value_a3; wire L1_spec_ld_a3; wire [3:0] L1_st_mask_a3; wire [31:0] L1_st_value_a3; wire L1_valid_st_a3; wire [(32 / 4) - 1 : 0] L1_Mem_Value_a3 [31:0]; //_/bank
+                  for (bank = 0; bank <= 4-1; bank++) begin : L1_FETCH_Instr_Bank wire [31:0] L1_addr_a3; wire [(32 / 4) - 1 : 0] L1_ld_value_a3; wire L1_spec_ld_a3; wire [3:0] L1_st_mask_a3; wire [31:0] L1_st_value_a3; wire L1_valid_st_a3; reg [(32 / 4) - 1 : 0] L1_Mem_Value_a3 [31:0]; //_/bank
                      assign {L1_addr_a3[31:0], L1_spec_ld_a3, L1_st_mask_a3[3:0], L1_st_value_a3[31:0], L1_valid_st_a3} = {FETCH_Instr_addr_a3, FETCH_Instr_spec_ld_a3, FETCH_Instr_st_mask_a3, FETCH_Instr_st_value_a3, FETCH_Instr_valid_st_a3}; // Find signal from outside of /bank.
                      //_/mem
                      //_?$spec_ld
@@ -2676,4 +2677,5 @@ generate
    
 //_\SV
    endmodule
+
 
