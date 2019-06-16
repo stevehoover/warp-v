@@ -4,13 +4,14 @@ SHELL=/bin/bash
 
 export PATH:=$(shell pwd)/env/bin:$(PATH)
 
-.PHONY: all compile verif env riscv-formal
+.PHONY: all clean compile verif env riscv-formal
 
 
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
 out/warp-v_formal.sv out/warp-v_formal_gen.sv: warp-v_formal.tlv ../warp-v.tlv
 	rm -rf out
 	curl -F 'warp-v_formal.tlv=@warp-v_formal.tlv' -F 'warp-v.tlv=@../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout
+	exit `cat out/status`
 
 env: env/PASSED
 
