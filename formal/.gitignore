@@ -4,13 +4,10 @@ complete
 /picorv32.v
 /disasm.s
 /disasm.o
-# These are pre-compiled by pre-commit so CI can run without SandPiper.
-#build\.sv
-#build_gen\.sv
-
-# Intermediate files for SandPiper pre-build
-/sp_obj/
 
 # Environment directories built by make_env
 /env
 /env_build
+
+# SandPiper(TM) SaaS Edition output directory
+/out

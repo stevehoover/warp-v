@@ -53,13 +53,15 @@ git submodule update
 
 ### Considerations
 
-Contributions are welcomed. Be aware, however, that WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced capabilities that are not yet officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
+Contributions are welcomed. Be aware, however, that WARP-V is probably the worst possible first exposure to TL-Verilog. It utilizes advanced proof-of-concept capabilities that are not officially supported. If you are new to TL-Verilog, utilize the resources available in Makerchip to learn TL-Verilog in baby steps before jumping into WARP-V.
 
 With a clear understanding of where to tread, you can navigate WARP-V and contribute successfully. WARP-V is a library with plenty of room to grow. Be aware, however, that working with CPU microarchitecture means walking in a minefield of patents. Work with the community to define your contributions.
 
 To work with WARP-V without stumbling over the undocumented features it utilizes, it is important to understand the tool stack. TL-Verilog is well-defined with reasonable documentation, examples, and interactive tutorials in Makerchip. It is a mature and extremely compelling tool stack that supports timing-abstract and transaction-level design techniques you cannot find elsewhere. WARP-V goes a step further, utilizing an undocumented proof-of-concept framework that supports advanced features for modularity, reuse, parameterization, and code generation. These features are provided using a macro preprocessor called M4 plus a bit of Perl. Though they can be used in Makerchip, they have no long-term support.
 
 There is a clear distinction between these layers, and Makerchip helps to work with them. If you load WARP-V into Makerchip (using the link above), you'll see the source code in the "Editor" pane, and the pre-processed TL-Verilog code (which you can navigate and debug) in the "Nav-TLV" pane. Clicking line numbers in this pane will take you to the source line that generated it. You can cut and paste from Nat-TLV into the Editor to avoid the preprocessing all together.
+
+formal/Makefile uses SandPiper(TM) SaaS Edition -- SandPiper running in the cloud as a service. No local SandPiper installation is required, but if the service goes down, the build will fail.
 
 ### Workflow
 
@@ -72,8 +74,6 @@ WARP-V is verified using the <a href="https://github.com/cliffordwolf/riscv-form
 ### CI
 
 <a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank">WARP-V Travis CI</a>. CI runs formal verification tests.
-
-**`pre-commit`**: Currently, SandPiper is not available for public download due to export restrictions, so it cannot be available in the CI environment. SV sources must be pre-built and included in the repository. Run the `pre-commit` script to run sandpiper locally. This will also configure your local repo to run `pre-commit` as a pre-commit hook in the future.
 
 **CI Environment**: CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
 

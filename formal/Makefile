@@ -6,6 +6,12 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 
 .PHONY: all compile verif env riscv-formal
 
+
+# Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
+out/warp-v_formal.sv out/warp-v_formal_gen.sv: warp-v_formal.tlv ../warp-v.tlv
+	rm -rf out
+	curl -F 'warp-v_formal.tlv=@warp-v_formal.tlv' -F 'warp-v.tlv=@../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout
+
 env: env/PASSED
 
 # Use env/PASSED to indicate that the environment has been successfully built.
@@ -15,19 +21,14 @@ env/PASSED:
 
 riscv-formal: riscv-formal/README.md
 
-# Use riscv-formal to indicate that the git submodules have been installed.
+# Use riscv-formal/README.md to indicate that the git submodules have been installed.
 riscv-formal/README.md:
 	@# Just update timestamp if that's all that's needed, or install git submodules.
 	if [ -e riscv-formal/README.md ]; then touch riscv-formal/README.md; else git submodule init; git submodule update; fi
 
-compile: build.sv
+compile: out/warp-v_formal.sv
 
-build.sv: warp-v_formal.tlv
-	rm -rf sp_obj
-	@# Invoke SandPiper. Need to provide input path reaching up the hierarchy to permit higher-level file inclusion.
-	sandpiper -i ../formal/warp-v_formal.tlv -o build.sv --obj sp_obj -p verilog
-
-verif: checks.cfg genchecks.py build.sv env riscv-formal
+verif: checks.cfg genchecks.py out/warp-v_formal.sv out/warp-v_formal_gen.sv env riscv-formal
 	@# Should use this, but until Clifford accepts pull request, we have a local copy of genchecks.py.
 	@#python3 riscv-formal/checks/genchecks.py --basedir ../riscv-formal
 	python3 ./genchecks.py --basedir ./riscv-formal
@@ -36,5 +37,4 @@ verif: checks.cfg genchecks.py build.sv env riscv-formal
 all: verif
 
 clean:
-	rm build.sv build_gen.sv
-	rm -rf sp_obj
+	rm -rf out
