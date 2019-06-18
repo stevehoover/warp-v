@@ -10,11 +10,10 @@ all: verilog/warp-v_5-stage.sv
 verilog/warp-v_5-stage.sv verilog/warp-v_5-stage_gen.sv: warp-v_5-stage.tlv
 	rm -rf out
 	mkdir -p verilog
-	curl -F 'warp-v_5-stage.tlv=@warp-v_5-stage.tlv' -F 'warp-v.tlv=@../warp-v.tlv' http://localhost:8888/sandpiper | tar -zx && cat out/stdout
+	curl -F 'warp-v_5-stage.tlv=@warp-v_5-stage.tlv' -F 'warp-v.tlv=@../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout
 	exit `cat out/status`
-	mv out/warp-v_5-stage*.sv verilog
+	cp out/warp-v_5-stage*.sv verilog
 	# HACKS: These fix bugs in the generated code.
-	sed -i 's/wire( \[[^\[]\] L1_Mem_Value_)/reg$1/' out/warp-v_5-stage.sv
-
+	sed -i 's/wire\( \[[^\[]\+\] L1_Mem_Value_\)/reg\1/' verilog/warp-v_5-stage.sv
 clean:
 	rm -rf out verilog
