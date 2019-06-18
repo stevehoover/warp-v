@@ -8,7 +8,7 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 
 
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
-out/warp-v_formal.sv out/warp-v_formal_gen.sv: warp-v_formal.tlv ../warp-v.tlv
+out/warp-v_formal.sv: warp-v_formal.tlv ../warp-v.tlv
 	rm -rf out
 	curl -F 'warp-v_formal.tlv=@warp-v_formal.tlv' -F 'warp-v.tlv=@../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout
 	exit `cat out/status`
@@ -29,7 +29,7 @@ riscv-formal/README.md:
 
 compile: out/warp-v_formal.sv
 
-verif: checks.cfg genchecks.py out/warp-v_formal.sv out/warp-v_formal_gen.sv env riscv-formal
+verif: checks.cfg genchecks.py out/warp-v_formal.sv env riscv-formal
 	@# Should use this, but until Clifford accepts pull request, we have a local copy of genchecks.py.
 	@#python3 riscv-formal/checks/genchecks.py --basedir ../riscv-formal
 	python3 ./genchecks.py --basedir ./riscv-formal
