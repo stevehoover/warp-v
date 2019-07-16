@@ -15,5 +15,8 @@ verilog/warp-v_5-stage.sv verilog/warp-v_5-stage_gen.sv: warp-v_5-stage.tlv
 	cp out/warp-v_5-stage*.sv verilog
 	# HACKS: These fix bugs in the generated code.
 	sed -i 's/wire\( \[[^\[]\+\] L1_Mem_Value_\)/reg\1/' verilog/warp-v_5-stage.sv
+	sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_vae_\)/reg\1/' verilog/warp-v_5-stage_gen.sv
 clean:
 	rm -rf out verilog
+
+#FETCH_Instr_Regs_value_a0

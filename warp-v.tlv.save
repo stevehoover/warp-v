@@ -216,13 +216,13 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
    m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+   m4_default(['M4_TB'], 0)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
@@ -1120,27 +1120,9 @@ m4+definitions(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-   |fetch
-      /instrs[11:0]
-         @0  // whatever the fetch stage is.
-            $instr[31:0] =
-               (#instrs == 0 ) ? m4_asm_ORI(r6, r0, 0) :
-               (#instrs == 1 ) ? m4_asm_ORI(r1, r0, 1) :
-               (#instrs == 2 ) ? m4_asm_ORI(r2, r0, 1010) :
-               (#instrs == 3 ) ? m4_asm_ORI(r3, r0, 0) :
-               (#instrs == 4 ) ? m4_asm_ADD(r3, r1, r3) :
-               (#instrs == 5 ) ? m4_asm_SW(r6, r3, 0) :
-               (#instrs == 6 ) ? m4_asm_ADDI(r1, r1, 1) :
-               (#instrs == 7 ) ? m4_asm_ADDI(r6, r6, 100) :
-               (#instrs == 8 ) ? m4_asm_BLT(r1, r2, 1111111110000) :
-               (#instrs == 9 ) ? m4_asm_LW(r4, r6,   111111111100) :
-               (#instrs == 10 ) ?m4_asm_BGE(r1, r2, 1111111010100): 32'b0;
-                              
    '])
-
 // M4-generated code.
 \TLV riscv_gen()
-
    
    // v---------------------
    // Instruction characterization
@@ -1799,7 +1781,7 @@ m4+definitions(['
                m4_ifelse_block(M4_TB, 0, ['
                `BOGUS_USE($$raw[M4_INSTR_RANGE])
                '], ['
-               $raw[M4_INSTR_RANGE] = |fetch/instrs[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
                '])
          @M4_NEXT_PC_STAGE
             
@@ -2159,9 +2141,7 @@ m4+module_def
    m4+cpu()
    m4_ifelse_block(M4_TB, 1, ['
    m4+tb()
-   //test tb instansiation
    '])
-	
 \SV
    endmodule
 
