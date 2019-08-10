@@ -223,6 +223,7 @@ m4+definitions(['
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
+   m4_default(['M4_IMPL'], 0)  // 0 to disable testbench and instrumentation code.
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
@@ -1110,7 +1111,7 @@ m4+definitions(['
 
 \TLV riscv_cnt10_prog()
    m4_ifexpr(M4_TB, ['
-   /* Vivado doesn't like this:
+   // (Vivado doesn't like this)
    \SV_plus
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
       
@@ -1145,10 +1146,11 @@ m4+definitions(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-   */
-   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file).
+   '])
+   m4_ifexpr(M4_IMPL, ['
+   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
    |fetch
-      /instrs[11:0]
+      /instr_mem[11:0]
          @M4_FETCH_STAGE
             $instr[31:0] =
                (#instrs == 0 ) ? m4_asm_ORI(r6, r0, 0) :
@@ -1162,7 +1164,6 @@ m4+definitions(['
                (#instrs == 8 ) ? m4_asm_BLT(r1, r2, 1111111110000) :
                (#instrs == 9 ) ? m4_asm_LW(r4, r6,   111111111100) :
                (#instrs == 10 ) ?m4_asm_BGE(r1, r2, 1111111010100): 32'b0;
-                              
    '])
 
 // M4-generated code.
@@ -1822,11 +1823,12 @@ m4+definitions(['
                // =====
 
                // Fetch the raw instruction from program memory (or, for formal, tie it off).
-               m4_ifelse_block(M4_TB, 0, ['
-               `BOGUS_USE($$raw[M4_INSTR_RANGE])
+               m4_ifelse_block(M4_TB, 1, ['
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+               '], M4_IMPL, 1, ['
+               $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
                '], ['
-               //$raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
-               $raw[M4_INSTR_RANGE] = |fetch/instrs[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
+               `BOGUS_USE($$raw[M4_INSTR_RANGE])
                '])
          @M4_NEXT_PC_STAGE
             
@@ -2193,9 +2195,7 @@ m4+module_def
    m4+cpu()
    m4_ifelse_block(M4_TB, 1, ['
    m4+tb()
-   //test tb instansiation
    '])
-	
 \SV
    endmodule
 

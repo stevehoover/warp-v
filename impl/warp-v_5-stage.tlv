@@ -1,7 +1,7 @@
 \m4_TLV_version 1d --bestsv --noline: tl-x.org
 m4+definitions
    // Configure for impl.
-   m4_define(['M4_TB'], 1)
+   m4_define(['M4_IMPL'], 1)
    m4_define(['M4_FORMAL'], 0)
 \SV
    // Include WARP-V.
