@@ -15,5 +15,8 @@ verilog/warp-v_%.sv: warp-v_%.tlv ../warp-v.tlv
 	cp out/warp-v_*.sv verilog
 	# HACKS: These fix bugs in the generated code.
 	sed -i 's/wire\( \[[^\[]\+\] L1_Mem_Value_\)/reg\1/' $@
+	sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_vae_\)/reg\1/' $(patsubst %.sv,%_gen.sv,$@)
 clean:
 	rm -rf out verilog
+
+#FETCH_Instr_Regs_value_a0
