@@ -216,7 +216,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
    
    m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
@@ -1110,6 +1110,7 @@ m4+definitions(['
 
 \TLV riscv_cnt10_prog()
    m4_ifexpr(M4_TB, ['
+   /* Vivado doesn't like this:
    \SV_plus
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
       
@@ -1144,9 +1145,11 @@ m4+definitions(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
+   */
+   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file).
    |fetch
       /instrs[11:0]
-         @0  // whatever the fetch stage is.
+         @M4_FETCH_STAGE
             $instr[31:0] =
                (#instrs == 0 ) ? m4_asm_ORI(r6, r0, 0) :
                (#instrs == 1 ) ? m4_asm_ORI(r1, r0, 1) :
@@ -1822,6 +1825,7 @@ m4+definitions(['
                m4_ifelse_block(M4_TB, 0, ['
                `BOGUS_USE($$raw[M4_INSTR_RANGE])
                '], ['
+               //$raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
                $raw[M4_INSTR_RANGE] = |fetch/instrs[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
                '])
          @M4_NEXT_PC_STAGE
