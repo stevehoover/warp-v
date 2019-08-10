@@ -7,25 +7,25 @@ WARP-V is an open-source RISC-V CPU core generator that is quickly getting a lot
 ## Links
 
 WARP-V is written in a single source file for compatibility with the Makerchip.com IDE.
-<a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank">Open the latest WARP-V in Makerchip</a>.
+<a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">Open the latest WARP-V in Makerchip</a>.
 
-There is a Google Drive area for this and other <a href="https://drive.google.com/drive/folders/1l9YTvpNZ0km3IlzlPaMvoLdriLw9B8Yk?usp=sharing" target="_blank">open-source TL-Verilog projects</a>.
+There is a Google Drive area for this and other <a href="https://drive.google.com/drive/folders/1l9YTvpNZ0km3IlzlPaMvoLdriLw9B8Yk?usp=sharing" target="_blank" target="_blank" atom_fix="_">open-source TL-Verilog projects</a>.
 
 There is a <a href="https://gitter.im/librecores/warp-v" target="_blank">public communication forum</a> (be respectful) for WARP-V. This is a LibreCores Gitter Room.
 
 Steve Hoover presented early work at DAC 2018:
-  - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank">Slides</a>
-  - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Poster.pdf" target="_blank">Poster</a>
+  - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank" target="_blank" atom_fix="_">Slides</a>
+  - <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Poster.pdf" target="_blank" target="_blank" atom_fix="_">Poster</a>
   
 Akos Hadnagy presented formal verification of WARP-V at ORConf 2018 and VSDOpen 2018:
-  - <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank">Slides</a>
+  - <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank" target="_blank" atom_fix="_">Slides</a>
   - <a href="https://www.youtube.com/watch?v=fqr4Z9wLNvQ&list=PLUg3wIOWD8yoZLznLfhXjlICGlx2tuwvT&index=14&t=21s" target="_blank">Presentation</a>
-  - <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank">Paper</a>
-  - Article: "Verifying a RISC-V in 1 Page of Code!" published on <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank">SemiWiki</a>, by Steve Hoover
+  - <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank" target="_blank" atom_fix="_">Paper</a>
+  - Article: "Verifying a RISC-V in 1 Page of Code!" published on <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank" target="_blank" atom_fix="_">SemiWiki</a>, by Steve Hoover
 
 ## Goals
 
-WARP-V originated as an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank">TL-Verilog language spec</a>. As such, it intentionally pushes the limits, using an undocumented proof-of-concept framework (even when old-school Verilog features might suffice).
+WARP-V originated as an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank" target="_blank" atom_fix="_">TL-Verilog language spec</a>. As such, it intentionally pushes the limits, using an undocumented proof-of-concept framework (even when old-school Verilog features might suffice).
 
 WARP-V has attracted interest for academic exploration of both the design methodology and CPU microarchitecture. It has significant potential for commercial use.
 
@@ -69,13 +69,13 @@ Work in a fork and submit push requests that have passed continuous integration 
 
 ### Formal Verification
 
-WARP-V is verified using the <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank">riscv-formal</a> open-source formal verification framework. Everything for formal verification is in the `formal` directory. See the <a href="https://github.com/stevehoover/warp-v/tree/master/formal" target="_blank">README.md</a> file there.
+WARP-V is verified using the <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank" target="_blank" atom_fix="_">riscv-formal</a> open-source formal verification framework. Everything for formal verification is in the `formal` directory. See the <a href="https://github.com/stevehoover/warp-v/tree/master/formal" target="_blank" target="_blank" atom_fix="_">README.md</a> file there.
 
 ### CI
 
-<a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank">WARP-V Travis CI</a>. CI runs formal verification tests.
+<a href="https://travis-ci.com/" target="_blank">Travis-CI</a> is used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank" target="_blank" atom_fix="_">WARP-V Travis CI</a>. CI runs formal verification tests.
 
-**CI Environment**: CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
+**CI Environment**: CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank" target="_blank" atom_fix="_">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
 
-**CI Debug**: <a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
+**CI Debug**: <a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank" target="_blank" atom_fix="_">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
 
