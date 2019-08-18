@@ -1799,6 +1799,9 @@ m4+definitions(['
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
    m4+indirect(M4_isa['_cnt10_prog'])
    '])
+   m4_ifelse_block(M4_IMPL, 1, ['
+   m4+indirect(M4_isa['_cnt10_prog'])
+   '])
 
 
    // /=========\
