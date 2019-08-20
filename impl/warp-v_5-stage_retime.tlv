@@ -4,7 +4,7 @@ m4+definitions
    m4_define(['M4_TB'], 0)
    m4_define(['M4_IMPL'], 1)
    m4_define(['M4_FORMAL'], 0)
-   m4_define(['M4_RETIMING_EXPERIMENT'], ['true'])
+   m4_define(['M4_RETIMING_EXPERIMENT'], ['false'])
    m4_define(['M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['true'])
 \SV
    // Include WARP-V.
@@ -12,5 +12,6 @@ m4+definitions
 m4+module_def
 \TLV
    m4+cpu()
+   m4+tb()
 \SV
    endmodule
