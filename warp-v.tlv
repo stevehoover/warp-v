@@ -1153,17 +1153,17 @@ m4+definitions(['
       /instr_mem[11:0]
          @M4_FETCH_STAGE
             $instr[31:0] =
-               (#instrs == 0 ) ? m4_asm_ORI(r6, r0, 0) :
-               (#instrs == 1 ) ? m4_asm_ORI(r1, r0, 1) :
-               (#instrs == 2 ) ? m4_asm_ORI(r2, r0, 1010) :
-               (#instrs == 3 ) ? m4_asm_ORI(r3, r0, 0) :
-               (#instrs == 4 ) ? m4_asm_ADD(r3, r1, r3) :
-               (#instrs == 5 ) ? m4_asm_SW(r6, r3, 0) :
-               (#instrs == 6 ) ? m4_asm_ADDI(r1, r1, 1) :
-               (#instrs == 7 ) ? m4_asm_ADDI(r6, r6, 100) :
-               (#instrs == 8 ) ? m4_asm_BLT(r1, r2, 1111111110000) :
-               (#instrs == 9 ) ? m4_asm_LW(r4, r6,   111111111100) :
-               (#instrs == 10 ) ?m4_asm_BGE(r1, r2, 1111111010100): 32'b0;
+               (#instr_mem == 0 ) ? m4_asm_ORI(r6, r0, 0) :
+               (#instr_mem == 1 ) ? m4_asm_ORI(r1, r0, 1) :
+               (#instr_mem == 2 ) ? m4_asm_ORI(r2, r0, 1010) :
+               (#instr_mem == 3 ) ? m4_asm_ORI(r3, r0, 0) :
+               (#instr_mem == 4 ) ? m4_asm_ADD(r3, r1, r3) :
+               (#instr_mem == 5 ) ? m4_asm_SW(r6, r3, 0) :
+               (#instr_mem == 6 ) ? m4_asm_ADDI(r1, r1, 1) :
+               (#instr_mem == 7 ) ? m4_asm_ADDI(r6, r6, 100) :
+               (#instr_mem == 8 ) ? m4_asm_BLT(r1, r2, 1111111110000) :
+               (#instr_mem == 9 ) ? m4_asm_LW(r4, r6,   111111111100) :
+               (#instr_mem == 10 ) ?m4_asm_BGE(r1, r2, 1111111010100): 32'b0;
    '])
 
 // M4-generated code.
