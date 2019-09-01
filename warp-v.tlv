@@ -227,6 +227,10 @@ m4+definitions(['
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
+   
+   // Which program to assemble.
+   m4_define(m4_prog_name, ['cnt10'])
+   
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -391,7 +395,7 @@ m4+definitions(['
    //                                  can be available.
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Characterization:
-         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE']
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
       '], ['RISCV'], ['
          // RISC-V Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
@@ -513,9 +517,6 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 12)  // Each memory address holds 12 bits.
          m4_define_vector(M4_WORD, 12)
          m4_define_hier(M4_REGS, 8)   // (Plural to avoid name conflict w/ SV "reg" keyword.)
-
-         m4_define(M4_NUM_INSTRS, 13)  // (Must match program exactly.)
-
       '],
       ['RISCV'], ['
          // Definitions matching "The RISC-V Instruction Set Manual Vol. I: User-Level ISA", Version 2.2.
@@ -525,9 +526,6 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], 32, 1)
-
-         m4_define(M4_NUM_INSTRS, 11)  // (Must match program exactly.)
-
       '],
       ['DUMMY'], ['
          m4_define_vector(M4_INSTR, 2)
@@ -535,9 +533,6 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 2)
          m4_define_vector(M4_WORD, 2)
          m4_define_hier(M4_REGS, 8)
-
-         m4_define(M4_NUM_INSTRS, 2)  // (Must match program exactly.)
-
       '])
    
    
@@ -860,10 +855,16 @@ m4+definitions(['
       // m4_asm_instr_str(<type>, <mnemonic>, <m4_asm-args>)
       m4_define(['m4_asm_instr_str'], ['m4_pushdef(['m4_str'], ['($1) $2 m4_shift(m4_shift($@))'])m4_define(['m4_asm_mem_expr'],
                                                        m4_dquote(m4_asm_mem_expr[' "']m4_str['']m4_substr(['                                        '], m4_len(m4_quote(m4_str)))['", ']))m4_popdef(['m4_str'])'])
+      // Assemble an instruction.
+      // m4_asm(FOO, ...) defines m4_inst# as m4_asm_FOO(...), counts instructions in M4_NUM_INSTRS ,and outputs a comment.
+      m4_define(['m4_asm'], ['m4_define(['m4_instr']M4_NUM_INSTRS, ['m4_asm_$1(m4_shift($@))'])['/']['/ Inst #']M4_NUM_INSTRS: $@m4_define(['M4_NUM_INSTRS'], m4_eval(M4_NUM_INSTRS + 1))'])
 
       //=========
    '], ['DUMMY'], ['
    '])
+   
+   // Macro initialization.
+   m4_define(['M4_NUM_INSTRS'], 0)
 
 
    // Define m4+module_def macro to be used as a region line providing the module definition, either inside makerchip,
@@ -910,8 +911,12 @@ m4+definitions(['
 //                            //
 //============================//
 
-\TLV mini_cnt10_prog()
+\TLV mini_program_mem()
    \SV_plus
+      m4_define(['M4_NUM_INSTRS'], 13)
+      
+      // The program in an instruction memory.
+      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
       
       // /=====================\
       // | Count to 10 Program |
@@ -1109,40 +1114,49 @@ m4+definitions(['
 //                            //
 //============================//
 
+// Define all instructions of the program (as Verilog expressions for the binary value in m4_instr#.
 \TLV riscv_cnt10_prog()
+
+   // /=====================\
+   // | Count to 10 Program |
+   // \=====================/
+   //
+
+   // Add 1,2,3,...,10 (in that order).
+   // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
+   //
+   // Regs:
+   // 1: cnt
+   // 2: ten
+   // 3: out
+   // 4: tmp
+   // 5: offset
+   // 6: store addr
+   
+   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
+   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
+   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
+   m4_asm(ORI, r3, r0, 0)        //     out = 0
+   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
+   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
+   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
+   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
+   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
+
+\TLV riscv_program_mem(_prog_name)
+   m4+indirect(['riscv_']_prog_name['_prog'])
+   
    m4_ifexpr(M4_TB, ['
    // (Vivado doesn't like this)
    \SV_plus
+      // The program in an instruction memory.
+      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
       
-      // /=====================\
-      // | Count to 10 Program |
-      // \=====================/
-      //
-      
-      // Add 1,2,3,...,10 (in that order).
-      // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
-      //
-      // Regs:
-      // 1: cnt
-      // 2: ten
-      // 3: out
-      // 4: tmp
-      // 5: offset
-      // 6: store addr
-      
       assign instrs = '{
-         m4_asm_ORI(r6, r0, 0),        //     store_addr = 0
-         m4_asm_ORI(r1, r0, 1),        //     cnt = 1
-         m4_asm_ORI(r2, r0, 1010),     //     ten = 10
-         m4_asm_ORI(r3, r0, 0),        //     out = 0
-         m4_asm_ADD(r3, r1, r3),       //  -> out += cnt
-         m4_asm_SW(r6, r3, 0),         //     store out at store_addr
-         m4_asm_ADDI(r1, r1, 1),       //     cnt ++
-         m4_asm_ADDI(r6, r6, 100),     //     store_addr++
-         m4_asm_BLT(r1, r2, 1111111110000), //  ^- branch back if cnt < 10
-         m4_asm_LW(r4, r6,   111111111100), //     load the final value into tmp
-         m4_asm_BGE(r1, r2, 1111111010100)  //     TERMINATE by branching to -1
+         m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
@@ -1150,20 +1164,11 @@ m4+definitions(['
    m4_ifexpr(M4_IMPL, ['
    // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
    |fetch
-      /instr_mem[11:0]
+      /instr_mem[M4_NUM_INSTRS-1:0]
          @M4_FETCH_STAGE
+            // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
             $instr[31:0] =
-               (#instr_mem == 0 ) ? m4_asm_ORI(r6, r0, 0) :
-               (#instr_mem == 1 ) ? m4_asm_ORI(r1, r0, 1) :
-               (#instr_mem == 2 ) ? m4_asm_ORI(r2, r0, 1010) :
-               (#instr_mem == 3 ) ? m4_asm_ORI(r3, r0, 0) :
-               (#instr_mem == 4 ) ? m4_asm_ADD(r3, r1, r3) :
-               (#instr_mem == 5 ) ? m4_asm_SW(r6, r3, 0) :
-               (#instr_mem == 6 ) ? m4_asm_ADDI(r1, r1, 1) :
-               (#instr_mem == 7 ) ? m4_asm_ADDI(r6, r6, 100) :
-               (#instr_mem == 8 ) ? m4_asm_BLT(r1, r2, 1111111110000) :
-               (#instr_mem == 9 ) ? m4_asm_LW(r4, r6,   111111111100) :
-               (#instr_mem == 10 ) ?m4_asm_BGE(r1, r2, 1111111010100): 32'b0;
+               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == 0 ) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
    '])
 
 // M4-generated code.
@@ -1629,8 +1634,10 @@ m4+definitions(['
 //                            //
 //============================//
 
-\TLV dummy_cnt10_prog()
+\TLV dummy_program_mem()
+   m4_define(['M4_NUM_INSTRS'], 2)
    \SV_plus
+      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
       assign instrs = '{2'b1, 2'b10};
 
 \TLV dummy_gen()
@@ -1793,15 +1800,8 @@ m4+definitions(['
    // Generated logic
    m4+indirect(M4_isa['_gen'])
 
-   m4_ifelse_block(M4_TB, 1, ['
-   // The program in an instruction memory.
-   \SV_plus
-      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
-   m4+indirect(M4_isa['_cnt10_prog'])
-   '])
-   m4_ifelse_block(M4_IMPL, 1, ['
-   m4+indirect(M4_isa['_cnt10_prog'])
-   '])
+   // Instruction memory.
+   m4+indirect(M4_isa['_program_mem'], m4_prog_name)
 
 
    // /=========\
