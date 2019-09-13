@@ -1,6 +1,6 @@
 ![WARP-V logo](doc/img/WARP-V.png)
 
-### The open-source RISC-V core IP you can bend to your needs!
+### The open-source RISC-V core IP you can shape to your needs!
 
 
 # Overview
