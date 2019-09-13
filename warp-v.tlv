@@ -216,7 +216,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['5-stage'])  // min_area, 1-stage, 5-stage, 7-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // min_area, 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
@@ -304,8 +304,8 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
-      ['5-stage'], ['
-         // A reasonable 5-stage pipeline.
+      ['4-stage'], ['
+         // A reasonable 4-stage pipeline.
          m4_defines(
             (M4_NEXT_PC_STAGE, 0),
             (M4_FETCH_STAGE, 0),
@@ -316,11 +316,12 @@ m4+definitions(['
             (M4_RESULT_STAGE, 2),
             (M4_REG_WR_STAGE, 3),
             (M4_MEM_WR_STAGE, 3),
+            (M4_EXTRA_REPLAY_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 4))
          m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
-      ['7-stage'], ['
+      ['6-stage'], ['
          // Deep pipeline
          m4_defines(
             (M4_NEXT_PC_STAGE, 1),

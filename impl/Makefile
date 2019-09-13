@@ -4,7 +4,7 @@ SHELL=/bin/bash
 
 .PHONY: all clean
 
-all: verilog/warp-v_5-stage.sv verilog/warp-v_5-stage_retime.sv
+all: verilog/warp-v_4-stage.sv verilog/warp-v_4-stage_retime.sv
 
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
 verilog/warp-v_%.sv: warp-v_%.tlv ../warp-v.tlv
