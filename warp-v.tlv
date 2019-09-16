@@ -2198,9 +2198,9 @@ m4+definitions(['
    // =================
    
    m4+cpu()
-   m4_ifelse_block(M4_FORMAL, 1 ['
+   m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
-   '])
+   '], [''])
 
 m4+module_def
 
