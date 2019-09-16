@@ -222,8 +222,7 @@ m4+definitions(['
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_default(['M4_TB'], 1)  // 0 to disable testbench and instrumentation code.
-   m4_default(['M4_IMPL'], 0)  // 0 to disable testbench and instrumentation code.
+   m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
 
@@ -503,6 +502,7 @@ m4+definitions(['
    
    m4_define(M4_isa, m4_translit(M4_ISA, ['A-Z'], ['a-z']))   // A lower-case version of M4_ISA.
    
+   m4_default(['m4_program_mem_macro_name'], M4_isa['_program_mem'])
    
    // For each ISA, define:
    //   m4_define_vector(['M4_INSTR'], XX)   // (or, m4_define_vector_with_fields(...)) Instruction vector.
@@ -912,7 +912,7 @@ m4+definitions(['
 //                            //
 //============================//
 
-\TLV mini_program_mem()
+\TLV mini_cnt10_prog()
    \SV_plus
       m4_define(['M4_NUM_INSTRS'], 13)
       
@@ -923,7 +923,7 @@ m4+definitions(['
       // | Count to 10 Program |
       // \=====================/
       //
-      // (The program I wrote, within the model I wrote, within the program I wrote.)
+      // (The program I wrote in the language I created in the CPU I wrote in a language I created.)
       
       // Add 1,2,3,...,10 (in that order).
       // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
@@ -951,6 +951,9 @@ m4+definitions(['
          "e=0{c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
       };
+
+\TLV mini_program_mem(_prog_name)
+   m4+indirect(['mini_']_prog_name['_prog'])
 
 \TLV mini_gen()
    // No M4-generated code for mini.
@@ -1149,7 +1152,7 @@ m4+definitions(['
 \TLV riscv_program_mem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    
-   m4_ifexpr(M4_TB, ['
+   m4_ifelse_block(M4_IMPL, 0, ['
    // (Vivado doesn't like this)
    \SV_plus
       // The program in an instruction memory.
@@ -1161,8 +1164,7 @@ m4+definitions(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-   '])
-   m4_ifexpr(M4_IMPL, ['
+   '], ['
    // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
    |fetch
       /instr_mem[M4_NUM_INSTRS-1:0]
@@ -1802,7 +1804,8 @@ m4+definitions(['
    m4+indirect(M4_isa['_gen'])
 
    // Instruction memory.
-   m4+indirect(M4_isa['_program_mem'], m4_prog_name)
+   //m4+indirect(M4_isa['_program_mem'], m4_prog_name)
+   m4+indirect(m4_program_mem_macro_name, m4_prog_name)  -- m4+indirect(['m4_']M4_IMEM_TYPE['_imem'])
 
 
    // /=========\
@@ -1827,7 +1830,7 @@ m4+definitions(['
                // =====
 
                // Fetch the raw instruction from program memory (or, for formal, tie it off).
-               m4_ifelse_block(M4_TB, 1, ['
+               m4_ifelse_block(M4_IMPL, 0, ['
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
                '], M4_IMPL, 1, ['
                $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
@@ -2119,7 +2122,7 @@ m4+definitions(['
          @M4_REG_WR_STAGE
             `BOGUS_USE(/original_ld/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
-\TLV tb()
+\TLV warpv_makerchip_cnt10_tb()
    |fetch
       /instr
          @M4_REG_WR_STAGE
@@ -2187,9 +2190,7 @@ m4+definitions(['
 
             `BOGUS_USE(/src[2]$dummy)
 
-m4+module_def
-
-\TLV
+\TLV warpv()
    // =================
    //
    //    THE MODEL
@@ -2197,9 +2198,15 @@ m4+module_def
    // =================
    
    m4+cpu()
-   m4_ifelse_block(M4_TB, 1, ['
    m4+tb()
+   m4_ifelse_block(M4_FOMAL, 1 ['
+   m4_formal()
    '])
+
+m4+module_def
+
+\TLV
+   m4+warpv()
 \SV
    endmodule
 
