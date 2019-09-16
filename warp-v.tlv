@@ -1152,7 +1152,15 @@ m4+definitions(['
 \TLV riscv_program_mem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    
-   m4_ifelse_block(M4_IMPL, 0, ['
+   m4_ifelse_block(M4_IMPL, 1, ['
+   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
+   |fetch
+      /instr_mem[M4_NUM_INSTRS-1:0]
+         @M4_FETCH_STAGE
+            // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
+            $instr[31:0] =
+               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == 0 ) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
+   '], M4_FORMAL, 0, ['
    // (Vivado doesn't like this)
    \SV_plus
       // The program in an instruction memory.
@@ -1164,15 +1172,7 @@ m4+definitions(['
       };
       
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-   '], ['
-   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
-   |fetch
-      /instr_mem[M4_NUM_INSTRS-1:0]
-         @M4_FETCH_STAGE
-            // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
-            $instr[31:0] =
-               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == 0 ) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
-   '])
+   '], [''])
 
 // M4-generated code.
 \TLV riscv_gen()
@@ -1830,10 +1830,10 @@ m4+definitions(['
                // =====
 
                // Fetch the raw instruction from program memory (or, for formal, tie it off).
-               m4_ifelse_block(M4_IMPL, 0, ['
-               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
-               '], M4_IMPL, 1, ['
+               m4_ifelse_block(M4_IMPL, 1, ['
                $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
+               '], M4_FORMAL, 0, ['
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
                '], ['
                `BOGUS_USE($$raw[M4_INSTR_RANGE])
                '])
