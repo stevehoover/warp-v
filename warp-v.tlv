@@ -2198,7 +2198,6 @@ m4+definitions(['
    // =================
    
    m4+cpu()
-   m4+tb()
    m4_ifelse_block(M4_FOMAL, 1 ['
    m4_formal()
    '])
@@ -2207,6 +2206,7 @@ m4+module_def
 
 \TLV
    m4+warpv()
+   m4+warpv_makerchip_cnt10_tb()
 \SV
    endmodule
 
