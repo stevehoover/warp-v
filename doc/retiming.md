@@ -50,6 +50,8 @@ It can be reasonable to develop a roughly-staged model at first and refine the t
 
 These studies did not use explicit BlockRAMs. Can synthesis retime these?
 
+WARP-V is a simple pipeline. Can synthesis retime across flow components, like a recirculation mux, FIFO, etc. (I doubt it will retime through FIFOs by default as there are RAS considerations.)
+
 Repeat experiments with other synthesis tools from other vendors (and open-source).
 
 Why are frequencies so low. We've seen much better for 4-stage.

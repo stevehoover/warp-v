@@ -76,13 +76,13 @@ Transaction-Level Verilog extends Verilog/SystemVerilog with constructs for pipe
 
 ## Code Construction with M4
 
-Code construction techniques for TL-Verilog are an active area of research. Before native implementation, code construction is being explored through the use of a macro preprocessor, <a href="https://www.gnu.org/software/m4/" target="_blank" atom_fix="_">M4</a> (plus a bit of Perl). Macro preprocessing is uses in WARP-V to enable a single definition of the instruction set to be used to generate:
+Code construction techniques for TL-Verilog are an active area of research. Before native implementation, code construction is being explored through the use of a macro preprocessor, <a href="https://www.gnu.org/software/m4/" target="_blank" atom_fix="_">M4</a> (plus a bit of Perl). Macro preprocessing is used in WARP-V to enable a single definition of the instruction set to be used to generate:
 
-  - pipeline staging
   - decode logic
   - result selection logic for the execution unit
-  - logic related to replay and register bypass
   - an assembler
+
+Logic related to replay and register bypass is generated based on CPU pipeline configuration.
 
 There are simple uses of M4 that are easy to follow, such as including library files, defining constants, and instantiating macros. M4 features are supported in the [Makerchip IDE](#makerchip) as a short-term solution with some nice features to help with these use models. But M4 use in WARP-V goes *way* beyond these scenarios, intentionally pushing the limits of code construction. A small amount of code does a lot, but it is *very* messy, undocumented, and extremely difficult to debug. So it is important to [give careful consideration to your intended use of WARP-V](#use).
 

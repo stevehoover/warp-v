@@ -228,7 +228,7 @@ m4+definitions(['
 
    
    // Which program to assemble.
-   m4_define(m4_prog_name, ['cnt10'])
+   m4_define(M4_PROG_NAME, ['cnt10'])
    
 
    // Define the implementation configuration, including pipeline depth and staging.
@@ -502,7 +502,12 @@ m4+definitions(['
    
    m4_define(M4_isa, m4_translit(M4_ISA, ['A-Z'], ['a-z']))   // A lower-case version of M4_ISA.
    
-   m4_default(['m4_program_mem_macro_name'], M4_isa['_program_mem'])
+   // Instruction Memory macros are responsible for providing the instruction memory interface for fetch, as:
+   // Inputs:
+   //   |fetch@M4_FETCH$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]
+   // Outputs:
+   //   |fetch/instr?$fetch$raw[M4_INSTR_RANGE] (at or after @M4_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
+   m4_default(['M4_IMEM_MACRO_NAME'], M4_isa['_imem'])
    
    // For each ISA, define:
    //   m4_define_vector(['M4_INSTR'], XX)   // (or, m4_define_vector_with_fields(...)) Instruction vector.
@@ -952,8 +957,13 @@ m4+definitions(['
          "P=0-1"  //     TERMINATE by jumping to -1
       };
 
-\TLV mini_program_mem(_prog_name)
+\TLV mini_imem(_prog_name)
    m4+indirect(['mini_']_prog_name['_prog'])
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
 
 \TLV mini_gen()
    // No M4-generated code for mini.
@@ -1149,10 +1159,18 @@ m4+definitions(['
    m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
    m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
-\TLV riscv_program_mem(_prog_name)
+\TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    
+   // ==============
+   // IMem and Fetch
+   // ==============
+   
    m4_ifelse_block(M4_IMPL, 1, ['
+   
+   // For implementation
+   // ------------------
+   
    // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
    |fetch
       /instr_mem[M4_NUM_INSTRS-1:0]
@@ -1160,7 +1178,16 @@ m4+definitions(['
             // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
             $instr[31:0] =
                m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == 0 ) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               // Fetch the raw instruction from program memory.
+               $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
    '], M4_FORMAL, 0, ['
+   
+   // For simulation
+   // --------------
+   
    // (Vivado doesn't like this)
    \SV_plus
       // The program in an instruction memory.
@@ -1171,8 +1198,27 @@ m4+definitions(['
          m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
       };
       
+      // String representations of the instructions for debug.
       assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-   '], [''])
+
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+   '], ['
+   
+   // For formal
+   // ----------
+   
+   // No instruction memory.
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               `BOGUS_USE($$raw[M4_INSTR_RANGE])
+   '])
+
 
 // M4-generated code.
 \TLV riscv_gen()
@@ -1637,11 +1683,13 @@ m4+definitions(['
 //                            //
 //============================//
 
-\TLV dummy_program_mem()
-   m4_define(['M4_NUM_INSTRS'], 2)
-   \SV_plus
-      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
-      assign instrs = '{2'b1, 2'b10};
+\TLV dummy_imem()
+   // Dummy IMem contains 2 dummy instructions.
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               $raw[M4_INSTR_RANGE] = $Pc[M4_PC_MIN:M4_PC_MIN] == 1'b0 ? 2'b01 : 2'b10;
 
 \TLV dummy_gen()
    // No M4-generated code for dummy.
@@ -1803,9 +1851,8 @@ m4+definitions(['
    // Generated logic
    m4+indirect(M4_isa['_gen'])
 
-   // Instruction memory.
-   //m4+indirect(M4_isa['_program_mem'], m4_prog_name)
-   m4+indirect(m4_program_mem_macro_name, m4_prog_name)  -- m4+indirect(['m4_']M4_IMEM_TYPE['_imem'])
+   // Instruction memory and fetch of $raw.
+   m4+indirect(M4_IMEM_MACRO_NAME, M4_PROG_NAME)
 
 
    // /=========\
@@ -1823,20 +1870,7 @@ m4+definitions(['
          
          @M4_FETCH_STAGE
             $fetch = ! $reset;  // always fetch
-            ?$fetch
-
-               // =====
-               // Fetch
-               // =====
-
-               // Fetch the raw instruction from program memory (or, for formal, tie it off).
-               m4_ifelse_block(M4_IMPL, 1, ['
-               $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
-               '], M4_FORMAL, 0, ['
-               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
-               '], ['
-               `BOGUS_USE($$raw[M4_INSTR_RANGE])
-               '])
+            // (M4_IMEM_MACRO_NAME instantiation produces ?$fetch$raw.)
          @M4_NEXT_PC_STAGE
             
             // ========
