@@ -700,7 +700,7 @@ m4+definitions(['
                   m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
         m4_define(['m4_csr_']$1['_args'], ['$@'])
         m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? $csr_']$1[' : ']m4_csrrx_rslt_expr))
-        m4_define(['m4_valid_csr_expr'], m4_dquote(m4_csrrx_rslt_expr[' || $is_csr_']$1))
+        m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
       ']
    )
    
@@ -904,8 +904,6 @@ m4+definitions(['
             output logic [31: 0] rvfi_mem_wdata);'])'])
 '])
 \SV
-/* verilator lint_on WIDTH */  // Let's be strict about bit widths.
-
 
 
 
@@ -1375,14 +1373,14 @@ m4+definitions(['
       m4_ifexpr(#side_effects, ['$csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;'])
       // The CSR value, updated by side-effect writes (if #side_effects).
       $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] =
-           m4_ifexpr(#side_effects, ['($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (! $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name)'], ['$csr_['']csr_name']);
+           m4_ifexpr(#side_effects, ['($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name)'], ['$csr_['']csr_name']);
       // Next value of the CSR.
       $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
            $masked_csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
       <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
            $reset ? reset_value :
            (($is_csrrw_instr || $is_csrrwi_instr) && $is_csr_['']csr_name)
-                  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ! writable_mask) :
+                  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ~ writable_mask) :
            (($is_csrrs_instr || $is_csrrsi_instr) && $is_csr_['']csr_name)
                   ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
            (($is_csrrc_instr || $is_csrrci_instr) && $is_csr_['']csr_name)
@@ -1418,39 +1416,39 @@ m4+definitions(['
 
    // CSR write signals.
    $csr_cycle_hw_wr = 1'b1;
-   $csr_cycle_hw_wr_mask = {32{1'b1}};
-   $csr_cycle_hw_wr_value = $full_csr_cycle_hw_wr_value[31:0];
+   $csr_cycle_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_cycle_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[31:0];
    $csr_cycleh_hw_wr = 1'b1;
-   $csr_cycleh_hw_wr_mask = {32{1'b1}};
-   $csr_cycleh_hw_wr_value = $full_csr_cycle_hw_wr_value[63:32];
+   $csr_cycleh_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_cycleh_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[63:32];
    $csr_time_hw_wr = $time_unit_expires;
-   $csr_time_hw_wr_mask = {32{1'b1}};
-   $csr_time_hw_wr_value = $full_csr_time_hw_wr_value[31:0];
+   $csr_time_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_time_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[31:0];
    $csr_timeh_hw_wr = $time_unit_expires;
-   $csr_timeh_hw_wr_mask = {32{1'b1}};
-   $csr_timeh_hw_wr_value = $full_csr_time_hw_wr_value[63:32];
+   $csr_timeh_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_timeh_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[63:32];
    $csr_instret_hw_wr = $commit;
-   $csr_instret_hw_wr_mask = {32{1'b1}};
-   $csr_instret_hw_wr_value = $full_csr_instret_hw_wr_value[31:0];
+   $csr_instret_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_instret_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[31:0];
    $csr_instreth_hw_wr = $commit;
-   $csr_instreth_hw_wr_mask = {32{1'b1}};
-   $csr_instreth_hw_wr_value = $full_csr_instret_hw_wr_value[63:32];
+   $csr_instreth_hw_wr_mask[31:0] = {32{1'b1}};
+   $csr_instreth_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[63:32];
    '])
    
    // For multicore CSRs:
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    $csr_pktavail_hw_wr = 1'b0;
-   $csr_pktavail_hw_wr_mask = {M4_VC_HIGH{1'b1}};
-   $csr_pktavail_hw_wr_value = {M4_VC_HIGH{1'b1}};
+   $csr_pktavail_hw_wr_mask[31:0] = {M4_VC_HIGH{1'b1}};
+   $csr_pktavail_hw_wr_value[31:0] = {M4_VC_HIGH{1'b1}};
    $csr_pktcomp_hw_wr = 1'b0;
-   $csr_pktcomp_hw_wr_mask = {M4_VC_HIGH{1'b1}};
-   $csr_pktcomp_hw_wr_value = {M4_VC_HIGH{1'b1}};
+   $csr_pktcomp_hw_wr_mask[31:0] = {M4_VC_HIGH{1'b1}};
+   $csr_pktcomp_hw_wr_value[31:0] = {M4_VC_HIGH{1'b1}};
    $csr_pktrd_hw_wr = 1'b0;
-   $csr_pktrd_hw_wr_mask = {M4_WORD_HIGH{1'b1}};
-   $csr_pktrd_hw_wr_value = {M4_WORD_HIGH{1'b0}};
+   $csr_pktrd_hw_wr_mask[31:0] = {M4_WORD_HIGH{1'b1}};
+   $csr_pktrd_hw_wr_value[31:0] = {M4_WORD_HIGH{1'b0}};
    $csr_pktinfo_hw_wr = 1'b0;
-   $csr_pktinfo_hw_wr_mask = {M4_WORD_HIGH{1'b1}};
-   $csr_pktinfo_hw_wr_value = {M4_WORD_HIGH{1'b0}};
+   $csr_pktinfo_hw_wr_mask[31:0] = {M4_WORD_HIGH{1'b1}};
+   $csr_pktinfo_hw_wr_value[31:0] = {M4_WORD_HIGH{1'b0}};
    '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
@@ -2239,6 +2237,8 @@ m4+definitions(['
 m4+module_def
 
 \TLV
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
+
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
 \SV
