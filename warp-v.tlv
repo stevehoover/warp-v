@@ -350,6 +350,15 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       '], ['RISCV'], ['
          // RISC-V Configuration:
+         
+         // A hook for a software-controlled reset. None by default.
+         m4_define(['m4_soft_reset'], 1'b0)
+         
+         // A hook for CPU back-pressure in M4_REG_RD_STAGE.
+         // Various sources of back-pressure can add to this expression.
+         // Currently, this is envisioned for CSR writes that cannot be processed, such as
+         // NoC packet writes.
+         m4_define(['m4_cpu_blocked'], 1'b0)
 
          // ISA options:
 
@@ -708,12 +717,12 @@ m4+definitions(['
       m4_ifelse(M4_NO_COUNTER_CSRS, ['1'], [''], ['
          // Define Counter CSRs
          //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
-         m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['32'b1'],                          1)
-         m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['32'b1'],                          1)
-         m4_define_csr(['time'],       12'hC01,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['32'b1'],                          1)
-         m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['32'b1'],                          1)
-         m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET_LOW, 0'],             ['32'b0'],                     ['32'b1'],                          1)
-         m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH_LOW, 0'],            ['32'b0'],                     ['32'b1'],                          1)
+         m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['time'],       12'hC01,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET_LOW, 0'],             ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH_LOW, 0'],            ['32'b0'],                     ['{32{1'b1}}'],                     1)
       '])
       
       // For NoC support
@@ -732,7 +741,8 @@ m4+definitions(['
          m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_VC_HIGH'b0'],             ['{M4_WORD_HIGH{1'b0}}'],            1)
          m4_define_csr(['pktinfo'],    12'h80c,    ['m4_eval(M4_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
                                                                             ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b100'], ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b0'], 1)
-         // Unimplemented: pkthead, pktfree, pktmax, pktmin.
+         // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
+         // TODO: Blocking will be implemented by replaying.
       '])
    '])
 
@@ -1175,7 +1185,7 @@ m4+definitions(['
          @M4_FETCH_STAGE
             // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
             $instr[31:0] =
-               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == 0 ) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
+               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == m4_instr_ind) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
       /instr
          @M4_FETCH_STAGE
             ?$fetch
@@ -1379,13 +1389,15 @@ m4+definitions(['
            $masked_csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
       <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
            $reset ? reset_value :
-           (($is_csrrw_instr || $is_csrrwi_instr) && $is_csr_['']csr_name)
+           ! $commit
+                  ? $upd_csr_['']csr_name :
+           $is_csr_write && $is_csr_['']csr_name
                   ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ~ writable_mask) :
-           (($is_csrrs_instr || $is_csrrsi_instr) && $is_csr_['']csr_name)
+           $is_csr_set   && $is_csr_['']csr_name
                   ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
-           (($is_csrrc_instr || $is_csrrci_instr) && $is_csr_['']csr_name)
+           $is_csr_clear && $is_csr_['']csr_name
                   ? $upd_csr_['']csr_name & ~ $csr_['']csr_name['']_masked_wr_value :
-           // retain
+           // No CSR instruction update, only h/w side-effects.
                     $upd_csr_['']csr_name;
 
 // Define all CSRs.
@@ -1414,7 +1426,7 @@ m4+definitions(['
    $full_csr_time_hw_wr_value[63:0]    = {$csr_timeh,    $csr_time   } + 64'b1;
    $full_csr_instret_hw_wr_value[63:0] = {$csr_instreth, $csr_instret} + 64'b1;
 
-   // CSR write signals.
+   // CSR h/w side-effect write signals.
    $csr_cycle_hw_wr = 1'b1;
    $csr_cycle_hw_wr_mask[31:0] = {32{1'b1}};
    $csr_cycle_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[31:0];
@@ -1608,14 +1620,14 @@ m4+definitions(['
    @_exe_stage
       m4+riscv_csr_logic()
       // CSR trap.
-      $is_csr_instr = $is_csrrw_instr ||
-                      $is_csrrs_instr ||
-                      $is_csrrc_instr ||
-                      $is_csrrwi_instr ||
-                      $is_csrrsi_instr ||
-                      $is_csrrci_instr;
+      $is_csr_write = $is_csrrw_instr || $is_csrrwi_instr;
+      $is_csr_set   = $is_csrrs_instr || $is_csrrsi_instr;
+      $is_csr_clear = $is_csrrc_instr || $is_csrrci_instr;
+      $is_csr_instr = $is_csr_write ||
+                      $is_csr_set   ||
+                      $is_csr_clear;
       $valid_csr = m4_valid_csr_expr;
-      $csr_trap = $is_csr_instr && $valid_csr;
+      $csr_trap = $is_csr_instr && ! $valid_csr;
       
       // Memory inputs.
       ?$valid_exe
@@ -1861,10 +1873,11 @@ m4+definitions(['
       /instr
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
-            $Cnt[7:0] <= *reset        ? 8'b0 :       // reset
+            $soft_reset = (m4_soft_reset) || *reset;
+            $Cnt[7:0] <= $soft_reset   ? 8'b0 :       // reset
                          $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
                                          $Cnt + 8'b1; // increment
-            $reset = *reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
+            $reset = $soft_reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
          
          @M4_FETCH_STAGE
             $fetch = ! $reset;  // always fetch
@@ -2072,7 +2085,7 @@ m4+definitions(['
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$returning_ld) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
                   m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
-            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
+            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending) || (m4_cpu_blocked);
          
          
          // =======
