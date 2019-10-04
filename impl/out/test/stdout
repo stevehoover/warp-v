@@ -1,0 +1,13 @@
+INFORM(0) (PROD_INFO):
+	SandPiper(TM) 1.9-2018/02/11-beta from Redwood EDA
+	(DEV) Run as: "java -jar sandpiper.jar --iArgs --nopath -i out/warp-v_risc-v_4-stage.m4out.tlv -o out/warp-v_risc-v_4-stage.sv
+	For help, including product info, run with -h.
+
+INFORM(0) (LICENSE):
+	Licensed to "Redwood EDA" as: Full Edition.
+
+INFORM(0) (FILES):
+	Reading "out/warp-v_risc-v_4-stage.m4out.tlv" to produce:
+		Translated HDL File: "out/warp-v_risc-v_4-stage.sv"
+		Generated HDL File: "out/warp-v_risc-v_4-stage_gen.sv"
+
