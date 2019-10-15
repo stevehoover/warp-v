@@ -1,0 +1,91 @@
+SandPiper SaaS Edition Microservice Service-Level Agreement
+(Version 1.0, June 15, 2019)
+
+
+Introduction
+
+These terms and conditions govern your use of the SandPiper SaaS Edition(TM) microservice, which provides remote access to SandPiper(TM), henceforth "the microservice". If you do not accept these terms, you must not use this service.
+
+You represent and warrant that you are at least (18) years of age, or of the legal age of majority in your jurisdiction, and possess the legal authority, right and freedom to form a binding agreement.
+
+
+Acceptable use
+
+You agree to use the microservice for the betterment of humanity without malicious intent. This includes intent to hang, crash, appreciably degrade, or extract information from the server providing the microservice.
+
+
+User Content
+
+SandPiper SaaS Edition is for OPEN-SOURCE DEVELOPMENT ONLY. Code compiled with SandPiper SaaS Edition must include an OSI-Approved License header. You certify that you have the legal right to share any content submitted to the service.
+ 
+
+No warrantees
+
+The microservice is provided "as is" without any representations or warranties express or implied.
+
+
+Limitation of liability
+
+Redwood EDA will not be liable to you (whether under the law of contact, the law of torts or otherwise) in relation to the contents of, or use of, or otherwise in connection with the microservice:
+  o to the extent that the microservice is provided free-of-charge, for any direct loss;
+  o for any indirect, special or consequential loss; or
+  o for any business losses, loss of revenue, income, profits or anticipated savings, loss of contracts or business relationships, loss of reputation or goodwill, or loss or corruption of information or data.
+These limitations of liability apply even if Redwood EDA has been expressly advised of the potential loss.
+
+
+Reasonableness
+
+By using the microservice, you agree that the limitations of liability set out in this agreement are reasonable.
+
+If you do not think they are reasonable, you must not use the microservice.
+
+
+Other parties
+
+You agree that you will not bring any claim personally against Redwood EDA in respect of any losses you suffer in connection with the microservice.
+
+Without prejudice to the foregoing paragraph, you agree that the limitations of warranties and liability set out in this microservice disclaimer will protect Redwood EDA and its agents, subsidiaries, successors, assigns and sub-contractors.
+
+
+Unenforceable provisions
+
+If any provision of this microservice disclaimer is, or is found to be, unenforceable under applicable law, that will not affect the enforceability of the other provisions of this microservice disclaimer.
+
+
+Indemnity
+
+You hereby indemnify Redwood EDA and undertake to keep Redwood EDA indemnified against any losses, damages, costs, liabilities and expenses (including without limitation legal expenses and any amounts paid by Redwood EDA to a third party in settlement of a claim or dispute on the advice of Redwood EDA’s legal advisers) incurred or suffered by Redwood EDA arising out of any breach by you of any provision of these terms and conditions, or arising out of any claim that you have breached any provision of these terms and conditions.
+
+
+Breaches of these terms and conditions
+
+Without prejudice to Redwood EDA’s other rights under these terms and conditions, if you breach these terms and conditions in any way, Redwood EDA may take such action as Redwood EDA deems appropriate to deal with the breach, including suspending your access to the microservice, blocking computers using your IP address from accessing the microservice, contacting your internet service provider to request that they block your access to the microservice and/or bringing court proceedings against you.
+
+
+Variation
+
+Redwood EDA may revise these terms and conditions from time-to-time. Revised terms and conditions will apply to the use of the microservice from the date of the revised terms and conditions. Please monitor changes in this agreement as you use the microservice to ensure you are familiar with the current version.
+
+
+Severability
+
+If a provision of these terms and conditions is determined by any court or other competent authority to be unlawful and/or unenforceable, the other provisions will continue in effect. If any unlawful and/or unenforceable provision would be lawful or enforceable if part of it were deleted, that part will be deemed to be deleted, and the rest of the provision will continue in effect.
+
+
+Entire agreement
+
+These terms and conditions constitute the entire agreement between you and Redwood EDA in relation to your use of the microservice and supersede all previous agreements in respect of your use of the microservice.
+
+
+Law and jurisdiction
+
+These terms and conditions will be governed by and construed in accordance with the state of Massachusetts, and any disputes relating to these terms and conditions will be subject to the exclusive jurisdiction of the courts of the state of Massachusetts.
+
+
+Registration, authorizations, and contact
+
+Redwood EDA is a sole proprietorship registered by Steven F. Hoover with the town of Shrewsbury, Massachusetts.
+
+Redwood EDA’s registered address is 36 Venus Drive, Shrewsbury, MA 01545.
+
+You can contact Redwood EDA by email to legal@redwoodeda.com.

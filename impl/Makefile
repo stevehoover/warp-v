@@ -22,7 +22,22 @@ out/%/status: warp-v_%.tlv ../warp-v.tlv
 	  && sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_vae_\)/reg\1/' $(patsubst %.tlv,%_gen.sv,$<)
 	@# Above sed HACKS fix bugs in the generated code.
 
-clean:
+impl:
+	vivado -mode tcl -source fpga_impl/impl.tcl 
+
+impl_gui:
+	 vivado -source fpga_impl/impl.tcl 
+
+clean: clean_compile clean_impl
+
+clean_compile:
 	rm -rf out
 
+clean_impl:
+	find . -type f -iname \*.rpt -delete  
+	find . -type f -iname \*.dcp -delete 
+	find . -type f -iname \*.log -delete
+	find . -type f -iname \*.str -delete
+	find . -type f -iname \*.jou -delete
+	rm fpga_impl/fpga_impl.xdc fpga_impl/fpga_impl_netlist.v
 #FETCH_Instr_Regs_value_a0
