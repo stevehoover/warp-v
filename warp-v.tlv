@@ -180,15 +180,35 @@ m4+definitions(['
    // RISC-V ISA
    // ==========
    
-   // This design is an incomplete RISC-V implementation.
-   // Most instructions are characterized. The primary missing pieces are:
-   //   o expressions for executing many instructions
-   //   o ISA extensions
-   //   o byte-level addressing
+   // This design is a RISC-V (RV32I) implementation.
+   // The ISA is characterized using M4 macros, and the microarchitecture is generated from this characterization, so
+   // the ISA can be modified through M4 definitions.
+   // Notes:
+   //   o Unaligned load/store are handled by trapping, though no s/w is available to handle the trap.
    // The implementation is based on "The RISC-V Instruction Set Manual Vol. I: User-Level ISA," Version 2.2: https://riscv.org/specifications/
 
-                     
-                     
+   
+   
+   // ====
+   // MIPS
+   // ====
+   
+   // WIP.
+   // Unlike RISC-V, this does not use M4 to characterize the ISA.
+   // No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
+   // not to provide a production-worthy MIPS design.
+   
+   
+   // =====
+   // Power
+   // =====
+   
+   // WIP. 
+   // Unlike RISC-V, this does not use M4 to characterize the ISA.
+   // No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
+   // not to provide a production-worthy MIPS design.
+   
+   
    // =========
    // DUMMY ISA
    // =========
@@ -214,7 +234,7 @@ m4+definitions(['
 
    // Machine:
    // ISA:
-   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, DUMMY, etc.
+   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPS, POWER, DUMMY, etc.
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // min_area, 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
@@ -264,29 +284,6 @@ m4+definitions(['
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
    //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(M4_STANDARD_CONFIG,
-      ['min_area'], ['
-         // A minimum-area RISC-V for the 2018 RISC-V Foundation Contest.
-         // This may not be a 100% complete, compliant implementation. Logic may be stripped that isn't needed to pass tests.
-         // TODO:
-         //   - Ability to exclude branch mispredicts.
-         //   - Ability to exclude misaligned traps logic.
-         // No pipeline
-         m4_defines(
-            (M4_NEXT_PC_STAGE, 0),
-            (M4_FETCH_STAGE, 0),
-            (M4_DECODE_STAGE, 0),
-            (M4_BRANCH_PRED_STAGE, 0),
-            (M4_REG_RD_STAGE, 0),
-            (M4_EXECUTE_STAGE, 0),
-            (M4_RESULT_STAGE, 0),
-            (M4_REG_WR_STAGE, 0),
-            (M4_MEM_WR_STAGE, 0),
-            (M4_LD_RETURN_ALIGN, 0))
-         m4_define(['M4_EXTRA_TRAP_BUBBLE'], 0)
-         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
-         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
-         m4_define(['M4_NO_COUNTER_CSRS'], 1)
-      '],
       ['1-stage'], ['
          // No pipeline
          m4_defines(
@@ -387,6 +384,8 @@ m4+definitions(['
          
          // For the time[h] CSR register, after this many cycles, time increments.
          m4_define_vector(M4_CYCLES_PER_TIME_UNIT, 1000000000)
+      '], ['MIPS'], ['
+      '], ['POWER'], ['
       '], ['
          // Dummy "ISA".
          m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
@@ -408,6 +407,8 @@ m4+definitions(['
       '], ['RISCV'], ['
          // RISC-V Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
+      '], ['MIPS'], ['
+      '], ['POWER'], ['
       '], ['DUMMY'], ['
          // DUMMY Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
@@ -541,6 +542,10 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], 32, 1)
+      '],
+      ['MIPS'], ['
+      '],
+      ['POWER'], ['
       '],
       ['DUMMY'], ['
          m4_define_vector(M4_INSTR, 2)
@@ -876,6 +881,8 @@ m4+definitions(['
       m4_define(['m4_asm'], ['m4_define(['m4_instr']M4_NUM_INSTRS, ['m4_asm_$1(m4_shift($@))'])['/']['/ Inst #']M4_NUM_INSTRS: $@m4_define(['M4_NUM_INSTRS'], m4_eval(M4_NUM_INSTRS + 1))'])
 
       //=========
+   '], ['MIPS'], ['
+   '], ['POWER'], ['
    '], ['DUMMY'], ['
    '])
    
@@ -1062,7 +1069,7 @@ m4+definitions(['
    $conditional_branch = $branch;  // All branches (any instruction with "p" dest) is conditional (where condition is that result != 0).
 
 
-// Execution unit logic for RISC-V.
+// Execution unit logic for Mini.
 // Context: pipeline
 \TLV mini_exe(@_exe_stage, @_rslt_stage)
    @M4_REG_RD_STAGE
@@ -1685,6 +1692,206 @@ m4+definitions(['
       m4+riscv_rslt_mux_expr()
    
 
+
+//============================//
+//                            //
+//           MIPS             //
+//                            //
+//============================//
+
+
+\TLV mips_cnt10_prog()
+   \SV_plus
+      m4_define(['M4_NUM_INSTRS'], 2)
+      
+      // The program in an instruction memory.
+      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
+      
+      // /=====================\
+      // | Count to 10 Program |
+      // \=====================/
+      
+      // Add 1,2,3,...,10 (in that order).
+      // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
+      //
+      // Regs:
+      // b: cnt
+      // c: nine
+      // d: out
+      // e: tmp
+      // f: offset
+      // g: store addr
+      
+      assign instrs = '{
+        32'b00000000000000000000000000000000,
+        32'b00000000000000000000000000000000
+      };
+
+\TLV mips_imem(_prog_name)
+   m4+indirect(['mips_']_prog_name['_prog'])
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+
+\TLV mips_gen()
+   // No M4-generated code for MIPS.
+
+
+// Decode logic for MIPS.
+// Context: within pipestage
+// Inputs:
+//    $raw[31:0]
+// Outputs:
+//    $ld
+//    $st
+//    $illegal
+//    $conditional_branch
+//    ...
+\TLV mini_decode()
+   // TODO
+
+// Execution unit logic for MIPS.
+// Context: pipeline
+\TLV mips_exe(@_exe_stage, @_rslt_stage)
+   @M4_REG_RD_STAGE
+      /src[*]
+         $valid = /instr$valid_decode && ($is_reg || $is_imm);
+         ?$valid
+            $value[M4_WORD_RANGE] = $is_reg ? $reg_value :
+                                              $imm_value;
+   // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
+   @_exe_stage
+      ?$valid_st
+         $st_value[M4_WORD_RANGE] = /src[1]$value;
+
+      $valid_ld_st = $valid_ld || $valid_st;
+      ?$valid_ld_st
+         $addr[M4_ADDR_RANGE] = $ld ? (/src[1]$value + /src[2]$value) : /src[2]$value;
+      // Always predict taken; mispredict if jump or unconditioned branch or
+      //   conditioned branch with positive condition.
+      ?$branch
+         $taken = $rslt != 12'b0;
+      $st_mask[0:0] = 1'b1;
+      $non_aborting_isa_trap = 1'b0;
+      $aborting_isa_trap = 1'b0;
+   @_rslt_stage
+      ?$dest_valid
+         $rslt[11:0] =
+            $returning_ld ? /original_ld$ld_value :
+            $st ? /src[1]$value :
+            $op_full ? $op_full_rslt :
+            $op_compare ? {12{$compare_rslt}} :
+                  12'b0;
+         
+      // Jump (Dest = "P") and Branch (Dest = "p") Targets.
+      ?$jump
+         $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
+   @M4_BRANCH_TARGET_CALC_STAGE
+      ?$branch
+         $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
+
+
+
+//============================//
+//                            //
+//          POWER             //
+//                            //
+//============================//
+
+
+\TLV power_cnt10_prog()
+   \SV_plus
+      m4_define(['M4_NUM_INSTRS'], 2)
+      
+      // The program in an instruction memory.
+      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
+      
+      // /=====================\
+      // | Count to 10 Program |
+      // \=====================/
+      
+      // Add 1,2,3,...,10 (in that order).
+      // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
+      //
+      // Regs:
+      // b: cnt
+      // c: nine
+      // d: out
+      // e: tmp
+      // f: offset
+      // g: store addr
+      
+      assign instrs = '{
+        32'b00000000000000000000000000000000,
+        32'b00000000000000000000000000000000
+      };
+
+\TLV power_imem(_prog_name)
+   m4+indirect(['mips_']_prog_name['_prog'])
+   |fetch
+      /instr
+         @M4_FETCH_STAGE
+            ?$fetch
+               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+
+\TLV power_gen()
+   // No M4-generated code for POWER.
+
+
+// Decode logic for Power.
+// Context: within pipestage
+// Inputs:
+//    $raw[31:0]
+// Outputs:
+//    $ld
+//    $st
+//    $illegal
+//    $conditional_branch
+//    ...
+\TLV mini_decode()
+   // TODO
+
+// Execution unit logic for POWER.
+// Context: pipeline
+\TLV power_exe(@_exe_stage, @_rslt_stage)
+   @M4_REG_RD_STAGE
+      /src[*]
+         $valid = /instr$valid_decode && ($is_reg || $is_imm);
+         ?$valid
+            $value[M4_WORD_RANGE] = $is_reg ? $reg_value :
+                                              $imm_value;
+   // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
+   @_exe_stage
+      ?$valid_st
+         $st_value[M4_WORD_RANGE] = /src[1]$value;
+
+      $valid_ld_st = $valid_ld || $valid_st;
+      ?$valid_ld_st
+         $addr[M4_ADDR_RANGE] = $ld ? (/src[1]$value + /src[2]$value) : /src[2]$value;
+      // Always predict taken; mispredict if jump or unconditioned branch or
+      //   conditioned branch with positive condition.
+      ?$branch
+         $taken = $rslt != 12'b0;
+      $st_mask[0:0] = 1'b1;
+      $non_aborting_isa_trap = 1'b0;
+      $aborting_isa_trap = 1'b0;
+   @_rslt_stage
+      ?$dest_valid
+         $rslt[11:0] =
+            $returning_ld ? /original_ld$ld_value :
+            $st ? /src[1]$value :
+            $op_full ? $op_full_rslt :
+            $op_compare ? {12{$compare_rslt}} :
+                  12'b0;
+         
+      // Jump (Dest = "P") and Branch (Dest = "p") Targets.
+      ?$jump
+         $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
+   @M4_BRANCH_TARGET_CALC_STAGE
+      ?$branch
+         $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
 
 
 //============================//

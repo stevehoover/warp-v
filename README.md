@@ -119,7 +119,7 @@ For RISC-V development (even if you are developing your own RISC-V core without 
 
 ## In the Cloud
 
-WARP-V is being implemented on FPGAs in the cloud using the <a href="https://github.com/alessandrocomodi/fpga-webserver" target="_blank" target="_blank" atom_fix="_">1st CLaaS</a> (custom logic as a service) framework. You can implement your own customized WARP-V on FPGAs in the cloud, too!
+WARP-V is implemented on FPGAs in the cloud using the <a href="https://github.com/alessandrocomodi/fpga-webserver" target="_blank" target="_blank" atom_fix="_">1st CLaaS</a> (custom logic as a service) framework. You can implement your own customized WARP-V on FPGAs in the cloud, too!
 
 
 ## Help
