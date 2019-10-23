@@ -238,7 +238,7 @@ m4+definitions(['
 
    // Machine:
    // ISA:
-   m4_default(['M4_ISA'], ['MIPSI']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
+   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // min_area, 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
