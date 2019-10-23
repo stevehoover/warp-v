@@ -189,14 +189,18 @@ m4+definitions(['
 
    
    
-   // ====
-   // MIPS
-   // ====
+   // ======
+   // MIPS I
+   // ======
    
    // WIP.
    // Unlike RISC-V, this does not use M4 to characterize the ISA.
+   // Not implemented:
+   //   o FPU
+   //   o Mult/Div and HI/LO regs
+   //   o Branch/Load delay slots
    // No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
-   // not to provide a production-worthy MIPS design.
+   // not to provide a production-worthy MIPS I design.
    
    
    // =====
@@ -206,7 +210,7 @@ m4+definitions(['
    // WIP. 
    // Unlike RISC-V, this does not use M4 to characterize the ISA.
    // No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
-   // not to provide a production-worthy MIPS design.
+   // not to provide a production-worthy Power design.
    
    
    // =========
@@ -234,7 +238,7 @@ m4+definitions(['
 
    // Machine:
    // ISA:
-   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPS, POWER, DUMMY, etc.
+   m4_default(['M4_ISA'], ['MIPSI']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // min_area, 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
@@ -249,7 +253,16 @@ m4+definitions(['
    
    // Which program to assemble.
    m4_define(M4_PROG_NAME, ['cnt10'])
-   
+
+   // A hook for a software-controlled reset. None by default.
+   m4_define(['m4_soft_reset'], 1'b0)
+
+   // A hook for CPU back-pressure in M4_REG_RD_STAGE.
+   // Various sources of back-pressure can add to this expression.
+   // Currently, this is envisioned for CSR writes that cannot be processed, such as
+   // NoC packet writes.
+   m4_define(['m4_cpu_blocked'], 1'b0)
+
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -347,15 +360,6 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       '], ['RISCV'], ['
          // RISC-V Configuration:
-         
-         // A hook for a software-controlled reset. None by default.
-         m4_define(['m4_soft_reset'], 1'b0)
-         
-         // A hook for CPU back-pressure in M4_REG_RD_STAGE.
-         // Various sources of back-pressure can add to this expression.
-         // Currently, this is envisioned for CSR writes that cannot be processed, such as
-         // NoC packet writes.
-         m4_define(['m4_cpu_blocked'], 1'b0)
 
          // ISA options:
 
@@ -384,7 +388,7 @@ m4+definitions(['
          
          // For the time[h] CSR register, after this many cycles, time increments.
          m4_define_vector(M4_CYCLES_PER_TIME_UNIT, 1000000000)
-      '], ['MIPS'], ['
+      '], ['MIPSI'], ['
       '], ['POWER'], ['
       '], ['
          // Dummy "ISA".
@@ -401,13 +405,20 @@ m4+definitions(['
    // Characterize the ISA, including:
    // M4_NOMINAL_BR_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
    //                                  can be available.
+   // M4_HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
+   // Defaults:
+   m4_define(['M4_HAS_INDIRECT_JUMP'], 0)
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
       '], ['RISCV'], ['
          // RISC-V Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
-      '], ['MIPS'], ['
+         m4_define(['M4_HAS_INDIRECT_JUMP'], 1)
+      '], ['MIPSI'], ['
+         // MIPS I Characterization:
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
+         m4_define(['M4_HAS_INDIRECT_JUMP'], 1)
       '], ['POWER'], ['
       '], ['DUMMY'], ['
          // DUMMY Characterization:
@@ -543,7 +554,12 @@ m4+definitions(['
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], 32, 1)
       '],
-      ['MIPS'], ['
+      ['MIPSI'], ['
+         m4_define_vector_with_fields(M4_INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
+         m4_define_vector(['M4_ADDR'], 32)
+         m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
+         m4_define_vector(['M4_WORD'], 32)
+         m4_define_hier(['M4_REGS'], 32, 1)
       '],
       ['POWER'], ['
       '],
@@ -658,7 +674,7 @@ m4+definitions(['
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
-      m4_ifelse(M4_ISA, ['RISCV'], ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
+      m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
       ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
       ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
 
@@ -881,7 +897,7 @@ m4+definitions(['
       m4_define(['m4_asm'], ['m4_define(['m4_instr']M4_NUM_INSTRS, ['m4_asm_$1(m4_shift($@))'])['/']['/ Inst #']M4_NUM_INSTRS: $@m4_define(['M4_NUM_INSTRS'], m4_eval(M4_NUM_INSTRS + 1))'])
 
       //=========
-   '], ['MIPS'], ['
+   '], ['MIPSI'], ['
    '], ['POWER'], ['
    '], ['DUMMY'], ['
    '])
@@ -931,7 +947,7 @@ m4+definitions(['
 //         MINI-CPU           //
 //                            //
 //============================//
-
+                         
 \TLV mini_cnt10_prog()
    \SV_plus
       m4_define(['M4_NUM_INSTRS'], 13)
@@ -1488,7 +1504,7 @@ m4+definitions(['
 
       // Extract fields of $raw (instruction) into $raw_<field>[x:0].
       m4_into_fields(['M4_INSTR'], ['$raw'])
-      `BOGUS_USE($raw_funct7 $raw_op2)  // Delete once its used.
+      `BOGUS_USE($raw_op2)  // Delete once it's used.
       // Extract immediate fields into type-specific signals.
       // (User ISA Manual 2.2, Fig. 2.4)
       $raw_i_imm[31:0] = {{21{$raw[31]}}, $raw[30:20]};
@@ -1564,7 +1580,8 @@ m4+definitions(['
             (($is_blt_instr || $is_bltu_instr || $is_bge_instr || $is_bgeu_instr) &&
              (($is_bge_instr || $is_bgeu_instr) ^
               (({($is_blt_instr ^ /src[1]$reg_value[M4_WORD_MAX]), /src[1]$reg_value[M4_WORD_MAX-1:0]} <
-               {($is_blt_instr ^ /src[2]$reg_value[M4_WORD_MAX]), /src[2]$reg_value[M4_WORD_MAX-1:0]}) ^ ((/src[1]$reg_value[M4_WORD_MAX] != /src[2]$reg_value[M4_WORD_MAX]) & $is_bge_instr)
+                {($is_blt_instr ^ /src[2]$reg_value[M4_WORD_MAX]), /src[2]$reg_value[M4_WORD_MAX-1:0]}
+               ) ^ ((/src[1]$reg_value[M4_WORD_MAX] != /src[2]$reg_value[M4_WORD_MAX]) & $is_bge_instr)
               )
              )
             );
@@ -1695,14 +1712,14 @@ m4+definitions(['
 
 //============================//
 //                            //
-//           MIPS             //
+//           MIPS I           //
 //                            //
 //============================//
 
 
-\TLV mips_cnt10_prog()
+\TLV mipsi_cnt10_prog()
    \SV_plus
-      m4_define(['M4_NUM_INSTRS'], 2)
+      m4_define(['M4_NUM_INSTRS'], 11)
       
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -1715,31 +1732,40 @@ m4+definitions(['
       // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
       //
       // Regs:
-      // b: cnt
-      // c: nine
-      // d: out
-      // e: tmp
-      // f: offset
-      // g: store addr
+      // 1: cnt
+      // 2: ten
+      // 3: out
+      // 4: tmp
+      // 5: offset
+      // 6: store addr
       
       assign instrs = '{
-        32'b00000000000000000000000000000000,
-        32'b00000000000000000000000000000000
+        {6'd13, 5'd0, 5'd6, 16'd0},             //    store_addr = 0
+        {6'd13, 5'd0, 5'd1, 16'd1},             //    cnt = 1
+        {6'd13, 5'd0, 5'd2, 16'd10},            //    ten = 10
+        {6'd13, 5'd0, 5'd3, 16'd0},             //    out = 0
+        {6'd0,  5'd1, 5'd3, 5'd3, 5'd0, 6'd32}, // -> out += cnt
+        {6'd43, 5'd6, 5'd3, 16'd0},              //    store out at store_addr
+        {6'd8,  5'd1, 5'd1, 16'd1},             //    cnt ++
+        {6'd8,  5'd6, 5'd6, 16'd4},             //    store_addr++
+        {6'd5,  5'd1, 5'd2, (~ 16'd4)},         // ^- branch back if cnt != ten
+        {6'd35, 5'd6, 5'd4, (~ 16'd3)},         //    load the final value into tmp
+        {6'd0,  26'd13}                         //    BREAK
       };
 
-\TLV mips_imem(_prog_name)
-   m4+indirect(['mips_']_prog_name['_prog'])
+\TLV mipsi_imem(_prog_name)
+   m4+indirect(['mipsi_']_prog_name['_prog'])
    |fetch
       /instr
          @M4_FETCH_STAGE
             ?$fetch
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
 
-\TLV mips_gen()
-   // No M4-generated code for MIPS.
+\TLV mipsi_gen()
+   // No M4-generated code for MIPS I.
 
 
-// Decode logic for MIPS.
+// Decode logic for MIPS I.
 // Context: within pipestage
 // Inputs:
 //    $raw[31:0]
@@ -1749,48 +1775,266 @@ m4+definitions(['
 //    $illegal
 //    $conditional_branch
 //    ...
-\TLV mini_decode()
-   // TODO
+\TLV mipsi_decode()
+   // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_prev_instr_valid_through(..).
+   ?$valid_decode
 
-// Execution unit logic for MIPS.
+      // Extract fields of $raw (instruction) into $raw_<field>[x:0].
+      m4_into_fields(['M4_INSTR'], ['$raw'])
+      $raw_immediate[15:0] = $raw[15:0];
+      $raw_address[25:0] = $raw[25:0];
+      
+      // Instruction Format
+      $rtype = $raw_opcode == 6'b000000;
+      $jtype = $raw_opcode == 6'b000010 || $raw_opcode == 6'b000011;
+      $itype = ! $rtype && ! $jtype;
+      
+      // Load/Store
+      //$is_lb  = $raw_opcode == 6'b100000;
+      $is_lh  = $raw_opcode == 6'b100001;
+      //$is_lwl = $raw_opcode == 6'b100010;
+      //$is_lw  = $raw_opcode == 6'b100011;
+      $is_lbu = $raw_opcode == 6'b100100;
+      $is_lhu = $raw_opcode == 6'b100101;
+      //$is_lwr = $raw_opcode == 6'b100110;
+      //$is_sb  = $raw_opcode == 6'b101000;
+      $is_sh  = $raw_opcode == 6'b101001;
+      //$is_swl = $raw_opcode == 6'b101010;
+      //$is_sw  = $raw_opcode == 6'b101011;
+      //$is_swr = $raw_opcode == 6'b101100;
+      
+      // ALU
+      $is_add   = $rtype && $raw_funct == 6'b100000;
+      $is_addu  = $rtype && $raw_funct == 6'b100001;
+      $is_sub   = $rtype && $raw_funct == 6'b100010;
+      $is_subu  = $rtype && $raw_funct == 6'b100011;
+      $is_and   = $rtype && $raw_funct == 6'b100100;
+      $is_or    = $rtype && $raw_funct == 6'b100101;
+      $is_xor   = $rtype && $raw_funct == 6'b100110;
+      $is_nor   = $rtype && $raw_funct == 6'b100111;
+      $is_slt   = $rtype && $raw_funct == 6'b101010;
+      $is_sltu  = $rtype && $raw_funct == 6'b101011;
+      $is_addi  = $raw_opcode == 6'b001000;
+      $is_addiu = $raw_opcode == 6'b001001;
+      $is_slti  = $raw_opcode == 6'b001010;
+      $is_sltiu = $raw_opcode == 6'b001011;
+      $is_andi  = $raw_opcode == 6'b001100;
+      $is_ori   = $raw_opcode == 6'b001101;
+      $is_xori  = $raw_opcode == 6'b001110;
+      $is_lui   = $raw_opcode == 6'b001111;
+      
+      // Shift
+      $is_sll  = $rtype && $raw_funct == 6'b000000;
+      $is_srl  = $rtype && $raw_funct == 6'b000010;
+      $is_sra  = $rtype && $raw_funct == 6'b000011;
+      $is_sllv = $rtype && $raw_funct == 6'b000100;
+      $is_srlv = $rtype && $raw_funct == 6'b000110;
+      $is_srav = $rtype && $raw_funct == 6'b000111;
+      
+      /*
+      // Mul/Div
+      $is_mfhi  = $rtype && $raw_funct == 6'b010000;
+      $is_mthi  = $rtype && $raw_funct == 6'b010001;
+      $is_mflo  = $rtype && $raw_funct == 6'b010010;
+      $is_mtlo  = $rtype && $raw_funct == 6'b010011;
+      $is_mult  = $rtype && $raw_funct == 6'b011000;
+      $is_multu = $rtype && $raw_funct == 6'b011001;
+      $is_div   = $rtype && $raw_funct == 6'b011010;
+      $is_divu  = $rtype && $raw_funct == 6'b011011;
+      */
+      
+      // Jump/Branch
+      $is_jr     = $rtype && $raw_funct == 6'b001000;
+      $is_jalr   = $rtype && $raw_funct == 6'b001001;
+      $is_bltz   = $raw_opcode == 6'b000001 && $raw_rt[4] == 1'b0 && $raw_rt[0] == 1'b0;
+      $is_bgez   = $raw_opcode == 6'b000001 && $raw_rt[4] == 1'b0 && $raw_rt[0] == 1'b1;
+      $is_bltzal = $raw_opcode == 6'b000001 && $raw_rt[4] == 1'b1 && $raw_rt[0] == 1'b0;
+      $is_bgezal = $raw_opcode == 6'b000001 && $raw_rt[4] == 1'b1 && $raw_rt[0] == 1'b1;
+      $is_j      = $raw_opcode == 6'b000010;
+      $is_jal    = $raw_opcode == 6'b000011;
+      $is_beq    = $raw_opcode == 6'b000100;
+      $is_bne    = $raw_opcode == 6'b000101;
+      $is_blez   = $raw_opcode == 6'b000110;
+      $is_bgtz   = $raw_opcode == 6'b000111;
+      
+      // Exception
+      $is_syscall = $rtype && $raw_funct == 6'b001100;
+      $is_break   = $rtype && $raw_funct == 6'b001101;
+      
+      // FPU
+      // TODO: NOT IMPLEMENTED
+      
+      
+      $illegal = 1'b0;  // MIPS I doesn't have an illegal instruction exception, just UNPREDICTABLE behavior.
+      $conditional_branch = $raw_opcode == 6'b000001 && $raw_opcode[5:2] == 4'b0001;
+
+      
+      // Special-Case Formats
+      $link_reg = $is_bltzal && $is_bgezal && $is_jal;
+      $unsigned_imm = $is_addiu || $is_sltiu;
+      $branch_if_valid = $raw_opcode == 6'b000001 || $is_beq || $is_bne || $is_blez || $is_bgtz;
+      $jump = $is_j || $is_jal;
+      $indirect_jump = $is_jr || $is_jalr;
+      $branch_or_jump = ($raw_opcode[5:3] == 3'b000) && ! $rtype;  // (does not include syscall & break)
+      $ld = $raw_opcode[5:3] == 3'b100;
+      $st = $raw_opcode[5:3] == 3'b101;
+      $ld_st = $ld || $st;
+      $ld_st_word = $ld_st && $raw_opcode[1] == 1'b1;
+      $ld_st_half = $is_lh || $is_lhu || $is_sh;
+      //$ld_st_byte = ...;
+
+      // Output signals.
+      /src[2:1]
+         // Reg valid for this source, based on instruction type.
+         $is_reg =
+             (#src == 1) ? ! /instr$jtype :
+                           /instr$rtype;
+         $reg[M4_REGS_INDEX_RANGE] =
+             (#src == 1) ? /instr$raw_rs :
+                           /instr$raw_rt;
+      $imm_value[M4_WORD_RANGE] = {{16{$raw_immediate[15] && $unsigned_imm}}, $raw_immediate[15:0]};
+      
+   // Condition signals must not themselves be conditioned (currently).
+   $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : $link_reg ? 5'b11111 : $itype ? $raw_rt : $raw_rd;
+   $dest_reg_valid = (($valid_decode && ! (($is_j && ! $link_reg) || $st || $is_syscall || $is_break)) || $returning_ld) &&
+                     | $dest_reg;   // r0 not valid.
+                     // Note that load is considered to have a valid dest (which may be marked pending).
+   $branch = $valid_decode && $branch_if_valid;   // (Should be $decode_valid_branch, but keeping consistent with other ISAs.)
+   $decode_valid_jump = $valid_decode && $jump;
+   $decode_valid_indirect_jump = $valid_decode && $indirect_jump;
+   // Actually load.
+   $spec_ld = $valid_decode && $ld;   // (Should be $decode_valid_ld, but keeping consistent with other ISAs.)
+
+
+// Execution unit logic for MIPS I.
 // Context: pipeline
-\TLV mips_exe(@_exe_stage, @_rslt_stage)
-   @M4_REG_RD_STAGE
-      /src[*]
-         $valid = /instr$valid_decode && ($is_reg || $is_imm);
-         ?$valid
-            $value[M4_WORD_RANGE] = $is_reg ? $reg_value :
-                                              $imm_value;
-   // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
-   @_exe_stage
-      ?$valid_st
-         $st_value[M4_WORD_RANGE] = /src[1]$value;
-
-      $valid_ld_st = $valid_ld || $valid_st;
-      ?$valid_ld_st
-         $addr[M4_ADDR_RANGE] = $ld ? (/src[1]$value + /src[2]$value) : /src[2]$value;
-      // Always predict taken; mispredict if jump or unconditioned branch or
-      //   conditioned branch with positive condition.
-      ?$branch
-         $taken = $rslt != 12'b0;
-      $st_mask[0:0] = 1'b1;
-      $non_aborting_isa_trap = 1'b0;
-      $aborting_isa_trap = 1'b0;
-   @_rslt_stage
-      ?$dest_valid
-         $rslt[11:0] =
-            $returning_ld ? /original_ld$ld_value :
-            $st ? /src[1]$value :
-            $op_full ? $op_full_rslt :
-            $op_compare ? {12{$compare_rslt}} :
-                  12'b0;
-         
-      // Jump (Dest = "P") and Branch (Dest = "p") Targets.
-      ?$jump
-         $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
+\TLV mipsi_exe(@_exe_stage, @_rslt_stage)
    @M4_BRANCH_TARGET_CALC_STAGE
+      // TODO: Branch delay slot not implemented.
+      // (PC is an instruction address, not a byte address.)
+      ?$valid_decode_branch
+         $branch_target[M4_PC_RANGE] = $pc_inc + $imm_value[M4_PC_RANGE];
+      ?$decode_valid_jump  // (JAL, not JALR)
+         $jump_target[M4_PC_RANGE] = {$Pc[M4_PC_MAX:28], $raw_address[25:0]};
+   @_exe_stage
+      // Execution.
+      $valid_exe = $valid_decode; // Execute if we decoded.
+      
+      ?$valid_exe
+         // Mux immediate values with register values. (Could be REG_RD or EXE stage.)
+         // Mux register value and immediate to produce operand 2.
+         $op2_value[M4_WORD_RANGE] = ($raw_opcode[5:3] == 3'b001) ? $imm_value : /src[2]$reg_value;
+         // Mux RS[4:0] and SHAMT to produce shift amount.
+         $shift_amount[4:0] = ($is_sllv || $is_srlv || $is_srav) ? /src[2]$reg_value[4:0] : $raw_shamt;
+         
+         $equal = /src[1]$reg_value == /src[2]$reg_value;
+         $equal_zero = ! | /src[1]$reg_value;
+         $ltz = /src[1]$reg_value[31];
+         $gtz = ! $ltz && ! $equal_zero;
       ?$branch
-         $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
+         $taken =
+            $jtype ||
+            ($is_jr || $is_jalr) ||
+            ($is_beq  &&   $equal) ||
+            ($is_bne  && ! $equal) ||
+            (($is_bltz || $is_bltzal) &&   $ltz) ||
+            (($is_bgez || $is_bgezal) && ! $ltz) ||
+            ($is_blez && ! $gtz) ||
+            ($is_bgtz &&   $gtz);
+      ?$decode_valid_indirect_jump  // (JR/JALR)
+         $indirect_jump_target[M4_PC_RANGE] = /src[1]$reg_value[M4_PC_RANGE];
+      ?$valid_exe
+         // Compute each individual instruction result, combined per-instruction by a macro.
+         
+         // Load/Store
+         // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
+         $ld_rslt[M4_WORD_RANGE] = m4_ifelse(M4_INJECT_RETURNING_LD, 1, ['32'b0'], ['/original_ld$ld_rslt']);
+         
+         $add_sub_rslt[M4_WORD_RANGE] = ($is_sub || $is_subu) ? /src[1]$reg_value - $op2_value : /src[1]$reg_value + $op2_value;
+         $is_add_sub = $is_add || $is_sub || $is_addu || $is_subu || $is_addi || $is_addiu;
+         $compare_rslt[M4_WORD_RANGE] = {31'b0, (/src[1]$reg_value < $op2_value) ^ /src[1]$reg_value[31] ^ $op2_value[31]};
+         $is_compare = $is_slt || $is_sltu || $is_slti || $is_sltiu;
+         $logical_rslt[M4_WORD_RANGE] =
+                 ({32{$is_and || $is_andi}} & (/src[1]$reg_value & $op2_value)) |
+                 ({32{$is_or  || $is_ori }} & (/src[1]$reg_value | $op2_value)) |
+                 ({32{$is_xor || $is_xori}} & (/src[1]$reg_value ^ $op2_value)) |
+                 ({32{$is_nor            }} & (/src[1]$reg_value | ~ /src[2]$reg_value));
+         $is_logical = $is_and || $is_andi || $is_or || $is_ori || $is_xor || $is_xori || $is_nor;
+         $shift_rslt[M4_WORD_RANGE] =
+                 ({32{$is_sll || $is_sllv}} & (/src[1]$reg_value << $shift_amount)) |
+                 ({32{$is_srl || $is_srlv}} & (/src[1]$reg_value >> $shift_amount)) |
+                 ({32{$is_sra || $is_srav}} & (/src[1]$reg_value << $shift_amount));
+         $is_shift = $is_sll || $is_srl || $is_sra || $is_sllv || $is_srlv || $is_srav;
+         $lui_rslt[M4_WORD_RANGE] = {$raw_immediate, 16'b0}; 
+         
+   @_rslt_stage
+      ?$valid_exe
+         $rslt[M4_WORD_RANGE] =
+              $returning_ld ? /original_ld$ld_rslt :
+                 ({32{$spec_ld}}    & $ld_rslt) |
+                 ({32{$is_add_sub}} & $add_sub_rslt) |
+                 ({32{$is_compare}} & $compare_rslt) |
+                 ({32{$is_logical}} & $logical_rslt) |
+                 ({32{$is_shift}}   & $shift_rslt) |
+                 ({32{$is_lui}}     & $lui_rslt) |
+                 ({32{$branch_or_jump}} & {$pc_inc, 2'b0});   // (no delay slot)
+         
+         
+         
+      // Memory inputs.
+      // TODO: Logic for load/store is cut-n-paste from RISC-V, blindly assuming it is spec'ed the same for MIPS I?
+      //       Load/Store half instructions unique vs. RISC-V and are not treated properly.
+      ?$valid_exe
+         $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
+      $ld_st_cond = $ld_st && $valid_exe;
+      ?$ld_st_cond
+         $addr[M4_ADDR_RANGE] = /src[1]$reg_value + $imm_value;
+         
+         // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
+      $st_cond = $st && $valid_exe;
+      ?$st_cond
+         // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
+         $st_reg_value[M4_WORD_RANGE] = /src[2]$reg_value;
+         $st_value[M4_WORD_RANGE] =
+              $ld_st_word ? $st_reg_value :            // word
+              $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
+                            {4{$st_reg_value[7:0]}};   // byte
+         $st_mask[3:0] =
+              $ld_st_word ? 4'hf :                     // word
+              $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
+                            (4'h1 << $addr[1:0]);      // byte
+      // Swizzle bytes for load result (assuming natural alignment).
+      ?$returning_ld
+         /original_ld
+            // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
+            $sign_bit =
+               ! ($is_lbu || $is_lhu) && (  // Signed && ...
+                  $ld_st_word ? $ld_value[31] :
+                  $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
+                                (($addr[1:0] == 2'b00) ? $ld_value[7] :
+                                 ($addr[1:0] == 2'b01) ? $ld_value[15] :
+                                 ($addr[1:0] == 2'b10) ? $ld_value[23] :
+                                                         $ld_value[31]
+                                )
+               );
+            $ld_rslt[M4_WORD_RANGE] =
+                 $ld_st_word ? $ld_value :
+                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? $ld_value[31:16] :
+                                                            $ld_value[15:0] } :
+                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? $ld_value[7:0]   :
+                                                 ($addr[1:0] == 2'b01) ? $ld_value[15:8]  :
+                                                 ($addr[1:0] == 2'b10) ? $ld_value[23:16] :
+                                                                         $ld_value[31:24]};
+      
+      
+      // ISA-specific trap conditions:
+      // TODO: Blindly copied from RISC-V.
+      // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
+      $non_aborting_isa_trap = ($branch && $taken) ||
+                               ($jump) ||
+                               ($indirect_jump);
+      $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap);
+      
 
 
 
@@ -1829,7 +2073,7 @@ m4+definitions(['
       };
 
 \TLV power_imem(_prog_name)
-   m4+indirect(['mips_']_prog_name['_prog'])
+   m4+indirect(['mipsi_']_prog_name['_prog'])
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -2232,11 +2476,12 @@ m4+definitions(['
                      $ANY = /top|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
             // Next PC
+            $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
             $Pc[M4_PC_RANGE] <=
                $reset ? M4_PC_CNT'b0 :
                // ? : terms for each condition (order does matter)
                m4_redirect_pc_terms
-                        $Pc + M4_PC_CNT'b1;
+                        $pc_inc;
          
          @M4_DECODE_STAGE
 
@@ -2247,6 +2492,8 @@ m4+definitions(['
             // Decode of the fetched instruction
             $valid_decode = $fetch;  // Always decode if we fetch.
             $valid_decode_branch = $valid_decode && $branch;
+            // A load that will return later.
+            //$split_ld = $spec_ld && 1'b['']M4_INJECT_RETURNING_LD;
             m4+indirect(M4_isa['_decode'])
          m4+indirect(['branch_pred_']M4_BRANCH_PRED)
          
@@ -2449,6 +2696,7 @@ m4+definitions(['
    //
    // =================
    
+
    m4+cpu()
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
