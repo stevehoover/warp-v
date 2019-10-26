@@ -961,7 +961,7 @@ m4+definitions(['
       //
       // (The program I wrote in the language I created in the CPU I wrote in a language I created.)
       
-      // Add 1,2,3,...,10 (in that order).
+      // Add 1,2,3,...,9 (in that order).
       // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
       //
       // Regs:
@@ -1167,7 +1167,7 @@ m4+definitions(['
    // \=====================/
    //
 
-   // Add 1,2,3,...,10 (in that order).
+   // Add 1,2,3,...,9 (in that order).
    // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
    //
    // Regs:
@@ -1728,7 +1728,7 @@ m4+definitions(['
       // | Count to 10 Program |
       // \=====================/
       
-      // Add 1,2,3,...,10 (in that order).
+      // Add 1,2,3,...,9 (in that order).
       // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
       //
       // Regs:
@@ -1745,7 +1745,7 @@ m4+definitions(['
         {6'd13, 5'd0, 5'd2, 16'd10},            //    ten = 10
         {6'd13, 5'd0, 5'd3, 16'd0},             //    out = 0
         {6'd0,  5'd1, 5'd3, 5'd3, 5'd0, 6'd32}, // -> out += cnt
-        {6'd43, 5'd6, 5'd3, 16'd0},              //    store out at store_addr
+        {6'd43, 5'd6, 5'd3, 16'd0},             //    store out at store_addr
         {6'd8,  5'd1, 5'd1, 16'd1},             //    cnt ++
         {6'd8,  5'd6, 5'd6, 16'd4},             //    store_addr++
         {6'd5,  5'd1, 5'd2, (~ 16'd4)},         // ^- branch back if cnt != ten
@@ -1866,13 +1866,12 @@ m4+definitions(['
       
       
       $illegal = 1'b0;  // MIPS I doesn't have an illegal instruction exception, just UNPREDICTABLE behavior.
-      $conditional_branch = $raw_opcode == 6'b000001 && $raw_opcode[5:2] == 4'b0001;
+      $conditional_branch = $raw_opcode == 6'b000001 || $raw_opcode[5:2] == 4'b0001;
 
       
       // Special-Case Formats
       $link_reg = $is_bltzal && $is_bgezal && $is_jal;
       $unsigned_imm = $is_addiu || $is_sltiu;
-      $branch_if_valid = $raw_opcode == 6'b000001 || $is_beq || $is_bne || $is_blez || $is_bgtz;
       $jump = $is_j || $is_jal;
       $indirect_jump = $is_jr || $is_jalr;
       $branch_or_jump = ($raw_opcode[5:3] == 3'b000) && ! $rtype;  // (does not include syscall & break)
@@ -1888,18 +1887,18 @@ m4+definitions(['
          // Reg valid for this source, based on instruction type.
          $is_reg =
              (#src == 1) ? ! /instr$jtype :
-                           /instr$rtype;
+                           /instr$rtype || /instr$st || /instr$is_beq || /instr$is_bne;
          $reg[M4_REGS_INDEX_RANGE] =
              (#src == 1) ? /instr$raw_rs :
                            /instr$raw_rt;
-      $imm_value[M4_WORD_RANGE] = {{16{$raw_immediate[15] && $unsigned_imm}}, $raw_immediate[15:0]};
+      $imm_value[M4_WORD_RANGE] = {{16{$raw_immediate[15] && ! $unsigned_imm}}, $raw_immediate[15:0]};
       
    // Condition signals must not themselves be conditioned (currently).
    $dest_reg[M4_REGS_INDEX_RANGE] = $returning_ld ? /original_ld$dest_reg : $link_reg ? 5'b11111 : $itype ? $raw_rt : $raw_rd;
-   $dest_reg_valid = (($valid_decode && ! (($is_j && ! $link_reg) || $st || $is_syscall || $is_break)) || $returning_ld) &&
+   $dest_reg_valid = (($valid_decode && ! ((($is_j || $conditional_branch) && ! $link_reg) || $st || $is_syscall || $is_break)) || $returning_ld) &&
                      | $dest_reg;   // r0 not valid.
                      // Note that load is considered to have a valid dest (which may be marked pending).
-   $branch = $valid_decode && $branch_if_valid;   // (Should be $decode_valid_branch, but keeping consistent with other ISAs.)
+   $branch = $valid_decode && $conditional_branch;   // (Should be $decode_valid_branch, but keeping consistent with other ISAs.)
    $decode_valid_jump = $valid_decode && $jump;
    $decode_valid_indirect_jump = $valid_decode && $indirect_jump;
    // Actually load.
@@ -1913,7 +1912,7 @@ m4+definitions(['
       // TODO: Branch delay slot not implemented.
       // (PC is an instruction address, not a byte address.)
       ?$valid_decode_branch
-         $branch_target[M4_PC_RANGE] = $pc_inc + $imm_value[M4_PC_RANGE];
+         $branch_target[M4_PC_RANGE] = $pc_inc + $imm_value[29:0];
       ?$decode_valid_jump  // (JAL, not JALR)
          $jump_target[M4_PC_RANGE] = {$Pc[M4_PC_MAX:28], $raw_address[25:0]};
    @_exe_stage
@@ -2028,13 +2027,8 @@ m4+definitions(['
       
       
       // ISA-specific trap conditions:
-      // TODO: Blindly copied from RISC-V.
-      // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
-      $non_aborting_isa_trap = ($branch && $taken) ||
-                               ($jump) ||
-                               ($indirect_jump);
+      $non_aborting_isa_trap = $is_break || $is_syscall;
       $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap);
-      
 
 
 
@@ -2056,7 +2050,7 @@ m4+definitions(['
       // | Count to 10 Program |
       // \=====================/
       
-      // Add 1,2,3,...,10 (in that order).
+      // Add 1,2,3,...,9 (in that order).
       // Store incremental results in memory locations 1..9. (1, 3, 6, 10, ..., 45)
       //
       // Regs:
@@ -2094,7 +2088,7 @@ m4+definitions(['
 //    $illegal
 //    $conditional_branch
 //    ...
-\TLV mini_decode()
+\TLV power_decode()
    // TODO
 
 // Execution unit logic for POWER.
@@ -2291,7 +2285,7 @@ m4+definitions(['
       ?$branch
          $pred_taken = >>m4_stage_eval(@M4_EXECUTE_STAGE + 1 - @M4_BRANCH_PRED_STAGE)$BranchState[1];
    @M4_EXECUTE_STAGE
-      $branch_or_reset = $branch || $reset;
+      $branch_or_reset = ($branch && $commit) || $reset;
       ?$branch_or_reset
          $BranchState[1:0] <=
             $reset ? 2'b01 :
@@ -2565,7 +2559,7 @@ m4+definitions(['
                   m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
-            $trap_target[M4_PC_RANGE] = M4_PC_CNT'b0;  // TODO: What should this be?
+            $trap_target[M4_PC_RANGE] = {M4_PC_CNT{1'b1}};  // TODO: What should this be? Using ones to terminate test for now.
             
             // Determine whether the instruction should commit it's result.
             //

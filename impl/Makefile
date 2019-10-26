@@ -39,5 +39,5 @@ clean_impl:
 	find . -type f -iname \*.log -delete
 	find . -type f -iname \*.str -delete
 	find . -type f -iname \*.jou -delete
-	rm out/fpga_impl/fpga_impl.xdc out/fpga_impl/fpga_impl_netlist.v
+	rm -f out/fpga_impl/fpga_impl.xdc out/fpga_impl/fpga_impl_netlist.v
 #FETCH_Instr_Regs_value_a0
