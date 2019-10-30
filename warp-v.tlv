@@ -240,7 +240,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // min_area, 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
    m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
@@ -310,7 +310,7 @@ m4+definitions(['
             (M4_REG_WR_STAGE, 0),
             (M4_MEM_WR_STAGE, 0),
             (M4_LD_RETURN_ALIGN, 1))
-         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
+         m4_default(['M4_BRANCH_PRED'], ['fallthrough'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
       ['4-stage'], ['
@@ -344,7 +344,7 @@ m4+definitions(['
             (M4_MEM_WR_STAGE, 7),
             (M4_EXTRA_REPLAY_BUBBLE, 1),
             (M4_LD_RETURN_ALIGN, 7))
-         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
+         m4_default(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       ']
    )

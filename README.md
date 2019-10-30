@@ -58,7 +58,7 @@ git submodule update
     - An assembler for hard-coded test programs
     - Formal verification in CI (continuous integration testing)
     - Implementation characterized on AWS data-center FPGAs
-  - A small code base (single ~2K-line file (heavily-commented) implements all WARP-V variants, assembler, tests, and formal verification harness)
+  - A small code base (single < 3K-line file (heavily-commented) implements all WARP-V variants, assembler, tests, formal verification harness, and Xilinx implementation)
 
 
 
