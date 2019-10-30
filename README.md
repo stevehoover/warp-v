@@ -13,8 +13,12 @@ WARP-V includes CPU core logic only with no current support for virtual memory, 
 
 # Quick Links
 
-WARP-V is written in a single source file for compatibility with the Makerchip.com IDE.
-<a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">Open the latest WARP-V in Makerchip</a>.
+### Explore WARP-V
+
+WARP-V is easiest to explore in Makerchip. You can:
+  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">open the entire WARP-V model as a single file</a>
+  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v_config.tlv" target="_blank" atom_fix="_">open a small configuration file to explore a given configuration</a>.
+
 
 ### Publications
 
