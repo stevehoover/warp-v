@@ -32,7 +32,7 @@ m4+definitions(['
 '])
 \SV
   // Include WARP-V.
-  m4_include_lib(['https://github.com/stevehoover/warp-v/blob/master/warp-v.tlv'])
+  m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
   
   m4+module_def
 \TLV
