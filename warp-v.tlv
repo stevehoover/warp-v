@@ -242,8 +242,23 @@ m4+definitions(['
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
-   m4_define_hier(['M4_CORE'], 1)  // Cores. If > 1, cores will be connected with a NoC.
-   m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
+   // A multi-core implementation (currently RISC-V only) should:
+   //   m4_define_hier(['M4_CORE'], #)
+   //   m4_define_hier(['M4_VC'], #)
+   //   m4_define_hier(['M4_PRIO'], #)
+   // prior to inclusion of this file.
+   m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], ['
+      // In not externally defined:
+      m4_define_hier(['M4_CORE'], 1)  // Number of cores.
+      m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
+      m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
+   '])
+   // Inclusions for multi-core only:
+   m4_ifexpr(M4_CORE_CNT > 1, ['
+      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['Multi-core supported for RISC-V only.']m4_new_line)'])
+      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_lib/481188115b4338567df916460d462ca82401e211/fundamentals_lib.tlv'])
+      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
+   '])
    
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
@@ -703,14 +718,15 @@ m4+definitions(['
    //  $3: CSR fields (as in m4_define_fields)
    //  $4: Reset value
    //  $5: Writable bits mask
-   //  $6: 1 or 0 indicating whether to allow side-effect writes; if 1, signals in scope |fetch@M4_EXECUTE_STAGE
-   //      must provide a write value. Signals are:
-   //        o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
-   //        o $csr_<csr_name>_hw_wr_value: the value to write
-   //        o $csr_<csr_name>_hw_wr_mask: mask of bits to write
-   //      Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
-   //      rare that a bit can be written by both hardware and software.
-
+   //  $6: 0, 1, RO indicating whether to allow side-effect writes.
+   //      If 1, these signals in scope |fetch@M4_EXECUTE_STAGE must provide a write value:
+   //         o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
+   //         o $csr_<csr_name>_hw_wr_value: the value to write
+   //         o $csr_<csr_name>_hw_wr_mask: mask of bits to write
+   //        Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
+   //        rare that a bit can be written by both hardware and software.
+   //      If RO, the CSR is read-only and code can be simpler. The CSR signal must be provided:
+   //         o $csr_<csr_name>: The read-only CSR value (used in |fetch@M4_EXECUTE_STAGE).
    // Variables set by this macro:
    // List of CSRs.
    m4_define(['m4_csrs'], [''])
@@ -729,7 +745,8 @@ m4+definitions(['
         m4_define(['m4_csrs'], 
                   m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
         m4_define(['m4_csr_']$1['_args'], ['$@'])
-        m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? $csr_']$1[' : ']m4_csrrx_rslt_expr))
+        // 32'b0 = ['{{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
+        m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
         m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
       ']
    )
@@ -756,14 +773,13 @@ m4+definitions(['
          m4_define_csr(['pktwr'],      12'h802,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b1}}'],            0)
          m4_define_csr(['pkttail'],    12'h803,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b1}}'],            0)
          m4_define_csr(['pktctrl'],    12'h804,    ['1, BLOCK, 0'],                    ['1'b0'],                      ['1'b1'],                            0)
-         m4_define_csr(['pktrdvc'],    12'h808,    ['M4_VC_INDEX_HIGH, VC, 0'],        ['M4_VC_INDEX_HIGH'b0'],       ['{M4_VC_INDEX_HIGH{1'b1}}'],        0)
+         m4_define_csr(['pktrdvcs'],   12'h808,    ['M4_VC_HIGH, VCS, 0'],             ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              0)
          m4_define_csr(['pktavail'],   12'h809,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
          m4_define_csr(['pktcomp'],    12'h80a,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
-         m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_VC_HIGH'b0'],             ['{M4_WORD_HIGH{1'b0}}'],            1)
+         m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b0}}'],            RO)
          m4_define_csr(['pktinfo'],    12'h80c,    ['m4_eval(M4_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
                                                                             ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b100'], ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b0'], 1)
          // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
-         // TODO: Blocking will be implemented by replaying.
       '])
    '])
 
@@ -1392,7 +1408,7 @@ m4+definitions(['
    
 
 // Logic for a single CSR.
-\TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, #side_effects)
+\TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, side_effects)
    //--------------
    /['']/ CSR m4_to_upper(csr_name)
    //--------------
@@ -1400,16 +1416,25 @@ m4+definitions(['
       $is_csr_['']csr_name = $raw[31:20] == csr_index;
    @M4_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
+      // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
       m4_define(['M4_THIS_CSR_RANGE'], m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
       
+      m4_ifelse_block(side_effects, 1, ['
       // hw_wr_mask conditioned by hw_wr.
-      m4_ifexpr(#side_effects, ['$csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;'])
-      // The CSR value, updated by side-effect writes (if #side_effects).
+      $csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
+      // The CSR value, updated by side-effect writes.
       $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] =
-           m4_ifexpr(#side_effects, ['($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name)'], ['$csr_['']csr_name']);
+           ($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name);
+      '], side_effects, 0, ['
+      // The CSR value with no side-effect writes.
+      $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] = $csr_['']csr_name;
+      '], ['
+      '])
+      m4_ifelse_block(side_effects, RO, ['
+      '], ['
       // Next value of the CSR.
       $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
-           $masked_csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
+           $csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
       <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
            $reset ? reset_value :
            ! $commit
@@ -1422,6 +1447,7 @@ m4+definitions(['
                   ? $upd_csr_['']csr_name & ~ $csr_['']csr_name['']_masked_wr_value :
            // No CSR instruction update, only h/w side-effects.
                     $upd_csr_['']csr_name;
+      '])
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
@@ -1432,7 +1458,7 @@ m4+definitions(['
 \TLV riscv_csr_logic()
    m4_ifelse_block(m4_csrs, [''], [''], ['
    // CSR write value for CSR write instructions.
-   $masked_csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
+   $csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
    '])
 
    // Counter CSR
@@ -1473,17 +1499,17 @@ m4+definitions(['
    // For multicore CSRs:
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    $csr_pktavail_hw_wr = 1'b0;
-   $csr_pktavail_hw_wr_mask[31:0] = {M4_VC_HIGH{1'b1}};
-   $csr_pktavail_hw_wr_value[31:0] = {M4_VC_HIGH{1'b1}};
+   $csr_pktavail_hw_wr_mask[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
+   $csr_pktavail_hw_wr_value[M4_VC_RANGE] = {M4_VC_HIGH{1'b1}};
    $csr_pktcomp_hw_wr = 1'b0;
-   $csr_pktcomp_hw_wr_mask[31:0] = {M4_VC_HIGH{1'b1}};
-   $csr_pktcomp_hw_wr_value[31:0] = {M4_VC_HIGH{1'b1}};
-   $csr_pktrd_hw_wr = 1'b0;
-   $csr_pktrd_hw_wr_mask[31:0] = {M4_WORD_HIGH{1'b1}};
-   $csr_pktrd_hw_wr_value[31:0] = {M4_WORD_HIGH{1'b0}};
+   $csr_pktcomp_hw_wr_mask[M4_VC_RANGE]   = {M4_VC_HIGH{1'b1}};
+   $csr_pktcomp_hw_wr_value[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
+   //$csr_pktrd_hw_wr = 1'b0;
+   //$csr_pktrd_hw_wr_mask[M4_WORD_RANGE]   = {M4_WORD_HIGH{1'b1}};
+   //$csr_pktrd_hw_wr_value[M4_WORD_RANGE]  = {M4_WORD_HIGH{1'b0}};
    $csr_pktinfo_hw_wr = 1'b0;
-   $csr_pktinfo_hw_wr_mask[31:0] = {M4_WORD_HIGH{1'b1}};
-   $csr_pktinfo_hw_wr_value[31:0] = {M4_WORD_HIGH{1'b0}};
+   $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
+   $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
    '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
@@ -1557,6 +1583,16 @@ m4+definitions(['
    // Actually load.
    $spec_ld = $valid_decode && $ld;
    
+   // CSR decode.
+   $is_csr_write = $is_csrrw_instr || $is_csrrwi_instr;
+   $is_csr_set   = $is_csrrs_instr || $is_csrrsi_instr;
+   $is_csr_clear = $is_csrrc_instr || $is_csrrci_instr;
+   $is_csr_instr = $is_csr_write ||
+                   $is_csr_set   ||
+                   $is_csr_clear;
+   $valid_csr = m4_valid_csr_expr;
+   $csr_trap = $is_csr_instr && ! $valid_csr;
+
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
@@ -1630,28 +1666,19 @@ m4+definitions(['
          $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
-         // TODO: CSR read instructions have the same result expression. Synthesis might not optimize optimally.
+         // CSR read instructions have the same result expression. Counting on synthesis to optimize result mux.
          $csrrw_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
-         $csrrs_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
-         $csrrc_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
-         $csrrwi_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
-         $csrrsi_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
-         $csrrci_rslt[M4_WORD_RANGE] = m4_csrrx_rslt_expr;
+         $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrc_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
          
    // CSR logic
    // ---------
    m4+riscv_csrs((m4_csrs))
    @_exe_stage
       m4+riscv_csr_logic()
-      // CSR trap.
-      $is_csr_write = $is_csrrw_instr || $is_csrrwi_instr;
-      $is_csr_set   = $is_csrrs_instr || $is_csrrsi_instr;
-      $is_csr_clear = $is_csrrc_instr || $is_csrrci_instr;
-      $is_csr_instr = $is_csr_write ||
-                      $is_csr_set   ||
-                      $is_csr_clear;
-      $valid_csr = m4_valid_csr_expr;
-      $csr_trap = $is_csr_instr && ! $valid_csr;
       
       // Memory inputs.
       ?$valid_exe
@@ -2206,13 +2233,13 @@ m4+definitions(['
 // Relative to |fetch/instr:
 // On $valid_st, stores the data $st_value at $addr, masked by $st_mask.
 // On $spec_ld, loads the word at $addr (ignoring intra-word bits).
-// The returned load result can be accessed from /cpu|mem/data<<M4_ALIGNMENT_VALUE$ANY as $ld_value and $ld
+// The returned load result can be accessed from /_cpu|mem/data<<M4_ALIGNMENT_VALUE$ANY as $ld_value and $ld
 // (along w/ everything else in the input instruction).
 
 // A fake memory with fixed latency.
 // The memory is placed in the fetch pipeline.
 // TODO: (/_cpu, @_mem, @_align)
-\TLV fixed_latency_fake_memory(/cpu, M4_ALIGNMENT_VALUE)
+\TLV fixed_latency_fake_memory(/_cpu, M4_ALIGNMENT_VALUE)
    // This macro assumes little-endian.
    m4_ifelse(M4_BIG_ENDIAN, 0, [''], ['m4_errprint(['Error: fixed_latency_fake_memory macro only supports little-endian memory.'])'])
    |fetch
@@ -2252,9 +2279,9 @@ m4+definitions(['
    |mem
       /data
          @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
-            $ANY = /cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
+            $ANY = /_cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
             /src[2:1]
-               $ANY = /cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
+               $ANY = /_cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
 
 
 
@@ -2302,7 +2329,7 @@ m4+definitions(['
 //                         //
 //=========================//
 
-\TLV cpu()
+\TLV cpu(/_cpu)
    // Generated logic
    m4+indirect(M4_isa['_gen'])
 
@@ -2460,14 +2487,14 @@ m4+definitions(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            $returning_ld = /top|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
+            $returning_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             // Recirculate returning load.
             ?$returning_ld
                // This scope holds the original load for a returning load.
                /original_ld
-                  $ANY = /top|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
-                     $ANY = /top|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
+                     $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
@@ -2533,8 +2560,7 @@ m4+definitions(['
                   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$returning_ld) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
                   m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
-            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending) || (m4_cpu_blocked);
-         
+            $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
          
          // =======
          // Execute
@@ -2548,9 +2574,10 @@ m4+definitions(['
             // =======
             // Control
             // =======
-
+            
             // Execute stage redirect conditions.
-            $aborting_trap = $illegal || $aborting_isa_trap;
+            $replay_trap = m4_cpu_blocked;
+            $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
             ?$valid_decode_branch
@@ -2559,7 +2586,7 @@ m4+definitions(['
                   m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + M4_PC_CNT'b1 :'])
                   $branch_target;
 
-            $trap_target[M4_PC_RANGE] = {M4_PC_CNT{1'b1}};  // TODO: What should this be? Using ones to terminate test for now.
+            $trap_target[M4_PC_RANGE] = $replay_trap ? $Pc : {M4_PC_CNT{1'b1}};  // TODO: What should this be? Using ones to terminate test for now.
             
             // Determine whether the instruction should commit it's result.
             //
@@ -2592,7 +2619,7 @@ m4+definitions(['
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
-   m4+fixed_latency_fake_memory(/top, 0)
+   m4+fixed_latency_fake_memory(/_cpu, 0)
    |fetch
       /instr
          @M4_REG_WR_STAGE
@@ -2622,8 +2649,8 @@ m4+definitions(['
             // Assert these to end simulation (before Makerchip cycle limit).
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
-            *passed = ! *reset && $ReachedEnd && $Reg4Became45;
-            *failed = ! *reset && (*cyc_cnt > 200 || (! |fetch/instr>>3$reset && |fetch/instr>>6$commit && |fetch/instr>>6$illegal));
+            $passed = ! $reset && $ReachedEnd && $Reg4Became45;
+            $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
    // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
@@ -2683,6 +2710,104 @@ m4+definitions(['
 
             `BOGUS_USE(/src[2]$dummy)
 
+// Ingress/Egress packet buffers between the CPU and NoC.
+// Packet buffers are m4+vc_flop_fifo_v2(...)s. See m4+vc_flop_fifo_v2 definition in tlv_flow_lib package
+//   and instantiations below for interface.
+// NoC must provide |egress_out interface and |ingress_in m4+vc_flop_fifo_v2(...) interface.
+\TLV noc_cpu_buffers(/_cpu, #depth)
+   // Egress FIFO.
+   // Block CPU |fetch pipeline if blocked.
+   m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /_cpu|egress_in<<M4_EXECUTE_STAGE$pkt_wr_blocked || /_cpu|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
+   |egress_in
+      // Stage numbering has @0 == |fetch@M4_EXECUTE_STAGE 
+      @0
+         $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;  // (including $reset)
+         $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
+         $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
+         // This PKTWR write is blocked if the skid buffer blocked last cycle.
+         $pkt_wr_blocked = $is_pkt_wr && /skid_buffer>>1$push_blocked;
+      @1
+         $valid_pkt_wr = $is_pkt_wr && $commit;
+         /skid_buffer
+            // Hold the write if blocked.
+            // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
+            $push_blocked = $valid_pkt_wr && /_cpu/vc[$csr_pktwrvc]|egress_in$blocked;
+            $ANY = >>1$push_blocked ? >>1$ANY : |egress_in$ANY;
+         /trans
+            $flit[M4_WORD_RANGE] = |egress_in/skid_buffer$csr_wr_value;
+   /vc[*]
+      |egress_in
+         @1
+            $vc_trans_valid = /_cpu|egress_in/skid_buffer$valid_pkt_wr && (/_cpu|egress_in/skid_buffer$vc == #vc);
+   m4+vc_flop_fifo_v2(/_cpu, |egress_in, @1, |egress_out, @1, #depth, /trans, M4_VC_RANGE, M4_PRIO_RANGE)
+   /vc[*]
+      |egress_out
+         @0
+            $has_credit = 1'b0 /*FIX*/;
+            $Prio[M4_PRIO_INDEX_RANGE] <= '0;
+   |egress_out
+      /trans
+         @1
+            `BOGUS_USE($flit)
+   
+   // Ingress FIFO.
+   //
+   // To avoid a critical path, we replay
+   //   CSR read of PKTRD if there was a
+   //   CSR write of PKTRDVCS the cycle prior.
+   // This allows us to use a value of PKTRDVCS that is one cycle old.
+   // Staging of CSR read of PKTRD is:
+   //   @DECODE
+   //      - Determine CSR write of PKTRDVCS
+   //   @EXECUTE-1 (which is likely @REG_RD)
+   //      - Detect PKTRDVCS change
+   //      - Arb VC FIFOs and MUX data among VCs
+   //   @EXECUTE
+   //      - Bypass VC FIFOs
+   //      - CSR mux and result MUX
+   |fetch
+      /instr
+         // Data from VC_FIFO is made available by the end of |ingress_out@-1(arb/byp) == M4_EXECUTE_STAGE-1
+         // reflecting prior-prior!-stage PKTRDVCS
+         // so it can be captured in PKTRD and used by M4_EXECUTE_STAGE (== |ingress_out@0(out))
+         @M4_EXECUTE_STAGE  // == |ingress_out@0
+            // CSR PKTRD is written by hardware as the head of the ingress buffer.
+            // Write if there is head data, else, CSR is invalid.
+            $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
+            ?$csr_pktrd_valid
+               $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/trans<<M4_EXECUTE_STAGE$flit;
+   |ingress_out
+      @-1
+         // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
+         $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;
+         $is_pktrd = $is_csr_instr && $is_csr_pktrd;
+         // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
+         $pktrdvcs_changed = >>1$is_csr_write && >>1$is_csr_pktrdvcs;
+         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+      @0
+         // Replay for PKTRD with no data read.
+         $pktrd_blocked = $is_pktrd && ! $trans_valid;
+   /vc[*]
+      |ingress_out
+         @-1
+            $has_credit = /_cpu|ingress_out>>1$csr_pktrdvcs[#vc] &&
+                          /_cpu|ingress_out$do_pktrd;
+            $Prio[M4_PRIO_INDEX_RANGE] <= '0;
+   m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /trans, M4_VC_RANGE, M4_PRIO_RANGE)
+   /M4_VC_HIER
+      |ingress_in
+         @0
+            $vc_trans_valid = 1'b0;  // TODO
+   |ingress_in
+      @0
+         $reset = *reset;  // TODO
+      /trans
+         @0
+            $flit[31:0] = 32'b0;  // TODO
+
+
+m4+module_def
+
 \TLV warpv()
    // =================
    //
@@ -2691,18 +2816,34 @@ m4+definitions(['
    // =================
    
 
-   m4+cpu()
+   m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
    '], [''])
 
-m4+module_def
-
 \TLV
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
-
+   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
+   // Multi-core
+   /M4_CORE_HIER
+      m4+noc_cpu_buffers(/core, 4)
+      m4+cpu(/core)
+      m4+warpv_makerchip_cnt10_tb()
+   //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /trans)
+   |done
+      @0
+         // Assert these to end simulation (before Makerchip cycle limit).
+         *passed = & /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$passed;
+         *failed = | /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$failed;
+   '], ['
+   // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
+   |done
+      @0
+         *passed = /top|fetch/instr>>M4_REG_WR_STAGE$passed;
+         *failed = /top|fetch/instr>>M4_REG_WR_STAGE$failed;
+   '])
 \SV
    endmodule
 

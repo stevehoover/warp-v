@@ -1,6 +1,6 @@
 \m4_TLV_version 1d: tl-x.org
 m4+definitions(['
-   // This file can be used to build a coursely-configured implementation of WARP-V within makerchip.com.
+   // This file can be used to build a coarsely-configured implementation of WARP-V within makerchip.com.
    // This enables exploration of a generated model (as TL-Verilog (without M4 macros) and/or Verilog/SystemVerilog).
    // Simulation waveforms can be explored.
    //
