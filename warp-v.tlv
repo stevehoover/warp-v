@@ -2821,6 +2821,16 @@ m4+module_def
    m4+formal()
    '], [''])
 
+// Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
+// Args:
+//   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
+\TLV makerchip_pass_fail(/_hier)
+   |done
+      @0
+         // Assert these to end simulation (before Makerchip cycle limit).
+         *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
+         *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
+
 \TLV
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
@@ -2830,19 +2840,12 @@ m4+module_def
       m4+cpu(/core)
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /trans)
-   |done
-      @0
-         // Assert these to end simulation (before Makerchip cycle limit).
-         *passed = & /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = | /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$failed;
+   m4+makerchip_pass_fail(core[*])
    '], ['
    // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
-   |done
-      @0
-         *passed = /top|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = /top|fetch/instr>>M4_REG_WR_STAGE$failed;
+   m4+makerchip_pass_fail()
    '])
 \SV
    endmodule

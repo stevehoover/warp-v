@@ -1,3 +1,5 @@
+# TODO: Extend this to do formal as a job and add a job(s) for simulations.
+
 dist: trusty
 sudo: false
 language: generic
