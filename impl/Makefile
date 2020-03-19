@@ -23,10 +23,10 @@ out/%/status: warp-v_%.tlv ../warp-v.tlv
 	@# Above sed HACKS fix bugs in the generated code.
 
 impl:
-	vivado -mode tcl -source impl.tcl 
+	vivado -mode tcl -source Vivado/impl.tcl 
 
 impl_gui:
-	 vivado -source impl.tcl 
+	 vivado -source Vivado/impl.tcl 
 
 clean: clean_compile clean_impl
 
@@ -34,10 +34,11 @@ clean_compile:
 	rm -rf out
 
 clean_impl:
+	rm -rf Vivado/out
 	find . -type f -iname \*.rpt -delete  
 	find . -type f -iname \*.dcp -delete 
 	find . -type f -iname \*.log -delete
 	find . -type f -iname \*.str -delete
 	find . -type f -iname \*.jou -delete
-	rm -f out/fpga_impl/fpga_impl.xdc out/fpga_impl/fpga_impl_netlist.v
+	rm viv\*
 #FETCH_Instr_Regs_value_a0
