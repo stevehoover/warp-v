@@ -72,6 +72,9 @@ m4+definitions(['
    //
    // The PC is redirected, and inflight instructions are squashed (their results are
    // not committed) for:
+   //   o no-fetch cycles (squashes only the no-fetch instruction itself)
+   //   o 2nd-issue of split (long-latency) instructions (squashes only the clobbered instruction itself,
+   //     which reissues next cycle)
    //   o jumps, which go to an absolute jump target address
    //   o predicted-taken branches, which speculatively redirect to the computed branch target
    //   o unconditioned and mispredicted taken branches, which go to branch target
@@ -79,6 +82,7 @@ m4+definitions(['
    //   o instructions that read or write a pending register
    //     (See "Loads", below.)
    //   o traps, which go to a trap target
+  
    //
    // Loads:
    //
@@ -96,6 +100,18 @@ m4+definitions(['
    // necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
    // for L1 misses. Power could be saved by going idle on replay until load will return
    // data.
+   //
+   // Long-latency pipelined instructions:
+   //
+   // Long-latency pipelined instructions can utilize the same split issue and pending
+   // mechanisms as load instructions.
+   //
+   // Long-latency non-pipelined instructions:
+   //
+   // FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
+   // are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
+   // the next redirect (which will be a second issue of the instruction).
+   // It doesn't matter whether registers are marked pending, but we do.
    //
    // Bypass:
    //
@@ -449,7 +465,8 @@ m4+definitions(['
       (M4_EXTRA_JUMP_BUBBLE, 0),
       (M4_EXTRA_BRANCH_BUBBLE, 0),
       (M4_EXTRA_INDIRECT_JUMP_BUBBLE, 0),
-      (M4_EXTRA_TRAP_BUBBLE, 1)  // Not perf-critical, so 1 is a good choice.
+      (M4_EXTRA_NON_PIPELINED_BUBBLE, 1),
+      (M4_EXTRA_TRAP_BUBBLE, 1)
    )
    
    // Calculated stages:
@@ -464,9 +481,11 @@ m4+definitions(['
    m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
    m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
    m4_define(['M4_INDIRECT_JUMP_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE))
+   m4_define(['M4_NON_PIPELINED_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_NON_PIPELINED_BUBBLE))
    m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE))
    m4_define(['M4_SECOND_ISSUE_BUBBLES'], 0)  // Bubbles between second issue of a long-latency instruction and
                                               // the replay of the instruction it squashed (so always zero).
+   m4_define(['M4_NO_FETCH_BUBBLES'], 0)  // Bubbles between a no-fetch cycle and the next cycles (so always zero).
    
    
    
@@ -657,6 +676,7 @@ m4+definitions(['
    //   $2: condition signal of triggering instr
    //   $3: target PC signal of triggering instruction
    //   $4: 1 for an aborting redirect (0 otherwise)
+   //   $5: (opt) 1 to freeze fetch until subsequent redirect
    m4_define(['m4_process_redirect_condition'],
              ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
                // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
@@ -664,15 +684,14 @@ m4+definitions(['
                // Params: $@ (m4_redirect_masking_triggers contains param use)
                m4_pushdef(['m4_redir_cond'],
                           ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
-               //m4_define(['$1_order'], $5)   // Order of this condition. (Not used, so commented)
                m4_define(['m4_redirect_list'],
                          m4_dquote(m4_redirect_list, ['$1']))
                m4_define(['m4_redirect_squash_terms'],
-                         ['']m4_redirect_squash_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_TRAP_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_TRAP_BUBBLES + 1){1'b1}})'])
+                         ['']m4_quote(m4_redirect_squash_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
                m4_define(['m4_redirect_shadow_terms'],
-                         ['']m4_redirect_shadow_terms[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_TRAP_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_TRAP_BUBBLES + 1){1'b1}})'])
+                         ['']m4_quote(m4_redirect_shadow_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
                m4_define(['m4_redirect_pc_terms'],
-                         ['m4_echo(']m4_redir_cond($@)[') ? >>m4_echo($1)$3 : ']m4_redirect_pc_terms[' '])
+                         ['m4_echo(']m4_redir_cond($@)[') ? {>>m4_echo($1)$3, m4_ifelse($5, 1, 1'b1, 1'b0)} : ']m4_quote(m4_redirect_pc_terms)[' '])
                m4_ifelse(['$4'], ['1'],
                   ['m4_define(['m4_abort_terms'],
                               m4_dquote(m4_abort_terms)['[' || $2']'])
@@ -685,12 +704,14 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
+      ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1'],
       ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
       m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
+      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $Pc, 1, 1'],
       ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
       ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
 
@@ -1043,6 +1064,7 @@ m4+definitions(['
    $branch = $dest_char == "p";
    $no_dest = $dest_char == "0";
    $write_pc = $jump || $branch;
+   $div_mul = 1'b0;
    $dest_valid = $write_pc || $dest_is_reg;
    $illegal_dest = !($dest_is_reg || 
                      (($branch || $jump || $no_dest) && ! $ld));  // Load must have reg dest.
@@ -1564,7 +1586,7 @@ m4+definitions(['
                  $is_rem_instr ||
                  $is_remu_instr;
       '], ['
-      //+ $div_mul = 1'b0;
+      $div_mul = 1'b0;
       '])
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
@@ -1898,6 +1920,7 @@ m4+definitions(['
       $is_div   = $rtype && $raw_funct == 6'b011010;
       $is_divu  = $rtype && $raw_funct == 6'b011011;
       */
+      $div_mul = 1'b0;
       
       // Jump/Branch
       $is_jr     = $rtype && $raw_funct == 6'b001000;
@@ -2219,6 +2242,7 @@ m4+definitions(['
    $illegal = 1'b0;
    $branch = 1'b0;
    $jump = 1'b0;
+   $div_mul = 1'b0;
    $conditional_branch = $branch;
    ?$valid_decode_branch
 
@@ -2379,9 +2403,8 @@ m4+definitions(['
                          $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
                                          $Cnt + 8'b1; // increment
             $reset = $soft_reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
-         
          @M4_FETCH_STAGE
-            $fetch = ! $reset;  // always fetch
+            $fetch = ! $reset && ! $NoFetch;
             // (M4_IMEM_MACRO_NAME instantiation produces ?$fetch$raw.)
          @M4_NEXT_PC_STAGE
             
@@ -2529,11 +2552,15 @@ m4+definitions(['
             
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
-            $Pc[M4_PC_RANGE] <=
-               $reset ? M4_PC_CNT'b0 :
+            // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
+            {$next_pc[M4_PC_RANGE], $next_no_fetch} =
+               $reset ? {M4_PC_CNT'b0, 1'b0} :
                // ? : terms for each condition (order does matter)
                m4_redirect_pc_terms
-                        $pc_inc;
+                          ({$pc_inc, 1'b1});
+            // Then as state.
+            $Pc[M4_PC_RANGE] <= $next_pc;
+            $NoFetch <= $next_no_fetch;
          
          @M4_DECODE_STAGE
 
@@ -2607,6 +2634,7 @@ m4+definitions(['
             // =======
             
             // Execute stage redirect conditions.
+            $non_pipelined = $div_mul;
             $replay_trap = m4_cpu_blocked;
             $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
