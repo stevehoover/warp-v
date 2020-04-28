@@ -110,8 +110,8 @@ m4+definitions(['
    //
    
    // TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
-   //       /fetch_instr reflects the instruction fetched from i-memory, and /commit_instr reflects the
-   //       instruction that will be committed. The difference is returning_ld instructions which commit
+   //       /fetch_instr reflects the instruction fetched from i-memory (1st issue), and /commit_instr reflects the
+   //       instruction that will be committed (2nd issue). The difference is long-latency instructions which commit
    //       in place of the fetch instruction. There have been several subtle bugs where the fetch
    //       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
    //       avoid them.
@@ -465,7 +465,8 @@ m4+definitions(['
    m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
    m4_define(['M4_INDIRECT_JUMP_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE))
    m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE))
-   m4_define(['M4_RETURNING_LD_BUBBLES'], 0)  // Bubbles between returning ld and the replay of the instruction it squashed (so always zero).
+   m4_define(['M4_SECOND_ISSUE_BUBBLES'], 0)  // Bubbles between second issue of a long-latency instruction and
+                                              // the replay of the instruction it squashed (so always zero).
    
    
    
@@ -684,7 +685,7 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_RETURNING_LD_BUBBLES'], $second_issue, $Pc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
@@ -1149,7 +1150,7 @@ m4+definitions(['
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
-            $second_issue ? /orig_inst$ld_value :
+            $second_issue ? /orig_inst$ld_value :  // (Only loads are issued twice.)
             $st ? /src[1]$value :
             $op_full ? $op_full_rslt :
             $op_compare ? {12{$compare_rslt}} :
@@ -1673,6 +1674,18 @@ m4+definitions(['
          $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
          $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
+         
+         // "M" Extension.
+         m4_ifelse_block(M4_EXT_M, 1, ['
+         $mul_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $mulh_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $mulhu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $div_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $divu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $rem_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $remu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         '])
          
    // CSR logic
    // ---------
@@ -2384,7 +2397,7 @@ m4+definitions(['
             //                     one-cycle redirect to repeat the clobbered instruction.
             //   o Predict-taken branch: A predicted-taken branch must determine the target before it can redirect the PC.
             //                           (This might be followed up by a mispredition.)
-            //   o Replay: (aborting) Replay the same instruction (because a source register is pending (awaiting a returning_ld))
+            //   o Replay: (aborting) Replay the same instruction (because a source register is pending (awaiting a long-latency/2nd issuing instruction))
             //   o Jump: A jump instruction.
             //   o Mispredicted branch: A branch condition was mispredicted.
             //   o Aborting traps: (aborting) illegal instructions, others?
@@ -2492,6 +2505,7 @@ m4+definitions(['
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
+                  // TODO: ... non-loads.
                   $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
@@ -2541,7 +2555,7 @@ m4+definitions(['
                   {$reg_value[M4_WORD_RANGE], $pending} =
                      m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
                      // Bypass stages. Both register and pending are bypassed.
-                     // Bypassed registers must be from instructions that are good-path as of this instruction or are returning_ld.
+                     // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
                      m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
@@ -2694,7 +2708,7 @@ m4+definitions(['
                *rvfi_rd_addr     = (/instr$dest_reg_valid && ! $abort) ? $raw_rd : 5'b0;
                *rvfi_rd_wdata    = *rvfi_rd_addr  ? /instr$rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
-            *rvfi_pc_wdata    = {$reset         ? M4_PC_CNT'b0 :
+            *rvfi_pc_wdata    = {$reset          ? M4_PC_CNT'b0 :
                                  $second_issue   ? /orig_inst$pc + 1'b1 :
                                  $trap           ? $trap_target :
                                  $jump           ? $jump_target :
