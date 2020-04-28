@@ -1520,8 +1520,8 @@ m4+definitions(['
 
 \TLV riscv_rslt_mux_expr()
    $rslt[M4_WORD_RANGE] =
-       $second_issue ? /orig_inst$ld_rslt :
-       M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
+       $second_issue ? /orig_inst$late_rslt :
+                       M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
    // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_prev_instr_valid_through(..).
@@ -1553,6 +1553,20 @@ m4+definitions(['
 
       // Instruction decode.
       m4+riscv_decode_expr()
+      
+      m4_ifelse_block(M4_EXT_M, 1, ['
+      // Instruction requires integer mul/div unit and is long-latency.
+      $div_mul = $is_mul_instr ||
+                 $is_mulh_instr ||
+                 $is_mulhsu_instr ||
+                 $is_mulhu_instr ||
+                 $is_div_instr ||
+                 $is_divu_instr ||
+                 $is_rem_instr ||
+                 $is_remu_instr;
+      '], ['
+      //+ $div_mul = 1'b0;
+      '])
 
       $illegal = 1'b1['']m4_illegal_instr_expr;
       $conditional_branch = $is_b_type;
@@ -1736,6 +1750,7 @@ m4+definitions(['
                                                  ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                          {$ld_value[31:24], 4'b1000}};
             `BOGUS_USE($ld_mask) // It's only for formal verification.
+            $late_rslt = $ld_rslt;  // TODO: || ...
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2500,7 +2515,8 @@ m4+definitions(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            $second_issue = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
+            $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
+            $second_issue = $second_issue_ld;  // TODO: || ...
             // Recirculate returning load.
             ?$second_issue
                // This scope holds the original load for a returning load.
@@ -2688,7 +2704,7 @@ m4+definitions(['
                     $non_aborting_trap;
             $rvfi_trap        = ! $reset && >>m4_eval(-M4_MAX_REDIRECT_BUBBLES + 1)$next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES] &&
                                 $trap && ! $replay && ! $second_issue;  // Good-path trap, not aborted for other reasons.
-            // Order for the instruction/trap for RVFI check. (For ld, this is associated with the ld itself, not the returning_ld.)
+            // Order for the instruction/trap for RVFI check. (For split instructions, this is associated with the 1st issue, not the 2nd issue.)
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
