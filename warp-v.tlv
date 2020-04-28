@@ -1318,7 +1318,6 @@ m4+definitions(['
       m4_op5(11111, _, 80B)
       
    \SV_plus
-      // Not sure these are ever used.
       m4_instr_types_sv(m4_instr_types_args)
       
    \SV_plus
@@ -1730,27 +1729,29 @@ m4+definitions(['
       // Swizzle bytes for load result (assuming natural alignment).
       ?$second_issue
          /orig_inst
-            // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
-            $sign_bit =
-               ! $raw_funct3[2] && (  // Signed && ...
-                  $ld_st_word ? $ld_value[31] :
-                  $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
-                                (($addr[1:0] == 2'b00) ? $ld_value[7] :
-                                 ($addr[1:0] == 2'b01) ? $ld_value[15] :
-                                 ($addr[1:0] == 2'b10) ? $ld_value[23] :
-                                                         $ld_value[31]
-                                )
-               );
-            {$ld_rslt[M4_WORD_RANGE], $ld_mask[3:0]} =
-                 $ld_st_word ? {$ld_value, 4'b1111} :
-                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? {$ld_value[31:16], 4'b1100} :
-                                                            {$ld_value[15:0] , 4'b0011}} :
-                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? {$ld_value[7:0]  , 4'b0001} :
-                                                 ($addr[1:0] == 2'b01) ? {$ld_value[15:8] , 4'b0010} :
-                                                 ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
-                                                                         {$ld_value[31:24], 4'b1000}};
-            `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt = $ld_rslt;  // TODO: || ...
+            $spec_ld_cond = $spec_ld;
+            ?$spec_ld_cond
+               // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
+               $sign_bit =
+                  ! $raw_funct3[2] && (  // Signed && ...
+                     $ld_st_word ? $ld_value[31] :
+                     $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
+                                   (($addr[1:0] == 2'b00) ? $ld_value[7] :
+                                    ($addr[1:0] == 2'b01) ? $ld_value[15] :
+                                    ($addr[1:0] == 2'b10) ? $ld_value[23] :
+                                                            $ld_value[31]
+                                   )
+                  );
+               {$ld_rslt[M4_WORD_RANGE], $ld_mask[3:0]} =
+                    $ld_st_word ? {$ld_value, 4'b1111} :
+                    $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? {$ld_value[31:16], 4'b1100} :
+                                                               {$ld_value[15:0] , 4'b0011}} :
+                                  {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? {$ld_value[7:0]  , 4'b0001} :
+                                                    ($addr[1:0] == 2'b01) ? {$ld_value[15:8] , 4'b0010} :
+                                                    ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
+                                                                            {$ld_value[31:24], 4'b1000}};
+               `BOGUS_USE($ld_mask) // It's only for formal verification.
+            $late_rslt[M4_WORD_RANGE] = $ld_rslt;  // TODO: || ...
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
