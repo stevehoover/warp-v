@@ -2557,7 +2557,7 @@ m4+definitions(['
                $reset ? {M4_PC_CNT'b0, 1'b0} :
                // ? : terms for each condition (order does matter)
                m4_redirect_pc_terms
-                          ({$pc_inc, 1'b1});
+                          ({$pc_inc, 1'b0});
             // Then as state.
             $Pc[M4_PC_RANGE] <= $next_pc;
             $NoFetch <= $next_no_fetch;
