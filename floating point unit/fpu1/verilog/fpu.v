@@ -1,37 +1,3 @@
-/////////////////////////////////////////////////////////////////////
-////                                                             ////
-////  FPU                                                        ////
-////  Floating Point Unit (Single precision)                     ////
-////                                                             ////
-////  Author: Rudolf Usselmann                                   ////
-////          rudi@asics.ws                                      ////
-////                                                             ////
-/////////////////////////////////////////////////////////////////////
-////                                                             ////
-//// Copyright (C) 2000 Rudolf Usselmann                         ////
-////                    rudi@asics.ws                            ////
-////                                                             ////
-//// This source file may be used and distributed without        ////
-//// restriction provided that this copyright statement is not   ////
-//// removed from the file and that any derivative work contains ////
-//// the original copyright notice and the associated disclaimer.////
-////                                                             ////
-////     THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY     ////
-//// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED   ////
-//// TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS   ////
-//// FOR A PARTICULAR PURPOSE. IN NO EVENT SHALL THE AUTHOR      ////
-//// OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,         ////
-//// INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES    ////
-//// (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE   ////
-//// GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR        ////
-//// BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF  ////
-//// LIABILITY, WHETHER IN  CONTRACT, STRICT LIABILITY, OR TORT  ////
-//// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT  ////
-//// OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE         ////
-//// POSSIBILITY OF SUCH DAMAGE.                                 ////
-////                                                             ////
-/////////////////////////////////////////////////////////////////////
-
 `timescale 1ns / 100ps
 
 /*
@@ -109,28 +75,28 @@ wire		mul_00, div_00;
 //
 
 always @(posedge clk)
-	opa_r <= #1 opa;
+	opa_r <=  opa;
 
 always @(posedge clk)
-	opb_r <= #1 opb;
+	opb_r <=  opb;
 
 always @(posedge clk)
-	rmode_r1 <= #1 rmode;
+	rmode_r1 <= rmode;
 
 always @(posedge clk)
-	rmode_r2 <= #1 rmode_r1;
+	rmode_r2 <=  rmode_r1;
 
 always @(posedge clk)
-	rmode_r3 <= #1 rmode_r2;
+	rmode_r3 <=  rmode_r2;
 
 always @(posedge clk)
-	fpu_op_r1 <= #1 fpu_op;
+	fpu_op_r1 <=  fpu_op;
 
 always @(posedge clk)
-	fpu_op_r2 <= #1 fpu_op_r1;
+	fpu_op_r2 <=  fpu_op_r1;
 
 always @(posedge clk)
-	fpu_op_r3 <= #1 fpu_op_r2;
+	fpu_op_r3 <=  fpu_op_r2;
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -190,7 +156,7 @@ pre_norm u1(.clk(clk),				// System Clock
 	);
 
 always @(posedge clk)
-	sign_fasu_r <= #1 sign_fasu;
+	sign_fasu_r <=  sign_fasu;
 
 pre_norm_fmul u2(
 		.clk(clk),
@@ -208,16 +174,16 @@ pre_norm_fmul u2(
 
 
 always @(posedge clk)
-	sign_mul_r <= #1 sign_mul;
+	sign_mul_r <=  sign_mul;
 
 always @(posedge clk)
-	sign_exe_r <= #1 sign_exe;
+	sign_exe_r <=  sign_exe;
 
 always @(posedge clk)
-	inf_mul_r <= #1 inf_mul;
+	inf_mul_r <=  inf_mul;
 
 always @(posedge clk)
-	exp_ovf_r <= #1 exp_ovf;
+	exp_ovf_r <=  exp_ovf;
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -233,7 +199,7 @@ add_sub27 u3(
 	.co(co_d) );			// Carry Output
 
 always @(posedge clk)
-	fract_out_q <= #1 {co_d, fract_out_d};
+	fract_out_q <=  {co_d, fract_out_d};
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -288,10 +254,10 @@ div_r2 u6(.clk(clk), .opa(fdiv_opa), .opb(fractb_mul), .quo(quo), .rem(remainder
 assign remainder_00 = !(|remainder);
 
 always @(posedge clk)
-	div_opa_ldz_r1 <= #1 div_opa_ldz_d;
+	div_opa_ldz_r1 <=  div_opa_ldz_d;
 
 always @(posedge clk)
-	div_opa_ldz_r2 <= #1 div_opa_ldz_r1;
+	div_opa_ldz_r2 <=  div_opa_ldz_r1;
 
 
 ////////////////////////////////////////////////////////////////////////
@@ -310,19 +276,19 @@ wire		f2i_out_sign;
 
 always @(posedge clk)			// Exponent must be once cycle delayed
 	case(fpu_op_r2)
-	  0,1:	exp_r <= #1 exp_fasu;
-	  2,3:	exp_r <= #1 exp_mul;
-	  4:	exp_r <= #1 0;
-	  5:	exp_r <= #1 opa_r1[30:23];
+	  0,1:	exp_r <=  exp_fasu;
+	  2,3:	exp_r <=  exp_mul;
+	  4:	exp_r <=  0;
+	  5:	exp_r <=  opa_r1[30:23];
 	endcase
 
 assign fract_div = (opb_dn ? quo[49:2] : {quo[26:0], 21'h0});
 
 always @(posedge clk)
-	opa_r1 <= #1 opa_r[30:0];
+	opa_r1 <=  opa_r[30:0];
 
 always @(posedge clk)
-	fract_i2f <= #1 (fpu_op_r2==5) ?
+	fract_i2f <=  (fpu_op_r2==5) ?
 			(sign_d ?  1-{24'h00, (|opa_r1[30:23]), opa_r1[22:0]}-1 : {24'h0, (|opa_r1[30:23]), opa_r1[22:0]}) :
 			(sign_d ? 1 - {opa_r1, 17'h01} : {opa_r1, 17'h0});
 
@@ -336,15 +302,15 @@ always @(fpu_op_r3 or fract_out_q or prod or fract_div or fract_i2f)
 
 
 always @(posedge clk)
-	opas_r1 <= #1 opa_r[31];
+	opas_r1 <=  opa_r[31];
 
 always @(posedge clk)
-	opas_r2 <= #1 opas_r1;
+	opas_r2 <=  opas_r1;
 
 assign sign_d = fpu_op_r2[1] ? sign_mul : sign_fasu;
 
 always @(posedge clk)
-	sign <= #1 (rmode_r2==2'h3) ? !sign_d : sign_d;
+	sign <=  (rmode_r2==2'h3) ? !sign_d : sign_d;
 
 post_norm u4(.clk(clk),			// System Clock
 	.fpu_op(fpu_op_r3),		// Floating Point Operation
@@ -391,13 +357,13 @@ reg		opa_nan_r;
 
 
 always @(posedge clk)
-	fasu_op_r1 <= #1 fasu_op;
+	fasu_op_r1 <=  fasu_op;
 
 always @(posedge clk)
-	fasu_op_r2 <= #1 fasu_op_r1;
+	fasu_op_r2 <=  fasu_op_r1;
 
 always @(posedge clk)
-	inf_mul2 <= #1 exp_mul == 8'hff;
+	inf_mul2 <=  exp_mul == 8'hff;
 
 
 // Force pre-set values for non numerical output
@@ -414,7 +380,7 @@ assign out_fixed = (	(qnan_d | snan_d) |
 		   )  ? QNAN : INF;
 
 always @(posedge clk)
-	out[30:0] <= #1 (mul_inf | div_inf | (inf_d & (fpu_op_r3!=3'b011) & (fpu_op_r3!=3'b101)) | snan_d | qnan_d) & fpu_op_r3!=3'b100 ? out_fixed :
+	out[30:0] <= (mul_inf | div_inf | (inf_d & (fpu_op_r3!=3'b011) & (fpu_op_r3!=3'b101)) | snan_d | qnan_d) & fpu_op_r3!=3'b100 ? out_fixed :
 			out_d;
 
 assign out_d_00 = !(|out_d);
@@ -423,7 +389,7 @@ assign sign_mul_final = (sign_exe_r & ((opa_00 & opb_inf) | (opb_00 & opa_inf)))
 assign sign_div_final = (sign_exe_r & (opa_inf & opb_inf)) ? !sign_mul_r : sign_mul_r | (opa_00 & opb_00);
 
 always @(posedge clk)
-	out[31] <= #1	((fpu_op_r3==3'b101) & out_d_00) ? (f2i_out_sign & !(qnan_d | snan_d) ) :
+	out[31] <= 	((fpu_op_r3==3'b101) & out_d_00) ? (f2i_out_sign & !(qnan_d | snan_d) ) :
 			((fpu_op_r3==3'b010) & !(snan_d | qnan_d)) ?	sign_mul_final :
 			((fpu_op_r3==3'b011) & !(snan_d | qnan_d)) ?	sign_div_final :
 			(snan_d | qnan_d | ind_d) ?			nan_sign_d :
@@ -440,7 +406,7 @@ assign ine_div  = (ine_d | overflow_d | underflow_d) & !(opb_00 | snan_d | qnan_
 assign ine_fasu = (ine_d | overflow_d | underflow_d) & !(snan_d | qnan_d | inf_d);
 
 always @(posedge  clk)
-	ine <= #1	 fpu_op_r3[2] ? ine_d :
+	ine <= 	 fpu_op_r3[2] ? ine_d :
 			!fpu_op_r3[1] ? ine_fasu :
 			 fpu_op_r3[0] ? ine_div  : ine_mul;
 
@@ -450,12 +416,12 @@ assign overflow_fmul = !inf_d & (inf_mul_r | inf_mul2 | overflow_d) & !(snan_d |
 assign overflow_fdiv = (overflow_d & !(opb_00 | inf_d | snan_d | qnan_d));
 
 always @(posedge clk)
-	overflow <= #1	 fpu_op_r3[2] ? 0 :
+	overflow <= 	 fpu_op_r3[2] ? 0 :
 			!fpu_op_r3[1] ? overflow_fasu :
 			 fpu_op_r3[0] ? overflow_fdiv : overflow_fmul;
 
 always @(posedge clk)
-	underflow_fmul_r <= #1 underflow_fmul_d;
+	underflow_fmul_r <=  underflow_fmul_d;
 
 
 assign underflow_fmul1 = underflow_fmul_r[0] |
@@ -468,56 +434,18 @@ assign underflow_fmul = underflow_fmul1 & !(snan_d | qnan_d | inf_mul_r);
 assign underflow_fdiv = underflow_fasu & !opb_00;
 
 always @(posedge clk)
-	underflow <= #1  fpu_op_r3[2] ? 0 :
+	underflow <=   fpu_op_r3[2] ? 0 :
 			!fpu_op_r3[1] ? underflow_fasu :
 			 fpu_op_r3[0] ? underflow_fdiv : underflow_fmul;
 
 always @(posedge clk)
-	snan <= #1 snan_d;
-
-// synopsys translate_off
-wire		mul_uf_del;
-wire		uf2_del, ufb2_del, ufc2_del,  underflow_d_del;
-wire		co_del;
-wire	[30:0]	out_d_del;
-wire		ov_fasu_del, ov_fmul_del;
-wire	[2:0]	fop;
-wire	[4:0]	ldza_del;
-wire	[49:0]	quo_del;
-
-delay1  #0 ud000(clk, underflow_fmul1, mul_uf_del);
-delay1  #0 ud001(clk, underflow_fmul_r[0], uf2_del);
-delay1  #0 ud002(clk, underflow_fmul_r[1], ufb2_del);
-delay1  #0 ud003(clk, underflow_d, underflow_d_del);
-delay1  #0 ud004(clk, test.u0.u4.exp_out1_co, co_del);
-delay1  #0 ud005(clk, underflow_fmul_r[2], ufc2_del);
-delay1 #30 ud006(clk, out_d, out_d_del);
-
-delay1  #0 ud007(clk, overflow_fasu, ov_fasu_del);
-delay1  #0 ud008(clk, overflow_fmul, ov_fmul_del);
-
-delay1  #2 ud009(clk, fpu_op_r3, fop);
-
-delay3  #4 ud010(clk, div_opa_ldz_d, ldza_del);
-
-delay1  #49 ud012(clk, quo, quo_del);
-
-always @(test.error_event)
-   begin
-	#0.2
-	$display("muf: %b uf0: %b uf1: %b uf2: %b, tx0: %b, co: %b, out_d: %h (%h %h), ov_fasu: %b, ov_fmul: %b, fop: %h",
-			mul_uf_del, uf2_del, ufb2_del, ufc2_del, underflow_d_del, co_del, out_d_del, out_d_del[30:23], out_d_del[22:0],
-			ov_fasu_del, ov_fmul_del, fop );
-	$display("ldza: %h, quo: %b",
-			ldza_del, quo_del);
-   end
-// synopsys translate_on
+	snan <=  snan_d;
 
 
 
 // Status Outputs
 always @(posedge clk)
-	qnan <= #1	fpu_op_r3[2] ? 0 : (
+	qnan <= 	fpu_op_r3[2] ? 0 : (
 						snan_d | qnan_d | (ind_d & !fasu_op_r2) |
 						(opa_00 & opb_00 & fpu_op_r3==3'b011) |
 						(((opa_inf & opb_00) | (opb_inf & opa_00 )) & fpu_op_r3==3'b010)
@@ -528,7 +456,7 @@ assign inf_fmul = 	(((inf_mul_r | inf_mul2) & (rmode_r3==2'h0)) | opa_inf | opb_
 			fpu_op_r3==3'b010;
 
 always @(posedge clk)
-	inf <= #1	fpu_op_r3[2] ? 0 :
+	inf <= 	fpu_op_r3[2] ? 0 :
 			(!(qnan_d | snan_d) & (
 						((&out_d[30:23]) & !(|out_d[22:0]) & !(opb_00 & fpu_op_r3==3'b011)) |
 						(inf_d & !(ind_d & !fasu_op_r2) & !fpu_op_r3[1]) |
@@ -546,15 +474,15 @@ assign output_zero_fmul = (out_d_00 | opa_00 | opb_00) &
 			  !(opa_inf & opb_00) & !(opb_inf & opa_00);
 
 always @(posedge clk)
-	zero <= #1	fpu_op_r3==3'b101 ?	out_d_00 & !(snan_d | qnan_d):
+	zero <= 	fpu_op_r3==3'b101 ?	out_d_00 & !(snan_d | qnan_d):
 			fpu_op_r3==3'b011 ?	output_zero_fdiv :
 			fpu_op_r3==3'b010 ?	output_zero_fmul :
 						output_zero_fasu ;
 
 always @(posedge clk)
-	opa_nan_r <= #1 !opa_nan & fpu_op_r2==3'b011;
+	opa_nan_r <=  !opa_nan & fpu_op_r2==3'b011;
 
 always @(posedge clk)
-	div_by_zero <= #1 opa_nan_r & !opa_00 & !opa_inf & opb_00;
+	div_by_zero <=  opa_nan_r & !opa_00 & !opa_inf & opb_00;
 
 endmodule
