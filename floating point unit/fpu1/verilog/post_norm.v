@@ -535,7 +535,7 @@ assign ine =	op_f2i ? f2i_ine :
 
 // ---------------------------------------------------------------------
 // Debugging Stuff
-
+/*
 // synopsys translate_off
 
 wire	[26:0]	fracta_del, fractb_del;
@@ -619,7 +619,7 @@ always @(test.error_event)
 
 
 // synopsys translate_on
-
+*/
 endmodule
 
 // synopsys translate_off
