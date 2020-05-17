@@ -704,14 +704,14 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1'],
       ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
+      ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
       m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
-      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $Pc, 1, 1'],
+      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $Pc, 0, 1'],
       ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
       ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
 
@@ -1712,14 +1712,14 @@ m4+definitions(['
          
          // "M" Extension.
          m4_ifelse_block(M4_EXT_M, 1, ['
-         $mul_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $mulh_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $mulhu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $div_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $divu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $rem_rslt[M4_WORD_RANGE] = $mul_div_rslt;
-         $remu_rslt[M4_WORD_RANGE] = $mul_div_rslt;
+         $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          '])
          
    // CSR logic
@@ -2374,7 +2374,41 @@ m4+definitions(['
 
 
 
+//===============//
+// "M" Extension //
+//===============//
 
+\TLV m_extension()
+   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
+   @M4_NEXT_PC_STAGE
+      $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
+   @M4_EXECUTE_STAGE
+      {$div_mul_stall, $stall_cnt[5:0]} =
+           $reset ? '0 :
+           $second_issue ? '0 :
+           ($commit && $div_mul) ? {1'b1, 6'b1} :
+           >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
+                    '0;
+      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      $div_mul_rslt[31:0] = 32'h55555555;
+//===============//
+// "F" Extension //
+//===============//
+
+\TLV f_extension()
+   // TODO: Get the ordering and defaulting behavior right for this:
+   m4_define(['M4_EXT_F'], 1)
+   
+   // This macro uses Berkeley Hard-Float to implement "F" extension support in risc-v.
+   // Floating-point operations (any instructions that write a floating-point register) abort (after)
+   // and no-fetch in the front-end until the dest FP reg has been written. This is a low-performance
+   // implementation, but with this approach, no reg-bypass logic is needed.
+   |fetch
+      @M4_NEXT_PC_STAGE
+         $NoFetch = 
+      @M4_EXECUTE_STAGE
+         $abort = ...
+      
 //=========================//
 //                         //
 //        THE CPU          //
@@ -2396,6 +2430,7 @@ m4+definitions(['
 
    |fetch
       /instr
+         m4+m_extension()
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -2540,7 +2575,7 @@ m4+definitions(['
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
-            $second_issue = $second_issue_ld;  // TODO: || ...
+            $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']);
             // Recirculate returning load.
             ?$second_issue
                // This scope holds the original load for a returning load.
