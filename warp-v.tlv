@@ -2430,7 +2430,6 @@ m4+definitions(['
 
    |fetch
       /instr
-         m4+m_extension()
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
