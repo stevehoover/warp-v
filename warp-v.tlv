@@ -848,11 +848,14 @@ m4+definitions(['
       // Instantiated (in \SV_plus context) for each instruction.
       m4_define_hide(['m4_instr'],
                      ['// check instr type
-                       m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
-                                 ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
+                       // TODO: (IMMEDIATELY) Re-enable 2 lines below.
+                       //m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
+                       //          ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
                        // if instrs extension is supported and instr is for the right machine width, "
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
+      m4_define(['m4_instr_funct7'],
+                ['m4_instr_decode_expr($6, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4 && $raw_funct7 == 7'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [6:0] $6_INSTR_FUNCT7 = 7'b']$5;'])
       m4_define(['m4_instr_func'],
                 ['m4_instr_decode_expr($5, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4'], $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
       m4_define(['m4_instr_no_func'],
@@ -889,6 +892,11 @@ m4+definitions(['
       //   S: m4_asm_SW(r1, r2, 100),  // Store r13 into [r10] + 4
       //   B: m4_asm_BLT(r1, r2, 1000), // Branch if r1 < r2 to PC + 13'b1000 (where lsb = 0)
       m4_define(['m4_instrI'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
+      // TODO: Convert all R types to RR, adding funct7 values.
+      //       Delete m4_instrR below.
+      //       Rename all RR to R.
+      //       Uncomment 2 lines under "// check instr type", above.
+      m4_define(['m4_instrRR'], ['m4_instr_funct7($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){$6_INSTR_FUNCT7, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
       m4_define(['m4_instrR'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrRI'], ['m4_instr_func($@)'])
       m4_define(['m4_instrR4'], ['m4_instr_func($@)'])
@@ -921,9 +929,6 @@ m4+definitions(['
       m4_define(['m4_asm_imm_field'], ['m4_eval($3 - $4 + 1)'b['']m4_substr(m4_asm_zero_ext($1, $2), m4_eval($2 - $3 - 1), m4_eval($3 - $4 + 1))'])
       // Register operand.
       m4_define(['m4_asm_reg'], ['m4_ifelse(m4_substr(['$1'], 0, 1), ['r'], [''], ['m4_errprint(['$1 passed to register field.'])'])5'd['']m4_substr(['$1'], 1)'])
-      // Specific asm instruction macros, in cases where the type-based defaults are insufficient.
-      m4_define(['m4_asm_ADD'], ['m4_asm_ADD_SUB($1, $2, $3)'])
-      m4_define(['m4_asm_SUB'], ['m4_asm_ADD_SUB($1, $2, $3, 0100000)'])
 
       // For debug, a string for an asm instruction.
       m4_define(['m4_asm_mem_expr'], [''])
@@ -1377,12 +1382,14 @@ m4+definitions(['
       m4_instr(I, 32, I, 00100, 111, ANDI)
       m4_instr(I, 32, I, 00100, 001, SLLI)
       m4_instr(I, 32, I, 00100, 101, SRLI_SRAI)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(R, 32, I, 01100, 000, ADD_SUB)  // Treated as a single instruction.
+      m4_instr(RR, 32, I, 01100, 000, 0000000, ADD)
+      m4_instr(RR, 32, I, 01100, 000, 0100000, SUB)
       m4_instr(R, 32, I, 01100, 001, SLL)
       m4_instr(R, 32, I, 01100, 010, SLT)
       m4_instr(R, 32, I, 01100, 011, SLTU)
       m4_instr(R, 32, I, 01100, 100, XOR)
-      m4_instr(R, 32, I, 01100, 101, SRL_SRA)  // Treated as a single instruction.
+      m4_instr(RR, 32, I, 01100, 101, 0000000, SRL)
+      m4_instr(RR, 32, I, 01100, 101, 0100000, SRA)
       m4_instr(R, 32, I, 01100, 110, OR)
       m4_instr(R, 32, I, 01100, 111, AND)
       //m4_instr(_, 32, I, 00011, 000, FENCE)
@@ -1402,9 +1409,11 @@ m4+definitions(['
       m4_instr(I, 64, I, 00110, 000, ADDIW)
       m4_instr(I, 64, I, 00110, 001, SLLIW)
       m4_instr(I, 64, I, 00110, 101, SRLIW_SRAIW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(R, 64, I, 01110, 000, ADDW_SUBW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
+      m4_instr(R, 64, I, 01110, 000, 0000000, ADDW)
+      m4_instr(R, 64, I, 01110, 000, 0100000, SUBW)
       m4_instr(R, 64, I, 01110, 001, SLLW)
-      m4_instr(R, 64, I, 01110, 101, SRLW_SRAW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
+      m4_instr(RR, 64, I, 01110, 101, 0000000, SRLW)
+      m4_instr(RR, 64, I, 01110, 101, 0100000, SRAW)
       m4_instr(R, 32, M, 01100, 000, MUL)
       m4_instr(R, 32, M, 01100, 001, MULH)
       m4_instr(R, 32, M, 01100, 010, MULHSU)
@@ -1589,7 +1598,9 @@ m4+definitions(['
       $div_mul = 1'b0;
       '])
 
-      $illegal = 1'b1['']m4_illegal_instr_expr;
+      // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
+      $illegal_itype_with_funct7 = ( $is_srli_srai_instr m4_ifelse(M4_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && ($raw_funct7 !=? 7'b0x00000);
+      $illegal = $illegal_itype_with_funct7['']m4_illegal_instr_expr;
       $conditional_branch = $is_b_type;
    $jump = $is_jal_instr;  // "Jump" in RISC-V means unconditional. (JALR is a separate redirect condition.)
    $branch = $is_b_type;
@@ -1663,6 +1674,8 @@ m4+definitions(['
          $misaligned_indirect_jump_target = $indirect_jump_full_target[1];
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
+         // TODO: Could provide some macro magic to specify combined instructions w/ a single result and mux select.
+         //       This would reduce code below and probably improve implementation.
          
          $lui_rslt[M4_WORD_RANGE] = {$raw_u_imm[31:12], 12'b0};
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
@@ -1682,33 +1695,35 @@ m4+definitions(['
          $lbu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
          $lhu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
          '])
-         $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
+         $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
          $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
+         // TODO: Should combine SRL and SRLI, and SRA and SRAI.
          $srli_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
          $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
-         $sra_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_intermediate_rslt;
-         $srl_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
          $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
          $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_intermediate_rslt : $srli_intermediate_rslt;
-         $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
+         $add_sub_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
+         $add_rslt[M4_WORD_RANGE] = $add_sub_rslt;
+         $sub_rslt[M4_WORD_RANGE] = $add_sub_rslt;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
-         $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
          // CSR read instructions have the same result expression. Counting on synthesis to optimize result mux.
          $csrrw_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
-         $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrc_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt;
+         $csrrc_rslt[M4_WORD_RANGE]  = $csrrw_rslt;
+         $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt;
+         $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt;
+         $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
          m4_ifelse_block(M4_EXT_M, 1, ['
