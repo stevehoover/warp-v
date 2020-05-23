@@ -815,7 +815,11 @@ m4+definitions(['
       m4_define_vector(['M4_PC'], 10, 0)
       
    '], ['RISCV'], ['
-      // For each op5 value, we associate an instruction type.
+      
+      // --------------------------------------
+      // Associate each op5 value with an instruction type.
+      // --------------------------------------
+      
       // TODO:
       // We construct M4_OP5_XXXXX_TYPE, and verify each instruction against that.
       // Instruction fields are constructed and valid based on op5.
@@ -840,12 +844,34 @@ m4+definitions(['
       // Instantiated for each op5 in \SV_plus context.
       m4_define(['m4_op5'],
                 ['m4_define(['M4_OP5_$1_TYPE'], $2)['localparam [4:0] OP5_$3 = 5'b$1;']m4_define(['m4_instr_type_$2_mask_expr'], m4_quote(m4_instr_type_$2_mask_expr)[' | (1 << 5'b$1)'])'])
+      
+      
+      // --------------------------------
+      // Characterize each instruction mnemonic
+      // --------------------------------
+      
+      // Each instruction is defined by instantiating m4_instr(...), e.g.: 
+      //    m4_instr(B, 32, I, 11000, 000, BEQ)
+      // which instantiates an instruction-type-specific macro, e.g.:
+      //    m4_instrB(32, I, 11000, 000, BEQ)
+      // which produces (or defines macros for):
+      //   o instruction decode logic ($is_<mnemonic>_instr = ...;)
+      //   o for debug, an expression to produce the MNEMONIC.
+      //   o result MUX expression to select result of the appropriate execution expression
+      //   o $illegal_instruction expression
+      //   o localparam definitions for fields
+      //   o m4_asm(<MNEMONIC>, ...) to assemble instructions to their binary representations
+      
       // Return 1 if the given instruction is supported, [''] otherwise.
+      // m4_instr_supported(<args-of-m4_instr(...)>)
       m4_define(['m4_instr_supported'],
                 ['m4_ifelse(M4_EXT_$3, 1,
                             ['m4_ifelse(M4_WORD_CNT, ['$2'], 1, [''])'],
                             [''])'])
+      
       // Instantiated (in \SV_plus context) for each instruction.
+      // m4_instr(<instr-type-char(s)>, <type-specific-args>)
+      // This instantiates m4_instr<type>(type-specific-args>)
       m4_define_hide(['m4_instr'],
                      ['// check instr type
                        // TODO: (IMMEDIATELY) Re-enable 2 lines below.
@@ -854,21 +880,32 @@ m4+definitions(['
                        // if instrs extension is supported and instr is for the right machine width, "
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
+      
+      // Decode logic for instructions with various opcode/func bits that dictate the mnemonic.
+      // (This would be easier if we could use 'x', but Yosys doesn't support ==?/!=? operators.)
+      // Opcode + funct3 + funct7 (R-type)
+      m4_define(['m4_op5_and_funct3'],
+                ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4'])
       m4_define(['m4_instr_funct7'],
-                ['m4_instr_decode_expr($6, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4 && $raw_funct7 == 7'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [6:0] $6_INSTR_FUNCT7 = 7'b']$5;'])
-      m4_define(['m4_instr_func'],
-                ['m4_instr_decode_expr($5, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4'], $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+                ['m4_instr_decode_expr($6, m4_op5_and_funct3($@)[' && $raw_funct7 == 7'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [6:0] $6_INSTR_FUNCT7 = 7'b']$5;'])
+      // Opcode + funct3 + func7[1:0] (R4-type)
+      m4_define(['m4_instr_funct2'],
+                ['m4_instr_decode_expr($6, m4_op5_and_funct3($@)[' && $raw_funct7[1:0] == 2'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [1:0] $6_INSTR_FUNCT2 = 2'b']$5;'])
+      // Opcode + funct3 + funct7[6:2] (R-type where funct7 has two lower bits that do not distinguish mnemonic.)
+      m4_define(['m4_instr_funct5'],
+                ['m4_instr_decode_expr($6, m4_op5_and_funct3($@)[' && $raw_funct7[6:2] == 5'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [4:0] $6_INSTR_FUNCT5 = 5'b']$5;'])
+      // Opcode + funct3
+      m4_define(['m4_instr_funct3'],
+                ['m4_instr_decode_expr($5, m4_op5_and_funct3($@), $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+      // Opcode
       m4_define(['m4_instr_no_func'],
                 ['m4_instr_decode_expr($4, ['$raw_op5 == 5'b$3'])'])
-      // Macros to create, for each instruction (xxx):
-      //   o instructiton decode: $is_xxx_instr = ...; ...
-      //   o result combining expr.: ({32{$is_xxx_instr}} & $xxx_rslt) | ...
-      //   o $illegal computation: && ! $is_xxx_instr ...
-      //   o $mnemonic: $is_xxx_instr ? "XXX" : ...
-      m4_define(['m4_decode_expr'], [''])
-      m4_define(['m4_rslt_mux_expr'], [''])
-      m4_define(['m4_illegal_instr_expr'], [''])
-      m4_define(['m4_mnemonic_expr'], [''])
+      
+      // m4_instr_decode_expr macro, to extend the following definitions to reflect the given instruction <mnemonic>:
+      m4_define(['m4_decode_expr'], [''])          // instructiton decode: $is_<mnemonic>_instr = ...; ...
+      m4_define(['m4_rslt_mux_expr'], [''])        // result combining expr.: ({32{$is_<mnemonic>_instr}} & $<mnemonic>_rslt) | ...
+      m4_define(['m4_illegal_instr_expr'], [''])   // $illegal instruction exception expr: && ! $is_<mnemonic>_instr ...
+      m4_define(['m4_mnemonic_expr'], [''])        // $is_<mnemonic>_instr ? "<MNEMONIC>" : ...
       m4_define_hide(
          ['m4_instr_decode_expr'],
          ['m4_define(
@@ -885,30 +922,43 @@ m4+definitions(['
            m4_define(
               ['m4_mnemonic_expr'],
               m4_dquote(m4_mnemonic_expr['$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr ? "$1']m4_substr(['          '], m4_len(['$1']))['" : ']))'])
-      // Unique to each instruction type.
-      // This includes assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
+      // Unique to each instruction type, eg:
+      //   m4_instr(U, 32, I, 01101,      LUI)
+      //   m4_instr(J, 32, I, 11011,      JAL)
+      //   m4_instr(B, 32, I, 11000, 000, BEQ)
+      //   m4_instr(S, 32, I, 01000, 000, SB)
+      //   m4_instr(I, 32, I, 00100, 000, ADDI)
+      //   m4_instr(R, 32, I, 01100, 000, 0000000, ADD)
+      //   m4_instr(R4, 32, F, 10000, rm, 10, FMADD.D)
+      //   m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRT.S)
+      // This defines assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
       //   I: m4_asm_ADDI(r4, r1, 0),
-      //   R: m4_asm_ADD(r4, r1, r2),  // optional 4th arg for funct7
+      //   R: m4_asm_ADD(r4, r1, r2),
+      //   R2: m4_asm_FSQRT.S(r4, r1),
+      //   R4: m4_asm_FMADD.S(r4, r1, r2, r3),
       //   S: m4_asm_SW(r1, r2, 100),  // Store r13 into [r10] + 4
       //   B: m4_asm_BLT(r1, r2, 1000), // Branch if r1 < r2 to PC + 13'b1000 (where lsb = 0)
-      m4_define(['m4_instrI'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
+      // Macro definitions include 2 parts:
+      //   o Hardware definitions: m4_instr_<mnemonic>($@)
+      //   o Assembler definition of m4_asm_<MNEMONIC>: m4_define(['m4_asm_<MNEMONIC>'], ['m4_asm_instr_str(...)'])
+      m4_define(['m4_instrI'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
       // TODO: Convert all R types to RR, adding funct7 values.
       //       Delete m4_instrR below.
       //       Rename all RR to R.
       //       Uncomment 2 lines under "// check instr type", above.
       m4_define(['m4_instrRR'], ['m4_instr_funct7($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){$6_INSTR_FUNCT7, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrR'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrRI'], ['m4_instr_func($@)'])
-      m4_define(['m4_instrR4'], ['m4_instr_func($@)'])
-      m4_define(['m4_instrS'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrB'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR2'], ['m4_instr_funct7($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$7'], $']['@){$7_INSTR_FUNCT7, 5'b$6, m4_asm_reg(']m4_arg(2)['), $7_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $7_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR4'], ['m4_instr_funct2($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_asm_reg(']m4_arg(4)['), $6_INSTR_FUNCT2, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrS'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrB'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrJ'], ['m4_instr_no_func($@)'])
       m4_define(['m4_instrU'], ['m4_instr_no_func($@)'])
       m4_define(['m4_instr_'], ['m4_instr_no_func($@)'])
 
       // For each instruction type.
       // Declare localparam[31:0] INSTR_TYPE_X_MASK, initialized to 0 that will be given a 1 bit for each op5 value of its type.
-      m4_define(['m4_instr_types_args'], ['I, R, RI, R4, S, B, J, U, _'])
+      m4_define(['m4_instr_types_args'], ['I, R, R2, R4, S, B, J, U, _'])
       m4_instr_types(m4_instr_types_args)
 
 
@@ -1322,7 +1372,7 @@ m4+definitions(['
       m4_op5(01000, S, STORE)
       m4_op5(01001, S, STORE_FP)
       m4_op5(01010, _, CUSTOM_1)
-      m4_op5(01011, RI, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(01011, R2, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(01100, R, OP)
       m4_op5(01101, U, LUI)
       m4_op5(01110, R, OP_32)
@@ -1331,7 +1381,7 @@ m4+definitions(['
       m4_op5(10001, R4, MSUB)
       m4_op5(10010, R4, NMSUB)
       m4_op5(10011, R4, NMADD)
-      m4_op5(10100, RI, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(10100, R2, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(10101, _, RESERVED_1)
       m4_op5(10110, _, CUSTOM_2_RV128)
       m4_op5(10111, _, 48B2)
@@ -1617,7 +1667,7 @@ m4+definitions(['
       // Output signals.
       /src[2:1]
          // Reg valid for this source, based on instruction type.
-         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_ri_type || /instr$is_s_type || /instr$is_b_type;
+         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
          $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
            
       // For debug.
