@@ -860,7 +860,10 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   // 
+   //
+   // For CPU instructions, it would be a good idea to try to link this instruction description with
+   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here.
+   //
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
