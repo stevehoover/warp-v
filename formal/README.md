@@ -1,6 +1,8 @@
 
 # WARP-V Formal Verification
 
+## Workflow
+
 For fomal verification work:
 
 ```sh
@@ -26,3 +28,10 @@ make compile
 The checks you want to run can be selected in `checks.cfg` (then rerun `make verif`).
 
 The results will appear in `checks/`.
+
+
+## Upgrading riscv-formal
+
+The file `riscv-formal/checks/genchecks.py` required modifications that were not accepted in riscv-formal.
+There is a local copy of this file that must be maintained if riscv-formal is updated.
+To apply the patch, run apply_genchecks.py.patch.
