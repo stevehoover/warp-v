@@ -14,8 +14,8 @@
    // Default Makerchip TL-Verilog Code Template
    /* verilator lint_off WIDTH */
    /* verilator lint_off CASEINCOMPLETE */
-   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/muldiv/muldiv/picorv32_pcpi_div.sv'])
-   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/muldiv/muldiv/picorv32_pcpi_fast_mul.sv'])
+   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
+   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
    // Macro providing required top-level module definition, random
    // stimulus support, and Verilator config.
    m4_makerchip_module()   // (Expanded in Nav-TLV pane.)

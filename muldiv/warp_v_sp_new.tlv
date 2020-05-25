@@ -27,8 +27,6 @@
    // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
-   // m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
-   // m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
 
 m4+definitions(['
 
@@ -811,13 +809,71 @@ m4+definitions(['
    // ISA Code Generation Macros
    // ==========================
    //
+   
+   // -------------------------------------------------
+   // TODO: Here are some thoughts for providing generic instruction definitions that can be used across all ISAs, even outside of CPUs (and would improve upon RISC-V macros).
+   //       None of this is implemented, just sketching.
+   //
+   // Define fields. Fields are extracted from instructions.
+   // Fields have a name, an extraction spec, and a condition under which the field may be defined.
+   // Extraction specs specify where the bits come from, and the select is a mutually-exclusive condition under which the extraction spec applies. E.g.:
+   //
+   //   m4_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'])
+   //
+   // defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}.
+   // ($i_type || $j_type) is verified to assert for all instructions which define this field. If this string begins with "?" is is used as the when expression
+   // for $my_instr_imm_field, otherwise, a generated instruction-granular condition is used.
+   //
+   // As an improvement, fields can be specified with different extraction specs for different instructions. E.g.:
+   //
+   //   m4_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'], ['i'], ['$b_type'], ['(31, 15), 2'b00'], ['b'])
+   //
+   // defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}, or, if $b_type, {$my_instr_instr[31:15], 2'b00}.
+   // Also defined will be $my_instr_imm_i_field[18:0] and $my_instr_imm_b_field[18:0].
+   //
+   // Assembly instruction formats can be defined. E.g.:
+   //
+   //   m4_asm_format(['my_instr'], ['op_imm'], ['/?(.ovf)\s+ r(\d+)\s=\sr(\d+), (\d+)/, FLAG, ovf, D, rd, D, r1, D, imm'])  // WIP
+   //
+   // specifies a format that might be used to assemble an ADD instruction. E.g.:
+   //
+   //   m4_asm(['my_instr'], ['ADD.ovf r3 = r10, 304'])
+   //
+   // "FLAG" specifies a value that if present is a 1-bit, else 0-bit.
+   // "D" specifies a decimal value.
+   // Instructions are assembled based on field definitions and instruction definitions.
+   //
+   // Instructions are then defined. e.g.:
+   //
+   //   m4_define_instr(['my_instr'], ['JMP'], ['op_jump'], ['imm(18,5)'], ['r1'], ['imm(4,0)=xxx00'], ['11000101'])
+   //
+   // defines a JMP instruction.
+   // The fields of the instruction, msb-to-lsb, are listed following the mnemonic and asm_format.
+   // Fields containing only 01x chars are used to decode the instruction, producing $is_<mnemonic>_inst.
+   // Fields containing "=" similarly, provided bits that are required of the instruction.
+   // Fields can have a bit range, in which case fields by the same name will be joined appropriately.
+   // Fields are verified to be defined in positions for which the field has a corresponding extraction spec.
+   // The assembly type is verified to define exactly the necessary fields.
+   //
+   // Multiple instructions can share the same execution logic, producing a single result value.
+   // To do this for JMP and RET, rather than ['JMP'] and ['RET'] args, provide, e.g., ['JMP:JUMP'], and ['RET:JUMP'].
+   // A "JUMP" result will be selected for either instruction.
+   //
+   // ISA-specific versions of the above macros can be created that drop the first argument.
+   // 
+   // --------------------------------------------------
+   
    m4_case(M4_ISA, ['MINI'], ['
       // An out-of-place correction for the fact that in Mini-CPU, instruction
       // addresses are to different memory than data, and the memories have different widths.
       m4_define_vector(['M4_PC'], 10, 0)
       
    '], ['RISCV'], ['
-      // For each op5 value, we associate an instruction type.
+      
+      // --------------------------------------
+      // Associate each op5 value with an instruction type.
+      // --------------------------------------
+      
       // TODO:
       // We construct M4_OP5_XXXXX_TYPE, and verify each instruction against that.
       // Instruction fields are constructed and valid based on op5.
@@ -842,32 +898,71 @@ m4+definitions(['
       // Instantiated for each op5 in \SV_plus context.
       m4_define(['m4_op5'],
                 ['m4_define(['M4_OP5_$1_TYPE'], $2)['localparam [4:0] OP5_$3 = 5'b$1;']m4_define(['m4_instr_type_$2_mask_expr'], m4_quote(m4_instr_type_$2_mask_expr)[' | (1 << 5'b$1)'])'])
+      
+      
+      // --------------------------------
+      // Characterize each instruction mnemonic
+      // --------------------------------
+      
+      // Each instruction is defined by instantiating m4_instr(...), e.g.: 
+      //    m4_instr(B, 32, I, 11000, 000, BEQ)
+      // which instantiates an instruction-type-specific macro, e.g.:
+      //    m4_instrB(32, I, 11000, 000, BEQ)
+      // which produces (or defines macros for):
+      //   o instruction decode logic ($is_<mnemonic>_instr = ...;)
+      //   o for debug, an expression to produce the MNEMONIC.
+      //   o result MUX expression to select result of the appropriate execution expression
+      //   o $illegal_instruction expression
+      //   o localparam definitions for fields
+      //   o m4_asm(<MNEMONIC>, ...) to assemble instructions to their binary representations
+      
       // Return 1 if the given instruction is supported, [''] otherwise.
+      // m4_instr_supported(<args-of-m4_instr(...)>)
       m4_define(['m4_instr_supported'],
                 ['m4_ifelse(M4_EXT_$3, 1,
                             ['m4_ifelse(M4_WORD_CNT, ['$2'], 1, [''])'],
                             [''])'])
+      
       // Instantiated (in \SV_plus context) for each instruction.
+      // m4_instr(<instr-type-char(s)>, <type-specific-args>)
+      // This instantiates m4_instr<type>(type-specific-args>)
       m4_define_hide(['m4_instr'],
                      ['// check instr type
-                       m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
-                                 ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
+                       // TODO: (IMMEDIATELY) Re-enable 2 lines below.
+                       //m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
+                       //          ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
                        // if instrs extension is supported and instr is for the right machine width, "
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
-      m4_define(['m4_instr_func'],
-                ['m4_instr_decode_expr($5, ['$raw_op5 == 5'b$3 && $raw_funct3 == 3'b$4'], $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+      
+      // Decode logic for instructions with various opcode/func bits that dictate the mnemonic.
+      // (This would be easier if we could use 'x', but Yosys doesn't support ==?/!=? operators.)
+      m4_define(['m4_op5_and_funct3'],
+                ['$raw_op5 == 5'b$3 m4_ifelse($4, ['rm'], [''], ['&& $raw_funct3 == 3'b$4'])'])
+      // Opcode + funct3 + funct7 (R-type). $@ as for m4_instrX(..), $7: MNEMONIC, $8: number of bits of leading bits of funct7 to interpret. If 5, for example, use the term funct5.
+      m4_define(['m4_instr_funct7'],
+                ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7'][6:m4_eval(7-$8)][' == $8'b$5'], $7)[' localparam [2:0] $7_INSTR_FUNCT3 = 3'b']$4['; localparam [6:0] $7_INSTR_FUNCT$8 = $8'b$5;']'])
+      // For cases w/ extra shamt bit that cuts into funct7.
+      m4_define(['m4_instr_funct6'],
+                ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7[6:1] == 6'b$5'], $7)[' localparam [2:0] $7_INSTR_FUNCT3 = 3'b']$4['; localparam [6:0] $7_INSTR_FUNCT6 = 6'b$5;']'])
+      // Opcode + funct3 + func7[1:0] (R4-type)
+      m4_define(['m4_instr_funct2'],
+                ['m4_instr_decode_expr($6, m4_op5_and_funct3($@)[' && $raw_funct7[1:0] == 2'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [1:0] $6_INSTR_FUNCT2 = 2'b']$5;'])
+      // Opcode + funct3 + funct7[6:2] (R-type where funct7 has two lower bits that do not distinguish mnemonic.)
+      m4_define(['m4_instr_funct5'],
+                ['m4_instr_decode_expr($6, m4_op5_and_funct3($@)[' && $raw_funct7[6:2] == 5'b$5'], $6)[' localparam [2:0] $6_INSTR_FUNCT3 = 3'b']$4['; localparam [4:0] $6_INSTR_FUNCT5 = 5'b']$5;'])
+      // Opcode + funct3
+      m4_define(['m4_instr_funct3'],
+                ['m4_instr_decode_expr($5, m4_op5_and_funct3($@), $6)[' localparam [2:0] $5_INSTR_FUNCT3 = 3'b']$4;'])
+      // Opcode
       m4_define(['m4_instr_no_func'],
                 ['m4_instr_decode_expr($4, ['$raw_op5 == 5'b$3'])'])
-      // Macros to create, for each instruction (xxx):
-      //   o instructiton decode: $is_xxx_instr = ...; ...
-      //   o result combining expr.: ({32{$is_xxx_instr}} & $xxx_rslt) | ...
-      //   o $illegal computation: && ! $is_xxx_instr ...
-      //   o $mnemonic: $is_xxx_instr ? "XXX" : ...
-      m4_define(['m4_decode_expr'], [''])
-      m4_define(['m4_rslt_mux_expr'], [''])
-      m4_define(['m4_illegal_instr_expr'], [''])
-      m4_define(['m4_mnemonic_expr'], [''])
+      
+      // m4_instr_decode_expr macro, to extend the following definitions to reflect the given instruction <mnemonic>:
+      m4_define(['m4_decode_expr'], [''])          // instructiton decode: $is_<mnemonic>_instr = ...; ...
+      m4_define(['m4_rslt_mux_expr'], [''])        // result combining expr.: ({32{$is_<mnemonic>_instr}} & $<mnemonic>_rslt) | ...
+      m4_define(['m4_illegal_instr_expr'], [''])   // $illegal instruction exception expr: && ! $is_<mnemonic>_instr ...
+      m4_define(['m4_mnemonic_expr'], [''])        // $is_<mnemonic>_instr ? "<MNEMONIC>" : ...
       m4_define_hide(
          ['m4_instr_decode_expr'],
          ['m4_define(
@@ -884,25 +979,53 @@ m4+definitions(['
            m4_define(
               ['m4_mnemonic_expr'],
               m4_dquote(m4_mnemonic_expr['$is_']m4_translit($1, ['A-Z'], ['a-z'])['_instr ? "$1']m4_substr(['          '], m4_len(['$1']))['" : ']))'])
-      // Unique to each instruction type.
-      // This includes assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
+      
+      // The first arg of m4_instr(..) is a type, and a type-specific macro is invoked. Types are those defined by RISC-V, plus:
+      //   R2: R-type with a hard-coded rs2 value. (assuming illegal instruction exception should be thrown for wrong value--not clear in RISC-V spec)
+      //   If: I-type with leading bits of imm[11:...] used as function bits.
+      // Unique to each instruction type, eg:
+      //   m4_instr(U, 32, I, 01101,      LUI)
+      //   m4_instr(J, 32, I, 11011,      JAL)
+      //   m4_instr(B, 32, I, 11000, 000, BEQ)
+      //   m4_instr(S, 32, I, 01000, 000, SB)
+      //   m4_instr(I, 32, I, 00100, 000, ADDI)
+      //   m4_instr(If, 64, I, 00100, 101, 000000, SRLI)  // (imm[11:6] are used like funct7[6:1] and must be 000000)
+      //   m4_instr(R, 32, I, 01100, 000, 0000000, ADD)
+      //   m4_instr(R4, 32, F, 10000, rm, 10, FMADD.D)
+      //   m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRT.S)
+      //   m4_instr(R2, 32, A, 01011, 010, 00010, 00000, LR.W)  // (5 bits for funct7 for all "A"-ext instrs)
+      //   m4_instr(R, 32, A, 01011, 010, 00011, SC.W)          //   "
+
+      // This defines assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
       //   I: m4_asm_ADDI(r4, r1, 0),
-      //   R: m4_asm_ADD(r4, r1, r2),  // optional 4th arg for funct7
+      //   R: m4_asm_ADD(r4, r1, r2),
+      //   R2: m4_asm_FSQRT.S(r4, r1),
+      //   R4: m4_asm_FMADD.S(r4, r1, r2, r3),
       //   S: m4_asm_SW(r1, r2, 100),  // Store r13 into [r10] + 4
       //   B: m4_asm_BLT(r1, r2, 1000), // Branch if r1 < r2 to PC + 13'b1000 (where lsb = 0)
-      m4_define(['m4_instrI'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrR'], ['m4_instr_func($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrRI'], ['m4_instr_func($@)'])
-      m4_define(['m4_instrR4'], ['m4_instr_func($@)'])
-      m4_define(['m4_instrS'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrB'], ['m4_instr_func($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrJ'], ['m4_instr_no_func($@)'])
-      m4_define(['m4_instrU'], ['m4_instr_no_func($@)'])
+      //   For "A"-extension instructions, an additional final arg is REQUIRED to provide 2 binary bits for aq and rl.
+      // Macro definitions include 2 parts:
+      //   o Hardware definitions: m4_instr_<mnemonic>($@)
+      //   o Assembler definition of m4_asm_<MNEMONIC>: m4_define(['m4_asm_<MNEMONIC>'], ['m4_asm_instr_str(...)'])
+      m4_define(['m4_instrI'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrIf'], ['m4_instr_funct7($@, ['$6'], m4_len($5))m4_define(['m4_asm_$6'], ['m4_asm_instr_str(I, ['$6'], $']['@){['$6_INSTR_FUNCT']m4_len($5)[', ']m4_eval(12-m4_len($5))'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
+      // TODO: Convert all R types to RR, adding funct7 values.
+      //       Delete m4_instrR below.
+      //       Rename all RR to R.
+      //       Uncomment 2 lines under "// check instr type", above.
+      m4_define(['m4_instrRR'], ['m4_instr_funct7($@, ['$6'], m4_ifelse($2, ['A'], 5, 7))m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_ifelse($2, ['A'], ['$6_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$6_INSTR_FUNCT7']), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR2'], ['m4_instr_funct7($@, 7)m4_define(['m4_asm_$7'], ['m4_asm_instr_str(R, ['$7'], $']['@){m4_ifelse($2, ['A'], ['$7_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$7_INSTR_FUNCT7']), 5'b$6, m4_asm_reg(']m4_arg(2)['), $7_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $7_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR4'], ['m4_instr_funct2($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_asm_reg(']m4_arg(4)['), $6_INSTR_FUNCT2, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrS'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrB'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), $5_INSTR_FUNCT3, m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrJ'], ['m4_instr_no_func($@)'])// TODO: asm
+      m4_define(['m4_instrU'], ['m4_instr_no_func($@)'])// TODO: asm
       m4_define(['m4_instr_'], ['m4_instr_no_func($@)'])
 
       // For each instruction type.
       // Declare localparam[31:0] INSTR_TYPE_X_MASK, initialized to 0 that will be given a 1 bit for each op5 value of its type.
-      m4_define(['m4_instr_types_args'], ['I, R, RI, R4, S, B, J, U, _'])
+      m4_define(['m4_instr_types_args'], ['I, R, R2, R4, S, B, J, U, _'])
       m4_instr_types(m4_instr_types_args)
 
 
@@ -923,9 +1046,6 @@ m4+definitions(['
       m4_define(['m4_asm_imm_field'], ['m4_eval($3 - $4 + 1)'b['']m4_substr(m4_asm_zero_ext($1, $2), m4_eval($2 - $3 - 1), m4_eval($3 - $4 + 1))'])
       // Register operand.
       m4_define(['m4_asm_reg'], ['m4_ifelse(m4_substr(['$1'], 0, 1), ['r'], [''], ['m4_errprint(['$1 passed to register field.'])'])5'd['']m4_substr(['$1'], 1)'])
-      // Specific asm instruction macros, in cases where the type-based defaults are insufficient.
-      m4_define(['m4_asm_ADD'], ['m4_asm_ADD_SUB($1, $2, $3)'])
-      m4_define(['m4_asm_SUB'], ['m4_asm_ADD_SUB($1, $2, $3, 0100000)'])
 
       // For debug, a string for an asm instruction.
       m4_define(['m4_asm_mem_expr'], [''])
@@ -1218,11 +1338,10 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
-   
-   
-   m4_asm(ORI, r8, r0, 0)
-   m4_asm(ORI, r9, r0, 0)
-   m4_asm(MULH, r10, r9, r8)
+
+   m4_asm(ORI, r8, r0, 1011)
+   m4_asm(ORI, r9, r0, 1010)
+   m4_asm(MUL, r10, r9, r8)
    
    
    m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
@@ -1236,7 +1355,6 @@ m4+definitions(['
    m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
    m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
    m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
-   
 
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
@@ -1326,7 +1444,7 @@ m4+definitions(['
       m4_op5(01000, S, STORE)
       m4_op5(01001, S, STORE_FP)
       m4_op5(01010, _, CUSTOM_1)
-      m4_op5(01011, RI, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(01011, R2, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(01100, R, OP)
       m4_op5(01101, U, LUI)
       m4_op5(01110, R, OP_32)
@@ -1335,7 +1453,7 @@ m4+definitions(['
       m4_op5(10001, R4, MSUB)
       m4_op5(10010, R4, NMSUB)
       m4_op5(10011, R4, NMADD)
-      m4_op5(10100, RI, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(10100, R2, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(10101, _, RESERVED_1)
       m4_op5(10110, _, CUSTOM_2_RV128)
       m4_op5(10111, _, 48B2)
@@ -1386,12 +1504,14 @@ m4+definitions(['
       m4_instr(I, 32, I, 00100, 111, ANDI)
       m4_instr(I, 32, I, 00100, 001, SLLI)
       m4_instr(I, 32, I, 00100, 101, SRLI_SRAI)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(R, 32, I, 01100, 000, ADD_SUB)  // Treated as a single instruction.
+      m4_instr(RR, 32, I, 01100, 000, 0000000, ADD)
+      m4_instr(RR, 32, I, 01100, 000, 0100000, SUB)
       m4_instr(R, 32, I, 01100, 001, SLL)
       m4_instr(R, 32, I, 01100, 010, SLT)
       m4_instr(R, 32, I, 01100, 011, SLTU)
       m4_instr(R, 32, I, 01100, 100, XOR)
-      m4_instr(R, 32, I, 01100, 101, SRL_SRA)  // Treated as a single instruction.
+      m4_instr(RR, 32, I, 01100, 101, 0000000, SRL)
+      m4_instr(RR, 32, I, 01100, 101, 0100000, SRA)
       m4_instr(R, 32, I, 01100, 110, OR)
       m4_instr(R, 32, I, 01100, 111, AND)
       //m4_instr(_, 32, I, 00011, 000, FENCE)
@@ -1411,22 +1531,32 @@ m4+definitions(['
       m4_instr(I, 64, I, 00110, 000, ADDIW)
       m4_instr(I, 64, I, 00110, 001, SLLIW)
       m4_instr(I, 64, I, 00110, 101, SRLIW_SRAIW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(R, 64, I, 01110, 000, ADDW_SUBW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
+      m4_instr(R, 64, I, 01110, 000, 0000000, ADDW)
+      m4_instr(R, 64, I, 01110, 000, 0100000, SUBW)
       m4_instr(R, 64, I, 01110, 001, SLLW)
-      m4_instr(R, 64, I, 01110, 101, SRLW_SRAW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(R, 32, M, 01100, 000, MUL)
-      m4_instr(R, 32, M, 01100, 001, MULH)
-      m4_instr(R, 32, M, 01100, 010, MULHSU)
-      m4_instr(R, 32, M, 01100, 011, MULHU)
-      m4_instr(R, 32, M, 01100, 100, DIV)
-      m4_instr(R, 32, M, 01100, 101, DIVU)
-      m4_instr(R, 32, M, 01100, 110, REM)
-      m4_instr(R, 32, M, 01100, 111, REMU)
-      m4_instr(R, 64, M, 01110, 000, MULW)
-      m4_instr(R, 64, M, 01110, 100, DIVW)
-      m4_instr(R, 64, M, 01110, 101, DIVUW)
-      m4_instr(R, 64, M, 01110, 110, REMW)
-      m4_instr(R, 64, M, 01110, 111, REMUW)
+      m4_instr(RR, 64, I, 01110, 101, 0000000, SRLW)
+      m4_instr(RR, 64, I, 01110, 101, 0100000, SRAW)
+      m4_instr(RR, 32, M, 01100, 000, 0000001, MUL)      // all muldiv set to RR for now!
+      m4_instr(RR, 32, M, 01100, 001, 0000001, MULH)
+      m4_instr(RR, 32, M, 01100, 010, 0000001, MULHSU)   
+      m4_instr(RR, 32, M, 01100, 011, 0000001, MULHU)
+      m4_instr(RR, 32, M, 01100, 100, 0000001, DIV)
+      m4_instr(RR, 32, M, 01100, 101, 0000001, DIVU)
+      m4_instr(RR, 32, M, 01100, 110, 0000001, REM)
+      m4_instr(RR, 32, M, 01100, 111, 0000001, REMU)
+      // m4_instr(R, 32, M, 01100, 000, MUL)
+      // m4_instr(R, 32, M, 01100, 001, MULH)
+      // m4_instr(R, 32, M, 01100, 010, MULHSU)
+      // m4_instr(R, 32, M, 01100, 011, MULHU)
+      // m4_instr(R, 32, M, 01100, 100, DIV)
+      // m4_instr(R, 32, M, 01100, 101, DIVU)
+      // m4_instr(R, 32, M, 01100, 110, REM)
+      // m4_instr(R, 32, M, 01100, 111, REMU)
+      m4_instr(RR, 64, M, 01110, 000, 0000001, MULW)
+      m4_instr(RR, 64, M, 01110, 100, 0000001, DIVW)
+      m4_instr(RR, 64, M, 01110, 101, 0000001, DIVUW)
+      m4_instr(RR, 64, M, 01110, 110, 0000001, REMW)
+      m4_instr(RR, 64, M, 01110, 111, 0000001, REMUW)
       // RV32A and RV64A
       // NOT IMPLEMENTED. These are distinct in the func7 field.
       // RV32F and RV64F
@@ -1586,28 +1716,21 @@ m4+definitions(['
       
       m4_ifelse_block(M4_EXT_M, 1, ['
       // Instruction requires integer mul/div unit and is long-latency.
-      /*$div_mul = $is_mul_instr ||
+      $div_mul = $is_mul_instr ||
                  $is_mulh_instr ||
                  $is_mulhsu_instr ||
                  $is_mulhu_instr ||
                  $is_div_instr ||
                  $is_divu_instr ||
                  $is_rem_instr ||
-                 $is_remu_instr;*/
-      $div_mul = $is_div_instr ||
-                 $is_divu_instr ||
-                 $is_rem_instr ||
                  $is_remu_instr;
-      $multype_instr = $is_mul_instr ||
-                       $is_mulh_instr ||
-                       $is_mulhsu_instr ||
-                       $is_mulhu_instr;             
       '], ['
       $div_mul = 1'b0;
-      $multype_instr = 1'b0;
       '])
 
-      $illegal = 1'b1['']m4_illegal_instr_expr;
+      // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
+      $illegal_itype_with_funct7 = ( $is_srli_srai_instr m4_ifelse(M4_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
+      $illegal = $illegal_itype_with_funct7['']m4_illegal_instr_expr;
       $conditional_branch = $is_b_type;
    $jump = $is_jal_instr;  // "Jump" in RISC-V means unconditional. (JALR is a separate redirect condition.)
    $branch = $is_b_type;
@@ -1624,7 +1747,7 @@ m4+definitions(['
       // Output signals.
       /src[2:1]
          // Reg valid for this source, based on instruction type.
-         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_ri_type || /instr$is_s_type || /instr$is_b_type;
+         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
          $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
            
       // For debug.
@@ -1646,8 +1769,7 @@ m4+definitions(['
                    $is_csr_clear;
    $valid_csr = m4_valid_csr_expr;
    $csr_trap = $is_csr_instr && ! $valid_csr;
-          
-   
+
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
@@ -1682,6 +1804,8 @@ m4+definitions(['
          $misaligned_indirect_jump_target = $indirect_jump_full_target[1];
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
+         // TODO: Could provide some macro magic to specify combined instructions w/ a single result and mux select.
+         //       This would reduce code below and probably improve implementation.
          
          $lui_rslt[M4_WORD_RANGE] = {$raw_u_imm[31:12], 12'b0};
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
@@ -1701,56 +1825,61 @@ m4+definitions(['
          $lbu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
          $lhu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
          '])
-         $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // Note: this has its own adder; could share w/ add/sub.
+         $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
          $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
+         // TODO: Should combine SRL and SRLI, and SRA and SRAI.
          $srli_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
          $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
-         $sra_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_intermediate_rslt;
-         $srl_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
          $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
          $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_intermediate_rslt : $srli_intermediate_rslt;
-         $add_sub_rslt[M4_WORD_RANGE] =  ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
+         $add_sub_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
+         $add_rslt[M4_WORD_RANGE] = $add_sub_rslt;
+         $sub_rslt[M4_WORD_RANGE] = $add_sub_rslt;
          $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
          $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
          $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
-         $srl_sra_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ? $sra_intermediate_rslt : $srl_intermediate_rslt;
          $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
          $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
          // CSR read instructions have the same result expression. Counting on synthesis to optimize result mux.
          $csrrw_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
-         $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrc_rslt[M4_WORD_RANGE]  = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
-         $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt[M4_WORD_RANGE];
+         $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt;
+         $csrrc_rslt[M4_WORD_RANGE]  = $csrrw_rslt;
+         $csrrwi_rslt[M4_WORD_RANGE] = $csrrw_rslt;
+         $csrrsi_rslt[M4_WORD_RANGE] = $csrrw_rslt;
+         $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
          m4_ifelse_block(M4_EXT_M, 1, ['
          $clk = *clk;
-         $resetn = !(*reset);
+         $resetn = !(*reset);         
          
          // might be fine
          //?$multype_instr
+         
          $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};   
          m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt[31:0], $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $multype_instr)
-         $div_mul_rslt = $instr_type_div ? $divblock_rslt : $mulblock_rslt;
+         $div_mul_rslt = $instr_type_div ? $divblock_rslt : $mulblock_rslt;      
+         
          $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         
-         // TODO : when condition wrt output
+
+        // TODO : when condition wrt output
          //?$div_mul     
             
          ///orig_inst
             //?$second_issue
          $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
          m4+warpv_div(|fetch/instr,/div1, $divblock_rslt[31:0], $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $div_mul)
+
          $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
@@ -2424,7 +2553,7 @@ m4+definitions(['
    '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
@@ -2436,7 +2565,7 @@ m4+definitions(['
                     '0;
       $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
       //$div_mul_rslt[31:0] = 32'h55555555;
-      
+
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
    /_name      
       
@@ -2495,7 +2624,7 @@ m4+definitions(['
                   .pcpi_wr       (/_top$['']$_wr),
                   .pcpi_ready    (/_top$['']$_ready)
                );
-   
+
 //===============//
 // "F" Extension //
 //===============//
@@ -2535,7 +2664,6 @@ m4+definitions(['
 
    |fetch
       /instr
-         m4+m_extension()
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
