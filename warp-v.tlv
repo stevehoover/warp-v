@@ -1080,7 +1080,9 @@ m4+definitions(['
             output logic rvfi_halt,
             output logic rvfi_trap,       
             output logic rvfi_halt,       
-            output logic rvfi_intr,       
+            output logic rvfi_intr,  
+            output logic [1: 0] rvfi_ixl,
+            output logic [1: 0] rvfi_mode,
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -2907,6 +2909,8 @@ m4+definitions(['
             *rvfi_valid       = $rvfi_valid;
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
+            *rvfi_ixl         = 2'd1;
+            *rvfi_mode        = 2'd3;
             /original
                *rvfi_insn        = $raw;
                *rvfi_order       = $rvfi_order;
