@@ -995,6 +995,7 @@ m4+definitions(['
       //   m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRT.S)
       //   m4_instr(R2, 32, A, 01011, 010, 00010, 00000, LR.W)  // (5 bits for funct7 for all "A"-ext instrs)
       //   m4_instr(R, 32, A, 01011, 010, 00011, SC.W)          //   "
+
       // This defines assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
       //   I: m4_asm_ADDI(r4, r1, 0),
       //   R: m4_asm_ADD(r4, r1, r2),
@@ -1530,19 +1531,27 @@ m4+definitions(['
       m4_instr(R, 64, I, 01110, 001, SLLW)
       m4_instr(RR, 64, I, 01110, 101, 0000000, SRLW)
       m4_instr(RR, 64, I, 01110, 101, 0100000, SRAW)
-      m4_instr(R, 32, M, 01100, 000, MUL)
-      m4_instr(R, 32, M, 01100, 001, MULH)
-      m4_instr(R, 32, M, 01100, 010, MULHSU)
-      m4_instr(R, 32, M, 01100, 011, MULHU)
-      m4_instr(R, 32, M, 01100, 100, DIV)
-      m4_instr(R, 32, M, 01100, 101, DIVU)
-      m4_instr(R, 32, M, 01100, 110, REM)
-      m4_instr(R, 32, M, 01100, 111, REMU)
-      m4_instr(R, 64, M, 01110, 000, MULW)
-      m4_instr(R, 64, M, 01110, 100, DIVW)
-      m4_instr(R, 64, M, 01110, 101, DIVUW)
-      m4_instr(R, 64, M, 01110, 110, REMW)
-      m4_instr(R, 64, M, 01110, 111, REMUW)
+      m4_instr(RR, 32, M, 01100, 000, 0000001, MUL)      // all muldiv set to RR for now!
+      m4_instr(RR, 32, M, 01100, 001, 0000001, MULH)
+      m4_instr(RR, 32, M, 01100, 010, 0000001, MULHSU)   
+      m4_instr(RR, 32, M, 01100, 011, 0000001, MULHU)
+      m4_instr(RR, 32, M, 01100, 100, 0000001, DIV)
+      m4_instr(RR, 32, M, 01100, 101, 0000001, DIVU)
+      m4_instr(RR, 32, M, 01100, 110, 0000001, REM)
+      m4_instr(RR, 32, M, 01100, 111, 0000001, REMU)
+      // m4_instr(R, 32, M, 01100, 000, MUL)
+      // m4_instr(R, 32, M, 01100, 001, MULH)
+      // m4_instr(R, 32, M, 01100, 010, MULHSU)
+      // m4_instr(R, 32, M, 01100, 011, MULHU)
+      // m4_instr(R, 32, M, 01100, 100, DIV)
+      // m4_instr(R, 32, M, 01100, 101, DIVU)
+      // m4_instr(R, 32, M, 01100, 110, REM)
+      // m4_instr(R, 32, M, 01100, 111, REMU)
+      m4_instr(RR, 64, M, 01110, 000, 0000001, MULW)
+      m4_instr(RR, 64, M, 01110, 100, 0000001, DIVW)
+      m4_instr(RR, 64, M, 01110, 101, 0000001, DIVUW)
+      m4_instr(RR, 64, M, 01110, 110, 0000001, REMW)
+      m4_instr(RR, 64, M, 01110, 111, 0000001, REMUW)
       // RV32A and RV64A
       // NOT IMPLEMENTED. These are distinct in the func7 field.
       // RV32F and RV64F
@@ -1842,7 +1851,7 @@ m4+definitions(['
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
-         m4_ifelse_block(M4_EXT_M, 1, ['
+         m4_ifelse_block(M4_EXT_M, 1, ['      
          $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
