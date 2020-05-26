@@ -403,10 +403,10 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 0),
-            (['M4_EXT_A'], 0),
+            (['M4_EXT_M'], 1),
+            (['M4_EXT_A'], 1),
             (['M4_EXT_F'], 1),
-            (['M4_EXT_D'], 0),
+            (['M4_EXT_D'], 1),
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
             (['M4_EXT_C'], 0),
@@ -1437,7 +1437,7 @@ m4+definitions(['
       m4_op5(01000, S, STORE)
       m4_op5(01001, S, STORE_FP)
       m4_op5(01010, _, CUSTOM_1)
-      m4_op5(01011, R2, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(01011, R, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(01100, R, OP)
       m4_op5(01101, U, LUI)
       m4_op5(01110, R, OP_32)
