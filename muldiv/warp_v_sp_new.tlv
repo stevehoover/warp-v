@@ -256,7 +256,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
@@ -1341,20 +1341,25 @@ m4+definitions(['
 
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
+   m4_asm(ORI, r11, r0, 10101010)
    m4_asm(MUL, r10, r9, r8)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(MUL, r12, r11, r9)
    
    
-   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
-   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
-   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
-   m4_asm(ORI, r3, r0, 0)        //     out = 0
-   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
-   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
-   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
-   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
+   // m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
+   // m4_asm(ORI, r1, r0, 1)        //     cnt = 1
+   // m4_asm(ORI, r2, r0, 1010)     //     ten = 10
+   // m4_asm(ORI, r3, r0, 0)        //     out = 0
+   // m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
+   // m4_asm(SW, r6, r3, 0)         //     store out at store_addr
+   // m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   // m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   // m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
+   // m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
+   // m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
@@ -1724,8 +1729,17 @@ m4+definitions(['
                  $is_divu_instr ||
                  $is_rem_instr ||
                  $is_remu_instr;
+      /*$div_mul = $is_div_instr ||
+                 $is_divu_instr ||
+                 $is_rem_instr ||
+                 $is_remu_instr;*/
+      $multype_instr = $is_mul_instr ||
+                       $is_mulh_instr ||
+                       $is_mulhsu_instr ||
+                       $is_mulhu_instr;             
       '], ['
       $div_mul = 1'b0;
+      $multype_instr = 1'b0;
       '])
 
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
@@ -1856,36 +1870,36 @@ m4+definitions(['
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
+         
          m4_ifelse_block(M4_EXT_M, 1, ['
          $clk = *clk;
          $resetn = !(*reset);         
+         $validin_mul = 1'b1;
+         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt[31:0], $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $validin_mul)
+         // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
          
-         // might be fine
          //?$multype_instr
-         
-         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};   
-         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt[31:0], $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $multype_instr)
-         $div_mul_rslt = $instr_type_div ? $divblock_rslt : $mulblock_rslt;      
-         
-         $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-
-        // TODO : when condition wrt output
-         //?$div_mul     
-            
-         ///orig_inst
-            //?$second_issue
+         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
          $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
-         m4+warpv_div(|fetch/instr,/div1, $divblock_rslt[31:0], $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $div_mul)
+         $div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
+         $mul_rslt[M4_WORD_RANGE]      = $div_mul_rslt;
+         $mulh_rslt[M4_WORD_RANGE]     = $div_mul_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE]   = $div_mul_rslt;
+         $mulhu_rslt[M4_WORD_RANGE]    = $div_mul_rslt;
 
+         // TODO : when condition wrt output
+         //?$div_mul     
+         
+         /orig_inst
+            m4+warpv_div(|fetch/instr,/div1, $divblock_rslt[31:0], $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $validin_mul)
+            //?$second_issue
+            $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
          $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          '])
-         
+         `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
    // CSR logic
    // ---------
    m4+riscv_csrs((m4_csrs))
@@ -2553,7 +2567,7 @@ m4+definitions(['
    '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 3)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
@@ -2664,6 +2678,7 @@ m4+definitions(['
 
    |fetch
       /instr
+         m4+m_extension()
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -3171,9 +3186,16 @@ m4+module_def
    '], ['
    // Single Core.
    m4+warpv()
-   m4+warpv_makerchip_cnt10_tb()
+   m4+warpv_makerchip_cnt10_tb() // parameterise to other programs
    m4+makerchip_pass_fail()
    '])
 \SV
    endmodule
 
+
+// new program, new tb
+// makefile automation for simulation - present in 1st CLaaS.
+// Travis on Fork - try locally
+// sims for PicoRV32, Ariane - purely picorv32 tiles - bare metal
+// PicoRV32 atomic -  openpiton-dev branch, repository
+// Build part for using Warp-v in piton
