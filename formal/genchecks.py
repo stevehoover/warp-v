@@ -454,3 +454,4 @@ with open("%s/makefile" % cfgname, "w") as mkfile:
 
 print("Generated %d checks." % (len(consistency_checks) + len(instruction_checks)))
 
+
