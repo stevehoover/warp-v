@@ -1570,7 +1570,7 @@ m4+definitions(['
       m4_instr(R, 32, F, 10100, 001, 0010100, FMAXS)
       m4_instr(R2, 32, F, 10100, rm, 1100000, 00000, FCVTWS)
       m4_instr(R2, 32, F, 10100, rm, 1100000, 00001, FCVTWUS)
-      m4_instr(R2, 32, F, 10100, 000, 1110000, 00000, FMVXS)
+      m4_instr(R2, 32, F, 10100, 000, 1110000, 00000, FMVXW)
       m4_instr(R, 32, F, 10100, 010, 1010000, FEQS)
       m4_instr(R, 32, F, 10100, 001, 1010000, FLTS)
       m4_instr(R, 32, F, 10100, 000, 1010000, FLES)
