@@ -860,7 +860,10 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   // 
+   //
+   // For CPU instructions, it would be a good idea to try to link this instruction description with
+   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here.
+   //
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
@@ -929,7 +932,7 @@ m4+definitions(['
       m4_define_hide(['m4_instr'],
                      ['// check instr type
                        // DONE: (IMMEDIATELY) Re-enable 2 lines below.
-                       m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
+                       m4_ifelse(M4_OP5_$4_TYPE, $1, [''], m4_ifdef(['m4_instr_type_of_$1'], ['m4_instr_type_of_$1'], ['$1']), [''],
                                  ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
                        // if instrs extension is supported and instr is for the right machine width, "
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
@@ -983,6 +986,9 @@ m4+definitions(['
       // The first arg of m4_instr(..) is a type, and a type-specific macro is invoked. Types are those defined by RISC-V, plus:
       //   R2: R-type with a hard-coded rs2 value. (assuming illegal instruction exception should be thrown for wrong value--not clear in RISC-V spec)
       //   If: I-type with leading bits of imm[11:...] used as function bits.
+      m4_define(['m4_instr_type_of_R'], ['R'])  // TODO: DELETE
+      m4_define(['m4_instr_type_of_R2'], ['R'])
+      m4_define(['m4_instr_type_of_If'], ['I'])
       // Unique to each instruction type, eg:
       //   m4_instr(U, 32, I, 01101,      LUI)
       //   m4_instr(J, 32, I, 11011,      JAL)
