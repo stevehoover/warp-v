@@ -1874,30 +1874,30 @@ m4+definitions(['
          m4_ifelse_block(M4_EXT_M, 1, ['
          $clk = *clk;
          $resetn = !(*reset);         
-         $validin_mul = 1'b1;
-         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt[31:0], $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $validin_mul)
+         $validin_mul = 1'b1;         
+         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $validin_mul)
          // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
-         
-         //?$multype_instr
+         m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $validin_mul)
          $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
          $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
-         $div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
-         $mul_rslt[M4_WORD_RANGE]      = $div_mul_rslt;
-         $mulh_rslt[M4_WORD_RANGE]     = $div_mul_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE]   = $div_mul_rslt;
-         $mulhu_rslt[M4_WORD_RANGE]    = $div_mul_rslt;
-
+               
+         //$div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
+         //?$second_issue
+         /orig_inst           
+            //$divmul_late_rslt[31:0] = |fetch/instr$div_mul_rslt;
+            $divmul_late_rslt[31:0] = |fetch/instr$div_mul ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
+         $mulhu_rslt[M4_WORD_RANGE]    = /orig_inst$late_rslt;
+         $div_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $divu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $rem_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $remu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
          // TODO : when condition wrt output
          //?$div_mul     
-         
-         /orig_inst
-            m4+warpv_div(|fetch/instr,/div1, $divblock_rslt[31:0], $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $validin_mul)
+         //$instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
             //?$second_issue
-            $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
-         $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
          '])
          `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
    // CSR logic
@@ -1951,7 +1951,7 @@ m4+definitions(['
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = $ld_rslt;  // TODO: || ...
+            $late_rslt[M4_WORD_RANGE] = $div_mul ? $divmul_late_rslt : $ld_rslt;  // TODO: || ...
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||

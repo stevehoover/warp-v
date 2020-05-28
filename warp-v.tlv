@@ -403,7 +403,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 0),
+            (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -860,10 +860,7 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   //
-   // For CPU instructions, it would be a good idea to try to link this instruction description with
-   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here.
-   //
+   // 
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
@@ -1084,9 +1081,7 @@ m4+definitions(['
             output logic rvfi_halt,
             output logic rvfi_trap,       
             output logic rvfi_halt,       
-            output logic rvfi_intr,  
-            output logic [1: 0] rvfi_ixl,
-            output logic [1: 0] rvfi_mode,
+            output logic rvfi_intr,       
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -1343,18 +1338,28 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
+
+   m4_asm(ORI, r8, r0, 1011)
+   m4_asm(ORI, r9, r0, 1010)
+   m4_asm(ORI, r11, r0, 10101010)
+   m4_asm(MUL, r10, r9, r8)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(MUL, r12, r11, r9)
    
-   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
-   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
-   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
-   m4_asm(ORI, r3, r0, 0)        //     out = 0
-   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
-   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
-   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
-   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
+   
+   // m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
+   // m4_asm(ORI, r1, r0, 1)        //     cnt = 1
+   // m4_asm(ORI, r2, r0, 1010)     //     ten = 10
+   // m4_asm(ORI, r3, r0, 0)        //     out = 0
+   // m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
+   // m4_asm(SW, r6, r3, 0)         //     store out at store_addr
+   // m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   // m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   // m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
+   // m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
+   // m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
@@ -1724,8 +1729,17 @@ m4+definitions(['
                  $is_divu_instr ||
                  $is_rem_instr ||
                  $is_remu_instr;
+      /*$div_mul = $is_div_instr ||
+                 $is_divu_instr ||
+                 $is_rem_instr ||
+                 $is_remu_instr;*/
+      $multype_instr = $is_mul_instr ||
+                       $is_mulh_instr ||
+                       $is_mulhsu_instr ||
+                       $is_mulhu_instr;             
       '], ['
       $div_mul = 1'b0;
+      $multype_instr = 1'b0;
       '])
 
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
@@ -1856,17 +1870,36 @@ m4+definitions(['
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
-         m4_ifelse_block(M4_EXT_M, 1, ['      
-         $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         '])
          
+         m4_ifelse_block(M4_EXT_M, 1, ['
+         $clk = *clk;
+         $resetn = !(*reset);         
+         $validin_mul = 1'b1;         
+         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_mul, $validin_mul)
+         // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
+         m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, /src[1]$reg_value, /src[2]$reg_value, $instr_type_div, $validin_mul)
+         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
+         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
+               
+         //$div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
+         //?$second_issue
+         /orig_inst           
+            //$divmul_late_rslt[31:0] = |fetch/instr$div_mul_rslt;
+            $divmul_late_rslt[31:0] = |fetch/instr$div_mul ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
+         $mulhu_rslt[M4_WORD_RANGE]    = /orig_inst$late_rslt;
+         $div_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $divu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $rem_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $remu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         // TODO : when condition wrt output
+         //?$div_mul     
+         //$instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
+            //?$second_issue
+         '])
+         `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
    // CSR logic
    // ---------
    m4+riscv_csrs((m4_csrs))
@@ -1918,7 +1951,7 @@ m4+definitions(['
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = $ld_rslt;  // TODO: || ...
+            $late_rslt[M4_WORD_RANGE] = $div_mul ? $divmul_late_rslt : $ld_rslt;  // TODO: || ...
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2521,12 +2554,22 @@ m4+definitions(['
 
 //===============//
 // "M" Extension //
+// Followed by multiply / divide macros //
 //===============//
 
+\SV
+   m4_ifexpr(M4_EXT_M == 1, ['
+      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
+   '])
+
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 3)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
-      $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
+      $second_issue_div_mul = >>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
       {$div_mul_stall, $stall_cnt[5:0]} =
            $reset ? '0 :
@@ -2535,7 +2578,67 @@ m4+definitions(['
            >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
                     '0;
       $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
-      $div_mul_rslt[31:0] = 32'h55555555;
+      //$div_mul_rslt[31:0] = 32'h55555555;
+
+\TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name      
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001) ? 3'b000 : // mull 
+                     (/_top$_instr_type == 4'b0010) ? 3'b001 : // mulh
+                     (/_top$_instr_type == 4'b0100) ? 3'b010 : // mulhsu
+                     (/_top$_instr_type == 4'b1000) ? 3'b011 : // mulhu
+                                                      3'b000 ; // default to mul, but this case 
+                                                               // should not be encountered ideally
+
+      $mul_insn[31:0] = {7'b0000001,10'b0011000101,$opcode,5'b00101,7'b0110011};
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+       
+      \SV_plus
+            picorv32_pcpi_fast_mul mul(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($mul_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_ready    (/_top$['']$_ready)
+            );
+   
+\TLV warpv_div(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001 ) ? 3'b100 : // div
+                     (/_top$_instr_type == 4'b0010 ) ? 3'b101 : // divu
+                     (/_top$_instr_type == 4'b0100 ) ? 3'b110 : // rem
+                     (/_top$_instr_type == 4'b1000 ) ? 3'b111 : // remu
+                                                       3'b100 ; // default to mul, but this case 
+                                                                // should not be encountered ideally
+      $div_insn[31:0] = {7'b0000001,10'b0011000101,3'b000,5'b00101,7'b0110011} | ($opcode << 12);
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+      
+      \SV_plus
+            picorv32_pcpi_div div(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($div_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_ready    (/_top$['']$_ready)
+               );
+
 //===============//
 // "F" Extension //
 //===============//
@@ -2575,6 +2678,7 @@ m4+definitions(['
 
    |fetch
       /instr
+         m4+m_extension()
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -2921,8 +3025,6 @@ m4+definitions(['
             *rvfi_valid       = $rvfi_valid;
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
-            *rvfi_ixl         = 2'd1;
-            *rvfi_mode        = 2'd3;
             /original
                *rvfi_insn        = $raw;
                *rvfi_order       = $rvfi_order;
@@ -3072,7 +3174,7 @@ m4+module_def
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
 
 \TLV
-   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
+   /* verilator lint_off WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    // Multi-core
    /M4_CORE_HIER
@@ -3084,9 +3186,8 @@ m4+module_def
    '], ['
    // Single Core.
    m4+warpv()
-   m4+warpv_makerchip_cnt10_tb()
+   m4+warpv_makerchip_cnt10_tb() // parameterise to other programs
    m4+makerchip_pass_fail()
    '])
 \SV
    endmodule
-
