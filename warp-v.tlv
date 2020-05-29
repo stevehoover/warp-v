@@ -1793,7 +1793,7 @@ m4+definitions(['
       $raw_rl = $raw[25];
       $raw_rs3[4:0] = $raw[31:27];
       $raw_rm[2:0] = $raw_funct3;
-      `BOGUS_USE($raw_shamt $raw_aq $raw_rl $raw_rs3 )  // Avoid "unused" messages. Remove these as they become used.
+      `BOGUS_USE($raw_shamt $raw_aq $raw_rl $raw_rs3 $raw_rm)  // Avoid "unused" messages. Remove these as they become used.
 
       // Instruction type decode
       \SV_plus
@@ -3056,7 +3056,9 @@ m4+definitions(['
             
             // Conditions that commit results.
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || $second_issue;
-            $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || $second_issue;            
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || $second_issue;     
+            '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
