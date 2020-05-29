@@ -1354,9 +1354,9 @@ m4+definitions(['
    //m4_asm(ORI, r0, r0, 0)
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
-   m4_asm(ORI, r11, r0, 10101010)
-   m4_asm(MUL, r10, r9, r8)
-   m4_asm(MUL, r12, r11, r9)
+  // m4_asm(ORI, r11, r0, 10101010)
+   m4_asm(MUL, r12, r9, r8)
+   //m4_asm(MUL, r12, r11, r9)
    // two consecutive muls is the challenge
    
    // m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
@@ -2594,7 +2594,7 @@ m4+definitions(['
            // we should not be committing here
            >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
                     '0;
-      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 0 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
       //$div_mul_rslt[31:0] = 32'h55555555;
 
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
@@ -3213,6 +3213,3 @@ m4+module_def
    '])
 \SV
    endmodule
-
-
-//commit coreresponds to the second one!
