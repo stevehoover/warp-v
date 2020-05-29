@@ -1350,14 +1350,12 @@ m4+definitions(['
    // 6: store addr
 
    // two NOPs to start with, will hopefully make things better
-   m4_asm(ORI, r0, r0, 0)
-   m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
    m4_asm(ORI, r11, r0, 10101010)
    m4_asm(MUL, r10, r9, r8)
-   //
-   //m4_asm(ORI, r0, r0, 0)
    m4_asm(MUL, r12, r11, r9)
    // two consecutive muls is the challenge
    
@@ -1748,7 +1746,7 @@ m4+definitions(['
       $multype_instr = $is_mul_instr ||
                        $is_mulh_instr ||
                        $is_mulhsu_instr ||
-                       $is_mulhu_instr;             
+                       $is_mulhu_instr;       
       '], ['
       $div_mul = 1'b0;
       $multype_instr = 1'b0;
@@ -1807,7 +1805,11 @@ m4+definitions(['
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
-      
+      m4_ifelse_block(M4_EXT_M, 1, ['
+      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_mul, $validin_mul)
+      // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
+      m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_div, $validin_mul)
+      '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
@@ -1886,18 +1888,13 @@ m4+definitions(['
          m4_ifelse_block(M4_EXT_M, 1, ['
          $clk = *clk;
          $resetn = !(*reset);         
-         $validin_mul = 1'b1;
-         
+         $validin_mul = $div_mul;
+         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
+         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
          $muldiv_in1[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[1]$reg_value : $RETAIN;
          $muldiv_in2[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[2]$reg_value : $RETAIN;
          //$muldiv_in1[M4_WORD_RANGE] = /src[1]$reg_value;
          //$muldiv_in2[M4_WORD_RANGE] = /src[2]$reg_value;
-
-         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_mul, $validin_mul)
-         // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
-         m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_div, $validin_mul)
-         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
-         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
                
          //$div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
          //?$second_issue
@@ -2585,17 +2582,19 @@ m4+definitions(['
    '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 3)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 5)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
-      $second_issue_div_mul = >>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
+      $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
       {$div_mul_stall, $stall_cnt[5:0]} =
            $reset ? '0 :
            $second_issue ? '0 :
            ($commit && $div_mul) ? {1'b1, 6'b1} :
+           //div_mul is commmitted not the previous one!! - they relate to the same instr unless explcitly alligned
+           // we should not be committing here
            >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
                     '0;
-      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY +1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
       //$div_mul_rslt[31:0] = 32'h55555555;
 
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
@@ -2615,7 +2614,7 @@ m4+definitions(['
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
        
       \SV_plus
-            picorv32_pcpi_fast_mul mul(
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
                   .pcpi_valid    (/_top$_muldiv_valid),
@@ -3214,5 +3213,3 @@ m4+module_def
    '])
 \SV
    endmodule
-
-// 4 -stage, everything goes to r10 version, before 29 May work

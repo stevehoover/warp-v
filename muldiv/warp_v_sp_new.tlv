@@ -1350,14 +1350,12 @@ m4+definitions(['
    // 6: store addr
 
    // two NOPs to start with, will hopefully make things better
-   m4_asm(ORI, r0, r0, 0)
-   m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
    m4_asm(ORI, r11, r0, 10101010)
    m4_asm(MUL, r10, r9, r8)
-   //
-   //m4_asm(ORI, r0, r0, 0)
    m4_asm(MUL, r12, r11, r9)
    // two consecutive muls is the challenge
    
@@ -1886,7 +1884,7 @@ m4+definitions(['
          m4_ifelse_block(M4_EXT_M, 1, ['
          $clk = *clk;
          $resetn = !(*reset);         
-         $validin_mul = 1'b1;
+         $validin_mul = $div_mul;
          
          $muldiv_in1[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[1]$reg_value : $RETAIN;
          $muldiv_in2[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[2]$reg_value : $RETAIN;
@@ -2585,7 +2583,7 @@ m4+definitions(['
    '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 3)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 5)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
@@ -2615,7 +2613,7 @@ m4+definitions(['
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
        
       \SV_plus
-            picorv32_pcpi_fast_mul mul(
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
                   .pcpi_valid    (/_top$_muldiv_valid),
@@ -3214,5 +3212,3 @@ m4+module_def
    '])
 \SV
    endmodule
-
-// 4 -stage, everything goes to r10 version, before 29 May work
