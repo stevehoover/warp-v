@@ -811,7 +811,6 @@ m4+definitions(['
    // Calling includes and top module of FPU i.e. HardFloat module
    // GitHub link in development , hence it can change later
    m4_ifelse_block(M4_EXT_F, 1, ['
-   \SV
    /* verilator lint_off WIDTH */                                
    m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/floating-point/verilog2/topmodule/fputopmodule.tlv'])
    '])
@@ -1996,7 +1995,7 @@ m4+definitions(['
 
          // "F" Extension.
          m4_ifelse_block(M4_EXT_F, 1, ['
-         // ToDo. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
+         // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
          // Need to call fpu_exe marco inside this ifelse_block itself and simplify it to optimize the unit.
          $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
                            ({5{$is_fmsubs_instr }}  & 5'h3 ) |
@@ -2998,7 +2997,7 @@ m4+definitions(['
             
             m4_ifelse_block(M4_EXT_F, 1, ['
             // Reg Read for FPU
-            // ToDo. pending and bypass mechanism.
+            // TODO. pending and bypass mechanism.
             /fpuregs[31:1]
             /fpusrc[2:1]
                $is_fpu_reg_condition = $is_fpu_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
@@ -3110,7 +3109,7 @@ m4+definitions(['
              '])
             m4_ifelse_block(M4_EXT_F, 1, ['
             // Reg Write (Floating Point Register)
-            // ToDo. Seperate the $rslt comit to both "int" and "fpu' regs and include pending mechanism.
+            // TODO. Seperate the $rslt comit to both "int" and "fpu' regs and include pending mechanism.
             $fpu_reg_write = $reset ? 1'b0 : $valid_dest_fpu_reg_valid;
             \SV_plus
                always @ (posedge clk) begin
