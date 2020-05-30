@@ -810,8 +810,7 @@ m4+definitions(['
    // TODO: be specific about widths (lint_on)
    // Calling includes and top module of FPU i.e. HardFloat module
    // GitHub link in development , hence it can change later
-   m4_ifelse_block(M4_EXT_F, 1, ['
-   /* verilator lint_off WIDTH */                                
+   m4_ifelse_block(M4_EXT_F, 1, ['                               
    m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/floating-point/verilog2/topmodule/fputopmodule.tlv'])
    '])
                                                                         
