@@ -1782,7 +1782,7 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? /orig_inst$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? |fetch/instr/orig_inst>>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    // Actually load.
@@ -2859,7 +2859,7 @@ m4+definitions(['
                   // assign {FETCH_Instr_OrigInst_addr_a0[1:0], FETCH_Instr_OrigInst_dest_reg_a0[4:0], FETCH_Instr_OrigInst_div_mul_a0, FETCH_Instr_OrigInst_ld_st_half_a0, FETCH_Instr_OrigInst_ld_st_word_a0, FETCH_Instr_OrigInst_ld_value_a0[31:0], FETCH_Instr_OrigInst_raw_funct3_a0[2], FETCH_Instr_OrigInst_spec_ld_a0} = {MEM_Data_addr_a4, MEM_Data_dest_reg_a4, MEM_Data_div_mul_a4, MEM_Data_ld_st_half_a4, MEM_Data_ld_st_word_a4, MEM_Data_ld_value_a4, MEM_Data_raw_funct3_a4, MEM_Data_spec_ld_a4};
                   //      for (src = 1; src <= 2; src++) begin : L1_FETCH_Instr_OrigInst_Src logic L1_dummy_a0, L1_dummy_a1, L1_dummy_a2, L1_dummy_a3; //_/src
                   //         assign {L1_dummy_a0} = {L1_MEM_Data_Src[src].L1_dummy_a4}; end
-                  $ANY = $second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : /_cpu|fetch/instr>>1$ANY;
+                  $ANY = $second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : /_cpu|fetch/instr>>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$ANY;
                   //$ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
