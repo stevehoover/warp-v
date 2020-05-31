@@ -256,7 +256,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
@@ -704,14 +704,14 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $next_pc, 1'],
       ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
       ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
       ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
       m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
-      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $Pc, 0, 1'],
+      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $next_pc, 0, 1'],
       ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
       ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
 
@@ -1349,17 +1349,19 @@ m4+definitions(['
    // 5: offset
    // 6: store addr
 
-   // two NOPs to start with, will hopefully make things better
-   m4_asm(ORI, r0, r0, 0)
-   m4_asm(ORI, r0, r0, 0)
+   // MULDIV Test!
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
    m4_asm(ORI, r11, r0, 10101010)
    m4_asm(MUL, r10, r9, r8)
-   //
-   //m4_asm(ORI, r0, r0, 0)
-   m4_asm(MUL, r12, r11, r9)
-   // two consecutive muls is the challenge
+   m4_asm(ADDI, r0, r0, 0)
+   m4_asm(DIV, r14, r10, r8)
+   m4_asm(ADDI, r0, r0, 0)
+   m4_asm(MUL, r12, r9, r11)
+   m4_asm(ADD, r13, r8, r9)
+   m4_asm(DIV, r15, r12, r9)
+   m4_asm(ADDI, r4, r0, 101101)
+   m4_asm(BGE, r8, r9, 111111111110)
    
    // m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
    // m4_asm(ORI, r1, r0, 1)        //     cnt = 1
@@ -1523,10 +1525,10 @@ m4+definitions(['
       m4_instr(I, 32, I, 00100, 101, SRLI_SRAI)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
       m4_instr(RR, 32, I, 01100, 000, 0000000, ADD)
       m4_instr(RR, 32, I, 01100, 000, 0100000, SUB)
-      m4_instr(R, 32, I, 01100, 001, SLL)
-      m4_instr(R, 32, I, 01100, 010, SLT)
-      m4_instr(R, 32, I, 01100, 011, SLTU)
-      m4_instr(R, 32, I, 01100, 100, XOR)
+      m4_instr(RR, 32, I, 01100, 001, 0000000, SLL)
+      m4_instr(RR, 32, I, 01100, 010, 0000000, SLT)
+      m4_instr(RR, 32, I, 01100, 011, 0000000, SLTU)
+      m4_instr(RR, 32, I, 01100, 100, 0000000, XOR)
       m4_instr(RR, 32, I, 01100, 101, 0000000, SRL)
       m4_instr(RR, 32, I, 01100, 101, 0100000, SRA)
       m4_instr(R, 32, I, 01100, 110, OR)
@@ -1741,14 +1743,14 @@ m4+definitions(['
                  $is_divu_instr ||
                  $is_rem_instr ||
                  $is_remu_instr;
-      /*$div_mul = $is_div_instr ||
-                 $is_divu_instr ||
-                 $is_rem_instr ||
-                 $is_remu_instr;*/
+      $divtype_instr = $is_div_instr ||
+                       $is_divu_instr ||
+                       $is_rem_instr ||
+                       $is_remu_instr;
       $multype_instr = $is_mul_instr ||
                        $is_mulh_instr ||
                        $is_mulhsu_instr ||
-                       $is_mulhu_instr;             
+                       $is_mulhu_instr;       
       '], ['
       $div_mul = 1'b0;
       $multype_instr = 1'b0;
@@ -1780,7 +1782,7 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? /orig_inst$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? |fetch/instr/orig_inst>>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    // Actually load.
@@ -1797,6 +1799,7 @@ m4+definitions(['
    $csr_trap = $is_csr_instr && ! $valid_csr;
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
+   m4+m_extension()
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
@@ -1807,7 +1810,17 @@ m4+definitions(['
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
-      
+      m4_ifelse_block(M4_EXT_M, 1, ['
+      //$divblk_valid = ($reset || $div_stall)? 1'b0 : $divtype_instr;
+      $divblk_valid = >>1$div_stall;
+      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $multype_instr)
+      // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
+      m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
+      /orig_inst           
+         $divmul_late_rslt[31:0] = |fetch/instr>>1$div_stall ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         //$div_mul_orig_inst = |fetch/instr$div_mul;
+         $dest_reg[4:0] = |fetch/instr$div_mul ?|fetch/instr$dest_reg : $RETAIN;
+      '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
@@ -1884,26 +1897,16 @@ m4+definitions(['
          // "M" Extension.
          
          m4_ifelse_block(M4_EXT_M, 1, ['
-         $clk = *clk;
+         $clk = *clk;         
          $resetn = !(*reset);         
-         $validin_mul = 1'b1;
          
-         $muldiv_in1[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[1]$reg_value : $RETAIN;
-         $muldiv_in2[M4_WORD_RANGE] = *reset? '0 : $div_mul ? /src[2]$reg_value : $RETAIN;
-         //$muldiv_in1[M4_WORD_RANGE] = /src[1]$reg_value;
-         //$muldiv_in2[M4_WORD_RANGE] = /src[2]$reg_value;
-
-         m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_mul, $validin_mul)
-         // this 'looks' as expected but Sandpiper says "Currently, signals used as 'when' conditions may not themselves be under a 'when' condition within their behavioral scope."
-         m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $muldiv_in1, $muldiv_in2, $instr_type_div, $validin_mul)
          $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
          $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
-               
-         //$div_mul_rslt[31:0] = $div_mul ? $divblock_rslt : $mulblock_rslt;         
-         //?$second_issue
-         /orig_inst           
-            //$divmul_late_rslt[31:0] = |fetch/instr$div_mul_rslt;
-            $divmul_late_rslt[31:0] = |fetch/instr$div_mul ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $mul_in1[M4_WORD_RANGE] = *reset? '0 : $multype_instr ? /src[1]$reg_value : $RETAIN;
+         $mul_in2[M4_WORD_RANGE] = *reset? '0 : $multype_instr ? /src[2]$reg_value : $RETAIN;
+         
+         $div_in1[M4_WORD_RANGE] = *reset? '0 : $divtype_instr ? /src[1]$reg_value : $RETAIN;
+         $div_in2[M4_WORD_RANGE] = *reset? '0 : $divtype_instr ? /src[2]$reg_value : $RETAIN;
          $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
          $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
          $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
@@ -1969,7 +1972,7 @@ m4+definitions(['
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = $div_mul ? $divmul_late_rslt : $ld_rslt;  // TODO: || ...
+            $late_rslt[M4_WORD_RANGE] = |fetch/instr$second_issue_div_mul ? $divmul_late_rslt : $ld_rslt;  // TODO: || ...
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2585,17 +2588,21 @@ m4+definitions(['
    '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 3)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
-      {$div_mul_stall, $stall_cnt[5:0]} =
-           $reset ? '0 :
-           $second_issue ? '0 :
-           ($commit && $div_mul) ? {1'b1, 6'b1} :
-           >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
-                    '0;
-      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY +1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
+                                                     $second_issue ? '0 :
+                                                     ($commit && $div_mul) ? {$divtype_instr, $multype_instr, 6'b1} :
+                                                     >>1$div_stall ? {1'b1, 1'b0, >>1$stall_cnt + 6'b1} :
+                                                     >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
+                                                     '0;
+                                                     
+      $stall_cnt_upper_mul = ($stall_cnt == (M4_MUL_LATENCY - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      $stall_cnt_upper_div = ($stall_cnt == (M4_DIV_LATENCY - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
+      $trigger_next_pc_div_mul_second_issue = ($div_stall && $stall_cnt_upper_div) || ($mul_stall && $stall_cnt_upper_mul);
       //$div_mul_rslt[31:0] = 32'h55555555;
 
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
@@ -2615,7 +2622,7 @@ m4+definitions(['
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
        
       \SV_plus
-            picorv32_pcpi_fast_mul mul(
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
                   .pcpi_valid    (/_top$_muldiv_valid),
@@ -2696,7 +2703,8 @@ m4+definitions(['
 
    |fetch
       /instr
-         m4+m_extension()
+         
+         
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -2851,8 +2859,8 @@ m4+definitions(['
                   // assign {FETCH_Instr_OrigInst_addr_a0[1:0], FETCH_Instr_OrigInst_dest_reg_a0[4:0], FETCH_Instr_OrigInst_div_mul_a0, FETCH_Instr_OrigInst_ld_st_half_a0, FETCH_Instr_OrigInst_ld_st_word_a0, FETCH_Instr_OrigInst_ld_value_a0[31:0], FETCH_Instr_OrigInst_raw_funct3_a0[2], FETCH_Instr_OrigInst_spec_ld_a0} = {MEM_Data_addr_a4, MEM_Data_dest_reg_a4, MEM_Data_div_mul_a4, MEM_Data_ld_st_half_a4, MEM_Data_ld_st_word_a4, MEM_Data_ld_value_a4, MEM_Data_raw_funct3_a4, MEM_Data_spec_ld_a4};
                   //      for (src = 1; src <= 2; src++) begin : L1_FETCH_Instr_OrigInst_Src logic L1_dummy_a0, L1_dummy_a1, L1_dummy_a2, L1_dummy_a3; //_/src
                   //         assign {L1_dummy_a0} = {L1_MEM_Data_Src[src].L1_dummy_a4}; end
-                  //$ANY = $second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : /_cpu|fetch/instr>>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$ANY;
-                  $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  $ANY = $second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : /_cpu|fetch/instr>>m4_eval(1 + M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$ANY;
+                  //$ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
@@ -3063,7 +3071,7 @@ m4+definitions(['
                                  $second_issue   ? /orig_inst$pc + 1'b1 :
                                  $trap           ? $trap_target :
                                  $jump           ? $jump_target :
-                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
+                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + trap'b1) :
                                  m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
                                  $indirect_jump  ? $indirect_jump_target :
                                  $pc[31:2] +1'b1, 2'b00};
@@ -3214,5 +3222,3 @@ m4+module_def
    '])
 \SV
    endmodule
-
-// 4 -stage, everything goes to r10 version, before 29 May work
