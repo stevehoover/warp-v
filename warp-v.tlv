@@ -113,7 +113,11 @@ m4+definitions(['
    // FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
    // are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
    // the next redirect (which will be a second issue of the instruction).
+   // The data required during second can be passed to the commit stage using /orig_inst scope
    // It doesn't matter whether registers are marked pending, but we do.
+   // process redirect conditions take care of the correct handling of PC for such instrctions.
+   // \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
+   // for such instructions
    //
    // Bypass:
    //
@@ -198,7 +202,7 @@ m4+definitions(['
    // RISC-V ISA
    // ==========
    
-   // This design is a RISC-V (RV32I) implementation.
+   // This design is a RISC-V (RV32IM) implementation.
    // The ISA is characterized using M4 macros, and the microarchitecture is generated from this characterization, so
    // the ISA can be modified through M4 definitions.
    // Notes:
@@ -282,10 +286,6 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-
-   
-   // Which program to assemble.
-   m4_define(M4_PROG_NAME, ['cnt10'])
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -430,7 +430,10 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       ']
    )
+   // Which program to assemble.
    
+   m4_ifexpr(M4_EXT_M == 1 ,['m4_define(M4_PROG_NAME, ['divmul_test'])'], ['m4_define(M4_PROG_NAME, ['cnt10'])'])
+
    // =====Done Defining Configuration=====
    
    // Characterize ISA and apply configuration.
@@ -1347,31 +1350,33 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
+ 
+   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
+   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
+   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
+   m4_asm(ORI, r3, r0, 0)        //     out = 0
+   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
+   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
+   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
+   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
+   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
+\TLV riscv_divmul_test_prog()
    // MULDIV Test!
+   //3 MULs followed by 3 DIVs, check r11-r15 for correct results!
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
-   m4_asm(ORI, r11, r0, 10101010)
-   m4_asm(MUL, r10, r9, r8)
-   m4_asm(MUL, r16, r11, r9)
-   m4_asm(MUL, r12, r8, r11)
-   m4_asm(DIV, r14, r10, r8)
-   m4_asm(DIV, r15, r12, r11)
+   m4_asm(ORI, r10, r0, 10101010)
+   m4_asm(MUL, r11, r8, r9)
+   m4_asm(MUL, r12, r9, r10)
+   m4_asm(MUL, r13, r8, r10)
+   m4_asm(DIV, r14, r11, r8)
+   m4_asm(DIV, r15, r13, r10)
    m4_asm(ADDI, r4, r0, 101101)
    m4_asm(BGE, r8, r9, 111111111110)
    
-   //m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
-   //m4_asm(ORI, r1, r0, 1)        //     cnt = 1
-   //m4_asm(ORI, r2, r0, 1010)     //     ten = 10
-   //m4_asm(ORI, r3, r0, 0)        //     out = 0
-   //m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
-   //m4_asm(SW, r6, r3, 0)         //     store out at store_addr
-   //m4_asm(ADDI, r1, r1, 1)       //     cnt ++
-   //m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   //m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   //m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   //m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
-
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    
@@ -1914,7 +1919,10 @@ m4+definitions(['
    $csr_trap = $is_csr_instr && ! $valid_csr;
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
+   // if M_EXT is enabled, this handles the stalling logic
+   m4_ifelse_block(M4_EXT_M, 1, ['
    m4+m_extension()
+   '])
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
@@ -1928,14 +1936,15 @@ m4+definitions(['
       m4_ifelse_block(M4_EXT_M, 1, ['
       //$divblk_valid = ($reset || $div_stall)? 1'b0 : $divtype_instr;
       $divblk_valid = >>1$div_stall;
+      //$divblk_valid = $div_stall && $commit;
       $mulblk_valid = $multype_instr && $commit;
       m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
       //mul_valid, 
       m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
       /orig_inst           
-         $divmul_late_rslt[31:0] = |fetch/instr>>1$div_stall ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $divmul_late_rslt[31:0] = |fetch/instr$divblk_valid ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
          //$div_mul_orig_inst = |fetch/instr$div_mul;
-         $dest_reg[4:0] = |fetch/instr$div_mul ?|fetch/instr$dest_reg : $RETAIN;
+         $dest_reg[4:0] = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
       '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
@@ -2023,8 +2032,8 @@ m4+definitions(['
          $mul_in2[M4_WORD_RANGE] = *reset? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
 
          
-         $div_in1[M4_WORD_RANGE] = *reset? '0 : $divtype_instr ? /src[1]$reg_value : $RETAIN;
-         $div_in2[M4_WORD_RANGE] = *reset? '0 : $divtype_instr ? /src[2]$reg_value : $RETAIN;
+         $div_in1[M4_WORD_RANGE] = *reset? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
+         $div_in2[M4_WORD_RANGE] = *reset? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
          $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
          $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
          $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
@@ -2779,7 +2788,7 @@ m4+definitions(['
 
 \TLV m_extension()
    m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
-   m4_define(['M4_MUL_LATENCY'], 3)
+   m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>m4_eval(M4_NON_PIPELINED_BUBBLES)$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
@@ -2790,8 +2799,10 @@ m4+definitions(['
                                                      >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
                                                      '0;
                                                      
-      $stall_cnt_upper_mul = ($stall_cnt == (M4_MUL_LATENCY + 2 - (M4_NON_PIPELINED_BUBBLES + 1)));
-      $stall_cnt_upper_div = ($stall_cnt == (M4_DIV_LATENCY + 2 - (M4_NON_PIPELINED_BUBBLES + 1)));
+      //$stall_cnt_upper_mul = ($stall_cnt == (M4_MUL_LATENCY + 6 - (M4_NON_PIPELINED_BUBBLES + 1)));
+      //$stall_cnt_upper_div = ($stall_cnt == (M4_DIV_LATENCY + 6 - (M4_NON_PIPELINED_BUBBLES + 1)));
+      $stall_cnt_upper_mul = ($stall_cnt == M4_MUL_LATENCY);
+      $stall_cnt_upper_div = ($stall_cnt == M4_DIV_LATENCY);
       $trigger_next_pc_div_mul_second_issue = ($div_stall && $stall_cnt_upper_div) || ($mul_stall && $stall_cnt_upper_mul);
 
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
@@ -2811,7 +2822,7 @@ m4+definitions(['
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
        
       \SV_plus
-            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(0), .EXTRA_INSN_FFS(0), .MUL_CLKGATE(0)) mul(
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
                   .pcpi_valid    (/_top$_muldiv_valid),
@@ -3044,16 +3055,13 @@ m4+definitions(['
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
-                  // TODO: ... non-loads.
                   // verilog generated out of this $ANY:
                   // assign {FETCH_Instr_OrigInst_addr_a0[1:0], FETCH_Instr_OrigInst_dest_reg_a0[4:0], FETCH_Instr_OrigInst_div_mul_a0, FETCH_Instr_OrigInst_ld_st_half_a0, FETCH_Instr_OrigInst_ld_st_word_a0, FETCH_Instr_OrigInst_ld_value_a0[31:0], FETCH_Instr_OrigInst_raw_funct3_a0[2], FETCH_Instr_OrigInst_spec_ld_a0} = {MEM_Data_addr_a4, MEM_Data_dest_reg_a4, MEM_Data_div_mul_a4, MEM_Data_ld_st_half_a4, MEM_Data_ld_st_word_a4, MEM_Data_ld_value_a4, MEM_Data_raw_funct3_a4, MEM_Data_spec_ld_a4};
                   //      for (src = 1; src <= 2; src++) begin : L1_FETCH_Instr_OrigInst_Src logic L1_dummy_a0, L1_dummy_a1, L1_dummy_a2, L1_dummy_a3; //_/src
                   //         assign {L1_dummy_a0} = {L1_MEM_Data_Src[src].L1_dummy_a4}; end
                   $ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
-                         //(|fetch/instr>>m4_eval(1 + M4_NON_PIPELINED_BUBBLE)$commit && |fetch/instr>>m4_eval(1 + M4_NON_PIPELINED_BUBBLE)$non_pipelined) ?  :
-                         |fetch/instr$second_issue_div_mul ? |fetch/instr>>m4_eval(M4_NON_PIPELINED_BUBBLES)$ANY :
-                        >>1$ANY;
-                  //$ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                         |fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :
+                         >>1$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
