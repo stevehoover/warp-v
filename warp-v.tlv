@@ -3323,7 +3323,7 @@ m4_ifelse_block(M4_EXT_F, 1, ['
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
             *rvfi_ixl         = 2'd1;
-+           *rvfi_mode        = 2'd3;
+            *rvfi_mode        = 2'd3;
             /original
                *rvfi_insn        = $raw;
                *rvfi_order       = $rvfi_order;
