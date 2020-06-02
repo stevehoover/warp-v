@@ -1856,6 +1856,7 @@ m4+definitions(['
       '], ['
       $div_mul = 1'b0;
       $multype_instr = 1'b0;
+      `BOGUS_USE($multype_instr)
       '])
 
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
@@ -2023,10 +2024,10 @@ m4+definitions(['
          $resetn = !(*reset);         
          $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
          $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
-         $mul_in1[M4_WORD_RANGE] = *reset? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
-         $mul_in2[M4_WORD_RANGE] = *reset? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
-         $div_in1[M4_WORD_RANGE] = *reset? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
-         $div_in2[M4_WORD_RANGE] = *reset? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
+         $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
+         $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
+         $div_in1[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
+         $div_in2[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
          
          // result signals
          $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
@@ -2079,7 +2080,7 @@ m4+definitions(['
          $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
          $operand_c[31:0] = /fpusrc[1]$fpu_reg_value;
          $roundingMode[2:0] = |fetch/instr$raw_rm;
-         $int_input[31:0] = /fpusrc[1]$fpu_reg_value;
+         $int_input[31:0] = /fpusrc[1]div_mul$fpu_reg_value;
          // Main Module
          m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $roundingMode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output, $divide_by_zero)
          m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
@@ -2162,7 +2163,7 @@ m4+definitions(['
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = |fetch/instr$second_issue_div_mul ? $divmul_late_rslt : $ld_rslt;
+            $late_rslt[M4_WORD_RANGE] = m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? $divmul_late_rslt : '])$ld_rslt;
             // either div_mul result or load
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
@@ -2776,9 +2777,20 @@ m4+definitions(['
       /* verilator lint_off CASEINCOMPLETE */   
       m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
       m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
+      /* verilator lint_on WIDTH */
    '])
 
 \TLV m_extension()
+
+   // RISC-V M-Extension instructions in WARP-V are fixed latency
+   // As of today, to handle those instructions, WARP-V pipeline is stalled for the given latency, and the
+   // results are written back through a second issue at the end of stalling duration.
+   // Verilog modules are inherited from PicoRV32, and are located in the ./muldiv directory.
+   // Since the modules have a fixed latency, their valid signals are instantiated as valid decode for M-type
+   // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
+
+   // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
+
    m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
    m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
@@ -2810,8 +2822,8 @@ m4+definitions(['
 
       $mul_insn[31:0] = {7'b0000001,10'b0011000101,$opcode,5'b00101,7'b0110011};
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
-       
-      \SV_plus
+      // this module is located in ./muldiv/picorv32_pcpi_fast_mul.sv
+      \SV_plus      
             picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
@@ -2839,7 +2851,7 @@ m4+definitions(['
                                                                 // should not be encountered ideally
       $div_insn[31:0] = {7'b0000001,10'b0011000101,3'b000,5'b00101,7'b0110011} | ($opcode << 12);
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
-      
+      // this module is located in ./muldiv/picorv32_div_opt.sv
       \SV_plus
             picorv32_pcpi_div div(
                   .clk           (/_top$_clk), 
@@ -3048,13 +3060,13 @@ m4_ifelse_block(M4_EXT_F, 1, ['
             //  it is non-speculative. Both could easily be fixed.)
             $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']);
-            //$orig_inst_valid = $second_issue...
-            // Recirculate returning load.
+            // Recirculate returning load or the div_mul_result from /orig_inst scope
+
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
                   $ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
-                         |fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :
+                         m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :'])
                          // fetch the values that we put in this scope in execute stage
                          >>1$ANY;
                   /src[2:1]
@@ -3318,7 +3330,7 @@ m4_ifelse_block(M4_EXT_F, 1, ['
                                  $second_issue   ? /orig_inst$pc + 1'b1 :
                                  $trap           ? $trap_target :
                                  $jump           ? $jump_target :
-                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + trap'b1) :
+                                 $mispred_branch ? ($taken ? $branch_target[M4_PC_RANGE] : $pc + M4_PC_CNT'b1) :
                                  m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[M4_PC_RANGE] :'])
                                  $indirect_jump  ? $indirect_jump_target :
                                  $pc[31:2] +1'b1, 2'b00};
@@ -3464,7 +3476,7 @@ m4+module_def
    '], ['
    // Single Core.
    m4+warpv()
-   m4+warpv_makerchip_cnt10_tb() // parameterise to other programs
+   m4+warpv_makerchip_cnt10_tb()
    m4+makerchip_pass_fail()
    '])
 \SV
