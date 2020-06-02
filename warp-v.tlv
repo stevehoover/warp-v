@@ -216,7 +216,7 @@ m4+definitions(['
    
    // ======
    // MIPS I
-   // ======mini_decode
+   // ======
    
    // WIP.
    // Unlike RISC-V, this does not use M4 to characterize the ISA.
@@ -374,7 +374,7 @@ m4+definitions(['
             (M4_NEXT_PC_STAGE, 1),
             (M4_FETCH_STAGE, 1),
             (M4_DECODE_STAGE, 3),
-       are single cycle     (M4_BRANCH_PRED_STAGE, 4),
+            (M4_BRANCH_PRED_STAGE, 4),
             (M4_REG_RD_STAGE, 4),
             (M4_EXECUTE_STAGE, 5),
             (M4_RESULT_STAGE, 5),
@@ -872,7 +872,9 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   // 
+   //  
+   // For CPU instructions, it would be a good idea to try to link this instruction description with
+   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
@@ -1101,7 +1103,7 @@ m4+definitions(['
             output logic rvfi_halt,       
             output logic rvfi_intr,
             output logic [1: 0] rvfi_ixl,
-            output logic [1: 0] rvfi_mode,       
+            output logic [1: 0] rvfi_mode,  
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -1165,7 +1167,7 @@ m4+definitions(['
          "0=d;g",  //    store out at store_addr, 
          "e=c-b", //     tmp = nine - cnt
          "p=f?e", //     branch back if tmp >= 0
-         "e=0:c", //     load the final value into tmp
+         "e=0)c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
       }; 
 
@@ -1888,7 +1890,7 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? |fetch/instr/orig_inst>>m4_eval(M4_NON_PIPELINED_BUBBLES)$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -2087,7 +2089,7 @@ m4+definitions(['
          $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
          $operand_c[31:0] = /fpusrc[1]$fpu_reg_value;
          $roundingMode[2:0] = |fetch/instr$raw_rm;
-         $int_input[31:0] = /fpusrc[1]div_mul$fpu_reg_value;
+         $int_input[31:0] = /fpusrc[1]$fpu_reg_value;
          // Main Module
          m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $roundingMode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output, $divide_by_zero)
          m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
