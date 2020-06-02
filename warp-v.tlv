@@ -37,7 +37,7 @@ m4+definitions(['
    //      - An uber-simple mini CPU for academic use
    //      - RISC-V (incomplete)
    //   o Pipeline staging (from 1 to 7 stages)
-   //   o Architectural parameters, like memory size, ":";etc.
+   //   o Architectural parameters, like memory size, etc.
 
    // This file includes:
    //   o The configurable (esp. for pipeline depth) ISA-independent CPU logic.
@@ -185,9 +185,9 @@ m4+definitions(['
    //     , : Combine (D = {1[11:6], 2[5:0]})
    //     ? : Conditional (D = 2 ? `0 : 1)
    //   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
-   //     : : Load
+   //     ) : Load
    //   Store (Eg: "0=a;b") ([2] = 1):
-   //     ; : Store
+   //     ( : Store
    //
    // A full-width immediate load sequence, to load octal 2017 is:
    //   a=2~0
@@ -216,7 +216,7 @@ m4+definitions(['
    
    // ======
    // MIPS I
-   // ======
+   // ======mini_decode
    
    // WIP.
    // Unlike RISC-V, this does not use M4 to characterize the ISA.
@@ -374,7 +374,7 @@ m4+definitions(['
             (M4_NEXT_PC_STAGE, 1),
             (M4_FETCH_STAGE, 1),
             (M4_DECODE_STAGE, 3),
-            (M4_BRANCH_PRED_STAGE, 4),
+       are single cycle     (M4_BRANCH_PRED_STAGE, 4),
             (M4_REG_RD_STAGE, 4),
             (M4_EXECUTE_STAGE, 5),
             (M4_RESULT_STAGE, 5),
@@ -438,7 +438,7 @@ m4+definitions(['
 
    // Which program to assemble.
    // this depends on the ISA extension(s) choice
-   m4_ifexpr(M4_EXT_M == 1 ,['m4_define(M4_PROG_NAME, ['divmul_test'])'], ['m4_define(M4_PROG_NAME, ['cnt10'])'])
+   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
 
    // =====Done Defining Configuration=====
    
@@ -960,7 +960,7 @@ m4+definitions(['
       m4_define(['m4_asm_funct3'], ['['m4_ifelse($2, ['rm'], ['3'b']m4_argn(']m4_arg(#)[', m4_echo(']m4_arg(@)[')), ['$1_INSTR_FUNCT3'])']'])
       // Opcode + funct3 + funct7 (R-type). $@ as for m4_instrX(..), $7: MNEMONIC, $8: number of bits of leading bits of funct7 to interpret. If 5, for example, use the term funct5.
       m4_define(['m4_instr_funct7'],
-                ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7'][6:m4_eval(7-$8)][' == $8'b$5'], $7)m4_funct3_localparam(['$7'], ['$4'])[' localparam [6:0] $7_INSTR_FUNCT$8 = $8'b$5;']'])
+                ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7'][6:m4_eval(7-$8)][' == $8'b$5'], $7)m4_funct3_localparam(['$7'], ['$4'])[' localparam [$8-1:0] $7_INSTR_FUNCT$8 = $8'b$5;']'])
       // For cases w/ extra shamt bit that cuts into funct7.
       m4_define(['m4_instr_funct6'],
                 ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7[6:1] == 6'b$5'], $7)m4_funct3_localparam(['$7'], ['$4'])[' localparam [6:0] $7_INSTR_FUNCT6 = 6'b$5;']'])
@@ -1099,7 +1099,9 @@ m4+definitions(['
             output logic rvfi_halt,
             output logic rvfi_trap,       
             output logic rvfi_halt,       
-            output logic rvfi_intr,       
+            output logic rvfi_intr,
+            output logic [1: 0] rvfi_ixl,
+            output logic [1: 0] rvfi_mode,       
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -1243,8 +1245,8 @@ m4+definitions(['
       // Conditional
       $conditional = $char == "?";
       // Memory
-      $ld = $char == ":";
-      $st = $char == ";";
+      $ld = $char == ")";
+      $st = $char == "(";
       // Opcode classes:
       $arith = $add || $sub || $mul || $div;
       $compare = $eq || $ne || $lt || $gt || $le || $ge;
@@ -1935,8 +1937,13 @@ m4+definitions(['
       // Verilog instantiation must happen outside when conditions' scope
       $divblk_valid = >>1$div_stall;
       $mulblk_valid = $multype_instr && $commit;
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
       m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
       m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
+      /* verilator lint_on CASEINCOMPLETE */   
+      /* verilator lint_on WIDTH */
+      
       /orig_inst
          // put correctly aligned values from MUL and DIV Verilog modules into /orig_inst scope
          // and RETAIN till next M-type instruction, to be used again at second issue
@@ -2771,11 +2778,11 @@ m4+definitions(['
 //==================//
 
 \SV
-   m4_ifexpr(M4_EXT_M == 1, ['
+   m4_ifelse_block(M4_EXT_M, 1, ['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */   
-      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_div.sv'])
       m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
       /* verilator lint_on WIDTH */
    '])
@@ -3315,6 +3322,8 @@ m4_ifelse_block(M4_EXT_F, 1, ['
             *rvfi_valid       = $rvfi_valid;
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
+            *rvfi_ixl         = 2'd1;
++           *rvfi_mode        = 2'd3;
             /original
                *rvfi_insn        = $raw;
                *rvfi_order       = $rvfi_order;

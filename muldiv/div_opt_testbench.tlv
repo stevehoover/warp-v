@@ -104,7 +104,7 @@ endmodule
 
    $mul_valid = 1'b1;
    $mul_insn = !$pcpi_wait;
-   //$mul_insn = (*cyc_cnt <= 2 || *cyc_cnt >= 'h27)? 0 : 1'b1;
+
    $mulin1[31:0] = $reset ? 0 : 
                    $mul_insn ? $pcpi_rs1 : 
                    $RETAIN;
@@ -112,9 +112,9 @@ endmodule
    $mulin2[31:0] = $reset ? 0 : 
                    $mul_insn ? $pcpi_rs2 : 
                    $RETAIN;                                           
-   //$pcpi_valid = (*cyc_cnt <= 'h170) ? 1'b1 : 1'b0;
+
    $pcpi_rs2[31:0] = 32'h5 ;
-   //$latency[4:0] = $reset ? 0 : >>37$latency+1;
+
    \SV_plus
       picorv32_pcpi_div div(
          .clk(clk), 
