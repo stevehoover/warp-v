@@ -101,10 +101,7 @@ endmodule
                      (*cyc_cnt >= 'd100 ) ? 32'h0 :
                      (*cyc_cnt >= 'd50 ) ? 32'h78   :
                                            32'h96     ;
-   /*$mul_insn = (*cyc_cnt >= 'h80 && *cyc_cnt <= 'h81) ? 1'b1 : 
-               (*cyc_cnt >= 'h40 && *cyc_cnt <= 'h41) ? 1'b1 :
-               (*cyc_cnt >= 'h5 && *cyc_cnt <= 'h7) ? 1'b1 :
-                                                        1'b0 ;*/
+
    $mul_valid = 1'b1;
    $mul_insn = !$pcpi_wait;
    //$mul_insn = (*cyc_cnt <= 2 || *cyc_cnt >= 'h27)? 0 : 1'b1;

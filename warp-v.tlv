@@ -97,7 +97,7 @@ m4+definitions(['
    //     supported (though loads are implemented to have a fixed latency). A returning load
    //     reserves an instruction slot at the beginning of the pipeline to reserve a register
    //     write port. The returning load writes its result and clears the destination
-   //     register`s pending flag.
+   //     register's pending flag.
    //
    // To support L1 and L2 caches, it would be reasonable to delay register write (if
    // necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
@@ -122,8 +122,8 @@ m4+definitions(['
    //
    // Bypass:
    //
-   //    Register bypass is provided if one instruction`s result is not written to the
-   //    register file in time for the next instruction`s read. An additional bypass is
+   //    Register bypass is provided if one instruction's result is not written to the
+   //    register file in time for the next instruction's read. An additional bypass is
    //    provided for each additional cycle between read and write.
    //
    // Memory:
@@ -151,9 +151,9 @@ m4+definitions(['
    
    // A dirt-simple CPU for educational purposes.
 
-   // What`s interesting about this CPU?
-   //   o It`s super small.
-   //   o It`s easy to play with an learn from.
+   // What's interesting about this CPU?
+   //   o It's super small.
+   //   o It's easy to play with an learn from.
    //   o Instructions are short, kind-of-readable strings, so no assembler is needed.
    //     They would map directly to a denser (~17-bit) encoding if desired.
    //   o The only instruction formats are op, load, and store.
