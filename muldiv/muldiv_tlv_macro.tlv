@@ -79,8 +79,7 @@
                   .pcpi_ready    (/_top$['']$_ready)
                );
 
-\TLV ignore()
-   
+\TLV    
    |muldiv
       @1
          $instr_type_mul[3:0] = (1 << 0);
