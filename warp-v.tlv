@@ -3475,7 +3475,7 @@ m4+module_def
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
 
 \TLV
-   /* verilator lint_off WIDTH */  // Let's be strict about bit widths.
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    // Multi-core
    /M4_CORE_HIER
