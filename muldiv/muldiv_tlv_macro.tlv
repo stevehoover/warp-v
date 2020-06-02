@@ -2,7 +2,7 @@
 \SV
 
  //Notes : 
-   //       1. Mul* are single cycle
+   //       1. Mul* have 5 cycle latency with 
    //       2. Div and rem have fixed 'd37 ('h25) cycles latency
    //       3. Original div kept output on pcpi_rd for only one cycle, modified to keep that as long as
    //          new inputs are not given
