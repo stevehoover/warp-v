@@ -267,7 +267,7 @@ m4+definitions(['
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
 
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['6-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
@@ -410,7 +410,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
+            (['M4_EXT_M'], 0),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -716,7 +716,7 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $pc_inc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1'],
       ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
@@ -1890,7 +1890,8 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$divmul_dest_reg :'])
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -1950,7 +1951,7 @@ m4+definitions(['
          // put correctly aligned values from MUL and DIV Verilog modules into /orig_inst scope
          // and RETAIN till next M-type instruction, to be used again at second issue
          $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr$divblk_valid ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
-         $dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
+         $divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
       '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
@@ -2889,7 +2890,7 @@ m4_ifelse_block(M4_EXT_F, 1, ['
 
 \TLV f_extension()
    // TODO: Get the ordering and defaulting behavior right for this:
-   m4_define(['M4_EXT_F'], 1)
+   m4_define(['M4_EXT_F'], 0)
    
    // This macro uses Berkeley Hard-Float to implement "F" extension support in risc-v.
    // Floating-point operations (any instructions that write a floating-point register) abort (after)
@@ -3074,10 +3075,13 @@ m4_ifelse_block(M4_EXT_F, 1, ['
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
-                  $ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
-                         m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :'])
-                         // fetch the values that we put in this scope in execute stage
-                         >>1$ANY;
+                  m4_ifelse_block(M4_EXT_M,1,['
+                  $ANY =   |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
+                           |fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :
+                           >>1$ANY;
+                         '], ['
+                  $ANY =   /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY; 
+                          '])
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
