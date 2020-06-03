@@ -61,8 +61,8 @@ if [ $? -eq 1 ]; then
 fi
 
 ## RISCV-Formal:
-#cd "$BUILD_DIR"
-#git clone https://github.com/cliffordwolf/riscv-formal.git riscv-formal && \
+cd "$BUILD_DIR"
+git clone https://github.com/cliffordwolf/riscv-formal.git riscv-formal && \
 #cd riscv-formal && \
 #`# Record commit ID.` \
 #(git rev-parse HEAD > commit_id.txt) && \
