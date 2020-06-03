@@ -6,7 +6,7 @@ language: generic
 
 cache:
   directories:
-    /home/travis/build/stevehoover/warp-v/formal/env
+    /home/travis/build/shivampotdar/warp-v/formal/env
 
 before_install:
 install:
@@ -21,11 +21,11 @@ before_script:
   - cd formal
 script:
   # Run riscv-formal for WARP-V.
-  - PATH=/home/travis/build/stevehoover/warp-v/formal/env/bin:$PATH bash -c 'make verif'
+  - PATH=/home/travis/build/shivampotdar/warp-v/formal/env/bin:$PATH bash -c 'make verif'
 after_success:
 after_failure:
   # Upload files for debug.
-  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/stevehoover/warp-v/formal/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`engine_0/trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd && echo; done
+  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/shivampotdar/warp-v/formal/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`engine_0/trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd && echo; done
 after_script:
   # Report a message if we didn't use the latest commit of yosys.
   - if cmp -s yosys_latest_commit_id.txt env/yosys_commit_id.txt; then echo '******** Using the following cached yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. **********' && cat env/yosys_commit_id.txt && echo '**********'; fi
