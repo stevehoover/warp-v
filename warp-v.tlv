@@ -267,7 +267,7 @@ m4+definitions(['
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
 
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
@@ -1377,14 +1377,18 @@ m4+definitions(['
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
    m4_asm(ORI, r10, r0, 10101010)
+   //m4_asm(ORI, r10, r0, 1001)
    m4_asm(MUL, r11, r8, r9)
    m4_asm(ORI, r6, r0, 0)
    m4_asm(SW, r6, r11, 0)
    m4_asm(MUL, r12, r9, r10)
+   m4_asm(LW, r4, r6, 0)
+   m4_asm(ADDI, r6, r6, 100)
+   m4_asm(SW, r6, r12, 0)
    m4_asm(MUL, r13, r8, r10)
    m4_asm(DIV, r14, r11, r8)
    m4_asm(DIV, r15, r13, r10)
-   m4_asm(LW, r4, r6, 0)
+   m4_asm(LW, r5, r6, 0)
    m4_asm(ADDI, r4, r0, 101101)
    m4_asm(BGE, r8, r9, 111111111110)
    
