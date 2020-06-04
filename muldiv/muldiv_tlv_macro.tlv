@@ -1,15 +1,21 @@
 \m4_TLV_version 1d: tl-x.org
 \SV
 
-   // =========================================
-   // Welcome!  Try the tutorials via the menu.
-   // =========================================
+ //Notes : 
+   //       1. Mul* have 5 cycle latency with 
+   //       2. Div and rem have fixed 'd37 ('h25) cycles latency
+   //       3. Original div kept output on pcpi_rd for only one cycle, modified to keep that as long as
+   //          new inputs are not given
+   //       4. Ideal to feed input when $$pcpi_wait = 1
+   //       5. Here pcpi_wr is same as pcpi_ready, ideally no need to use _wr,
+   //          since committing the result would be done by WARP-V pipeline and not the module
+                        
 
    // Default Makerchip TL-Verilog Code Template
    /* verilator lint_off WIDTH */
    /* verilator lint_off CASEINCOMPLETE */
-   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/muldiv/muldiv/picorv32_pcpi_div.sv'])
-   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/muldiv/muldiv/picorv32_pcpi_fast_mul.sv'])
+   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_div_opt.sv'])
+   m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
    // Macro providing required top-level module definition, random
    // stimulus support, and Verilator config.
    m4_makerchip_module()   // (Expanded in Nav-TLV pane.)
@@ -38,15 +44,11 @@
                   .pcpi_insn     ($mul_insn),
                   .pcpi_rs1      (/_top$_op_a),
                   .pcpi_rs2      (/_top$_op_b),
-                  .pcpi_wr       ($$mul_pcpi_wr),
-                  .pcpi_rd       ($$mul_pcpi_rd[31:0]),
-                  .pcpi_wait     ($$mul_pcpi_wait),
-                  .pcpi_ready    ($$mul_pcpi_ready)
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_ready    (/_top$['']$_ready)
             );
-   $_wr           =   /_name$mul_pcpi_wr;
-   $_wait         =   /_name$mul_pcpi_wait;
-   $_ready        =   /_name$mul_pcpi_ready;
-   $_rslt[31:0]   =   /_name$mul_pcpi_rd;           
    
 \TLV warpv_div(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
    /_name
@@ -71,17 +73,13 @@
                   .pcpi_insn     ($div_insn),
                   .pcpi_rs1      (/_top$_op_a),
                   .pcpi_rs2      (/_top$_op_b),
-                  .pcpi_rd       ($$div_pcpi_rd[31:0]),
-                  .pcpi_wait     ($$div_pcpi_wait),
-                  .pcpi_wr       ($$div_pcpi_wr),
-                  .pcpi_ready    ($$div_pcpi_ready)
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_ready    (/_top$['']$_ready)
                );
-   $_ready       =   /_name$div_pcpi_ready;
-   $_wait        =   /_name$div_pcpi_wait;
-   $_wr          =   /_name$div_pcpi_wr;
-   $_rslt[31:0]  =   /_name$div_pcpi_rd;
-\TLV 
-   
+
+\TLV    
    |muldiv
       @1
          $instr_type_mul[3:0] = (1 << 0);
