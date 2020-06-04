@@ -68,7 +68,7 @@ m4+definitions(['
    //   o One instruction traverses the single free-flowing CPU pipeline per cycle.
    //   o There is no branch or condition or target prediction.
    //   o Instructions are in-order, but the uarch supports loads that return their
-   //     data out of order (though, they don't).
+   //     data out of order (though, they do not).
    //
    // Redirects:
    //
@@ -88,15 +88,16 @@ m4+definitions(['
    //
    // Loads:
    //
-   // Load instructions complete without writing their destination registers. Destination
-   // registers are instead marked "pending", and reads of pending registers are replayed.
-   // This could again result in a read of the same pending register and can repeat until
-   // the load returns. Writes to pending registers are also replayed, so there can be at
-   // most one oustanding load to any given register. This way, out-of-order loads are
-   // supported (though loads are implemented to have a fixed latency). A returning load
-   // reserves an instruction slot at the beginning of the pipeline to reserve a register
-   // write port. The returning load writes its result and clears the destination
-   // register's pending flag.
+   //   o Load instructions complete without writing their destination registers. Destination
+   //     registers are instead marked "pending", and reads of pending registers are replayed.
+   //   o This could again result in a read of the same pending register and can repeat until
+   //     the load returns. Writes to pending registers are also replayed, so there can be at
+   //     most one oustanding load to any given register. 
+   //   o This way, out-of-order loads are
+   //     supported (though loads are implemented to have a fixed latency). A returning load
+   //     reserves an instruction slot at the beginning of the pipeline to reserve a register
+   //     write port. The returning load writes its result and clears the destination
+   //     register's pending flag.
    //
    // To support L1 and L2 caches, it would be reasonable to delay register write (if
    // necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
@@ -105,26 +106,30 @@ m4+definitions(['
    //
    // Long-latency pipelined instructions:
    //
-   // Long-latency pipelined instructions can utilize the same split issue and pending
-   // mechanisms as load instructions.
+   //    Long-latency pipelined instructions can utilize the same split issue and pending
+   //    mechanisms as load instructions.
    //
    // Long-latency non-pipelined instructions:
    //
-   // FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
-   // are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
-   // the next redirect (which will be a second issue of the instruction).
-   // It doesn't matter whether registers are marked pending, but we do.
+   //   o FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
+   //     are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
+   //     the next redirect (which will be a second issue of the instruction).
+   //   o The data required during second can be passed to the commit stage using /orig_inst scope
+   //   o It does not matter whether registers are marked pending, but we do.
+   //   o Process redirect conditions take care of the correct handling of PC for such instrctions.
+   //   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
+   //     for such instructions
    //
    // Bypass:
    //
-   // Register bypass is provided if one instruction's result is not written to the
-   // register file in time for the next instruction's read. An additional bypass is
-   // provided for each additional cycle between read and write.
+   //    Register bypass is provided if one instruction's result is not written to the
+   //    register file in time for the next instruction's read. An additional bypass is
+   //    provided for each additional cycle between read and write.
    //
    // Memory:
    //
-   // The program is stored in its own instruction memory (for simplicity).
-   // Data memory is separate.
+   //    The program is stored in its own instruction memory (for simplicity).
+   //    Data memory is separate.
    //
    
    // TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
@@ -133,11 +138,13 @@ m4+definitions(['
    //       in place of the fetch instruction. There have been several subtle bugs where the fetch
    //       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
    //       avoid them.
+   //
    // TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
    //       already have the raw instruction bits to inject. The replay mechanism can be separated from
    //       redirects.
    
-   
+
+
    // ============
    // Mini-CPU ISA
    // ============
@@ -174,13 +181,13 @@ m4+definitions(['
    //     &, |: Bitwise
    //        (Can be used on booleans as well as vectors.)
    //     (There are no operators for NAND and NOR and unary !.)
-   //     ~: Extended constant (D = {1[2:0], 2[2:0]})
-   //     ,: Combine (D = {1[11:6], 2[5:0]})
-   //     ?: Conditional (D = 2 ? `0 : 1)
-   //   Load (Eg: "c=a{b") (D = [1 + 2] (typically 1 would be an immediate offset):
-   //     {: Load
-   //   Store (Eg: "0=a}b") ([2] = 1):
-   //     }: Store
+   //     ~ : Extended constant (D = {1[2:0], 2[2:0]})
+   //     , : Combine (D = {1[11:6], 2[5:0]})
+   //     ? : Conditional (D = 2 ? `0 : 1)
+   //   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
+   //     ) : Load
+   //   Store (Eg: "0=a;b") ([2] = 1):
+   //     ( : Store
    //
    // A full-width immediate load sequence, to load octal 2017 is:
    //   a=2~0
@@ -198,7 +205,7 @@ m4+definitions(['
    // RISC-V ISA
    // ==========
    
-   // This design is a RISC-V (RV32I) implementation.
+   // This design is a RISC-V (RV32IM) implementation.
    // The ISA is characterized using M4 macros, and the microarchitecture is generated from this characterization, so
    // the ISA can be modified through M4 definitions.
    // Notes:
@@ -221,6 +228,7 @@ m4+definitions(['
    // not to provide a production-worthy MIPS I design.
    
    
+
    // =====
    // Power
    // =====
@@ -231,6 +239,7 @@ m4+definitions(['
    // not to provide a production-worthy Power design.
    
    
+
    // =========
    // DUMMY ISA
    // =========
@@ -246,7 +255,6 @@ m4+definitions(['
    
 
 
-
    // =============
    // Configuration
    // =============
@@ -257,6 +265,7 @@ m4+definitions(['
    // Machine:
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
+
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
@@ -282,10 +291,6 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-
-   
-   // Which program to assemble.
-   m4_define(M4_PROG_NAME, ['cnt10'])
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -397,7 +402,7 @@ m4+definitions(['
          // ISA options:
 
          // Currently supported uarch variants:
-         //   RV32I 2.0, w/ no ISA extensions.
+         //   RV32IM 2.0, w/ FA ISA extensions WIP.
 
          // Machine width
          m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
@@ -405,7 +410,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 0),
+            (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -430,7 +435,11 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       ']
    )
-   
+
+   // Which program to assemble.
+   // this depends on the ISA extension(s) choice
+   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+
    // =====Done Defining Configuration=====
    
    // Characterize ISA and apply configuration.
@@ -496,7 +505,7 @@ m4+definitions(['
    // The idea here, is to move all logic into @0 and see how well synthesis results compare vs. the timed model with
    // retiming enabled. In theory, synthesis should be able to produce identical results.
    //
-   // Unfortunately, this modeling doesn't work because of the redirection logic. When timed @0, the $GoodPathMask would
+   // Unfortunately, this modeling does not work because of the redirection logic. When timed @0, the $GoodPathMask would
    // need to be redistributed, with each bit in a different stage to enable $commit to be computed in @0. So, to make
    // this work, each bit of $GoodPathMask would have to become a separate signal, and each signal assignment would need
    // its own @stage scope, affected by M4_RETIMING_EXPERIMENT. Since this is all generated by M4 ugliness, it was too
@@ -506,6 +515,7 @@ m4+definitions(['
    //
    // This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
+   
    m4_ifelse(M4_RETIMING_EXPERIMENT, ['M4_RETIMING_EXPERIMENT'], [''], ['
       m4_define(['M4_NEXT_PC_STAGE'], 0)
       m4_define(['M4_FETCH_STAGE'], 0)
@@ -706,7 +716,7 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1'],
       ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
@@ -806,14 +816,7 @@ m4+definitions(['
          // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
       '])
    '])
-   
-   // TODO: be specific about widths (lint_on)
-   // Calling includes and top module of FPU i.e. HardFloat module
-   // GitHub link in development , hence it can change later
-   m4_ifelse_block(M4_EXT_F, 1, ['                               
-   m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/floating-point/verilog2/topmodule/fputopmodule.tlv'])
-   '])
-                                                                        
+                                                                         
    // ==========================
    // ISA Code Generation Macros
    // ==========================
@@ -869,10 +872,9 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   //
+   //  
    // For CPU instructions, it would be a good idea to try to link this instruction description with
-   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here.
-   //
+   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
@@ -1017,6 +1019,7 @@ m4+definitions(['
       //   m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRT.S)
       //   m4_instr(R2, 32, A, 01011, 010, 00010, 00000, LR.W)  // (5 bits for funct7 for all "A"-ext instrs)
       //   m4_instr(R, 32, A, 01011, 010, 00011, SC.W)          //   "
+
       // This defines assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
       //   I: m4_asm_ADDI(r4, r1, 0),
       //   R: m4_asm_ADD(r4, r1, r2),
@@ -1098,9 +1101,9 @@ m4+definitions(['
             output logic rvfi_halt,
             output logic rvfi_trap,       
             output logic rvfi_halt,       
-            output logic rvfi_intr,  
+            output logic rvfi_intr,
             output logic [1: 0] rvfi_ixl,
-            output logic [1: 0] rvfi_mode,
+            output logic [1: 0] rvfi_mode,  
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -1160,12 +1163,13 @@ m4+definitions(['
          "d=d+b", //  -> out += cnt
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
-         "0=d}g", //     store out at store_addr
+         
+         "0=d;g",  //    store out at store_addr, 
          "e=c-b", //     tmp = nine - cnt
-         "p=f?e", //  ^- branch back if tmp >= 0
-         "e=0{c", //     load the final value into tmp
+         "p=f?e", //     branch back if tmp >= 0
+         "e=0)c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
-      };
+      }; 
 
 \TLV mini_imem(_prog_name)
    m4+indirect(['mini_']_prog_name['_prog'])
@@ -1243,8 +1247,8 @@ m4+definitions(['
       // Conditional
       $conditional = $char == "?";
       // Memory
-      $ld = $char == "{";
-      $st = $char == "}";
+      $ld = $char == ")";
+      $st = $char == "(";
       // Opcode classes:
       $arith = $add || $sub || $mul || $div;
       $compare = $eq || $ne || $lt || $gt || $le || $ge;
@@ -1339,7 +1343,7 @@ m4+definitions(['
    // | Count to 10 Program |
    // \=====================/
    //
-
+   // Default program for RV32I test
    // Add 1,2,3,...,9 (in that order).
    // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
    //
@@ -1350,7 +1354,7 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
-   
+ 
    m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
    m4_asm(ORI, r1, r0, 1)        //     cnt = 1
    m4_asm(ORI, r2, r0, 1010)     //     ten = 10
@@ -1363,6 +1367,30 @@ m4+definitions(['
    m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
    m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
+\TLV riscv_divmul_test_prog()
+   // /==========================\
+   // | M-extension Test Program |
+   // \==========================/
+   //
+   //3 MULs followed by 3 DIVs, check r11-r15 for correct results
+
+   m4_asm(ORI, r8, r0, 1011)
+   m4_asm(ORI, r9, r0, 1010)
+   m4_asm(ORI, r10, r0, 10101010)
+   m4_asm(MUL, r11, r8, r9)
+   m4_asm(ORI, r6, r0, 0)
+   m4_asm(SW, r6, r11, 0)
+   m4_asm(MUL, r12, r9, r10)
+   m4_asm(LW, r4, r6, 0)
+   m4_asm(ADDI, r6, r6, 100)
+   m4_asm(SW, r6, r12, 0)
+   m4_asm(MUL, r13, r8, r10)
+   m4_asm(DIV, r14, r11, r8)
+   m4_asm(DIV, r15, r13, r10)
+   m4_asm(LW, r5, r6, 0)
+   m4_asm(ADDI, r4, r0, 101101)
+   m4_asm(BGE, r8, r9, 111111111110)
+   
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    
@@ -1826,16 +1854,19 @@ m4+definitions(['
       
       m4_ifelse_block(M4_EXT_M, 1, ['
       // Instruction requires integer mul/div unit and is long-latency.
-      $div_mul = $is_mul_instr ||
-                 $is_mulh_instr ||
-                 $is_mulhsu_instr ||
-                 $is_mulhu_instr ||
-                 $is_div_instr ||
-                 $is_divu_instr ||
-                 $is_rem_instr ||
-                 $is_remu_instr;
+      $divtype_instr = $is_div_instr ||
+                       $is_divu_instr ||
+                       $is_rem_instr ||
+                       $is_remu_instr;
+      $multype_instr = $is_mul_instr ||
+                       $is_mulh_instr ||
+                       $is_mulhsu_instr ||
+                       $is_mulhu_instr;       
+      $div_mul       = $multype_instr || $divtype_instr;
       '], ['
       $div_mul = 1'b0;
+      $multype_instr = 1'b0;
+      `BOGUS_USE($multype_instr)
       '])
 
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
@@ -1865,7 +1896,8 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? /orig_inst$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$divmul_dest_reg :'])
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -1896,6 +1928,10 @@ m4+definitions(['
    $csr_trap = $is_csr_instr && ! $valid_csr;
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
+   // if M_EXT is enabled, this handles the stalling logic
+   m4_ifelse_block(M4_EXT_M, 1, ['
+   m4+m_extension()
+   '])
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
@@ -1906,7 +1942,23 @@ m4+definitions(['
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
+      m4_ifelse_block(M4_EXT_M, 1, ['
+      // Verilog instantiation must happen outside when conditions' scope
+      $divblk_valid = >>1$div_stall;
+      $mulblk_valid = $multype_instr && $commit;
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
+      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+      m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
+      /* verilator lint_on CASEINCOMPLETE */   
+      /* verilator lint_on WIDTH */
       
+      /orig_inst
+         // put correctly aligned values from MUL and DIV Verilog modules into /orig_inst scope
+         // and RETAIN till next M-type instruction, to be used again at second issue
+         $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr$divblk_valid ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
+      '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
@@ -1981,18 +2033,32 @@ m4+definitions(['
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
-         m4_ifelse_block(M4_EXT_M, 1, ['
-         $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
+         
+         m4_ifelse_block(M4_EXT_M, 1, ['       
+         // for Verilog modules instantiation
+         $clk = *clk;         
+         $resetn = !(*reset);         
+         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
+         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
+         $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
+         $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
+         $div_in1[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
+         $div_in2[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
+         
+         // result signals
+         $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
+         $mulhu_rslt[M4_WORD_RANGE]    = /orig_inst$late_rslt;
+         $div_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $divu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $rem_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $remu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
          '])
 
-         // "F" Extension.
+         // "F" Extension
+
          m4_ifelse_block(M4_EXT_F, 1, ['
          // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
          // Need to call fpu_exe marco inside this ifelse_block itself and simplify it to optimize the unit.
@@ -2061,7 +2127,7 @@ m4+definitions(['
          $fcvtswu_rslt[M4_WORD_RANGE] = /fpu1$output_result;
          $fmvwx_rslt[M4_WORD_RANGE] = /src[1]$reg_value;
          '])
-         
+
    // CSR logic
    // ---------
    m4+riscv_csrs((m4_csrs))
@@ -2113,7 +2179,8 @@ m4+definitions(['
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = $ld_rslt;  // TODO: || ...
+            $late_rslt[M4_WORD_RANGE] = m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? $divmul_late_rslt : '])$ld_rslt;
+            // either div_mul result or load
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2714,30 +2781,122 @@ m4+definitions(['
 
 
 
-//===============//
-// "M" Extension //
-//===============//
+//==================//
+//      RISC-V      //
+//  "M" Extension   //
+//==================//
+
+\SV
+   m4_ifelse_block(M4_EXT_M, 1, ['
+      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_div.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
+      /* verilator lint_on WIDTH */
+   '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
+
+   // RISC-V M-Extension instructions in WARP-V are fixed latency
+   // As of today, to handle those instructions, WARP-V pipeline is stalled for the given latency, and the
+   // results are written back through a second issue at the end of stalling duration.
+   // Verilog modules are inherited from PicoRV32, and are located in the ./muldiv directory.
+   // Since the modules have a fixed latency, their valid signals are instantiated as valid decode for M-type
+   // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
+
+   // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
+
+   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
-      $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
+      $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
-      {$div_mul_stall, $stall_cnt[5:0]} =
-           $reset ? '0 :
-           $second_issue ? '0 :
-           ($commit && $div_mul) ? {1'b1, 6'b1} :
-           >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
-                    '0;
-      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
-      $div_mul_rslt[31:0] = 32'h55555555;
-//===============//
-// "F" Extension //
-//===============//
+      {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
+                                                     $second_issue_div_mul ? '0 :
+                                                     ($commit && $div_mul) ? {$divtype_instr, $multype_instr, 6'b1} :
+                                                     >>1$div_stall ? {1'b1, 1'b0, >>1$stall_cnt + 6'b1} :
+                                                     >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
+                                                     '0;
+                                                     
+      $stall_cnt_upper_mul = ($stall_cnt == M4_MUL_LATENCY);
+      $stall_cnt_upper_div = ($stall_cnt == M4_DIV_LATENCY);
+      $trigger_next_pc_div_mul_second_issue = ($div_stall && $stall_cnt_upper_div) || ($mul_stall && $stall_cnt_upper_mul);
+
+\TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name      
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001) ? 3'b000 : // mull 
+                     (/_top$_instr_type == 4'b0010) ? 3'b001 : // mulh
+                     (/_top$_instr_type == 4'b0100) ? 3'b010 : // mulhsu
+                     (/_top$_instr_type == 4'b1000) ? 3'b011 : // mulhu
+                                                      3'b000 ; // default to mul, but this case 
+                                                               // should not be encountered ideally
+
+      $mul_insn[31:0] = {7'b0000001,10'b0011000101,$opcode,5'b00101,7'b0110011};
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+      // this module is located in ./muldiv/picorv32_pcpi_fast_mul.sv
+      \SV_plus      
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($mul_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_ready    (/_top$['']$_ready)
+            );
+   
+\TLV warpv_div(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001 ) ? 3'b100 : // div
+                     (/_top$_instr_type == 4'b0010 ) ? 3'b101 : // divu
+                     (/_top$_instr_type == 4'b0100 ) ? 3'b110 : // rem
+                     (/_top$_instr_type == 4'b1000 ) ? 3'b111 : // remu
+                                                       3'b100 ; // default to mul, but this case 
+                                                                // should not be encountered ideally
+      $div_insn[31:0] = {7'b0000001,10'b0011000101,3'b000,5'b00101,7'b0110011} | ($opcode << 12);
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+      // this module is located in ./muldiv/picorv32_div_opt.sv
+      \SV_plus
+            picorv32_pcpi_div div(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($div_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_ready    (/_top$['']$_ready)
+               );
+
+//==================//
+//      RISC-V      //
+//  "F" Extension   //
+//==================//
+
+// TODO: be specific about widths (lint_on)
+// Calling includes and top module of FPU i.e. HardFloat module
+// GitHub link in development , hence it can change later
+m4_ifelse_block(M4_EXT_F, 1, ['                               
+   m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/floating-point/verilog2/topmodule/fputopmodule.tlv'])
+'])
 
 \TLV f_extension()
    // TODO: Get the ordering and defaulting behavior right for this:
-   m4_define(['M4_EXT_F'], 1)
+   m4_define(['M4_EXT_F'], 0)
    
    // This macro uses Berkeley Hard-Float to implement "F" extension support in risc-v.
    // Floating-point operations (any instructions that write a floating-point register) abort (after)
@@ -2770,6 +2929,8 @@ m4+definitions(['
 
    |fetch
       /instr
+         
+         
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -2915,12 +3076,18 @@ m4+definitions(['
             //  it is non-speculative. Both could easily be fixed.)
             $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']);
-            // Recirculate returning load.
+            // Recirculate returning load or the div_mul_result from /orig_inst scope
+
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
-                  // TODO: ... non-loads.
-                  $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  m4_ifelse_block(M4_EXT_M,1,['
+                  $ANY =   |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
+                           |fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :
+                           >>1$ANY;
+                         '], ['
+                  $ANY =   /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY; 
+                          '])
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             

@@ -54,9 +54,12 @@
 	always @(posedge clk) begin
 		pcpi_ready <= 0;
 		pcpi_wr <= 0;
-		pcpi_rd <= 0;
+	//write output to 0 only if valid sig is 
+      if(!pcpi_valid) begin
+         pcpi_rd <= 0;
+      end
 
-		if (!resetn) begin
+		if (!resetn || !pcpi_valid) begin
 			running <= 0;
 		end else
 		if (start) begin
@@ -92,20 +95,34 @@ endmodule
    
 \TLV
    $reset = *reset;
-   
+   $cyc_cnt[7:0] = *cyc_cnt;
    $pcpi_insn[31:0] = {7'b0000001,10'b0011000101,3'b100, 5'b00101,7'b0110011}; //change 3 part for DIV, DIVU..
-   $pcpi_rs1[31:0] = 32'h12345678;
-   $pcpi_rs2[31:0] = 32'h5678;
-   $pcpi_valid = 1'b1;
-   
+   $pcpi_rs1[31:0] = (*cyc_cnt >= 'd150 ) ? 32'h3C : 
+                     (*cyc_cnt >= 'd100 ) ? 32'h0 :
+                     (*cyc_cnt >= 'd50 ) ? 32'h78   :
+                                           32'h96     ;
+
+   $mul_valid = 1'b1;
+   $mul_insn = !$pcpi_wait;
+
+   $mulin1[31:0] = $reset ? 0 : 
+                   $mul_insn ? $pcpi_rs1 : 
+                   $RETAIN;
+                   
+   $mulin2[31:0] = $reset ? 0 : 
+                   $mul_insn ? $pcpi_rs2 : 
+                   $RETAIN;                                           
+
+   $pcpi_rs2[31:0] = 32'h5 ;
+
    \SV_plus
       picorv32_pcpi_div div(
          .clk(clk), 
          .resetn(!reset),
-         .pcpi_valid($pcpi_valid),
+         .pcpi_valid($mul_valid),
          .pcpi_insn($pcpi_insn),
-         .pcpi_rs1($pcpi_rs1),
-         .pcpi_rs2($pcpi_rs2),
+         .pcpi_rs1($mulin1),
+         .pcpi_rs2($mulin2),
          .pcpi_wr($$pcpi_wr),
          .pcpi_rd($$pcpi_rd[31:0]),
          .pcpi_wait($$pcpi_wait),
@@ -113,7 +130,7 @@ endmodule
          );
 
    // Assert these to end simulation (before Makerchip cycle limit).
-   *passed = *cyc_cnt > 50;
+   *passed = *cyc_cnt > 200;
    *failed = 1'b0;
 \SV
    endmodule
