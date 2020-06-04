@@ -1377,7 +1377,6 @@ m4+definitions(['
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
    m4_asm(ORI, r10, r0, 10101010)
-   //m4_asm(ORI, r10, r0, 1001)
    m4_asm(MUL, r11, r8, r9)
    m4_asm(ORI, r6, r0, 0)
    m4_asm(SW, r6, r11, 0)
@@ -2814,7 +2813,7 @@ m4+definitions(['
       $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
       {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
-                                                     $second_issue ? '0 :
+                                                     $second_issue_div_mul ? '0 :
                                                      ($commit && $div_mul) ? {$divtype_instr, $multype_instr, 6'b1} :
                                                      >>1$div_stall ? {1'b1, 1'b0, >>1$stall_cnt + 6'b1} :
                                                      >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
