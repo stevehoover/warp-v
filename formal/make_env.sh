@@ -61,8 +61,8 @@ if [ $? -eq 1 ]; then
 fi
 
 ## RISCV-Formal:
-cd "$BUILD_DIR"
-git submodule add https://github.com/cliffordwolf/riscv-formal.git ../riscv-formal
+#cd "$BUILD_DIR"
+#git submodule add https://github.com/cliffordwolf/riscv-formal.git ../riscv-formal
 #git clone https://github.com/cliffordwolf/riscv-formal.git riscv-formal && \
 #cd riscv-formal && \
 #`# Record commit ID.` \
