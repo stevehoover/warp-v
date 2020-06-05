@@ -80,20 +80,35 @@
 			quotient_msk <= (1 << 31);
 		end else
 		if ((quotient_msk==0) && running) begin
-         running <= 0;
+            running <= 0;
 			pcpi_ready <= 1;
 			pcpi_wr <= 1;
+
+`ifdef RISCV_FORMAL_ALTOPS
+			case (1)
+				instr_div:  pcpi_rd <= (pcpi_rs1 - pcpi_rs2) ^ 32'h7f8529ec;
+				instr_divu: pcpi_rd <= (pcpi_rs1 - pcpi_rs2) ^ 32'h10e8fd70;
+				instr_rem:  pcpi_rd <= (pcpi_rs1 - pcpi_rs2) ^ 32'h8da68fa5;
+				instr_remu: pcpi_rd <= (pcpi_rs1 - pcpi_rs2) ^ 32'h3138d0e1;
+			endcase
+`else
 			if (instr_div || instr_divu)
 				pcpi_rd <= outsign ? -quotient : quotient;
 			else
 				pcpi_rd <= outsign ? -dividend : dividend;
+`endif
 		end else begin
 			if (divisor <= dividend) begin
 				dividend <= dividend - divisor;
 				quotient <= quotient | quotient_msk;
 			end
-			divisor <= (divisor >> 1);
+			divisor <= divisor >> 1;
+
+`ifdef RISCV_FORMAL_ALTOPS
+			quotient_msk <= quotient_msk >> 5;
+`else
 			quotient_msk <= quotient_msk >> 1;
+`endif
 		end
 	end
 endmodule

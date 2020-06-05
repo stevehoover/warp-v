@@ -103,5 +103,13 @@
 	assign pcpi_wr = active[EXTRA_MUL_FFS ? 3 : 1];
 	assign pcpi_wait = 0;
 	assign pcpi_ready = active[EXTRA_MUL_FFS ? 3 : 1];
+`ifdef RISCV_FORMAL_ALTOPS
+	assign pcpi_rd =
+			instr_mul    ? (pcpi_rs1 + pcpi_rs2) ^ 32'h5876063e :
+			instr_mulh   ? (pcpi_rs1 + pcpi_rs2) ^ 32'hf6583fb7 :
+			instr_mulhsu ? (pcpi_rs1 - pcpi_rs2) ^ 32'hecfbe137 :
+			instr_mulhu  ? (pcpi_rs1 + pcpi_rs2) ^ 32'h949ce5e8 : 1'bx;
+`else
 	assign pcpi_rd = shift_out ? (EXTRA_MUL_FFS ? rd_q : rd) >> 32 : (EXTRA_MUL_FFS ? rd_q : rd);
+`endif
 endmodule
