@@ -3071,6 +3071,217 @@ m4+module_def
          *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
 
+
+
+
+
+// ===
+// VIZ
+// ===
+
+//
+// Logic for VIZ specific to ISA
+//
+
+\TLV mipsi_viz_logic()
+   // nothing
+
+\TLV mini_viz_logic()
+   // nothing
+
+\TLV riscv_viz_logic()
+   // Code that supports 
+   |fetch
+      @M4_MEM_WR_STAGE
+         /instr
+            // A type-independent immediate value, for debug. (For R-type, funct7 is used as immediate).
+            $imm_value[M4_WORD_RANGE] =
+                 ({M4_WORD_CNT{$is_i_type}} & $raw_i_imm) |
+                 ({M4_WORD_CNT{$is_r_type}} & {25'b0, $raw_funct7}) |
+                 ({M4_WORD_CNT{$is_s_type}} & $raw_s_imm) |
+                 ({M4_WORD_CNT{$is_b_type}} & $raw_b_imm) |
+                 ({M4_WORD_CNT{$is_u_type}} & $raw_u_imm) |
+                 ({M4_WORD_CNT{$is_j_type}} & $raw_j_imm);
+
+\TLV dummy_viz_logic()
+   // dummy
+
+\TLV cpu_viz()
+   m4+indirect(M4_isa['_viz_logic'])
+   |fetch
+      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
+         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
+            $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
+            m4_case(M4_ISA, ['MINI'], ['
+            '], ['RISCV'], ['
+            $instr_str[40*8-1:0] = *instr_strs[instr_mem];
+            '], ['MIPSI'], ['
+            '], ['DUMMY'], ['
+            '])
+            \viz_alpha
+               renderEach: function() {
+                  // Instruction memory is constant, so just create it once.
+                  if (!global.instr_mem_drawn) {
+                     global.instr_mem_drawn = [];
+                  }
+                  if (!global.instr_mem_drawn[this.getIndex()]) {
+                     global.instr_mem_drawn[this.getIndex()] = true;
+                     m4_ifelse_block_tmp(['                     '], M4_ISA, ['MINI'], ['
+                        let instr_str = '$instr'.goTo(0).asString();
+                     '], M4_ISA, ['RISCV'], ['
+                        let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
+                     '], M4_ISA, ['MIPSI'], ['
+                        let instr_str = '$instr'.asBinaryStr(NaN);
+                     '], ['
+                        let instr_str = '$instr'.goTo(0).asString();
+                     '])
+                     this.getCanvas().add(new fabric.Text(instr_str, {
+                        top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
+                        left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+                        fontSize: 14,
+                        fontFamily: "monospace"
+                     }));
+                  }
+               }
+         /instr
+            \viz_alpha
+               //
+               renderEach: function() {
+                  debugger;
+                  //
+                  // PC instr_mem pointer
+                  //
+                  let $Pc = '$Pc';
+                  let color = !('$commit'.asBool()) ? "gray" :
+                              '$abort'.asBool()        ? "red" :
+                                                         "blue";
+                  let pcPointer = new fabric.Text("->", {
+                     top: 18 * $Pc.asInt(),
+                     left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
+                     fill: color,
+                     fontSize: 14,
+                     fontFamily: "monospace"
+                  });
+                  //
+                  //
+                  // Fetch Instruction
+                  //
+                  // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
+                  //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
+                  //   top: 50,
+                  //   left: 90,
+                  //   fill: color,
+                  //   fontSize: 14,
+                  //   fontFamily: "monospace"
+                  //});
+                  //
+                  // Instruction with values.
+                  //
+                  m4_ifelse_block(M4_ISA, ['MINI'], ['
+                     let str = '$dest_char'.asString();
+                     str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n =";
+                     str += '/src[1]$char'.asString();
+                     str += "(" + ('/src[1]$valid'.asBool(false) ? '/src[1]$value'.asInt(NaN) : "--") + ")\n   ";
+                     str += '/op$char'.asString("-");
+                     str += '/src[2]$char'.asString();
+                     str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")";
+                  '], M4_ISA, ['RISCV'], ['
+                     let regStr = (valid, regNum, regValue) => {
+                        return valid ? `r${regNum} (${regValue})` : `rX`;
+                     };
+                     let srcStr = (src) => {
+                        return '/src[src]$is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                                   : "";
+                     };
+                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+                               `  = ${'$mnemonic'.asString()}${srcStr(1)}${srcStr(2)}\n` +
+                               `      i[${'$imm_value'.asInt(NaN)}]`;
+                  '], M4_ISA, ['MIPSI'], ['
+                     // TODO: Almost same as RISC-V. Avoid cut-n-paste.
+                     let regStr = (valid, regNum, regValue) => {
+                        return valid ? `r${regNum} (${regValue})` : `rX`;
+                     };
+                     let srcStr = (src) => {
+                        return '/src[src]$is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                                   : "";
+                     };
+                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+                               `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
+                               `      i[${'$imm_value'.asInt(NaN)}]`;
+                  '], ['
+                  '])
+                  let instrWithValues = new fabric.Text(str, {
+                     top: 70,
+                     left: 90,
+                     fill: color,
+                     fontSize: 14,
+                     fontFamily: "monospace"
+                  });
+                  return {objects: [pcPointer, instrWithValues]};
+               }
+            //
+            // Register file
+            //
+            
+            /regs[M4_REGS_RANGE]  // TODO: Fix [*]
+               \viz_alpha
+                  initEach: function() {
+                     let reg = new fabric.Text("", {
+                        top: 18 * this.getIndex(),
+                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 400, ['MIPSI'], 400, ['DUMMY'], 200),
+                        fontSize: 14,
+                        fontFamily: "monospace"
+                     });
+                     return {objects: {reg: reg}};
+                  },
+                  renderEach: function() {
+                     let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index);
+                     let pending = '$pending'.asBool(false);
+                     let reg = parseInt(this.getIndex());
+                     let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
+                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
+                     this.getInitObject("reg").setText(
+                        regIdent + ": " +
+                        '$value'.step(1).asInt(NaN).toString() + oldValStr);
+                     this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
+                  }
+            /bank[M4_ADDRS_PER_WORD-1:0]
+               /mem[M4_DATA_MEM_WORDS_RANGE]
+                  \viz_alpha
+                     initEach: function() {
+                        let data = new fabric.Text("", {
+                           top: 18 * this.getIndex(),
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30 + 30,
+                           fontSize: 14,
+                           fontFamily: "monospace"
+                        });
+                        let index = (this.getScope("bank").index != 0) ? null :
+                           new fabric.Text("", {
+                              top: 18 * this.getIndex(),
+                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30,
+                              fontSize: 14,
+                              fontFamily: "monospace"
+                           });
+                        return {objects: {data: data, index: index}};
+                     },
+                     renderEach: function() {
+                        // BUG: It seems this is not getting called for every /bank[*].
+                        console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
+                        let mod = '/instr$st'.asBool(false) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex());
+                        let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString()})` : "";
+                        if (this.getInitObject("index")) {
+                           let addrStr = parseInt(this.getIndex()).toString();
+                           this.getInitObject("index").setText(addrStr + ":");
+                        }
+                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString() + oldValStr);
+                        this.getInitObject("data").setFill(mod ? "blue" : "black");
+                     }
+
+
+
+
 \TLV
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
@@ -3081,12 +3292,16 @@ m4+module_def
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /trans)
    m4+makerchip_pass_fail(core[*])
+   /M4_CORE_HIER
+      m4+cpu_viz(/top)
    '], ['
    // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
    m4+makerchip_pass_fail()
+   m4+cpu_viz(/top)
    '])
+
 \SV
    endmodule
 
