@@ -3,6 +3,7 @@ m4+definitions
    m4_define(['M4_ISA'], ['RISCV'])
    // Configure for formal verification.
    m4_define(['M4_FORMAL'], 1)
+   m4_define(['M4_VIZ'], 0)
 \SV
    // Include WARP-V.
    m4_include_lib(['./warp-v.tlv'])
