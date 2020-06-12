@@ -3243,6 +3243,7 @@ m4+module_def
    m4+formal()
    '], [''])
 
+
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
@@ -3315,11 +3316,12 @@ m4+module_def
 \TLV dummy_viz_logic()
    // dummy
 
-// These must be defined local to the *instrs definition (because *instrs is local to the generate block).
+// *instrs must be consumed local to its definition (because it is local to the generate block).
 \TLV instrs_for_viz()
    m4_ifelse_block(M4_VIZ, 1, ['
    |fetch
       @M4_REG_WR_STAGE
+         m4_ifelse_block(M4_ISA, ['MINI'], [''], ['
          // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
          // has different fields on different clocks, Verilator throws warnings.
          // These are unconditioned versions of the problematic signals.
@@ -3330,6 +3332,8 @@ m4+module_def
                $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
          /instr_mem
             $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
+         '])
+         /instr_mem
             m4_case(M4_ISA, ['MINI'], ['
             '], ['RISCV'], ['
             $instr_str[40*8-1:0] = *instr_strs[instr_mem];
@@ -3507,6 +3511,17 @@ m4+module_def
 
 
 
+// Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
+// Args:
+//   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
+\TLV makerchip_pass_fail(/_hier)
+   |done
+      @0
+         // Assert these to end simulation (before Makerchip cycle limit).
+         *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
+         *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
+
+
 \TLV //disabled_main()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
@@ -3521,11 +3536,7 @@ m4+module_def
       m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
-   |done
-      @0
-         // Assert these to end simulation (before Makerchip cycle limit).
-         *passed = & /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = | /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$failed;
+   m4+makerchip_pass_fail(/core[*])
    /M4_CORE_HIER
       m4_ifelse_block(M4_VIZ, 1, ['
       m4+cpu_viz(/top)
@@ -3534,10 +3545,7 @@ m4+module_def
    // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
-   |done
-      @0
-         *passed = /top|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = /top|fetch/instr>>M4_REG_WR_STAGE$failed;
+   m4+makerchip_pass_fail()
    m4+cpu_viz(/top)
    '])
 
