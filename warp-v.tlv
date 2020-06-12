@@ -275,10 +275,12 @@ m4+definitions(['
    //   m4_define_hier(['M4_PRIO'], #)
    // prior to inclusion of this file.
    m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], ['
-      // In not externally defined:
+      // If not externally defined:
       m4_define_hier(['M4_CORE'], 1)  // Number of cores.
       m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
       m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
+      m4_define(['M4_MAX_PACKET_SIZE'], 3)   // Max number of payload flits in a packet.
+      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
    '])
    // Inclusions for multi-core only:
    m4_ifexpr(M4_CORE_CNT > 1, ['
@@ -287,6 +289,8 @@ m4+definitions(['
       m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
    '])
    
+   // Include visualization
+   m4_default(['M4_VIZ'], 1)
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
@@ -1119,6 +1123,7 @@ m4+definitions(['
             output logic [31: 0] rvfi_mem_wdata);'])'])
 '])
 \SV
+m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/4bcf06b71272556ec7e72269152561902474848e/pipeflow_lib.tlv'])'])
 
 
 
@@ -1173,6 +1178,7 @@ m4+definitions(['
 
 \TLV mini_imem(_prog_name)
    m4+indirect(['mini_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -1393,6 +1399,7 @@ m4+definitions(['
    
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    
    // ==============
    // IMem and Fetch
@@ -2554,6 +2561,7 @@ m4+definitions(['
 
 \TLV power_imem(_prog_name)
    m4+indirect(['mipsi_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -3363,45 +3371,54 @@ m4_ifelse_block(M4_EXT_F, 1, ['
 
             `BOGUS_USE(/src[2]$dummy)
 
+
+
 // Ingress/Egress packet buffers between the CPU and NoC.
 // Packet buffers are m4+vc_flop_fifo_v2(...)s. See m4+vc_flop_fifo_v2 definition in tlv_flow_lib package
 //   and instantiations below for interface.
+// A header flit is inserted containing {src, dest}.
 // NoC must provide |egress_out interface and |ingress_in m4+vc_flop_fifo_v2(...) interface.
 \TLV noc_cpu_buffers(/_cpu, #depth)
    // Egress FIFO.
-   // Block CPU |fetch pipeline if blocked.
-   m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /_cpu|egress_in<<M4_EXECUTE_STAGE$pkt_wr_blocked || /_cpu|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
    |egress_in
-      // Stage numbering has @0 == |fetch@M4_EXECUTE_STAGE 
-      @0
-         $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;  // (including $reset)
-         $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
-         $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
-         // This PKTWR write is blocked if the skid buffer blocked last cycle.
-         $pkt_wr_blocked = $is_pkt_wr && /skid_buffer>>1$push_blocked;
+      @-1
+         $reset = *reset;
+      /instr
+         // Stage numbering has @0 == |fetch@M4_EXECUTE_STAGE 
+         @0
+            $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;  // (including $reset)
+            $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
+            $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
+            // This PKTWR write is blocked if the skid buffer blocked last cycle.
+            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$push_blocked;
+         @1
+            $valid_pkt_wr = $is_pkt_wr && $commit;
+            $insert_header = |egress_in/skid_buffer$is_pkt_wr && ! $InPacket;
+            // Assert after inserting header up to insertion of tail.
+            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$is_csr_pkttail && ! |egress_in/skid_buffer$push_blocked));
       @1
-         $valid_pkt_wr = $is_pkt_wr && $commit;
          /skid_buffer
-            // Hold the write if blocked.
+            $ANY = >>1$push_blocked ? >>1$ANY : |egress_in/instr$ANY;
+            // Hold the write if blocked, including the write of the header in separate signals.
             // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
-            $push_blocked = $valid_pkt_wr && /_cpu/vc[$csr_pktwrvc]|egress_in$blocked;
-            $ANY = >>1$push_blocked ? >>1$ANY : |egress_in$ANY;
-         /trans
-            $flit[M4_WORD_RANGE] = |egress_in/skid_buffer$csr_wr_value;
+            // Note that signals in this scope are captured versions reflecting the flit and its producing instruction.
+            $push_blocked = $valid_pkt_wr && (/_cpu/vc[$csr_pktwrvc]|egress_in$blocked || ! |egress_in/instr$InPacket);
+            // Header
+            // Construct header flit.
+            $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
+            $header_flit[31:0] = {{M4_FLIT_UNUSED_CNT{1'b0}},
+                                  $src,
+                                  $vc,
+                                  $csr_pktdest[m4_echo(M4_CORE_INDEX_RANGE)]
+                                 };
+         /flit
+            {$tail, $flit[M4_WORD_RANGE]} = |egress_in/instr$insert_header ? {1'b0, |egress_in/skid_buffer$header_flit} :
+                                                                             {|egress_in/skid_buffer$is_csr_pkttail, |egress_in/skid_buffer$csr_wr_value};
    /vc[*]
       |egress_in
          @1
             $vc_trans_valid = /_cpu|egress_in/skid_buffer$valid_pkt_wr && (/_cpu|egress_in/skid_buffer$vc == #vc);
-   m4+vc_flop_fifo_v2(/_cpu, |egress_in, @1, |egress_out, @1, #depth, /trans, M4_VC_RANGE, M4_PRIO_RANGE)
-   /vc[*]
-      |egress_out
-         @0
-            $has_credit = 1'b0 /*FIX*/;
-            $Prio[M4_PRIO_INDEX_RANGE] <= '0;
-   |egress_out
-      /trans
-         @1
-            `BOGUS_USE($flit)
+   m4+vc_flop_fifo_v2(/_cpu, |egress_in, @1, |egress_out, @1, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
    
    // Ingress FIFO.
    //
@@ -3428,14 +3445,15 @@ m4_ifelse_block(M4_EXT_F, 1, ['
             // Write if there is head data, else, CSR is invalid.
             $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
             ?$csr_pktrd_valid
-               $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/trans<<M4_EXECUTE_STAGE$flit;
+               $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
    |ingress_out
       @-1
          // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
-         $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;
-         $is_pktrd = $is_csr_instr && $is_csr_pktrd;
+         /instr
+            $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;
+         $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
-         $pktrdvcs_changed = >>1$is_csr_write && >>1$is_csr_pktrdvcs;
+         $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
          $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
       @0
          // Replay for PKTRD with no data read.
@@ -3443,20 +3461,184 @@ m4_ifelse_block(M4_EXT_F, 1, ['
    /vc[*]
       |ingress_out
          @-1
-            $has_credit = /_cpu|ingress_out>>1$csr_pktrdvcs[#vc] &&
+            $has_credit = /_cpu|ingress_out/instr>>1$csr_pktrdvcs[#vc] &&
                           /_cpu|ingress_out$do_pktrd;
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
-   m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /trans, M4_VC_RANGE, M4_PRIO_RANGE)
-   /M4_VC_HIER
+   m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
+
+\TLV noc_insertion_ring(/_cpu, #_depth)
+   /vc[*]
       |ingress_in
          @0
-            $vc_trans_valid = 1'b0;  // TODO
+            $vc_match = /_cpu|rg_arriving>>m4_align(0, 0)$vc == #vc;
+            $vc_trans_valid = /_cpu|ingress_in$trans_valid && $vc_match;
    |ingress_in
       @0
-         $reset = *reset;  // TODO
-      /trans
+         /arriving
+            $ANY = /_cpu|rg_arriving<>0$ANY;
+         $blocked = ! /arriving$body && ! /_cpu/vc[/arriving$vc]|ingress_in$would_bypass;
+         $trans_valid = $avail && ! $blocked;
+   /vc[*]
+      |egress_out
          @0
-            $flit[31:0] = 32'b0;  // TODO
+            // Per-VC backpressure from NoC.
+            $has_credit = ! /_cpu|egress_out$blocked &&   // propagate blocked
+                          (! /_cpu|egress_out$body || (/_cpu|egress_out$body_vc == #vc));   // avoid interleaving packets
+            $Prio[M4_PRIO_INDEX_RANGE] <= '0;
+   |egress_out
+      @-1
+         $reset = *reset;
+      @0
+         // This is a body flit (includes invalid body flits and tail flit) if last cycle was a tail flit and 
+         $body = $reset   ? 1'b0 :
+                 >>1$body ? ! >>1$valid_tail :
+                            >>1$valid_head;
+         $body_vc[M4_VC_INDEX_RANGE] = >>1$valid_head ? /flit>>1$flit[M4_FLIT_VC_RANGE] : $RETAIN;
+      @1
+         $avail = $trans_valid;
+         $valid_head = $trans_valid && ! $body;
+         $valid_tail = $trans_valid && /flit$tail;
+   m4+insertion_ring(/_cpu, |egress_out, @1, |ingress_in, @0, /_cpu|ingress_in<<1$reset, |rg, /flit, 2, #_depth)
+
+
+
+// +++++++++++++++++++++++++++++++++++++++++++++++++++
+// MOVE OUT
+
+
+// Register insertion ring.
+//
+// See diagram here: https://docs.google.com/drawings/d/1VS_oaNYgT3p4b64nGSAjs5FKSvs_-s8OTfTY4gQjX6o/edit?usp=sharing
+//
+// This macro provides a ring with support for multi-flit packets. It is unable to utilize the m4+simple_ring macro because flits
+// pulled from the ring to the insertion FIFO are pulled prior to the ring flit mux, whereas the ring macros
+// pull the output flit after. This difference implies that the other ring macros support local loopback, whereas
+// this one does not; packets will loopback around the ring.
+//
+// This ring does not support multiple VCs.
+//
+// Packets are contiguous on the ring without gaps.
+// Once a packet is completely loaded into the insertion FIFO, it can be injected contiguously into
+// the ring between packets on the ring, at which time it essentially becomes part of the ring, so the
+// ring expands to absorb it. Any valid flits from the ring are absorbed into the insertion FIFO during
+// insertion. The ring shrinks by absorbing idle slots as the FIFO drains. Only once the FIFO is empty
+// can it be filled with a new insertion packet.
+//
+// Support for multiple-VCs could be added in a few ways, including:
+//   o via a credit mechanism
+//   o VC-specific ring slots
+//   o per-VC insertion FIFOs (or ring-ingress FIFOs plus one insertion buffer) providing source
+//     buffering; packets make a full circuit around the ring and back to their source to ensure
+//     draining or preservation of the insertion FIFO.)
+//
+// For traffic from node, FIFO permits only one packet from node at a time, and fully buffers.
+// Head packet and control info are not included.
+//
+// Control information, except head/tail, is provided in a header flit. As such, there is no support for data
+// lagging 1 cycle behind control info. Control info and the decision for accepting packets based on it are
+// up to the caller, but must include $dest.
+//
+// Flits traverse the ring from index 0 to N-1 continuing back to 0, until they reach
+// their destination.
+//
+// The interface matches simple_ring_v2(..) with the following modifications.
+//
+// Input interface:
+//   - $tail is required in /_flit
+//   - Additional arg for #_depth: FIFO depth; at least max packet size, including header flit
+//   - Removal of >>_data_delay arg
+//   - Removal of $_avail_expr arg
+//   - /_flit (/_trans) arg is not optional
+//   - Calling context must provide /_hop|_name/arriving?$valid@0$acceptable. E.g.:
+//          {..., $dest} = $head ? $data[..];
+//          $acceptable = $dest
+\TLV insertion_ring(/_hop, |_in, @_in, |_out, @_out, $_reset, |_name, /_flit, #_hop_dist, #_depth)
+   m4_pushdef(['m4_in_delay'], m4_defaulted_arg(#_in_delay, 0))
+   m4_pushdef(['m4_hop_dist'], m4_defaulted_arg(#_hop_dist, 1))
+   m4_pushdef(['m4_hop_name'], m4_strip_prefix(/_hop))
+   m4_pushdef(['M4_HOP'], ['M4_']m4_translit(m4_hop_name, ['a-z'], ['A-Z']))
+   m4_pushdef(['m4_prev_hop_index'], (m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT']))
+   
+   // ========
+   // The Flow
+   // ========
+
+   // Relax the timing on input backpressure with a skid buffer.
+   m4+skid_buffer(/_hop, |_in, @_in, |_name['']_in_present, @0, /_flit, $_reset)
+   // Block head flit if FIFO not empty.
+   m4+connect(/_hop, |_name['']_in_present, @0, |_name['']_node_to_fifo, @0, /_flit, [''], ['|| (! /_hop|_name['']_fifo_in<>0$would_bypass && $head)'])
+   // Pipeline for ring hop.
+   m4+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
+   // Connect hops in a ring.
+   |_name['']_arriving
+      @0
+         $ANY = /_hop[(#m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_leaving<>0$ANY;
+         /_flit
+            $ANY = /_hop[(#m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_leaving/_flit<>0$ANY;
+   |_name['']_leaving
+      @0
+         $blocked = /_hop[(#m4_hop_name + 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
+   // Fork off ring
+   m4+fork(/_hop, |_name['']_arriving, @0, $head_out, |_name['']_off_ramp, @0, $true, |_name['']_continuing, @0, /_flit)
+   // Fork from off-ramp out or into FIFO
+   m4+fork(/_hop, |_name['']_off_ramp, @0, $head_out, |_out, @_out, $true, |_name['']_deflected, @0, /_flit)
+   // Flop prior to FIFO.
+   m4+stage(ff, /_hop, |_name['']_deflected, @0, |_name['']_deflected_st1, @1, /_flit)
+   // Mux into FIFO. (Priority to deflected blocks node.)
+   m4+arb2(/_hop, |_name['']_deflected_st1, @1, |_name['']_node_to_fifo, @0, |_name['']_fifo_in, @0, /_flit)
+   // The insertion FIFO.
+   m4+flop_fifo_v2(/_hop, |_name['']_fifo_in, @0, |_name['']_fifo_out, @0, #_depth, /_flit)
+   // Block FIFO output until a full packet is ready (tail from node in FIFO)
+   m4+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
+   // Ring
+   m4+arb2(/_hop, |_name['']_fifo_inj, @0, |_name['']_continuing, @0, |_name, @0, /_flit)
+
+
+   // Decode arriving header flit.
+   |_name['']_arriving
+      @0
+         // Characterize arriving flit (head/tail/body, header)
+         {$vc[M4_VC_INDEX_RANGE], $dest[m4_echo(M4_HOP['_INDEX_RANGE'])]} =
+            $reset  ? '0 :
+            ! $body ? {/flit$flit[M4_FLIT_VC_RANGE], /flit$flit[M4_FLIT_DEST_RANGE]} :
+                      {>>1$vc, >>1$dest};
+         $body = $reset   ? 1'b0 :
+                 >>1$body ? ! >>1$valid_tail :
+                            >>1$valid_head;
+         $valid_head = $accepted && ! $body;
+         $valid_tail = $accepted && /flit$tail;
+         // The ring is expanded through the insertion FIFO (or one additional staging flop before it)
+         // Asserts with the first absorbed flit, deasserts for the first flit that can stay on the ring.
+         $valid_dest = $dest == #m4_hop_name;
+         $head_out = ! /_hop|_out<>0$blocked && $valid_dest;
+         $true = 1'b1; // (ok signal for fork along continuing path)
+   |_name['']_off_ramp
+      @0
+         $head_out = /_hop|_name['']_arriving<>0$head_out;
+         $true = 1'b1;  // (ok signal for fork to FIFO)
+   |_name['']_in_present
+      @0
+         $head = $reset                          ? 1'b0 :
+                 (>>1$accepted && /flit>>1$tail) ? 1'b1 :
+                 (>>1$accepted && >>1$head)      ? 1'b0 :
+                                                   $RETAIN;
+   |_name['']_fifo_in
+      @0
+         // The FIFO can hold only one packet at a time.
+         // Keep track of whether the FIFO (or bypass path) contains tail. This asserts for tail flit to FIFO, and deasserts after
+         // tail is sent from FIFO. Streaming single-flit packets is possible without gaps.
+         // XXX It will deassert for a minimum of 1 cycle (since $would_bypass enables a flit from node).
+         $node_tail_flit_in_fifo =
+              $reset ? 1'b0 :
+              /_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail ? 1'b1 :
+              $would_bypass ? 1'b0 :
+                   $RETAIN;
+
+   m4_popdef(['m4_in_delay'])
+   m4_popdef(['m4_hop_dist'])
+   m4_popdef(['m4_hop_name'])
+   m4_popdef(['M4_HOP'])
+   m4_popdef(['m4_prev_hop_index'])
 
 
 m4+module_def
@@ -3474,15 +3656,43 @@ m4+module_def
    m4+formal()
    '], [''])
 
-// Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
-// Args:
-//   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
-\TLV makerchip_pass_fail(/_hier)
-   |done
-      @0
-         // Assert these to end simulation (before Makerchip cycle limit).
-         *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
+
+// Can be used to build for many-core without a NoC (during development).
+\TLV dummy_noc(/_cpu)
+   |fetch
+      @M4_EXECUTE_STAGE
+         /instr
+            $csr_pktrd[31:0] = 32'b0;
+   
+// For building just the insertion ring in isolation.
+// The diagram builds, but unfortunately it is messed up :(.
+\TLV main_ring_only()
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
+   /M4_CORE_HIER
+      |egress_out
+         /flit
+            @0
+               $bogus_head = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000100)) ||
+                             ((#core == 1) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $tail       = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000001000)) ||
+                             ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $bogus_mid  = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000)) ||
+                             ((#core == 1) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $bogus_src[M4_CORE_INDEX_RANGE] = #core;
+               $bogus_dest[M4_CORE_INDEX_RANGE] = 1;
+               $bogus_vc[M4_VC_INDEX_RANGE] = 0;
+               $flit[M4_FLIT_RANGE] = $bogus_head ? {*cyc_cnt[M4_FLIT_UNUSED_CNT-3:0], 2'b01      , $bogus_vc, $bogus_src, $bogus_dest}
+                                                  : {*cyc_cnt[M4_FLIT_UNUSED_CNT-3:0], $tail, 1'b0, m4_eval(M4_VC_INDEX_CNT + M4_CORE_INDEX_CNT * 2)'b1};
+         @0
+            $avail = /flit$bogus_head || /flit$tail || /flit$bogus_mid;
+      m4+insertion_ring(/core, |egress_out, @1, |ingress_in, @0, /core|ingress_in<<1$reset, |rg, /flit, 4, 4)  // /flit, hop_latency, FIFO_depth
+      |ingress_in
+         @0
+            $blocked = 1'b0;
+            /flit
+               `BOGUS_USE($flit)
+   *passed = *cyc_cnt > 40;
+   *failed = 1'b0;
 
 
 
@@ -3519,18 +3729,37 @@ m4+module_def
 \TLV dummy_viz_logic()
    // dummy
 
-\TLV cpu_viz()
-   m4+indirect(M4_isa['_viz_logic'])
+// *instrs must be consumed local to its definition (because it is local to the generate block).
+\TLV instrs_for_viz()
+   m4_ifelse_block(M4_VIZ, 1, ['
    |fetch
-      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
-         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
+      @M4_REG_WR_STAGE
+         m4_ifelse_block(M4_ISA, ['MINI'], [''], ['
+         // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
+         // has different fields on different clocks, Verilator throws warnings.
+         // These are unconditioned versions of the problematic signals.
+         /instr
+            /src[*]
+               $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+               $unconditioned_is_reg = $is_reg;
+               $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
+         /instr_mem
             $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
+         '])
+         /instr_mem
             m4_case(M4_ISA, ['MINI'], ['
             '], ['RISCV'], ['
             $instr_str[40*8-1:0] = *instr_strs[instr_mem];
             '], ['MIPSI'], ['
             '], ['DUMMY'], ['
             '])
+   '])
+
+\TLV cpu_viz()
+   m4+indirect(M4_isa['_viz_logic'])
+   |fetch
+      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
+         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
             \viz_alpha
                renderEach: function() {
                   // Instruction memory is constant, so just create it once.
@@ -3603,8 +3832,8 @@ m4+module_def
                         return valid ? `r${regNum} (${regValue})` : `rX`;
                      };
                      let srcStr = (src) => {
-                        return '/src[src]$is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                        return '/src[src]$unconditioned_is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                                    : "";
                      };
                      let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
@@ -3616,8 +3845,8 @@ m4+module_def
                         return valid ? `r${regNum} (${regValue})` : `rX`;
                      };
                      let srcStr = (src) => {
-                        return '/src[src]$is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                        return '/src[src]$unconditioned_is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                                    : "";
                      };
                      let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
@@ -3695,18 +3924,36 @@ m4+module_def
 
 
 
-\TLV
+// Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
+// Args:
+//   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
+\TLV makerchip_pass_fail(/_hier)
+   |done
+      @0
+         // Assert these to end simulation (before Makerchip cycle limit).
+         *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
+         *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
+
+
+\TLV //disabled_main()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    // Multi-core
    /M4_CORE_HIER
-      m4+noc_cpu_buffers(/core, 4)
+      // TODO: Find a better place for this:
+      // Block CPU |fetch pipeline if blocked.
+      m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
       m4+cpu(/core)
+      //m4+dummy_noc(/core)
+      m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+      m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
       m4+warpv_makerchip_cnt10_tb()
-   //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /trans)
-   m4+makerchip_pass_fail(core[*])
+   //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
+   m4+makerchip_pass_fail(/core[*])
    /M4_CORE_HIER
+      m4_ifelse_block(M4_VIZ, 1, ['
       m4+cpu_viz(/top)
+      '])
    '], ['
    // Single Core.
    m4+warpv()
