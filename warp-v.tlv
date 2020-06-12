@@ -278,6 +278,8 @@ m4+definitions(['
       m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
    '])
    
+   // Include visualization
+   m4_default(['M4_VIZ'], 1)
    // Include testbench (for Makerchip simulation) (defaulted to 1).
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
@@ -1166,6 +1168,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 \TLV mini_imem(_prog_name)
    m4+indirect(['mini_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -1369,6 +1372,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    
    // ==============
    // IMem and Fetch
@@ -2295,6 +2299,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 \TLV power_imem(_prog_name)
    m4+indirect(['mipsi_']_prog_name['_prog'])
+   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -3310,11 +3315,20 @@ m4+module_def
 \TLV dummy_viz_logic()
    // dummy
 
-\TLV cpu_viz()
-   m4+indirect(M4_isa['_viz_logic'])
+// These must be defined local to the *instrs definition (because *instrs is local to the generate block).
+\TLV instrs_for_viz()
+   m4_ifelse_block(M4_VIZ, 1, ['
    |fetch
-      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
-         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
+      @M4_REG_WR_STAGE
+         // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
+         // has different fields on different clocks, Verilator throws warnings.
+         // These are unconditioned versions of the problematic signals.
+         /instr
+            /src[*]
+               $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+               $unconditioned_is_reg = $is_reg;
+               $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
+         /instr_mem
             $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
             m4_case(M4_ISA, ['MINI'], ['
             '], ['RISCV'], ['
@@ -3322,6 +3336,13 @@ m4+module_def
             '], ['MIPSI'], ['
             '], ['DUMMY'], ['
             '])
+   '])
+
+\TLV cpu_viz()
+   m4+indirect(M4_isa['_viz_logic'])
+   |fetch
+      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
+         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
             \viz_alpha
                renderEach: function() {
                   // Instruction memory is constant, so just create it once.
@@ -3394,8 +3415,8 @@ m4+module_def
                         return valid ? `r${regNum} (${regValue})` : `rX`;
                      };
                      let srcStr = (src) => {
-                        return '/src[src]$is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                        return '/src[src]$unconditioned_is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                                    : "";
                      };
                      let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
@@ -3407,8 +3428,8 @@ m4+module_def
                         return valid ? `r${regNum} (${regValue})` : `rX`;
                      };
                      let srcStr = (src) => {
-                        return '/src[src]$is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$reg'.asInt(NaN), '/src[src]$reg_value'.asInt(NaN))}`
+                        return '/src[src]$unconditioned_is_reg'.asBool(false)
+                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                                    : "";
                      };
                      let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
@@ -3506,7 +3527,9 @@ m4+module_def
          *passed = & /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = | /top/core[*]|fetch/instr>>M4_REG_WR_STAGE$failed;
    /M4_CORE_HIER
+      m4_ifelse_block(M4_VIZ, 1, ['
       m4+cpu_viz(/top)
+      '])
    '], ['
    // Single Core.
    m4+warpv()
