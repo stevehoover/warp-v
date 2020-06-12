@@ -955,7 +955,7 @@ m4+definitions(['
             output logic [31: 0] rvfi_mem_wdata);'])'])
 '])
 \SV
-
+m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/4bcf06b71272556ec7e72269152561902474848e/pipeflow_lib.tlv'])'])
 
 
 
@@ -1195,7 +1195,7 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
-   m4_dumpdef
+   //m4_dumpdef
    m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
    m4_asm(ORI, r1, r0, 1)        //     cnt = 1
    m4_asm(ORI, r2, r0, 1010)     //     ten = 10
@@ -2838,444 +2838,13 @@ m4+definitions(['
          $avail = $trans_valid;
          $valid_head = $trans_valid && ! $body;
          $valid_tail = $trans_valid && /flit$tail;
-   m4+insertion_ring(/_cpu, |egress_out, @1, |ingress_in, @0, /_cpu|ingress_in<<1$reset, |rg, /flit, 2, #_depth, 1)
+   m4+insertion_ring(/_cpu, |egress_out, @1, |ingress_in, @0, /_cpu|ingress_in<<1$reset, |rg, /flit, 2, #_depth)
 
 
 
 
 // +++++++++++++++++++++++++++++++++++++++++++++++++++
 // MOVE OUT
-
-// A 1-in 1-out "avail/blocked" combinational flow component that, in default usage, does nothing but rename pipeline/stage.
-// It can also:
-//   o cuts backpressure connection
-//   o add extra backpressure
-// Args (non-standard ones):
-//   $_block_expr:
-//      ['']: default behavior (input and output are identical with identical backpressure)
-//      ['&& 1'b0']: cut downstream backpressure because it must be 1'b0. (Use this exact string to enable assertion.)
-//      ['|| ! $ready']: to introduce backpressure
-//      ['&& 1'b0) || (! $ready']: to do both
-\TLV connect(/_top, |_in, @_in, |_out, @_out, /_trans, $_reset, $_block_expr)
-   m4+flow_interface(/_top, [' |_in, @_in'], [' |_out, @_out'], $_reset)
-   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
-   |_in
-      @_in
-         $blocked = (/_top|_out>>m4_align(@_out, @_in)$blocked $_block_expr);
-         $out_avail = $avail && ! ((1'b0 $_block_expr));
-   |_out
-      @_out
-         m4_ifelse($_block_expr, ['&& 1'b0'], ['m4_assert(! $blocked, ['"Expected no backpressure from .../_top|_out@_out$blocked."'])'])
-         $avail = /_top|_in>>m4_align(@_in, @_out)$out_avail;
-         $reset = /_top|_in>>m4_align(@_in, @_out)$reset_in;
-         ?$avail
-            /_trans
-         m4_trans_ind   $ANY = /_top|_in/_trans>>m4_align(@_in, @_out)$ANY;
-
-// A one-cycle skid buffer. This can be used to alleviate timing on backpressure ($blocked) between flow components.
-// Backpressure is applied with a one-cycle delay, and if the downstream backpressures a valid transaction, the transaction
-// is captured in the skid buffer which receives the packpressure immediately. The skid buffer does not add any latency
-// to the flow.
-// Args are typical flow component args (where /_trans is not optional out of laziness).
-\TLV skid_buffer(/_top, |_in, @_in, |_out, @_out, /_trans, $_reset)
-   m4+flow_interface(/_top, [' |_in, @_in'], [' |_out, @_out'], $_reset)
-   |_in
-      @m4_stage_eval(@_in<<1)
-         $blocked = /_top|_in['']_skid<>0$avail;
-   // Skid buffer, aligned the same as |_in with respect to |_out.
-   |_in['']_skid
-      @m4_stage_eval(@_in<<1)
-         $blocked = /_top|_out>>m4_align(@_out>>1, @_in)$blocked;
-         // Skid is available if input or skid was available last cycle and was blocked.
-         $avail = (/_top|_in>>1$avail || >>1$avail) && $blocked;
-      @_in
-         ?$avail
-            /_trans
-               $ANY = (|_in['']_skid>>1$avail && |_in['']_skid>>1$blocked) ? >>1$ANY : /_top|_in/_trans>>1$ANY;
-   |_out
-      @_out
-         $avail = /_top|_in['']_skid>>m4_align(@_in, @_out)$avail || /_top|_in>>m4_align(@_in, @_out)$avail;
-         $reset = /_top|_in>>m4_align(@_in, @_out)$reset_in;
-         ?$avail
-            /_trans
-               $ANY = /_top|_in['']_skid>>m4_align(@_in, @_out)$avail ? /_top|_in['']_skid/_trans>>m4_align(@_in, @_out)$ANY :
-                                                                        /_top|_in/_trans>>m4_align(@_in, @_out)$ANY;
-
-
-// -------------------------------
-
-
-// One cycle of a pipeline.
-//
-// The pipeline can be free-flowing (ff), backpressured (bp), or stalling (stall).
-// Using this macro for pipelines provides backpressure interfaces for one upstream
-// and one downstream component and enables the pipeline type to be modified easily.
-//
-//   /_top:              eg: ['/top']
-//   |_in/out, @_in/out: The pipeline and stage of the input (A-phase) stage
-//                          and the output stage.
-//   #_data_delay: (opt) Data (transaction) muxing will be delayed by this number of stages.
-//
-// This creates recirculation for a transaction going from |_in to |_out,
-// where |_in@_in is one cycle from |_out@_out without backpressure.
-//
-// Currently, this uses recirculation, but it is intended to be modified to use flop enables
-// to hold the transactions.
-//
-// Input interface:
-//   |_in
-//      @_in
-//         $reset         // A reset signal.
-//         $avail         // A transaction is available for consumption.
-//         ?avail
-//            /_trans
-//               $ANY     // input transaction
-//   |_out
-//      @_out
-//         $blocked       // The corresponding output transaction, if valid, cannot be consumed
-//                        // and will recirculate.
-// Output signals:
-//   |_in
-//      @_in
-//         $blocked       // The corresponding input transaction, if valid, cannot be consumed
-//                        // and must recirculate.
-//   |_out
-//      @_out
-//         $reset         // The reset signal (from input pipeline).
-//         $avail         // A transaction is available for consumption.
-//         ?avail
-//            /_trans
-//               $ANY     // Output transaction
-//
-\TLV stage(type, /_top, |_in, @_in, |_out, @_out, /_trans, $_reset, #_data_delay)
-   m4_pushdef(['m4_data_delay'], m4_ifelse(#_data_delay, [''], 0, #_data_delay))
-   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
-   m4+flow_interface(/_top, [' |_in, @_in'], [' |_out, @_out'], $_reset)
-   |_in
-      @_in
-         $blocked = /_top|_out>>m4_align(@_out, @_in)$recirc;
-   |_out
-      @m4_stage_eval(@_out<<1)
-         $avail = >>1$reset   ? 1'b0 :
-                  >>1$blocked ? >>1$avail :
-                                /_top|_in>>m4_align(@_in>>1, @_out)$avail;
-      @_out
-         m4_ifelse(type, ['ff'], ['m4_assert(! $blocked, ['"Free-flowing pipeline is backpressured by .../_top|_out@_out$blocked."'])'])
-         // Propagate $reset to next stage with no delay (may create timing pressure,
-         //   but similar to reverse path for $blocked).
-         $reset = /_top|_in>>m4_align(@_in, @_out)$reset_in;
-         
-         $recirc = m4_ifelse(type, ['bp'], ['$avail && $blocked'], type, ['stall'], ['$blocked'], type, ['ff'], ['1'b0'], ['ERROR: bad type ']type);
-      @m4_stage_eval(@_out<<1>>m4_data_delay)
-         ?$avail
-            /_trans
-         m4_trans_ind   $ANY = |_out>>1$recirc ? >>1$ANY : /_top|_in/_trans>>m4_align(@_in >> 1, @_out)$ANY;
-   m4_popdef(['m4_data_delay'])
-   m4_popdef(['m4_trans_ind'])
-
-
-// A backpressured, stalling, or free-flowing pipeline of zero or more stage.
-//
-// The pipeline can be free-flowing (ff), backpressured (bp), or stalling (stall).
-// Using this macro for pipelines provides backpressure interfaces for one upstream
-// and one downstream component and enables the pipeline type to be modified easily.
-//
-// Transaction functionality should be placed in |_in@_in, |_in['']_st@1, ..., |_out@_out .
-//
-// For backpressured and stall pipelines:
-//   #_depth stages of recirculation MUXes are created in
-//   |_in['']_st1@0, ..., |_out(@_out-1) of the upstream pipeline.
-//
-// Backpressure (|_out@_out$blocked input):
-//
-//   Free-flowing: $blocked is asserted to be 1'b0, and backpressure is cut off.
-//
-//   For backpressured, if there is any unoccupied stage, all prior stages will progress.
-//   $blocked must be reflected combinationally on the input stage (|_in@_in$blocked) and
-//   should be available early enough to pass through combinational logic that grows with
-//   the depth of the pipeline.
-//
-//   For stalling, $blocked is directly connected to each recirculation mux. $blocked must
-//   be available early enough to support its fanout.
-//
-// Input interface:
-//   |_in
-//      @1
-//         $avail         // A transaction is available for consumption.
-//         ?avail
-//            $ANY        // input transaction.
-//   |_out
-//      @1
-//         $blocked       // The corresponding output transaction, if valid, cannot be consumed
-//                        // and will recirculate.
-// Output signals:
-//   |_in
-//      @0  // (for use in @1)
-//         $blocked       // The corresponding input transaction, if valid, cannot be consumed
-//                        // and must recirculate.
-//   |_out
-//      @0  // (for use in @1)
-//         $avail         // A transaction is available for consumption.
-\TLV pipe(type, #_depth, /_top, |_in, @_in, |_out, @_out, /_trans, $_reset, #_data_delay)
-   m4_ifelse_block(m4_eval(#_depth > 0), 1, ['
-   m4_forloop(['m4_st'], 0, #_depth, ['
-   m4+stage(type, /_top, m4_ifelse(m4_eval(m4_st == 0), 1, |_in, |_in['_st']m4_st), m4_ifelse(m4_eval(m4_st == 0), 1, @_in, @1), m4_ifelse(m4_eval((m4_st+1) == #_depth), 0, |_in['_st']m4_eval(m4_st+1), |_out), m4_ifelse(m4_eval(m4_st+1 == #_depth), 0, @1, @_out), /_trans, $_reset, #_data_delay)
-   '])'], ['
-   m4+connect(/_top, |_in, @_in, |_out, @_out, /_trans, $_reset, m4_ifelse(type, ['ff'], ['&& 1'b0'], ['']))
-   '])
-
-
-
-// A 2-way-forked flow macro. Two control input signals $_out0/1_ok (in |_in@0) specify which paths
-// may be taken. Any values are legal and are dont-care for an invalid input transaction.
-// |_out0 is favored if both are permitted. $blocked propagates appropriately.
-\TLV fork(/_top, |_in, @_in, $_out0_ok, |_out0, @_out0, $_out1_ok, |_out1, @_out1, /_trans, $_reset)
-   m4+flow_interface(/_top, [' |_in, @_in'], [' |_out0, @_out0, |_out1, @_out1'], $_reset)
-   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
-   |_out0
-      @_out0
-         $avail = /_top|_in>>m4_align(@_in, @_out0)$avail &&
-                  /_top|_in>>m4_align(@_in, @_out0)$_out0_ok;
-         $reset = /_top|_in>>m4_align(@_in, @_out0)$reset_in;
-         ?$avail
-            /_trans
-         m4_trans_ind   $ANY = /_top|_in/_trans>>m4_align(@_in, @_out0)$ANY;
-   |_out1
-      @_out1
-         $avail = /_top|_in>>m4_align(@_in, @_out1)$avail &&
-                  /_top|_in>>m4_align(@_in, @_out1)$_out1_ok &&
-                  ! /_top|_out0>>m4_align(@_out0, @_out1)$avail;
-         $reset = /_top|_in>>m4_align(@_in, @_out1)$reset_in;
-         ?$avail
-            /_trans
-         m4_trans_ind   $ANY = /_top|_in/_trans>>m4_align(@_in, @_out1)$ANY;
-   |_in
-      @_in
-         $blocked = (/_top|_out0>>m4_align(@_out0, @_in)$blocked || ! $_out0_ok) &&
-                    (/_top|_out1>>m4_align(@_out1, @_in)$blocked || ! $_out1_ok);
-   m4_popdef(['m4_trans_ind'])
-
-
-// A simple ring.
-// Changes in _v2:
-//   - /_trans is required
-//   - other optional arguments are removed
-//
-// Creates N ring stops, where a transaction can be injected into the ring (if not blocked) at any
-// ring stop, destined for any other stop. The transaction is a simple TLV transaction. It traverses
-// the ring from index 0 to N-1 continuing back to 0, one ring stop each cycle, until it reaches
-// its destination. Destinations must accept the transaction and cannot block.
-//
-// This macro implements a bi-directional "avail/blocked" interface at each ring stop, but ring output cannot be blocked.
-//
-// Input interface:
-//   /hop[*]
-//      |in_pipe
-//         @in_stage
-//            $avail         // A transaction is available for consumption.
-//            ?trans_valid = $avail && ! $blocked
-//               $dest       // Destination hop
-//               /_trans
-//                  $ANY        // Input transaction
-//   /hop[*]
-//      |out_pipe
-//         @out_stage
-//            $blocked       // The corresponding output transaction, if valid, cannot be consumed, though
-//                           //   backpressure is not supported at the output, so $blocked is assumed to be 1'b0,
-//                           //   and this is not really an input.
-// Output interface:
-//   /hop[*]
-//      |in_pipe
-//         @in_stage
-//            $blocked       // The corresponding input transaction, if valid, cannot be consumed.
-//      |out_pipe
-//         @out_stage
-//            $avail         // A transaction is available for consumption.
-//         @out_stage
-//            ?$avail
-//               /_trans
-//                  $ANY        // Output transaction
-// Arguments:
-//   /_hop: The beh hier for a ring hop/stop.
-//   [|/@][_in/_out]_[pipe/stage]:
-//          The pipeline name and stage of the input and output according to the conventions of
-//          the "avail/blocked" interface. Control logic is performed in the given stages, and
-//          data MUXing can run behind this by the number of cycles given in >>data_delay.)
-//   $_reset: As is standard for flow components.
-//   |_name: Name of the ring pipeline.
-//   /_trans: Name of transaction hierarchy.
-// Other inputs:
-//   M4 constants must be defined as created by a call to m4_define_hier(..) corresponding to /_hop,
-//   and /_hop must have a low index of 0.
-//
-\TLV simple_ring_v2(/_hop, |_in_pipe, @_in_at, |_out_pipe, @_out_at, $_reset, |_name, /_trans)
-   m4_pushdef(['m4_out_in_align'], m4_align(@_out_at, @_in_at))
-   m4_pushdef(['m4_in_out_align'], m4_align(@_in_at, @_out_at))
-   m4_pushdef(['m4_hop_name'], m4_strip_prefix(/_hop))
-   m4_pushdef(['M4_HOP'], ['M4_']m4_translit(m4_hop_name, ['a-z'], ['A-Z']))
-   // Logic
-   /_hop[*]
-      m4+flow_interface(/_hop, [' |_in_pipe, @_in_at'], [' |_out_pipe, @_out_at'], $_reset)
-      |default
-         @0
-            \SV_plus
-               int prev_hop = (m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT']);
-      |_in_pipe
-         @_in_at
-            $blocked = /_hop|_name<>0$passed_on;
-      |_name
-         @_in_at
-            // Control calculation.
-            $passed_on = /_hop[prev_hop]|_name>>1$pass_on;
-            $valid = ! /_hop|_in_pipe<>0$reset_in &&
-                     ($passed_on || /_hop|_in_pipe<>0$avail);
-            $pass_on = $valid && ! /_hop|_out_pipe>>m4_out_in_align$trans_valid;
-            ?$valid
-               $dest =
-                  $passed_on
-                     ? /_hop[prev_hop]|_name>>1$dest
-                     : /_hop|_in_pipe<>0$dest;
-                  /_trans
-                     $ANY =
-                       |_name$passed_on
-                           ? /_hop[prev_hop]|_name/_trans>>1$ANY
-                           : /_hop|_in_pipe/_trans<>0$ANY;
-      |_out_pipe
-         // Ring out
-         @_out_at
-            $avail = /_hop|_name>>m4_in_out_align$valid && (/_hop|_name>>m4_in_out_align$dest == #m4_strip_prefix(/_hop));
-            $blocked = 1'b0;  // Assume no output blocking (bounced transaction).
-            $trans_valid = $avail && ! $blocked;
-            $reset = /_hop|_in_pipe>>m4_in_out_align$reset_in;
-         ?$trans_valid
-            @_out_at
-               /_trans
-                  $ANY = /_hop|_name/_trans>>m4_in_out_align$ANY;
-   m4_popdef(['m4_out_in_align'])
-   m4_popdef(['m4_in_out_align'])
-   m4_popdef(['m4_hop_name'])
-   m4_popdef(['M4_HOP'])
-
-
-// A ring.
-// Changes in _v2:
-//   o $dest is moved under /ctrl
-//   o $blocked at output is required (and therefore backpressure is permitted).
-//
-// Creates N ring stops, where a transaction can be injected into the ring (if not blocked) at any
-// ring stop, destined for any other stop. The transaction is a simple TLV transaction. It traverses
-// the ring from index 0 to N-1 continuing back to 0, one ring stop each #_hop_dist cycles, until it reaches
-// its destination. Output from the ring comes from after the injection mux, so loopback is supported.
-//
-// Data muxing can be one cycle behind the control logic. (See >>_data_delay.)
-//
-// Input interface:
-//   /hop[*]
-//      |in_pipe
-//         @in_stage
-//            $avail         // A transaction is available for consumption.
-//         ?trans_valid = $avail && ! $blocked
-//            /_trans
-//               @in_stage
-//                  /ctrl  // Control signals that can have earlier timing than data. (See >>_data_delay.)
-//                     $dest       // Destination hop
-//                     $...        // As needed by $_can_expect_expr.
-//               @(in_stage >>data_delay)
-//                  $ANY        // Input transaction
-//   /hop[*]
-//      |out_pipe
-//         @out_stage
-//            $blocked       // The corresponding output transaction, if valid, cannot be consumed.
-//                           // Backpressure is not supported at the output, so $blocked must be 1'b0.
-// Output interface:
-//   /hop[*]
-//      |in_pipe
-//         @in_stage
-//            $blocked       // The corresponding input transaction, if valid, cannot be consumed.
-//      |out_pipe
-//         @out_stage
-//            $avail         // A transaction is available for consumption.
-//         @(out_stage >>data_delay)
-//            ?trans_valid = $avail && ! $blocked
-//               /_trans
-//                  $ANY        // Output transaction
-//                  // /ctrl$ANY is not provided at the output. (Once it is permitted to have empty $ANYs this could be added.)
-// Arguments:
-//   /_hop: The beh hier for a ring hop/stop.
-//   [|/@][_in/_out]_[pipe/stage]:
-//          The pipeline name and stage of the input and output according to the conventions of
-//          the "avail/blocked" interface. Control logic is performed in the given stages, and
-//          data MUXing can run behind this by the number of cycles given in >>data_delay.)
-//   $_reset: As is standard for flow components.
-//   |_name: Name of the ring pipeline.
-//   /_trans: Name of transaction hierarchy.
-//   >>_data_delay: [default: <>0] Stage offset of data relative to control, generally <>0 or >>1. Note that
-//           values other than <>0 do not match the convention of flow macros. To hook up to a flow macro, the
-//           control would be delayed by a cycle in both directions, and a one-cycle skid buffer would be needed
-//           to absorb back-pressured data.
-//   $_can_accept_expr: [default: destination matches] An expression in |_name@_in_at indicating, for valid flits, whether they can route out from the ring to the node (if not blocked).
-//   #_hop_dist: [default: 1] The distance in cycles between hops.
-// Other inputs:
-//   M4 constants must be defined as created by a call to m4_define_hier(..) corresponding to /_hop,
-//   and /_hop must have a low index of 0.
-//
-\TLV ring(/_hop, |_in_pipe, @_in_at, |_out_pipe, @_out_at, $_reset, |_name, /_trans, >>_data_delay, $_can_accept_expr, #_hop_dist)
-   m4_pushdef(['m4_data_delay'], m4_defaulted_arg(>>_data_delay, <>0))
-   m4_pushdef(['m4_can_accept_expr'], m4_defaulted_arg($_can_accept_expr, /_trans/ctrl<>0$dest == #m4_strip_prefix(/_hop)))
-   m4_pushdef(['m4_hop_dist'], m4_defaulted_arg(#_hop_dist, 1))
-   m4_pushdef(['m4_out_in_align'], m4_align(@_out_at, @_in_at))
-   m4_pushdef(['m4_in_out_align'], m4_align(@_in_at, @_out_at))
-   m4_pushdef(['m4_hop_name'], m4_strip_prefix(/_hop))
-   m4_pushdef(['M4_HOP'], ['M4_']m4_translit(m4_hop_name, ['a-z'], ['A-Z']))
-   // Logic
-   /_hop[*]
-      m4+flow_interface(/_hop, [' |_in_pipe, @_in_at'], [' |_out_pipe, @_out_at'], $_reset)
-      |default
-         @0
-            \SV_plus
-               int prev_hop = (m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT']);
-      |_in_pipe
-         @_in_at
-            $blocked = /_hop|_name<>0$passed_on;
-      |_name
-         @_in_at
-            // Control calculation.
-            $passed_on = /_hop[prev_hop]|_name>>m4_hop_dist$pass_on;
-            $valid = ! /_hop|_in_pipe<>0$reset_in &&
-                     ($passed_on || /_hop|_in_pipe<>0$avail);
-            $pass_on = $valid && ! /_hop|_out_pipe>>m4_out_in_align$trans_valid;
-            ?$valid
-               /_trans
-                  /ctrl
-                     $ANY =
-                       |_name$passed_on
-                          ? /_hop[prev_hop]|_name/ctrl>>_hop_dist$ANY
-                          : /_hop|_in_pipe/ctrl<>0$ANY;
-            $can_accept_expr = $valid && (m4_can_accept_expr);
-         @m4_stage_eval(@_in_at m4_data_delay)
-            ?$valid
-               /_trans
-                  $ANY =
-                    |_name$passed_on
-                        ? /_hop[prev_hop]|_name/_trans>>m4_hop_dist$ANY
-                        : /_hop|_in_pipe/_trans<>0$ANY;
-      |_out_pipe
-         // Ring out
-         @_out_at
-            $avail = /_hop|_name>>m4_in_out_align$can_accept;
-            $trans_valid = $avail && ! $blocked;
-            $reset = /_hop|_in_pipe>>m4_in_out_align$reset_in;
-         ?$trans_valid
-            @m4_stage_eval(@_out_at m4_data_delay)
-               /_trans
-                  $ANY = /_hop|_name/_trans>>m4_in_out_align$ANY;
-   m4_popdef(['m4_data_delay'])
-   m4_popdef(['m4_can_except_expr'])
-   m4_popdef(['m4_hop_dist'])
-   m4_popdef(['m4_out_in_align'])
-   m4_popdef(['m4_in_out_align'])
-   m4_popdef(['m4_hop_name'])
-   m4_popdef(['M4_HOP'])
 
 
 // Register insertion ring.
@@ -3340,7 +2909,16 @@ m4+definitions(['
    // Block head flit if FIFO not empty.
    m4+connect(/_hop, |_name['']_in_present, @0, |_name['']_node_to_fifo, @0, /_flit, [''], ['|| (! /_hop|_name['']_fifo_in<>0$would_bypass && $head)'])
    // Pipeline for ring hop.
-   m4+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_arriving, @0, /_flit)
+   m4+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
+   // Connect hops in a ring.
+   |_name['']_arriving
+      @0
+         $ANY = /_hop[(#m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_leaving<>0$ANY;
+         /_flit
+            $ANY = /_hop[(#m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_leaving/_flit<>0$ANY;
+   |_name['']_leaving
+      @0
+         $blocked = /_hop[(#m4_hop_name + 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
    // Fork off ring
    m4+fork(/_hop, |_name['']_arriving, @0, $head_out, |_name['']_off_ramp, @0, $true, |_name['']_continuing, @0, /_flit)
    // Fork from off-ramp out or into FIFO
@@ -3361,7 +2939,7 @@ m4+definitions(['
    |_name['']_arriving
       @0
          // Characterize arriving flit (head/tail/body, header)
-         {$vc[M4_VC_INDEX_RANGE], $dest[m4_echo(M4_HOP['']_INDEX_RANGE)]} =
+         {$vc[M4_VC_INDEX_RANGE], $dest[m4_echo(M4_HOP['_INDEX_RANGE'])]} =
             $reset  ? '0 :
             ! $body ? {/flit$flit[M4_FLIT_VC_RANGE], /flit$flit[M4_FLIT_DEST_RANGE]} :
                       {>>1$vc, >>1$dest};
@@ -3388,9 +2966,14 @@ m4+definitions(['
    |_name['']_fifo_in
       @0
          // The FIFO can hold only one packet at a time.
-         // Keep track of tail. This asserts for tail flit to FIFO, and deasserts after tail is sent from FIFO.
-         // It will deassert for a minimum of 1 cycle (since $would_bypass enables a flit from node).
-         $node_tail_flit_in_fifo = ! $would_bypass && (>>1$node_tail_flit_in_fifo || (/_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail));
+         // Keep track of whether the FIFO (or bypass path) contains tail. This asserts for tail flit to FIFO, and deasserts after
+         // tail is sent from FIFO. Streaming single-flit packets is possible without gaps.
+         // XXX It will deassert for a minimum of 1 cycle (since $would_bypass enables a flit from node).
+         $node_tail_flit_in_fifo =
+              $reset ? 1'b0 :
+              /_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail ? 1'b1 :
+              $would_bypass ? 1'b0 :
+                   $RETAIN;
 
    m4_popdef(['m4_in_delay'])
    m4_popdef(['m4_hop_dist'])
@@ -3420,19 +3003,49 @@ m4+module_def
          /instr
             $csr_pktrd[31:0] = 32'b0;
    
-\TLV
+// For building just the insertion ring in isolation.
+// The diagram builds, but unfortunately it is messed up :(.
+\TLV //main_ring_only()
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
+   /M4_CORE_HIER
+      |egress_out
+         /flit
+            @0
+               $bogus_head = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000100)) ||
+                             ((#core == 1) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $tail       = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000001000)) ||
+                             ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $bogus_mid  = ((#core == 0) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000)) ||
+                             ((#core == 1) && | ((1 << (*cyc_cnt - 2)) & 10'b00000000000));
+               $bogus_src[M4_CORE_INDEX_RANGE] = #core;
+               $bogus_dest[M4_CORE_INDEX_RANGE] = 1;
+               $bogus_vc[M4_VC_INDEX_RANGE] = 0;
+               $flit[M4_FLIT_RANGE] = $bogus_head ? {*cyc_cnt[M4_FLIT_UNUSED_CNT-3:0], 2'b01      , $bogus_vc, $bogus_src, $bogus_dest}
+                                                  : {*cyc_cnt[M4_FLIT_UNUSED_CNT-3:0], $tail, 1'b0, m4_eval(M4_VC_INDEX_CNT + M4_CORE_INDEX_CNT * 2)'b1};
+         @0
+            $avail = /flit$bogus_head || /flit$tail || /flit$bogus_mid;
+      m4+insertion_ring(/core, |egress_out, @1, |ingress_in, @0, /core|ingress_in<<1$reset, |rg, /flit, 4, 4)  // /flit, hop_latency, FIFO_depth
+      |ingress_in
+         @0
+            $blocked = 1'b0;
+            /flit
+               `BOGUS_USE($flit)
+   *passed = *cyc_cnt > 40;
+   *failed = 1'b0;
+
+\TLV disabled_main()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
    // Multi-core
    /M4_CORE_HIER
       // TODO: Find a better place for this:
       // Block CPU |fetch pipeline if blocked.
-      //m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
+      m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
       m4+cpu(/core)
-      m4+dummy_noc(/core)
-      //m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      //m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      //m4+warpv_makerchip_cnt10_tb()
+      //m4+dummy_noc(/core)
+      m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+      m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+      m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    |done
       @0
@@ -3448,6 +3061,7 @@ m4+module_def
          *passed = /top|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = /top|fetch/instr>>M4_REG_WR_STAGE$failed;
    '])
+
 \SV
    endmodule
 
