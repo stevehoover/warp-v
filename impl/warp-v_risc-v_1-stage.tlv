@@ -2,6 +2,7 @@
 m4+definitions(['
    m4_define(['M4_IMPL'], 1)
    m4_define(['M4_STANDARD_CONFIG'], ['1-stage'])
+   m4_define(['M4_VIZ'], 0)
 '])
 \SV
    // Include WARP-V.
