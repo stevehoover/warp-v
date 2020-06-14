@@ -411,7 +411,7 @@ m4+definitions(['
             (['M4_EXT_I'], 1),
             (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
-            (['M4_EXT_F'], 1),
+            (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
@@ -4124,6 +4124,7 @@ m4+module_def
                         '$value'.step(1).asInt(NaN).toString() + oldValStr);
                      this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
                   }
+            m4_ifelse_block(M4_EXT_F, 1, ['
             /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
                \viz_alpha
                   initEach: function() {
@@ -4152,6 +4153,7 @@ m4+module_def
                         '$fpuvalue'.step(1).asInt(NaN).toString(16) + oldValStr);
                      this.getInitObject("fpureg").setFill(pending ? "red" : mod ? "blue" : "black");
                   }
+               '])
 
             /bank[M4_ADDRS_PER_WORD-1:0]
                /mem[M4_DATA_MEM_WORDS_RANGE]
