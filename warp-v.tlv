@@ -28,6 +28,8 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
+
+
 m4+definitions(['
 
    // A highly-parameterized CPU generator, configurable for:
@@ -66,7 +68,7 @@ m4+definitions(['
    //   o One instruction traverses the single free-flowing CPU pipeline per cycle.
    //   o There is no branch or condition or target prediction.
    //   o Instructions are in-order, but the uarch supports loads that return their
-   //     data out of order (though, they don't).
+   //     data out of order (though, they do not).
    //
    // Redirects:
    //
@@ -86,15 +88,16 @@ m4+definitions(['
    //
    // Loads:
    //
-   // Load instructions complete without writing their destination registers. Destination
-   // registers are instead marked "pending", and reads of pending registers are replayed.
-   // This could again result in a read of the same pending register and can repeat until
-   // the load returns. Writes to pending registers are also replayed, so there can be at
-   // most one oustanding load to any given register. This way, out-of-order loads are
-   // supported (though loads are implemented to have a fixed latency). A returning load
-   // reserves an instruction slot at the beginning of the pipeline to reserve a register
-   // write port. The returning load writes its result and clears the destination
-   // register's pending flag.
+   //   o Load instructions complete without writing their destination registers. Destination
+   //     registers are instead marked "pending", and reads of pending registers are replayed.
+   //   o This could again result in a read of the same pending register and can repeat until
+   //     the load returns. Writes to pending registers are also replayed, so there can be at
+   //     most one oustanding load to any given register. 
+   //   o This way, out-of-order loads are
+   //     supported (though loads are implemented to have a fixed latency). A returning load
+   //     reserves an instruction slot at the beginning of the pipeline to reserve a register
+   //     write port. The returning load writes its result and clears the destination
+   //     register's pending flag.
    //
    // To support L1 and L2 caches, it would be reasonable to delay register write (if
    // necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
@@ -103,26 +106,30 @@ m4+definitions(['
    //
    // Long-latency pipelined instructions:
    //
-   // Long-latency pipelined instructions can utilize the same split issue and pending
-   // mechanisms as load instructions.
+   //    Long-latency pipelined instructions can utilize the same split issue and pending
+   //    mechanisms as load instructions.
    //
    // Long-latency non-pipelined instructions:
    //
-   // FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
-   // are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
-   // the next redirect (which will be a second issue of the instruction).
-   // It doesn't matter whether registers are marked pending, but we do.
+   //   o FP and mul/div are likely to take multiple cycles to execute, may not be pipelined, and 
+   //     are likely to utilize the ALU iteratively. These are followed by "no-fetch" cycles until
+   //     the next redirect (which will be a second issue of the instruction).
+   //   o The data required during second can be passed to the commit stage using /orig_inst scope
+   //   o It does not matter whether registers are marked pending, but we do.
+   //   o Process redirect conditions take care of the correct handling of PC for such instrctions.
+   //   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
+   //     for such instructions
    //
    // Bypass:
    //
-   // Register bypass is provided if one instruction's result is not written to the
-   // register file in time for the next instruction's read. An additional bypass is
-   // provided for each additional cycle between read and write.
+   //    Register bypass is provided if one instruction's result is not written to the
+   //    register file in time for the next instruction's read. An additional bypass is
+   //    provided for each additional cycle between read and write.
    //
    // Memory:
    //
-   // The program is stored in its own instruction memory (for simplicity).
-   // Data memory is separate.
+   //    The program is stored in its own instruction memory (for simplicity).
+   //    Data memory is separate.
    //
    
    // TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
@@ -131,11 +138,13 @@ m4+definitions(['
    //       in place of the fetch instruction. There have been several subtle bugs where the fetch
    //       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
    //       avoid them.
+   //
    // TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
    //       already have the raw instruction bits to inject. The replay mechanism can be separated from
    //       redirects.
    
-   
+
+
    // ============
    // Mini-CPU ISA
    // ============
@@ -172,13 +181,13 @@ m4+definitions(['
    //     &, |: Bitwise
    //        (Can be used on booleans as well as vectors.)
    //     (There are no operators for NAND and NOR and unary !.)
-   //     ~: Extended constant (D = {1[2:0], 2[2:0]})
-   //     ,: Combine (D = {1[11:6], 2[5:0]})
-   //     ?: Conditional (D = 2 ? `0 : 1)
-   //   Load (Eg: "c=a{b") (D = [1 + 2] (typically 1 would be an immediate offset):
-   //     {: Load
-   //   Store (Eg: "0=a}b") ([2] = 1):
-   //     }: Store
+   //     ~ : Extended constant (D = {1[2:0], 2[2:0]})
+   //     , : Combine (D = {1[11:6], 2[5:0]})
+   //     ? : Conditional (D = 2 ? `0 : 1)
+   //   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
+   //     ) : Load
+   //   Store (Eg: "0=a;b") ([2] = 1):
+   //     ( : Store
    //
    // A full-width immediate load sequence, to load octal 2017 is:
    //   a=2~0
@@ -196,7 +205,7 @@ m4+definitions(['
    // RISC-V ISA
    // ==========
    
-   // This design is a RISC-V (RV32I) implementation.
+   // This design is a RISC-V (RV32IM) implementation.
    // The ISA is characterized using M4 macros, and the microarchitecture is generated from this characterization, so
    // the ISA can be modified through M4 definitions.
    // Notes:
@@ -219,6 +228,7 @@ m4+definitions(['
    // not to provide a production-worthy MIPS I design.
    
    
+
    // =====
    // Power
    // =====
@@ -229,6 +239,7 @@ m4+definitions(['
    // not to provide a production-worthy Power design.
    
    
+
    // =========
    // DUMMY ISA
    // =========
@@ -244,7 +255,6 @@ m4+definitions(['
    
 
 
-
    // =============
    // Configuration
    // =============
@@ -255,6 +265,7 @@ m4+definitions(['
    // Machine:
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
+
    // Select a standard configuration:
    m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
@@ -284,10 +295,6 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-
-   
-   // Which program to assemble.
-   m4_define(M4_PROG_NAME, ['cnt10'])
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -399,7 +406,7 @@ m4+definitions(['
          // ISA options:
 
          // Currently supported uarch variants:
-         //   RV32I 2.0, w/ no ISA extensions.
+         //   RV32IM 2.0, w/ FA ISA extensions WIP.
 
          // Machine width
          m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
@@ -407,7 +414,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 0),
+            (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -432,7 +439,11 @@ m4+definitions(['
          m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
       ']
    )
-   
+
+   // Which program to assemble.
+   // this depends on the ISA extension(s) choice
+   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+
    // =====Done Defining Configuration=====
    
    // Characterize ISA and apply configuration.
@@ -498,7 +509,7 @@ m4+definitions(['
    // The idea here, is to move all logic into @0 and see how well synthesis results compare vs. the timed model with
    // retiming enabled. In theory, synthesis should be able to produce identical results.
    //
-   // Unfortunately, this modeling doesn't work because of the redirection logic. When timed @0, the $GoodPathMask would
+   // Unfortunately, this modeling does not work because of the redirection logic. When timed @0, the $GoodPathMask would
    // need to be redistributed, with each bit in a different stage to enable $commit to be computed in @0. So, to make
    // this work, each bit of $GoodPathMask would have to become a separate signal, and each signal assignment would need
    // its own @stage scope, affected by M4_RETIMING_EXPERIMENT. Since this is all generated by M4 ugliness, it was too
@@ -508,6 +519,7 @@ m4+definitions(['
    //
    // This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
+   
    m4_ifelse(M4_RETIMING_EXPERIMENT, ['M4_RETIMING_EXPERIMENT'], [''], ['
       m4_define(['M4_NEXT_PC_STAGE'], 0)
       m4_define(['M4_FETCH_STAGE'], 0)
@@ -708,7 +720,7 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $Pc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1'],
       ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
@@ -808,7 +820,7 @@ m4+definitions(['
          // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
       '])
    '])
-
+                                                                         
    // ==========================
    // ISA Code Generation Macros
    // ==========================
@@ -864,10 +876,9 @@ m4+definitions(['
    // A "JUMP" result will be selected for either instruction.
    //
    // ISA-specific versions of the above macros can be created that drop the first argument.
-   //
+   //  
    // For CPU instructions, it would be a good idea to try to link this instruction description with
-   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here.
-   //
+   // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
    // --------------------------------------------------
    
    m4_case(M4_ISA, ['MINI'], ['
@@ -935,9 +946,9 @@ m4+definitions(['
       // This instantiates m4_instr<type>(type-specific-args>)
       m4_define_hide(['m4_instr'],
                      ['// check instr type
-                       // TODO: (IMMEDIATELY) Re-enable 2 lines below.
-                       //m4_ifelse(M4_OP5_$4_TYPE, $1, [''],
-                       //          ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
+
+                       m4_ifelse(M4_OP5_$4_TYPE, m4_ifdef(['m4_instr_type_of_$1'], ['m4_instr_type_of_$1'], ['$1']), [''],
+                                 ['m4_errprint(['Instruction ']m4_argn($#, $@)[''s type ($1) is inconsistant with its op5 code ($4) of type ']M4_OP5_$4_TYPE[' on line ']m4___line__[' of file ']m4_FILE.m4_new_line)'])
                        // if instrs extension is supported and instr is for the right machine width, "
                        m4_ifelse(m4_instr_supported($@), 1, ['m4_show(['localparam [6:0] ']']m4_argn($#, $@)['['_INSTR_OPCODE = 7'b$4['']11;m4_instr$1(m4_shift($@))'])'],
                                  [''])'])
@@ -945,7 +956,6 @@ m4+definitions(['
       
       // Decode logic for instructions with various opcode/func bits that dictate the mnemonic.
       // (This would be easier if we could use 'x', but Yosys doesn't support ==?/!=? operators.)
-
       // Helpers to deal with "rm" cases:
       m4_define(['m4_op5_and_funct3'],
                 ['$raw_op5 == 5'b$3 m4_ifelse($4, ['rm'], [''], ['&& $raw_funct3 == 3'b$4'])'])
@@ -1001,6 +1011,9 @@ m4+definitions(['
       // The first arg of m4_instr(..) is a type, and a type-specific macro is invoked. Types are those defined by RISC-V, plus:
       //   R2: R-type with a hard-coded rs2 value. (assuming illegal instruction exception should be thrown for wrong value--not clear in RISC-V spec)
       //   If: I-type with leading bits of imm[11:...] used as function bits.
+
+      m4_define(['m4_instr_type_of_R2'], ['R'])
+      m4_define(['m4_instr_type_of_If'], ['I'])
       // Unique to each instruction type, eg:
       //   m4_instr(U, 32, I, 01101,      LUI)
       //   m4_instr(J, 32, I, 11011,      JAL)
@@ -1013,6 +1026,7 @@ m4+definitions(['
       //   m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRT.S)
       //   m4_instr(R2, 32, A, 01011, 010, 00010, 00000, LR.W)  // (5 bits for funct7 for all "A"-ext instrs)
       //   m4_instr(R, 32, A, 01011, 010, 00011, SC.W)          //   "
+
       // This defines assembler macros as follows. Fields are ordered rd, rs1, rs2, imm:
       //   I: m4_asm_ADDI(r4, r1, 0),
       //   R: m4_asm_ADD(r4, r1, r2),
@@ -1026,14 +1040,8 @@ m4+definitions(['
       //   o Assembler definition of m4_asm_<MNEMONIC>: m4_define(['m4_asm_<MNEMONIC>'], ['m4_asm_instr_str(...)'])
       m4_define(['m4_instrI'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(I, ['$5'], $']['@){12'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $5_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrIf'], ['m4_instr_funct7($@, ['$6'], m4_len($5))m4_define(['m4_asm_$6'], ['m4_asm_instr_str(I, ['$6'], $']['@){['$6_INSTR_FUNCT']m4_len($5)[', ']m4_eval(12-m4_len($5))'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
-      // TODO: Convert all R types to RR, adding funct7 values.
-      //       Delete m4_instrR below.
-      //       Rename all RR to R.
-      //       Uncomment 2 lines under "// check instr type", above.
-      // TODO: Change these to m4_define_hide and break into multiple lines.
-      m4_define(['m4_instrRR'], ['m4_instr_funct7($@, ['$6'], m4_ifelse($2, ['A'], 5, 7))m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_ifelse($2, ['A'], ['$6_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$6_INSTR_FUNCT7']), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$6'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrR'], ['m4_instr_funct3($@)m4_define(['m4_asm_$5'], ['m4_asm_instr_str(R, ['$5'], $']['@){7'b['']m4_ifelse(']m4_arg(4)[', [''], 0, ']m4_arg(4)['), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$5'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $5_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrR2'], ['m4_instr_funct7($@, 7, ['$6'])m4_define(['m4_asm_$7'], ['m4_asm_instr_str(R, ['$7'], $']['@){m4_ifelse($2, ['A'], ['$7_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$7_INSTR_FUNCT7']), 5'b$6, m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$7'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $7_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR'], ['m4_instr_funct7($@, ['$6'], m4_ifelse($2, ['A'], 5, 7))m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_ifelse($2, ['A'], ['$6_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$6_INSTR_FUNCT7']), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$6'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
+      m4_define(['m4_instrR2'], ['m4_instr_funct7($@, 7)m4_define(['m4_asm_$7'], ['m4_asm_instr_str(R, ['$7'], $']['@){m4_ifelse($2, ['A'], ['$7_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$7_INSTR_FUNCT7']), 5'b$6, m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$7'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $7_INSTR_OPCODE}'])'])
       m4_define(['m4_instrR4'], ['m4_instr_funct2($@)m4_define(['m4_asm_$6'], ['m4_asm_instr_str(R, ['$6'], $']['@){m4_asm_reg(']m4_arg(4)['), $6_INSTR_FUNCT2, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$6'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
       m4_define(['m4_instrS'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(S, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 12, 11, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), ']m4_asm_funct3(['$5'], ['$4'])[', m4_asm_imm_field(']m4_arg(3)[', 12, 4, 0), $5_INSTR_OPCODE}'])'])
       m4_define(['m4_instrB'], ['m4_instr_funct3($@, ['no_dest'])m4_define(['m4_asm_$5'], ['m4_asm_instr_str(B, ['$5'], $']['@){m4_asm_imm_field(']m4_arg(3)[', 13, 12, 12), m4_asm_imm_field(']m4_arg(3)[', 13, 10, 5), m4_asm_reg(']m4_arg(2)['), m4_asm_reg(']m4_arg(1)['), ']m4_asm_funct3(['$5'], ['$4'])[', m4_asm_imm_field(']m4_arg(3)[', 13, 4, 1), m4_asm_imm_field(']m4_arg(3)[', 13, 11, 11), $5_INSTR_OPCODE}'])'])
@@ -1099,9 +1107,9 @@ m4+definitions(['
             output logic rvfi_halt,
             output logic rvfi_trap,       
             output logic rvfi_halt,       
-            output logic rvfi_intr,  
+            output logic rvfi_intr,
             output logic [1: 0] rvfi_ixl,
-            output logic [1: 0] rvfi_mode,
+            output logic [1: 0] rvfi_mode,  
             output logic [4: 0] rvfi_rs1_addr,   
             output logic [4: 0] rvfi_rs2_addr,   
             output logic [31: 0] rvfi_rs1_rdata,  
@@ -1162,12 +1170,13 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          "d=d+b", //  -> out += cnt
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
-         "0=d}g", //     store out at store_addr
+         
+         "0=d;g",  //    store out at store_addr, 
          "e=c-b", //     tmp = nine - cnt
-         "p=f?e", //  ^- branch back if tmp >= 0
-         "e=0{c", //     load the final value into tmp
+         "p=f?e", //     branch back if tmp >= 0
+         "e=0)c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
-      };
+      }; 
 
 \TLV mini_imem(_prog_name)
    m4+indirect(['mini_']_prog_name['_prog'])
@@ -1246,8 +1255,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       // Conditional
       $conditional = $char == "?";
       // Memory
-      $ld = $char == "{";
-      $st = $char == "}";
+      $ld = $char == ")";
+      $st = $char == "(";
       // Opcode classes:
       $arith = $add || $sub || $mul || $div;
       $compare = $eq || $ne || $lt || $gt || $le || $ge;
@@ -1329,13 +1338,6 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
 
-
-
-
-
-
-
-
 //============================//
 //                            //
 //          RISC-V            //
@@ -1349,7 +1351,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // | Count to 10 Program |
    // \=====================/
    //
-
+   // Default program for RV32I test
    // Add 1,2,3,...,9 (in that order).
    // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
    //
@@ -1360,7 +1362,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // 4: tmp
    // 5: offset
    // 6: store addr
-   
+ 
    m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
    m4_asm(ORI, r1, r0, 1)        //     cnt = 1
    m4_asm(ORI, r2, r0, 1010)     //     ten = 10
@@ -1373,6 +1375,30 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
    m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
+\TLV riscv_divmul_test_prog()
+   // /==========================\
+   // | M-extension Test Program |
+   // \==========================/
+   //
+   //3 MULs followed by 3 DIVs, check r11-r15 for correct results
+
+   m4_asm(ORI, r8, r0, 1011)
+   m4_asm(ORI, r9, r0, 1010)
+   m4_asm(ORI, r10, r0, 10101010)
+   m4_asm(MUL, r11, r8, r9)
+   m4_asm(ORI, r6, r0, 0)
+   m4_asm(SW, r6, r11, 0)
+   m4_asm(MUL, r12, r9, r10)
+   m4_asm(LW, r4, r6, 0)
+   m4_asm(ADDI, r6, r6, 100)
+   m4_asm(SW, r6, r12, 0)
+   m4_asm(MUL, r13, r8, r10)
+   m4_asm(DIV, r14, r11, r8)
+   m4_asm(DIV, r15, r13, r10)
+   m4_asm(LW, r5, r6, 0)
+   m4_asm(ADDI, r4, r0, 101101)
+   m4_asm(BGE, r8, r9, 111111111110)
+   
 \TLV riscv_imem(_prog_name)
    m4+indirect(['riscv_']_prog_name['_prog'])
    m4+instrs_for_viz()
@@ -1462,7 +1488,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       m4_op5(01000, S, STORE)
       m4_op5(01001, S, STORE_FP)
       m4_op5(01010, _, CUSTOM_1)
-      m4_op5(01011, R2, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(01011, R, AMO)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(01100, R, OP)
       m4_op5(01101, U, LUI)
       m4_op5(01110, R, OP_32)
@@ -1471,7 +1497,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       m4_op5(10001, R4, MSUB)
       m4_op5(10010, R4, NMSUB)
       m4_op5(10011, R4, NMADD)
-      m4_op5(10100, R2, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
+      m4_op5(10100, R, OP_FP)  // (R-type, but rs2 = const for some, based on funct7 which doesn't exist for I-type?? R-type w/ ignored R2?)
       m4_op5(10101, _, RESERVED_1)
       m4_op5(10110, _, CUSTOM_2_RV128)
       m4_op5(10111, _, 48B2)
@@ -1520,18 +1546,19 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       m4_instr(I, 32, I, 00100, 100, XORI)
       m4_instr(I, 32, I, 00100, 110, ORI)
       m4_instr(I, 32, I, 00100, 111, ANDI)
-      m4_instr(I, 32, I, 00100, 001, SLLI)
-      m4_instr(I, 32, I, 00100, 101, SRLI_SRAI)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
-      m4_instr(RR, 32, I, 01100, 000, 0000000, ADD)
-      m4_instr(RR, 32, I, 01100, 000, 0100000, SUB)
-      m4_instr(R, 32, I, 01100, 001, SLL)
-      m4_instr(R, 32, I, 01100, 010, SLT)
-      m4_instr(R, 32, I, 01100, 011, SLTU)
-      m4_instr(R, 32, I, 01100, 100, XOR)
-      m4_instr(RR, 32, I, 01100, 101, 0000000, SRL)
-      m4_instr(RR, 32, I, 01100, 101, 0100000, SRA)
-      m4_instr(R, 32, I, 01100, 110, OR)
-      m4_instr(R, 32, I, 01100, 111, AND)
+      m4_instr(If, 32, I, 00100, 001, 000000, SLLI)
+      m4_instr(If, 32, I, 00100, 101, 000000, SRLI)
+      m4_instr(If, 32, I, 00100, 101, 010000, SRAI)
+      m4_instr(R, 32, I, 01100, 000, 0000000, ADD)
+      m4_instr(R, 32, I, 01100, 000, 0100000, SUB)
+      m4_instr(R, 32, I, 01100, 001, 0000000, SLL)
+      m4_instr(R, 32, I, 01100, 010, 0000000, SLT)
+      m4_instr(R, 32, I, 01100, 011, 0000000, SLTU)
+      m4_instr(R, 32, I, 01100, 100, 0000000, XOR)
+      m4_instr(R, 32, I, 01100, 101, 0000000, SRL)
+      m4_instr(R, 32, I, 01100, 101, 0100000, SRA)
+      m4_instr(R, 32, I, 01100, 110, 0000000, OR)
+      m4_instr(R, 32, I, 01100, 111, 0000000, AND)
       //m4_instr(_, 32, I, 00011, 000, FENCE)
       //m4_instr(_, 32, I, 00011, 001, FENCE_I)
       //m4_instr(_, 32, I, 11100, 000, ECALL_EBREAK)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
@@ -1544,37 +1571,147 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       m4_instr(I, 64, I, 00000, 110, LWU)
       m4_instr(I, 64, I, 00000, 011, LD)
       m4_instr(S, 64, I, 01000, 011, SD)
-      m4_instr(I, 64, I, 00100, 001, SLLI)
-      m4_instr(I, 64, I, 00100, 101, SRLI_SRAI)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
+      m4_instr(If, 64, I, 00100, 001, 000000, SLLI)
+      m4_instr(If, 64, I, 00100, 101, 000000, SRLI)
+      m4_instr(If, 64, I, 00100, 101, 010000, SRAI)
       m4_instr(I, 64, I, 00110, 000, ADDIW)
-      m4_instr(I, 64, I, 00110, 001, SLLIW)
-      m4_instr(I, 64, I, 00110, 101, SRLIW_SRAIW)  // Two instructions distinguished by an immediate bit, treated as a single instruction.
+      m4_instr(If, 64, I, 00110, 001, 000000, SLLIW)
+      m4_instr(If, 64, I, 00110, 101, 000000, SRLIW)
+      m4_instr(If, 64, I, 00110, 101, 010000, SRAIW)
       m4_instr(R, 64, I, 01110, 000, 0000000, ADDW)
       m4_instr(R, 64, I, 01110, 000, 0100000, SUBW)
-      m4_instr(R, 64, I, 01110, 001, SLLW)
-      m4_instr(RR, 64, I, 01110, 101, 0000000, SRLW)
-      m4_instr(RR, 64, I, 01110, 101, 0100000, SRAW)
-      m4_instr(R, 32, M, 01100, 000, MUL)
-      m4_instr(R, 32, M, 01100, 001, MULH)
-      m4_instr(R, 32, M, 01100, 010, MULHSU)
-      m4_instr(R, 32, M, 01100, 011, MULHU)
-      m4_instr(R, 32, M, 01100, 100, DIV)
-      m4_instr(R, 32, M, 01100, 101, DIVU)
-      m4_instr(R, 32, M, 01100, 110, REM)
-      m4_instr(R, 32, M, 01100, 111, REMU)
-      m4_instr(R, 64, M, 01110, 000, MULW)
-      m4_instr(R, 64, M, 01110, 100, DIVW)
-      m4_instr(R, 64, M, 01110, 101, DIVUW)
-      m4_instr(R, 64, M, 01110, 110, REMW)
-      m4_instr(R, 64, M, 01110, 111, REMUW)
-      // RV32A and RV64A
-      // NOT IMPLEMENTED. These are distinct in the func7 field.
-      // RV32F and RV64F
-      // NOT IMPLEMENTED.
-      // RV32D and RV64D
-      // NOT IMPLEMENTED.
-
-
+      m4_instr(R, 64, I, 01110, 001, 0000000, SLLW)
+      m4_instr(R, 64, I, 01110, 101, 0000000, SRLW)
+      m4_instr(R, 64, I, 01110, 101, 0100000, SRAW)
+      m4_instr(R, 32, M, 01100, 000, 0000001, MUL)
+      m4_instr(R, 32, M, 01100, 001, 0000001, MULH)
+      m4_instr(R, 32, M, 01100, 010, 0000001, MULHSU)
+      m4_instr(R, 32, M, 01100, 011, 0000001, MULHU)
+      m4_instr(R, 32, M, 01100, 100, 0000001, DIV)
+      m4_instr(R, 32, M, 01100, 101, 0000001, DIVU)
+      m4_instr(R, 32, M, 01100, 110, 0000001, REM)
+      m4_instr(R, 32, M, 01100, 111, 0000001, REMU)
+      m4_instr(R, 64, M, 01110, 000, 0000001, MULW)
+      m4_instr(R, 64, M, 01110, 100, 0000001, DIVW)
+      m4_instr(R, 64, M, 01110, 101, 0000001, DIVUW)
+      m4_instr(R, 64, M, 01110, 110, 0000001, REMW)
+      m4_instr(R, 64, M, 01110, 111, 0000001, REMUW)
+      m4_instr(I, 32, F, 00001, 010, FLW)
+      m4_instr(S, 32, F, 01001, 010, FSW)
+      m4_instr(R4, 32, F, 10000, rm, 00, FMADDS)
+      m4_instr(R4, 32, F, 10001, rm, 00, FMSUBS)
+      m4_instr(R4, 32, F, 10010, rm, 00, FNMSUBS)
+      m4_instr(R4, 32, F, 10011, rm, 00, FNMADDS)
+      m4_instr(R, 32, F, 10100, rm, 0000000, FADDS)
+      m4_instr(R, 32, F, 10100, rm, 0000100, FSUBS)
+      m4_instr(R, 32, F, 10100, rm, 0001000, FMULS)
+      m4_instr(R, 32, F, 10100, rm, 0001100, FDIVS)
+      m4_instr(R2, 32, F, 10100, rm, 0101100, 00000, FSQRTS)
+      m4_instr(R, 32, F, 10100, 000, 0010000, FSGNJS)
+      m4_instr(R, 32, F, 10100, 001, 0010000, FSGNJNS)
+      m4_instr(R, 32, F, 10100, 010, 0010000, FSGNJXS)
+      m4_instr(R, 32, F, 10100, 000, 0010100, FMINS)
+      m4_instr(R, 32, F, 10100, 001, 0010100, FMAXS)
+      m4_instr(R2, 32, F, 10100, rm, 1100000, 00000, FCVTWS)
+      m4_instr(R2, 32, F, 10100, rm, 1100000, 00001, FCVTWUS)
+      m4_instr(R2, 32, F, 10100, 000, 1110000, 00000, FMVXW)
+      m4_instr(R, 32, F, 10100, 010, 1010000, FEQS)
+      m4_instr(R, 32, F, 10100, 001, 1010000, FLTS)
+      m4_instr(R, 32, F, 10100, 000, 1010000, FLES)
+      m4_instr(R2, 32, F, 10100, 001, 1110000, 00000, FCLASSS)
+      m4_instr(R2, 32, F, 10100, rm, 1101000, 00000, FCVTSW)
+      m4_instr(R2, 32, F, 10100, rm, 1101000, 00001, FCVTSWU)
+      m4_instr(R2, 32, F, 10100, 000, 1111000, 00000, FMVWX)
+      m4_instr(R2, 64, F, 10100, rm, 1100000, 00010, FCVTLS)
+      m4_instr(R2, 64, F, 10100, rm, 1100000, 00011, FCVTLUS)
+      m4_instr(R2, 64, F, 10100, rm, 1101000, 00010, FCVTSL)
+      m4_instr(R2, 64, F, 10100, rm, 1101000, 00011, FCVTSLU)
+      m4_instr(I, 32, D, 00001, 011, FLD)
+      m4_instr(S, 32, D, 01001, 011, FSD)
+      m4_instr(R4, 32, D, 10000, rm, 01, FMADDD)
+      m4_instr(R4, 32, D, 10001, rm, 01, FMSUBD)
+      m4_instr(R4, 32, D, 10010, rm, 01, FNMSUBD)
+      m4_instr(R4, 32, D, 10011, rm, 01, FNMADDD)
+      m4_instr(R, 32, D, 10100, rm, 0000001, FADDD)
+      m4_instr(R, 32, D, 10100, rm, 0000101, FSUBD)
+      m4_instr(R, 32, D, 10100, rm, 0001001, FMULD)
+      m4_instr(R, 32, D, 10100, rm, 0001101, FDIVD)
+      m4_instr(R2, 32, D, 10100, rm, 0101101, 00000, FSQRTD)
+      m4_instr(R, 32, D, 10100, 000, 0010001, FSGNJD)
+      m4_instr(R, 32, D, 10100, 001, 0010001, FSGNJND)
+      m4_instr(R, 32, D, 10100, 010, 0010001, FSGNJXD)
+      m4_instr(R, 32, D, 10100, 000, 0010101, FMIND)
+      m4_instr(R, 32, D, 10100, 001, 0010101, FMAXD)
+      m4_instr(R2, 32, D, 10100, rm, 0100000, 00001, FCVTSD)
+      m4_instr(R2, 32, D, 10100, rm, 0100001, 00000, FCVTDS)
+      m4_instr(R, 32, D, 10100, 010, 1010001, FEQD)
+      m4_instr(R, 32, D, 10100, 001, 1010001, FLTD)
+      m4_instr(R, 32, D, 10100, 000, 1010001, FLED)
+      m4_instr(R2, 32, D, 10100, 001, 1110001, 00000, FCLASSD)
+      m4_instr(R2, 32, D, 10100, rm, 1110001, 00000, FCVTWD)
+      m4_instr(R2, 32, D, 10100, rm, 1100001, 00001, FCVTWUD)
+      m4_instr(R2, 32, D, 10100, rm, 1101001, 00000, FCVTDW)
+      m4_instr(R2, 32, D, 10100, rm, 1101001, 00001, FCVTDWU)
+      m4_instr(R2, 64, D, 10100, rm, 1100001, 00010, FCVTLD)
+      m4_instr(R2, 64, D, 10100, rm, 1100001, 00011, FCVTLUD)
+      m4_instr(R2, 64, D, 10100, 000, 1110001, 00000, FMVXD)
+      m4_instr(R2, 64, D, 10100, rm, 1101001, 00010, FCVTDL)
+      m4_instr(R2, 64, D, 10100, rm, 1101001, 00011, FCVTDLU)
+      m4_instr(R2, 64, D, 10100, 000, 1111001, 00000, FMVDX)
+      m4_instr(I, 32, Q, 00001, 100, FLQ)
+      m4_instr(S, 32, Q, 01001, 100, FSQ)
+      m4_instr(R4, 32, Q, 10000, rm, 11, FMADDQ)
+      m4_instr(R4, 32, Q, 10001, rm, 11, FMSUBQ)
+      m4_instr(R4, 32, Q, 10010, rm, 11, FNMSUBQ)
+      m4_instr(R4, 32, Q, 10011, rm, 11, FNMADDQ)
+      m4_instr(R, 32, Q, 10100, rm, 0000011, FADDQ)
+      m4_instr(R, 32, Q, 10100, rm, 0000111, FSUBQ)
+      m4_instr(R, 32, Q, 10100, rm, 0001011, FMULQ)
+      m4_instr(R, 32, Q, 10100, rm, 0001111, FDIVQ)
+      m4_instr(R2, 32, Q, 10100, rm, 0101111, 00000, FSQRTQ)
+      m4_instr(R, 32, Q, 10100, 000, 0010011, FSGNJQ)
+      m4_instr(R, 32, Q, 10100, 001, 0010011, FSGNJNQ)
+      m4_instr(R, 32, Q, 10100, 010, 0010011, FSGNJXQ)
+      m4_instr(R, 32, Q, 10100, 000, 0010111, FMINQ)
+      m4_instr(R, 32, Q, 10100, 001, 0010111, FMAXQ)
+      m4_instr(R2, 32, Q, 10100, rm, 0100000, 00011, FCVTSQ)
+      m4_instr(R2, 32, Q, 10100, rm, 0100011, 00000, FCVTQS)
+      m4_instr(R2, 32, Q, 10100, rm, 0100001, 00011, FCVTDQ)
+      m4_instr(R2, 32, Q, 10100, rm, 0100011, 00001, FCVTQD)
+      m4_instr(R, 32, Q, 10100, 010, 1010011, FEQQ)
+      m4_instr(R, 32, Q, 10100, 001, 1010011, FLTQ)
+      m4_instr(R, 32, Q, 10100, 000, 1010011, FLEQ)
+      m4_instr(R2, 32, Q, 10100, 001, 1110011, 00000, FCLASSQ)
+      m4_instr(R2, 32, Q, 10100, rm, 1110011, 00000, FCVTWQ)
+      m4_instr(R2, 32, Q, 10100, rm, 1100011, 00001, FCVTWUQ)
+      m4_instr(R2, 32, Q, 10100, rm, 1101011, 00000, FCVTQW)
+      m4_instr(R2, 32, Q, 10100, rm, 1101011, 00001, FCVTQWU)
+      m4_instr(R2, 64, Q, 10100, rm, 1100011, 00010, FCVTLQ)
+      m4_instr(R2, 64, Q, 10100, rm, 1100011, 00011, FCVTLUQ)
+      m4_instr(R2, 64, Q, 10100, rm, 1101011, 00010, FCVTQL)
+      m4_instr(R2, 64, Q, 10100, rm, 1101011, 00011, FCVTQLU)
+      m4_instr(R2, 32, A, 01011, 010, 00010, 00000, LRW)
+      m4_instr(R, 32, A, 01011, 010, 00011, SCW)
+      m4_instr(R, 32, A, 01011, 010, 00001, AMOSWAPW)
+      m4_instr(R, 32, A, 01011, 010, 00000, AMOADDW)
+      m4_instr(R, 32, A, 01011, 010, 00100, AMOXORW)
+      m4_instr(R, 32, A, 01011, 010, 01100, AMOANDW)
+      m4_instr(R, 32, A, 01011, 010, 01000, AMOORW)
+      m4_instr(R, 32, A, 01011, 010, 10000, AMOMINW)
+      m4_instr(R, 32, A, 01011, 010, 10100, AMOMAXW)
+      m4_instr(R, 32, A, 01011, 010, 11000, AMOMINUW)
+      m4_instr(R, 32, A, 01011, 010, 11100, AMOMAXUW)
+      m4_instr(R2, 64, A, 01011, 011, 00010, 00000, LRD)
+      m4_instr(R, 64, A, 01011, 011, 00011, SCD)
+      m4_instr(R, 64, A, 01011, 011, 00001, AMOSWAPD)
+      m4_instr(R, 64, A, 01011, 011, 00000, AMOADDD)
+      m4_instr(R, 64, A, 01011, 011, 00100, AMOXORD)
+      m4_instr(R, 64, A, 01011, 011, 01100, AMOANDD)
+      m4_instr(R, 64, A, 01011, 011, 01000, AMOORD)
+      m4_instr(R, 64, A, 01011, 011, 10000, AMOMIND)
+      m4_instr(R, 64, A, 01011, 011, 10100, AMOMAXD)
+      m4_instr(R, 64, A, 01011, 011, 11000, AMOMINUD)
+      m4_instr(R, 64, A, 01011, 011, 11100, AMOMAXUD)
    // ^---------------------
    
 
@@ -1726,18 +1863,22 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       
       m4_ifelse_block(M4_EXT_M, 1, ['
       // Instruction requires integer mul/div unit and is long-latency.
-      $div_mul = $is_mul_instr ||
-                 $is_mulh_instr ||
-                 $is_mulhsu_instr ||
-                 $is_mulhu_instr ||
-                 $is_div_instr ||
-                 $is_divu_instr ||
-                 $is_rem_instr ||
-                 $is_remu_instr;
+      $divtype_instr = $is_div_instr ||
+                       $is_divu_instr ||
+                       $is_rem_instr ||
+                       $is_remu_instr;
+      $multype_instr = $is_mul_instr ||
+                       $is_mulh_instr ||
+                       $is_mulhsu_instr ||
+                       $is_mulhu_instr;       
+      $div_mul       = $multype_instr || $divtype_instr;
       '], ['
       $div_mul = 1'b0;
+      $multype_instr = 1'b0;
+      `BOGUS_USE($multype_instr)
       '])
 
+      $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
       $illegal_itype_with_funct7 = ( $is_srli_srai_instr m4_ifelse(M4_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
       $illegal = $illegal_itype_with_funct7['']m4_illegal_instr_expr;
@@ -1764,9 +1905,24 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = $second_issue ? /orig_inst$dest_reg : $raw_rd;
+   $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$divmul_dest_reg :'])
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
    $dest_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
+   
+   m4_ifelse_block(M4_EXT_F, 1, ['
+   ?$valid_decode
+      // Output signals. seperate FPU source
+      /fpusrc[2:1]
+         // Reg valid for this fpu source, based on instruction type.
+         $is_fpu_reg = /instr$is_r_type || /instr$is_r4_type || /instr$is_r2_type || (/instr$is_i_type && (#fpusrc == 1)) || /instr$is_s_type;
+         $fpu_reg[M4_REGS_INDEX_RANGE] = (#fpusrc == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
+         
+   $dest_fpu_reg[M4_REGS_INDEX_RANGE] = $second_issue ? /orig_inst$dest_fpu_reg : $raw_rd;
+   $dest_fpu_reg_valid = (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
+                     | $dest_fpu_reg;   // r0 not valid.
+   '])
+   
    // Actually load.
    $spec_ld = $valid_decode && $ld;
    
@@ -1781,6 +1937,10 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    $csr_trap = $is_csr_instr && ! $valid_csr;
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
+   // if M_EXT is enabled, this handles the stalling logic
+   m4_ifelse_block(M4_EXT_M, 1, ['
+   m4+m_extension()
+   '])
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
@@ -1791,7 +1951,23 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
+      m4_ifelse_block(M4_EXT_M, 1, ['
+      // Verilog instantiation must happen outside when conditions' scope
+      $divblk_valid = >>1$div_stall;
+      $mulblk_valid = $multype_instr && $commit;
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
+      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+      m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
+      /* verilator lint_on CASEINCOMPLETE */   
+      /* verilator lint_on WIDTH */
       
+      /orig_inst
+         // put correctly aligned values from MUL and DIV Verilog modules into /orig_inst scope
+         // and RETAIN till next M-type instruction, to be used again at second issue
+         $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr$divblk_valid ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+         $divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
+      '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
@@ -1840,14 +2016,14 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
          $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
          $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
-         // TODO: Should combine SRL and SRLI, and SRA and SRAI.
          $srli_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
          $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
          $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
          $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
          $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
-         $srli_srai_rslt[M4_WORD_RANGE] = ($raw_i_imm[10] == 1) ? $srai_intermediate_rslt : $srli_intermediate_rslt;
+         $srai_rslt[M4_WORD_RANGE] = $srai_intermediate_rslt;
+         $srli_rslt[M4_WORD_RANGE] = $srli_intermediate_rslt;
          $add_sub_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
          $add_rslt[M4_WORD_RANGE] = $add_sub_rslt;
          $sub_rslt[M4_WORD_RANGE] = $add_sub_rslt;
@@ -1866,17 +2042,101 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          $csrrci_rslt[M4_WORD_RANGE] = $csrrw_rslt;
          
          // "M" Extension.
-         m4_ifelse_block(M4_EXT_M, 1, ['
-         $mul_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulh_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $mulhu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $div_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $divu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $rem_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         $remu_rslt[M4_WORD_RANGE] = $div_mul_rslt;
-         '])
          
+         m4_ifelse_block(M4_EXT_M, 1, ['       
+         // for Verilog modules instantiation
+         $clk = *clk;         
+         $resetn = !(*reset);         
+         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
+         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
+         $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
+         $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
+         $div_in1[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
+         $div_in2[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
+         
+         // result signals
+         $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
+         $mulhu_rslt[M4_WORD_RANGE]    = /orig_inst$late_rslt;
+         $div_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $divu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $rem_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
+         $remu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
+         '])
+
+         // "F" Extension
+
+         m4_ifelse_block(M4_EXT_F, 1, ['
+         // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
+         // Need to call fpu_exe marco inside this ifelse_block itself and simplify it to optimize the unit.
+         $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
+                           ({5{$is_fmsubs_instr }}  & 5'h3 ) |
+                           ({5{$is_fnmadds_instr}}  & 5'h4 ) |
+                           ({5{$is_fnmsubs_instr}}  & 5'h5 ) |
+                           ({5{$is_fadds_instr  }}  & 5'h6 ) |
+                           ({5{$is_fsubs_instr  }}  & 5'h7 ) |
+                           ({5{$is_fmuls_instr  }}  & 5'h8 ) |
+                           ({5{$is_fdivs_instr  }}  & 5'h9 ) |
+                           ({5{$is_fsqrts_instr }}  & 5'ha ) |
+                           ({5{$is_fsgnjs_instr }}  & 5'hb ) |
+                           ({5{$is_fsgnjns_instr}}  & 5'hc ) |
+                           ({5{$is_fsgnjxs_instr}}  & 5'hd ) |
+                           ({5{$is_fmins_instr  }}  & 5'he ) |
+                           ({5{$is_fmaxs_instr  }}  & 5'hf ) |
+                           ({5{$is_fcvtws_instr }}  & 5'h10) |
+                           ({5{$is_fcvtwus_instr}}  & 5'h11) |
+                           ({5{$is_fmvxw_instr  }}  & 5'h12) |
+                           ({5{$is_feqs_instr   }}  & 5'h13) |
+                           ({5{$is_flts_instr   }}  & 5'h14) |
+                           ({5{$is_fles_instr   }}  & 5'h15) |
+                           ({5{$is_fclasss_instr}}  & 5'h16) |
+                           ({5{$is_fcvtsw_instr }}  & 5'h17) |
+                           ({5{$is_fcvtswu_instr}}  & 5'h18) |
+                           ({5{$is_fmvwx_instr  }}  & 5'h19);
+         // Testing... For division  
+         $nreset = ! *reset;
+         $clock = *clk;
+         $input_valid = (*cyc_cnt == 2);
+         // Operands
+         // ToDo- provide operand_c[31:0] as /fpusrc[3] for multiply-add fused Instruction.
+         $operand_a[31:0] = /fpusrc[1]$fpu_reg_value;
+         $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
+         $operand_c[31:0] = /fpusrc[1]$fpu_reg_value;
+         $roundingMode[2:0] = |fetch/instr$raw_rm;
+         $int_input[31:0] = /fpusrc[1]$fpu_reg_value;
+         // Main Module
+         m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $roundingMode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output, $divide_by_zero)
+         m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
+         m4+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
+         m4+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
+         $fmadds_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fmsubs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fnmadds_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fnmsubs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fadds_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fsubs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fmuls_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fdivs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fsqrts_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fsgnjs_rslt[M4_WORD_RANGE] = $fsgnjs_output;
+         $fsgnjns_rslt[M4_WORD_RANGE] = $fsgnjns_output;
+         $fsgnjxs_rslt[M4_WORD_RANGE] = $fsgnjxs_output;
+         $fmins_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fmaxs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fcvtws_rslt[M4_WORD_RANGE] = /fpu1$int_output;
+         $fcvtwus_rslt[M4_WORD_RANGE] = /fpu1$int_output;
+         $fmvxw_rslt[M4_WORD_RANGE] = /fpusrc[1]$fpu_reg_value;
+         $feqs_rslt[M4_WORD_RANGE] = {31'b0 , /fpu1$eq_compare};
+         $flts_rslt[M4_WORD_RANGE] = {31'b0 , /fpu1$lt_compare}; 
+         $fles_rslt[M4_WORD_RANGE] = {31'b0 ,{/fpu1$eq_compare & /fpu1$lt_compare}};
+         $fclasss_rslt[M4_WORD_RANGE] = /fpu1$output_class;
+         $fcvtsw_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fcvtswu_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+         $fmvwx_rslt[M4_WORD_RANGE] = /src[1]$reg_value;
+         '])
+
    // CSR logic
    // ---------
    m4+riscv_csrs((m4_csrs))
@@ -1928,7 +2188,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = $ld_rslt;  // TODO: || ...
+            $late_rslt[M4_WORD_RANGE] = m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? $divmul_late_rslt : '])$ld_rslt;
+            // either div_mul result or load
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2530,30 +2791,122 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 
 
-//===============//
-// "M" Extension //
-//===============//
+//==================//
+//      RISC-V      //
+//  "M" Extension   //
+//==================//
+
+\SV
+   m4_ifelse_block(M4_EXT_M, 1, ['
+      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
+      /* verilator lint_off WIDTH */
+      /* verilator lint_off CASEINCOMPLETE */   
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_div.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
+      /* verilator lint_on WIDTH */
+   '])
 
 \TLV m_extension()
-   m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
+
+   // RISC-V M-Extension instructions in WARP-V are fixed latency
+   // As of today, to handle those instructions, WARP-V pipeline is stalled for the given latency, and the
+   // results are written back through a second issue at the end of stalling duration.
+   // Verilog modules are inherited from PicoRV32, and are located in the ./muldiv directory.
+   // Since the modules have a fixed latency, their valid signals are instantiated as valid decode for M-type
+   // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
+
+   // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
+
+   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
-      $second_issue_div_mul = >>m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$trigger_next_pc_div_mul_second_issue;
+      $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
-      {$div_mul_stall, $stall_cnt[5:0]} =
-           $reset ? '0 :
-           $second_issue ? '0 :
-           ($commit && $div_mul) ? {1'b1, 6'b1} :
-           >>1$div_mul_stall ? {1'b1, >>1$stall_cnt + 6'b1} :
-                    '0;
-      $trigger_next_pc_div_mul_second_issue = $div_mul_stall && ($stall_cnt == (M4_DIV_LATENCY + 1 - (M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)));
-      $div_mul_rslt[31:0] = 32'h55555555;
-//===============//
-// "F" Extension //
-//===============//
+      {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
+                                                     $second_issue_div_mul ? '0 :
+                                                     ($commit && $div_mul) ? {$divtype_instr, $multype_instr, 6'b1} :
+                                                     >>1$div_stall ? {1'b1, 1'b0, >>1$stall_cnt + 6'b1} :
+                                                     >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
+                                                     '0;
+                                                     
+      $stall_cnt_upper_mul = ($stall_cnt == M4_MUL_LATENCY);
+      $stall_cnt_upper_div = ($stall_cnt == M4_DIV_LATENCY);
+      $trigger_next_pc_div_mul_second_issue = ($div_stall && $stall_cnt_upper_div) || ($mul_stall && $stall_cnt_upper_mul);
+
+\TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name      
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001) ? 3'b000 : // mull 
+                     (/_top$_instr_type == 4'b0010) ? 3'b001 : // mulh
+                     (/_top$_instr_type == 4'b0100) ? 3'b010 : // mulhsu
+                     (/_top$_instr_type == 4'b1000) ? 3'b011 : // mulhu
+                                                      3'b000 ; // default to mul, but this case 
+                                                               // should not be encountered ideally
+
+      $mul_insn[31:0] = {7'b0000001,10'b0011000101,$opcode,5'b00101,7'b0110011};
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+      // this module is located in ./muldiv/picorv32_pcpi_fast_mul.sv
+      \SV_plus      
+            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($mul_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_ready    (/_top$['']$_ready)
+            );
+   
+\TLV warpv_div(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
+   /_name
+      
+      // instr type is one hot encoding of the required M type instruction
+      // the idea is to concatenate is_*_instr from WARP-V and pass on to this module
+         
+      $opcode[2:0] = (/_top$_instr_type == 4'b0001 ) ? 3'b100 : // div
+                     (/_top$_instr_type == 4'b0010 ) ? 3'b101 : // divu
+                     (/_top$_instr_type == 4'b0100 ) ? 3'b110 : // rem
+                     (/_top$_instr_type == 4'b1000 ) ? 3'b111 : // remu
+                                                       3'b100 ; // default to mul, but this case 
+                                                                // should not be encountered ideally
+      $div_insn[31:0] = {7'b0000001,10'b0011000101,3'b000,5'b00101,7'b0110011} | ($opcode << 12);
+                        // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
+      // this module is located in ./muldiv/picorv32_div_opt.sv
+      \SV_plus
+            picorv32_pcpi_div div(
+                  .clk           (/_top$_clk), 
+                  .resetn        (/_top$_reset),
+                  .pcpi_valid    (/_top$_muldiv_valid),
+                  .pcpi_insn     ($div_insn),
+                  .pcpi_rs1      (/_top$_op_a),
+                  .pcpi_rs2      (/_top$_op_b),
+                  .pcpi_rd       (/_top$['']$_rslt[31:0]),
+                  .pcpi_wait     (/_top$['']$_wait),
+                  .pcpi_wr       (/_top$['']$_wr),
+                  .pcpi_ready    (/_top$['']$_ready)
+               );
+
+//==================//
+//      RISC-V      //
+//  "F" Extension   //
+//==================//
+
+// TODO: be specific about widths (lint_on)
+// Calling includes and top module of FPU i.e. HardFloat module
+// GitHub link in development , hence it can change later
+m4_ifelse_block(M4_EXT_F, 1, ['                               
+   m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/floating-point/verilog2/topmodule/fputopmodule.tlv'])
+'])
 
 \TLV f_extension()
    // TODO: Get the ordering and defaulting behavior right for this:
-   m4_define(['M4_EXT_F'], 1)
+   m4_define(['M4_EXT_F'], 0)
    
    // This macro uses Berkeley Hard-Float to implement "F" extension support in risc-v.
    // Floating-point operations (any instructions that write a floating-point register) abort (after)
@@ -2586,6 +2939,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
    |fetch
       /instr
+         
+         
          // Provide a longer reset to cover the pipeline depth.
          @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
@@ -2731,12 +3086,18 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             //  it is non-speculative. Both could easily be fixed.)
             $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']);
-            // Recirculate returning load.
+            // Recirculate returning load or the div_mul_result from /orig_inst scope
+
             ?$second_issue
                // This scope holds the original load for a returning load.
                /orig_inst
-                  // TODO: ... non-loads.
-                  $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
+                  m4_ifelse_block(M4_EXT_M,1,['
+                  $ANY =   |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY :
+                           |fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :
+                           >>1$ANY;
+                         '], ['
+                  $ANY =   /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY; 
+                          '])
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
             
@@ -2809,6 +3170,38 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                   m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
             $replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
+            
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            // Reg Read for FPU
+            // TODO. pending and bypass mechanism.
+            /fpuregs[31:1]
+            /fpusrc[2:1]
+               $is_fpu_reg_condition = $is_fpu_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
+               ?$is_fpu_reg_condition
+                  {$fpu_reg_value[M4_WORD_RANGE], $pending_fpu} =
+                     m4_ifelse(M4_ISA, ['RISCV'], ['($fpu_reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read f0 as 0 (not pending).'])
+                     // Bypass stages. Both register and pending are bypassed.
+                     // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
+                     //m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_fpu_reg == $fpu_reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     //m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_fpu_reg == $fpu_reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     //m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_fpu_reg == $fpu_reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                     {/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$fpuvalue, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu'])};
+               // Replay if FPU source register is pending.
+               $replay_fpu = $is_fpu_reg_condition && $pending_fpu;
+               $dummy_fpu = 1'b0;
+            // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
+            $is_dest_fpu_condition = $dest_fpu_reg_valid && /instr$valid_decode;
+            ?$is_dest_fpu_condition
+               $dest_fpu_pending =
+                  m4_ifelse(M4_ISA, ['RISCV'], ['($dest_fpu_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
+                  // Bypass stages. Both register and pending are bypassed.
+                  //m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_fpu_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
+                  //m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_fpu_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
+                  //m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_fpu_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
+                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/fpuregs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu']);
+            // Combine replay conditions for pending source or dest registers.
+            $replay_fpu = | /fpusrc[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
+            '])
          
          // =======
          // Execute
@@ -2865,6 +3258,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             
             // Conditions that commit results.
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || $second_issue;
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || $second_issue;     
+            '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
@@ -2886,7 +3282,23 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             // Write $pending along with $value, but coded differently because it must be reset.
             /regs[*]
                <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
+             '])
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            // Reg Write (Floating Point Register)
+            // TODO. Seperate the $rslt comit to both "int" and "fpu' regs and include pending mechanism.
+            $fpu_reg_write = $reset ? 1'b0 : $valid_dest_fpu_reg_valid;
+            \SV_plus
+               always @ (posedge clk) begin
+                  if ($fpu_reg_write)
+                     /fpuregs[$dest_fpu_reg]<<0$$fpuvalue[M4_WORD_RANGE] <= $rslt;
+               end
+            m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
+            // Write $pending along with $value, but coded differently because it must be reset.
+            /fpuregs[*]
+               <<1$pending_fpu = ! /instr$reset && (((#fpuregs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending_fpu);
+              '])
             '])
+
             
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
@@ -3554,4 +3966,3 @@ m4+module_def
 
 \SV
    endmodule
-

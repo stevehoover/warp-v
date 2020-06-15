@@ -9,8 +9,8 @@
    /* verilator lint_off WIDTH */
    /* verilator lint_off CASEINCOMPLETE */
    module picorv32_pcpi_fast_mul #(
-	parameter EXTRA_MUL_FFS = 0,
-	parameter EXTRA_INSN_FFS = 0,
+	parameter EXTRA_MUL_FFS = 1,
+	parameter EXTRA_INSN_FFS = 1,
 	parameter MUL_CLKGATE = 0
 ) (
 	input clk, resetn,
@@ -102,21 +102,39 @@ endmodule
    m4_makerchip_module   // (Expanded in Nav-TLV pane.)
 \TLV
    $reset = *reset;
-   $reset = *reset;
-   
+  // $reset = *reset;
+   $cyc_cnt[7:0] = *cyc_cnt;
    $pcpi_insn[31:0] = {7'b0000001,10'b0011000101,3'b000, 5'b00100,7'b0110011}; //change 3 part for DIV, DIVU..
-   $pcpi_rs1[31:0] = 32'h12345678;
+   $pcpi_rs1[31:0] = (*cyc_cnt >= 'h80 ) ? 32'hCAFEBABE : 
+                     (*cyc_cnt >= 'h50 ) ? 32'hDECAFBAD :
+                     (*cyc_cnt >= 'h30 ) ? 32'h421124   :
+                                           32'h9876     ;
    $pcpi_rs2[31:0] = 32'h5678;
    $pcpi_valid = 1'b1;
    
+   $mul_insn = (*cyc_cnt >= 'h70 && *cyc_cnt <= 'h71) ? 1'b1 : 
+               (*cyc_cnt >= 'h40 && *cyc_cnt <= 'h41) ? 1'b1 :
+               (*cyc_cnt >= 'h20 && *cyc_cnt <= 'h21) ? 1'b1 :
+                                                        1'b0 ;
+   $mulin1[31:0] = $reset ? 0 : 
+                   $mul_insn ? $pcpi_rs1 : 
+                   $RETAIN;
+                   
+   $mulin2[31:0] = $reset ? 0 : 
+                   $mul_insn ? $pcpi_rs2 : 
+                   $RETAIN;
+                   
+   m4_define(MUL_LATENCY, 3)
+  
+   //$keep_it_valid = $reset ? 0 : >>3$mul_insn;
    \SV_plus
       picorv32_pcpi_fast_mul mul(
          .clk(clk), 
          .resetn(!reset),
-         .pcpi_valid($pcpi_valid),
+         .pcpi_valid($mul_insn),
          .pcpi_insn($pcpi_insn),
-         .pcpi_rs1($pcpi_rs1),
-         .pcpi_rs2($pcpi_rs2),
+         .pcpi_rs1($mulin1),
+         .pcpi_rs2($mulin2),
          .pcpi_wr($$pcpi_wr),
          .pcpi_rd($$pcpi_rd[31:0]),
          .pcpi_wait($$pcpi_wait),
@@ -124,7 +142,7 @@ endmodule
          );
 
    // Assert these to end simulation (before Makerchip cycle limit).
-   *passed = *cyc_cnt > 40;
+   *passed = *cyc_cnt > 200;
    *failed = 1'b0;
 \SV
    endmodule
