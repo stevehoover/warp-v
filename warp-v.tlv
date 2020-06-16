@@ -406,12 +406,13 @@ m4+definitions(['
          // Machine width
          m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
          // ISA extensions,  1, or 0 (following M4 boolean convention).
+         // TODO. Currently formal checks are broken when M4_EXT_F is set to 1.
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
             (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
-            (['M4_EXT_F'], 1),
+            (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
@@ -437,8 +438,8 @@ m4+definitions(['
 
    // Which program to assemble.
    // this depends on the ISA extension(s) choice
-   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
-   //m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+   //m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+   m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
 
    // =====Done Defining Configuration=====
    
@@ -961,7 +962,6 @@ m4+definitions(['
       // m4_asm_<MNEMONIC> output for funct3 or rm, returned in unquoted context so arg references can be produced. 'rm' is always the last m4_asm_<MNEMONIC> arg (m4_arg(#)).
       //   Args: $1: MNEMONIC, $2: funct3 field of instruction definition (or 'rm')
       m4_define(['m4_asm_funct3'], ['['m4_ifelse($2, ['rm'], ['3'b']m4_argn(']m4_arg(#)[', m4_echo(']m4_arg(@)[')), ['$1_INSTR_FUNCT3'])']'])
-
       // Opcode + funct3 + funct7 (R-type, R2-type). $@ as for m4_instrX(..), $7: MNEMONIC, $8: number of bits of leading bits of funct7 to interpret. If 5, for example, use the term funct5, $9: (opt) for R2, the r2 value.
       m4_define(['m4_instr_funct7'],
                 ['m4_instr_decode_expr($7, m4_op5_and_funct3($@)[' && $raw_funct7'][6:m4_eval(7-$8)][' == $8'b$5']m4_ifelse($9, [''], [''], [' && $raw_rs2 == 5'b$9']))m4_funct3_localparam(['$7'], ['$4'])[' localparam [$8-1:0] $7_INSTR_FUNCT$8 = $8'b$5;']'])
@@ -1040,7 +1040,7 @@ m4+definitions(['
            ['m4_asm_instr_str(I, ['$6'], $']['@){['$6_INSTR_FUNCT']m4_len($5)[', ']m4_eval(12-m4_len($5))'b']m4_arg(3)[', m4_asm_reg(']m4_arg(2)['), $6_INSTR_FUNCT3, m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
       m4_define(['m4_instrR'], ['m4_instr_funct7($@, ['$6'], m4_ifelse($2, ['A'], 5, 7))m4_define(['m4_asm_$6'],
            ['m4_asm_instr_str(R, ['$6'], $']['@){m4_ifelse($2, ['A'], ['$6_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$6_INSTR_FUNCT7']), m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$6'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
-      m4_define(['m4_instrR2'], ['m4_instr_funct7($@, 7)m4_define(['m4_asm_$7'],
+      m4_define(['m4_instrR2'], ['m4_instr_funct7($@, 7, ['$6'])m4_define(['m4_asm_$7'],
            ['m4_asm_instr_str(R, ['$7'], $']['@){m4_ifelse($2, ['A'], ['$7_INSTR_FUNCT5, ']']m4_arg(2)['[''], ['$7_INSTR_FUNCT7']), 5'b$6, m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$7'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $7_INSTR_OPCODE}'])'])
       m4_define(['m4_instrR4'], ['m4_instr_funct2($@)m4_define(['m4_asm_$6'],
            ['m4_asm_instr_str(R, ['$6'], $']['@){m4_asm_reg(']m4_arg(4)['), $6_INSTR_FUNCT2, m4_asm_reg(']m4_arg(3)['), m4_asm_reg(']m4_arg(2)['), ']m4_asm_funct3(['$6'], ['$4'])[', m4_asm_reg(']m4_arg(1)['), $6_INSTR_OPCODE}'])'])
@@ -1409,9 +1409,12 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // | F-extension Test Program |
    // \==========================/
    //
-   m4_asm(ORI, r1, r0, 011111111111)
-   m4_asm(ORI, r2, r0, 011111111101)
-   m4_asm(ORI, r3, r0, 101101011011)
+   m4_asm(LUI, r1, 01110001010101100000)
+   m4_asm(ADDI, r1, r1, 010001000001)
+   m4_asm(LUI, r2, 01100101100101001111)
+   m4_asm(ADDI, r2, r2, 010001000000)
+   m4_asm(LUI, r3, 01001101110111110001)
+   m4_asm(ADDI, r3, r3, 010000000000)
    m4_asm(FMVWX, r1, r1)
    m4_asm(FMVWX, r2, r2)
    m4_asm(FMVWX, r3, r3)
@@ -1426,8 +1429,6 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    m4_asm(FADDS, r9, r1, r2, 000)
    m4_asm(FSUBS, r10, r1, r2, 000)
    m4_asm(FMULS, r11, r1, r2, 000)
-   m4_asm(FADDS, r9, r6, r6, 000)
-   m4_asm(FMULS, r11, r3, r3, 000)
    m4_asm(FDIVS, r12, r1, r2, 000)
    m4_asm(FSQRTS, r13, r1, 000)
    m4_asm(FSGNJS, r14, r1, r2)
@@ -1435,16 +1436,16 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    m4_asm(FSGNJXS, r16, r1, r2)
    m4_asm(FMINS, r17, r1, r2)
    m4_asm(FMAXS, r18, r1, r2)
-   m4_asm(FCVTWS, r12, r11, 000)
-   m4_asm(FCVTWUS, r13, r11, 000)
+   m4_asm(FCVTSW, r23, r2, 000)
+   m4_asm(FCVTSWU, r24, r3, 000)
    m4_asm(FMVXW, r5, r11)
    m4_asm(FEQS, r19, r1, r2)
-   m4_asm(FLTS, r20, r1, r2)
+   m4_asm(FLTS, r20, r2, r1)
    m4_asm(FLES, r21, r1, r2)
    m4_asm(FCLASSS, r22, r1)
    m4_asm(FEQS, r19, r1, r2)
-   m4_asm(FCVTSW, r23, r3, 000)
-   m4_asm(FCVTSWU, r24, r3, 000)
+   m4_asm(FCVTWS, r12, r23, 000)
+   m4_asm(FCVTWUS, r13, r24, 000)
    m4_asm(ORI, r0, r0, 0)
    
 \TLV riscv_imem(_prog_name)
@@ -1934,9 +1935,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                         $is_fsw_instr     ||
                         $is_fmadds_instr  ||
                         $is_fmsubs_instr  ||
-                        $is_fmsubs_instr  ||
-                        $is_fnmadds_instr ||
                         $is_fnmsubs_instr ||
+                        $is_fnmadds_instr ||
                         $is_fadds_instr   ||
                         $is_fsubs_instr   ||
                         $is_fmuls_instr   ||
@@ -1960,12 +1960,6 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
       $fmvxw_type_instr = $is_fmvxw_instr;
       $fcvtw_s_type_instr = $is_fcvtws_instr || $is_fcvtwus_instr;
-      '], ['
-      $fpu_type_instr = 1'b0;
-      $fmvxw_type_instr = 1'b0;
-      $fcvtw_s_type_instr = 1'b0;
-      $fpu_div_sqrt_type_instr = 1'b0;
-      `BOGUS_USE($fpu_type_instr $fmvxw_type_instr $fcvtw_s_type_instr $fpu_div_sqrt_type_instr)
       '])
 
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
@@ -2202,8 +2196,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       // Determining the type of fpu_operation according to the fpu_exe marco
       $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
                         ({5{$is_fmsubs_instr }}  & 5'h3 ) |
-                        ({5{$is_fnmadds_instr}}  & 5'h4 ) |
-                        ({5{$is_fnmsubs_instr}}  & 5'h5 ) |
+                        ({5{$is_fnmsubs_instr}}  & 5'h4 ) |
+                        ({5{$is_fnmadds_instr}}  & 5'h5 ) |
                         ({5{$is_fadds_instr  }}  & 5'h6 ) |
                         ({5{$is_fsubs_instr  }}  & 5'h7 ) |
                         ({5{$is_fmuls_instr  }}  & 5'h8 ) |
@@ -2231,7 +2225,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       // Operands
       $operand_a[31:0] = /fpusrc[1]$fpu_reg_value;
       $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
-      $operand_c[31:0] = /fpusrc[1]$fpu_reg_value;
+      $operand_c[31:0] = /fpusrc[3]$fpu_reg_value;
       $roundingMode[2:0] = |fetch/instr$raw_rm;
       $int_input[31:0] = /src[1]$reg_value;
 
@@ -3137,7 +3131,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       {$_exception_invaild_output, $_exception_infinite_output, $_exception_overflow_output, $_exception_underflow_output, $_exception_inexact_output} = $exceptionFlags_all[4:0];
 
 \TLV f_extension()
-   m4_define(['M4_EXT_F'], 1)
+
    
    // RISC-V F-Extension instructions in WARP-V are fixed latency
    // As of today, to handle those instructions, WARP-V pipeline is stalled for the given latency, and the
@@ -3158,8 +3152,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                                    7'b0;
 
       $stall_cnt_max_fpu = ($fpu_stall_cnt == M4_FPU_DIV_LATENCY);
-      //$trigger_next_pc_fpu_div_sqrt_second_issue = ($fpu_div_sqrt_stall && $stall_cnt_max_fpu) || ($fpu_div_sqrt_stall && |fetch/instr/fpu1$exceptionFlags_div_sqrt[3]) || ( |fetch/instr/fpu1>>1$in_ready && |fetch/instr/fpu1$outvalid);
-      $trigger_next_pc_fpu_div_sqrt_second_issue = ($fpu_div_sqrt_stall && $stall_cnt_max_fpu);
+      $trigger_next_pc_fpu_div_sqrt_second_issue = ($fpu_div_sqrt_stall && $stall_cnt_max_fpu) || ($fpu_div_sqrt_stall && |fetch/instr/fpu1$exceptionFlags_div_sqrt[3]) || ( |fetch/instr/fpu1>>1$in_ready && |fetch/instr/fpu1$outvalid);
+
 
 //=========================//
 //                         //
@@ -4130,10 +4124,10 @@ m4+module_def
                      let pending = '$pending'.asBool(false);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
+                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : "";
                      this.getInitObject("reg").setText(
                         regIdent + ": " +
-                        '$value'.step(1).asInt(NaN).toString() + oldValStr);
+                        '$value'.step(1).asInt(NaN).toString(16) + oldValStr);
                      this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
                   }
             m4_ifelse_block(M4_EXT_F, 1, ['
