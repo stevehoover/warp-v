@@ -2051,13 +2051,18 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       /* verilator lint_off CASEINCOMPLETE */   
       m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
       m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
-      /* verilator lint_on CASEINCOMPLETE */   
+      /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on WIDTH */
-      
       /orig_inst
-         // put correctly aligned values from MUL and DIV Verilog modules into /orig_inst scope
+         $second_issue = |fetch/instr$second_issue;
+         ?$second_issue
+         // put correctly aligned result for MUL and DIV Verilog modules into /orig_inst scope, 
+         // valid only when we have a second issue (no bogus values propagated)
+            $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+            // stall_cnt_upper_div indicates that the results for div module are ready. The second issue of the instruction takes place
+            // M4_NON_PIPELINED_BUBBLES after this point (depending on pipeline depth)
+         // put correctly aligned destination register for MUL and DIV Verilog modules into /orig_inst scope
          // and RETAIN till next M-type instruction, to be used again at second issue
-         $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr$divblk_valid ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
          $divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
       '])
       m4_ifelse_block(M4_EXT_F, 1, ['
@@ -2111,52 +2116,52 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          // TODO: Could provide some macro magic to specify combined instructions w/ a single result and mux select.
          //       This would reduce code below and probably improve implementation.
          
-         $lui_rslt[M4_WORD_RANGE] = {$raw_u_imm[31:12], 12'b0};
+         $lui_rslt[M4_WORD_RANGE]   = {$raw_u_imm[31:12], 12'b0};
          $auipc_rslt[M4_WORD_RANGE] = M4_FULL_PC + $raw_u_imm;
-         $jal_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
-         $jalr_rslt[M4_WORD_RANGE] = M4_FULL_PC + 4;
+         $jal_rslt[M4_WORD_RANGE]   = M4_FULL_PC + 4;
+         $jalr_rslt[M4_WORD_RANGE]  = M4_FULL_PC + 4;
          // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
          m4_ifelse_block(M4_INJECT_RETURNING_LD, 1, ['
-         $lb_rslt[M4_WORD_RANGE] = 32'b0;
-         $lh_rslt[M4_WORD_RANGE] = 32'b0;
-         $lw_rslt[M4_WORD_RANGE] = 32'b0;
-         $lbu_rslt[M4_WORD_RANGE] = 32'b0;
-         $lhu_rslt[M4_WORD_RANGE] = 32'b0;
+         $lb_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+         $lh_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+         $lw_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+         $lbu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+         $lhu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
          m4_ifelse_block(M4_EXT_F, 1, ['
          $flw_rslt[M4_WORD_RANGE] = 32'b0;
          '])
          '], ['
-         $lb_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
-         $lh_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
-         $lw_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
-         $lbu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
-         $lhu_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
+         $lb_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
+         $lh_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
+         $lw_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
+         $lbu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
+         $lhu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
          m4_ifelse_block(M4_EXT_F, 1, ['
-         $flw_rslt[M4_WORD_RANGE] = /orig_inst$ld_rslt;
+         $flw_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
          '])
          '])
-         $addi_rslt[M4_WORD_RANGE] = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
-         $xori_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ $raw_i_imm;
-         $ori_rslt[M4_WORD_RANGE] = /src[1]$reg_value | $raw_i_imm;
-         $andi_rslt[M4_WORD_RANGE] = /src[1]$reg_value & $raw_i_imm;
-         $slli_rslt[M4_WORD_RANGE] = /src[1]$reg_value << $raw_i_imm[5:0];
+         $addi_rslt[M4_WORD_RANGE]  = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
+         $xori_rslt[M4_WORD_RANGE]  = /src[1]$reg_value ^ $raw_i_imm;
+         $ori_rslt[M4_WORD_RANGE]   = /src[1]$reg_value | $raw_i_imm;
+         $andi_rslt[M4_WORD_RANGE]  = /src[1]$reg_value & $raw_i_imm;
+         $slli_rslt[M4_WORD_RANGE]  = /src[1]$reg_value << $raw_i_imm[5:0];
          $srli_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> $raw_i_imm[5:0];
          $srai_intermediate_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srli_intermediate_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - $raw_i_imm[5:0]) ): $srli_intermediate_rslt;
-         $srl_rslt[M4_WORD_RANGE] = /src[1]$reg_value >> /src[2]$reg_value[4:0];
-         $sra_rslt[M4_WORD_RANGE] = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
-         $slti_rslt[M4_WORD_RANGE] =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
+         $srl_rslt[M4_WORD_RANGE]   = /src[1]$reg_value >> /src[2]$reg_value[4:0];
+         $sra_rslt[M4_WORD_RANGE]   = /src[1]$reg_value[M4_WORD_MAX] ? $srl_rslt | ((M4_WORD_HIGH'b0 - 1) << (M4_WORD_HIGH - /src[2]$reg_value[4:0]) ): $srl_rslt;
+         $slti_rslt[M4_WORD_RANGE]  =  (/src[1]$reg_value[M4_WORD_MAX] == $raw_i_imm[M4_WORD_MAX]) ? $sltiu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
-         $srai_rslt[M4_WORD_RANGE] = $srai_intermediate_rslt;
-         $srli_rslt[M4_WORD_RANGE] = $srli_intermediate_rslt;
+         $srai_rslt[M4_WORD_RANGE]  = $srai_intermediate_rslt;
+         $srli_rslt[M4_WORD_RANGE]  = $srli_intermediate_rslt;
          $add_sub_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
-         $add_rslt[M4_WORD_RANGE] = $add_sub_rslt;
-         $sub_rslt[M4_WORD_RANGE] = $add_sub_rslt;
-         $sll_rslt[M4_WORD_RANGE] = /src[1]$reg_value << /src[2]$reg_value[4:0];
-         $slt_rslt[M4_WORD_RANGE] = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
-         $sltu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
-         $xor_rslt[M4_WORD_RANGE] = /src[1]$reg_value ^ /src[2]$reg_value;
-         $or_rslt[M4_WORD_RANGE] = /src[1]$reg_value | /src[2]$reg_value;
-         $and_rslt[M4_WORD_RANGE] = /src[1]$reg_value & /src[2]$reg_value;
+         $add_rslt[M4_WORD_RANGE]   = $add_sub_rslt;
+         $sub_rslt[M4_WORD_RANGE]   = $add_sub_rslt;
+         $sll_rslt[M4_WORD_RANGE]   = /src[1]$reg_value << /src[2]$reg_value[4:0];
+         $slt_rslt[M4_WORD_RANGE]   = (/src[1]$reg_value[M4_WORD_MAX] == /src[2]$reg_value[M4_WORD_MAX]) ? $sltu_rslt : {M4_WORD_MAX'b0,/src[1]$reg_value[M4_WORD_MAX]};
+         $sltu_rslt[M4_WORD_RANGE]  = (/src[1]$reg_value < /src[2]$reg_value) ? 1 : 0;
+         $xor_rslt[M4_WORD_RANGE]   = /src[1]$reg_value ^ /src[2]$reg_value;
+         $or_rslt[M4_WORD_RANGE]    = /src[1]$reg_value | /src[2]$reg_value;
+         $and_rslt[M4_WORD_RANGE]   = /src[1]$reg_value & /src[2]$reg_value;
          // CSR read instructions have the same result expression. Counting on synthesis to optimize result mux.
          $csrrw_rslt[M4_WORD_RANGE]  = m4_csrrx_rslt_expr;
          $csrrs_rslt[M4_WORD_RANGE]  = $csrrw_rslt;
@@ -2179,14 +2184,14 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          $div_in2[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[2]$reg_value : $RETAIN;
          
          // result signals
-         $mul_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
-         $mulh_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
-         $mulhsu_rslt[M4_WORD_RANGE]   = /orig_inst$late_rslt;
-         $mulhu_rslt[M4_WORD_RANGE]    = /orig_inst$late_rslt;
-         $div_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
-         $divu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
-         $rem_rslt[M4_WORD_RANGE]      = /orig_inst$late_rslt;
-         $remu_rslt[M4_WORD_RANGE]     = /orig_inst$late_rslt;
+         $mul_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+         $mulh_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
+         $mulhsu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+         $mulhu_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+         $div_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+         $divu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
+         $rem_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+         $remu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
          `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
          '])
       
