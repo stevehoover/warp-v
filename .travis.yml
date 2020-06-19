@@ -20,7 +20,7 @@ install:
 
 before_script:
   - cd formal
-  - if ($TRAVIS_PULL_REQUEST_SLUG); then export BUILD_PATH=$TRAVIS_PULL_REQUEST_SLUG; else export BUILD_PATH=$TRAVIS_REPO_SLUG; fi
+  - if ("$TRAVIS_PULL_REQUEST"); then export BUILD_PATH=$TRAVIS_PULL_REQUEST_SLUG; else export BUILD_PATH=$TRAVIS_REPO_SLUG; fi
 script:
   # Run riscv-formal for WARP-V.
   - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
