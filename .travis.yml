@@ -6,8 +6,8 @@ language: generic
 
 cache:
   directories:
-    if ($TRAVIS_PULL_REQUEST); then /home/travis/build/$TRAVIS_PULL_REQUEST_SLUG/formal/env;
-    else /home/travis/build/$TRAVIS_REPO_SLUG/formal/env; fi
+    -  /home/travis/build/$TRAVIS_PULL_REQUEST_SLUG/formal/env
+    -  /home/travis/build/$TRAVIS_REPO_SLUG/formal/env
 
 before_install:
 install:
@@ -20,14 +20,14 @@ install:
 
 before_script:
   - cd formal
+  - if ($TRAVIS_PULL_REQUEST_SLUG); then export BUILD_PATH=$TRAVIS_PULL_REQUEST_SLUG; else export BUILD_PATH=$TRAVIS_REPO_SLUG; fi
 script:
   # Run riscv-formal for WARP-V.
-  - if ($TRAVIS_PULL_REQUEST); then PATH=/home/travis/build/$TRAVIS_PULL_REQUEST_SLUG/formal/env/bin:$PATH bash -c 'make verif'; 
-    else PATH=/home/travis/build/$TRAVIS_REPO_SLUG/formal/env/bin:$PATH bash -c 'make verif';
+  - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
 after_success:
 after_failure:
   # Upload files for debug.
-  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/stevehoover/warp-v/formal/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`engine_0/trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd && echo; done
+  - echo "Uploading up to 4 failure traces for debug" && for FILE in `ls /home/travis/build/$BUILD_PATH/formal/checks/*/FAIL | head -n 4`; do curl --upload-file `echo $FILE | sed s/FAIL$//`engine_0/trace.vcd https://transfer.sh/`echo $FILE | sed 's/^.*\/\([^\/]*\)\/FAIL$/\1/'`_trace.vcd && echo; done
 after_script:
   # Report a message if we didn't use the latest commit of yosys.
   - if cmp -s yosys_latest_commit_id.txt env/yosys_commit_id.txt; then echo '******** Using the following cached yosys (https://github.com/cliffordwolf/yosys.git) commit ID which is not the latest. Consider clearing Travis cache. **********' && cat env/yosys_commit_id.txt && echo '**********'; fi
