@@ -6,7 +6,8 @@ language: generic
 
 cache:
   directories:
-    /home/travis/build/stevehoover/warp-v/formal/env
+    if ($TRAVIS_PULL_REQUEST); then /home/travis/build/$TRAVIS_PULL_REQUEST_SLUG/formal/env;
+    else /home/travis/build/$TRAVIS_REPO_SLUG/formal/env; fi
 
 before_install:
 install:
@@ -21,7 +22,8 @@ before_script:
   - cd formal
 script:
   # Run riscv-formal for WARP-V.
-  - PATH=/home/travis/build/stevehoover/warp-v/formal/env/bin:$PATH bash -c 'make verif'
+  - if ($TRAVIS_PULL_REQUEST); then PATH=/home/travis/build/$TRAVIS_PULL_REQUEST_SLUG/formal/env/bin:$PATH bash -c 'make verif'; 
+    else PATH=/home/travis/build/$TRAVIS_REPO_SLUG/formal/env/bin:$PATH bash -c 'make verif';
 after_success:
 after_failure:
   # Upload files for debug.
