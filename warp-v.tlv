@@ -412,7 +412,7 @@ m4+definitions(['
             (['M4_EXT_I'], 1),
             (['M4_EXT_M'], 1),
             (['M4_EXT_A'], 0),
-            (['M4_EXT_F'], 0),
+            (['M4_EXT_F'], 1),
             (['M4_EXT_D'], 0),
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
@@ -438,8 +438,8 @@ m4+definitions(['
 
    // Which program to assemble.
    // this depends on the ISA extension(s) choice
-   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
-   //m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+   //m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+   m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
 
    // =====Done Defining Configuration=====
    
@@ -791,16 +791,16 @@ m4+definitions(['
       m4_ifelse(M4_NO_COUNTER_CSRS, ['1'], [''], ['
          // Define Counter CSRs
          //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
-         m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['time'],       12'hC01,    ['32, CYCLE_LOW, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH_LOW, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET_LOW, 0'],             ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH_LOW, 0'],            ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['time'],       12'hC01,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET, 0'],             ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH, 0'],            ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_ifelse_block(M4_EXT_F, 1, ['
-         m4_define_csr(['fflags'],     12'h001,    ['32, FFLAGS_LOW, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['frm'],        12'h002,    ['32, FRM_LOW, 0'],                 ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_define_csr(['fcsr'],       12'h003,    ['32, FCSR_LOW, 0'],                ['32'b0'],                     ['{32{1'b1}}'],                     1)
+         m4_define_csr(['fflags'],     12'h001,    ['5, FFLAGS, 0'],               ['5'b0'],                      ['{5{1'b1}}'],                      1)
+         m4_define_csr(['frm'],        12'h002,    ['3, FRM, 0'],                  ['3'b0'],                      ['{3{1'b1}}'],                      1)
+         m4_define_csr(['fcsr'],       12'h003,    ['8, FCSR, 0'],                 ['8'b0'],                      ['{8{1'b1}}'],                      1)
          '])                                
       '])
       
@@ -1853,7 +1853,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // occurs then, take the previous "rm"(RoundingMode) stored in "frm" CSR or else take that from instruction encoding itself.
    // NOTE. In first issue of fpu_div_sqrt itself the vaild $raw_rm value get stored/latched in "frm" CSR,
    //       so to use that at time of second issue of fpu_div_sqrt. 
-   $fpufcsr[31:0] = {24'b0,(((|fetch/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_frm[2:0] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
+   $fpufcsr[7:0] = {(((|fetch/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_fcsr[7:5] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
    '])
    
    // CSR h/w side-effect write signals.
@@ -1877,19 +1877,16 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    $csr_instreth_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[63:32];
    m4_ifelse_block(M4_EXT_F, 1, ['
    $csr_fflags_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
-   $csr_fflags_hw_wr_mask[31:0] = {32{1'b1}};
-   //If Dynamic RoundingMode then take the previous value from CSR itself otherwise update it.
-   $csr_fflags_hw_wr_value[31:0] = {27'b0 ,(($fpufcsr[7:5] == 3'b111) ? >>1$csr_fflags[4:0] : $fpufcsr[4:0])};
+   $csr_fflags_hw_wr_mask[4:0] = {5{1'b1}};
+   $csr_fflags_hw_wr_value[4:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_fflags[4:0] : $fpufcsr[4:0])};
    
    $csr_frm_hw_wr = ($commit && $fpu_csr_fflags_type_instr);
-   $csr_frm_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_frm_hw_wr_value[31:0] = {29'b0 ,( ($fpufcsr[7:5] == 3'b111) ? >>1$csr_frm[2:0] : $fpufcsr[7:5])};
+   $csr_frm_hw_wr_mask[2:0] = {3{1'b1}};
+   $csr_frm_hw_wr_value[2:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_frm[2:0] : $fpufcsr[7:5])};
    
    $csr_fcsr_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
-   $csr_fcsr_hw_wr_mask[31:0] = {32{1'b1}};
-   // If only $fpu_fflags_type_instr then except Exception Flags field dont change content of CSR's, else if
-   // Dynamic RoundingMode then take the previous value from CSR itself otherwise update it.
-   $csr_fcsr_hw_wr_value[31:0] = { ($fpu_fflags_type_instr) ? {>>1$csr_fcsr[31:5], $fpufcsr[4:0]} : (($fpufcsr[7:5] == 3'b111) ? >>1$csr_fcsr : $fpufcsr)};
+   $csr_fcsr_hw_wr_mask[7:0] = {8{1'b1}};
+   $csr_fcsr_hw_wr_value[7:0] = { ($fpu_fflags_type_instr) ? {>>1$csr_fcsr[7:5], $fpufcsr[4:0]} : (($fpufcsr[7:5] == 3'b111) ? >>1$csr_fcsr : $fpufcsr)};
    '])
    '])
    
@@ -2123,7 +2120,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $input_valid = $fpu_div_sqrt_type_instr && |fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit;
       
       // Main FPU execution
-      m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $roundingMode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
+      m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
       
       // Sign-injection marcos
       m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
@@ -2280,7 +2277,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
       $operand_c[31:0] = /fpusrc[3]$fpu_reg_value;
       // rounding mode as per the RISC-V specs (synchronizing with HardFloat module)
-      $roundingMode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
+      $rounding_mode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
                            (|fetch/instr$raw_rm == 3'b001) ? 3'b010 :
                            (|fetch/instr$raw_rm == 3'b010) ? 3'b011 :
                            (|fetch/instr$raw_rm == 3'b011) ? 3'b100 :
@@ -3101,9 +3098,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $is_pos_normal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && ((! (& /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]));
       $is_pos_subnormal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && (! (| /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]);
       
-      m4+fn_to_rec(1, #_expwidth, #_sigwidth, /_top['']$_input1, $fn_To_Rec_a) 
-      m4+fn_to_rec(2, #_expwidth, #_sigwidth, /_top['']$_input2, $fn_To_Rec_b) 
-      m4+fn_to_rec(3, #_expwidth, #_sigwidth, /_top['']$_input3, $fn_To_Rec_c) 
+      m4+fn_to_rec(1, #_expwidth, #_sigwidth, /_top['']$_input1, $fn_to_rec_a) 
+      m4+fn_to_rec(2, #_expwidth, #_sigwidth, /_top['']$_input2, $fn_to_rec_b) 
+      m4+fn_to_rec(3, #_expwidth, #_sigwidth, /_top['']$_input3, $fn_to_rec_c) 
       
       $is_operation_int_to_recfn = (/_top['']$_operation == 5'h17  ||  /_top['']$_operation == 5'h18);
       ?$is_operation_int_to_recfn
@@ -3113,7 +3110,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       
       $is_operation_class = (/_top['']$_operation == 5'h16);
       ?$is_operation_class
-         m4+is_sig_nan(1, #_expwidth, #_sigwidth, $fn_To_Rec_a, $issignan)
+         m4+is_sig_nan(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $issignan)
          $_output_class[3:0] = $is_neg_infinite   ? 4'h0 :
                               $is_neg_normal     ? 4'h1 :
                               $is_neg_subnormal  ? 4'h2 :
@@ -3127,28 +3124,28 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $is_operation_add_sub = (/_top['']$_operation == 5'h6  ||  /_top['']$_operation == 5'h7);
       ?$is_operation_add_sub
          $subOp = (/_top['']$_operation == 5'h6) ? 1'b0 : 1'b1;
-         m4+add_sub_recfn(1, #_expwidth, #_sigwidth, $control, $subOp, $fn_To_Rec_a, $fn_To_Rec_b, /_top['']$_roundingmode, $output_add_sub, $exception_flags_add_sub)
+         m4+add_sub_recfn(1, #_expwidth, #_sigwidth, $control, $subOp, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_add_sub, $exception_flags_add_sub)
          
       $is_operation_mul = (/_top['']$_operation == 5'h8);
       ?$is_operation_mul
-         m4+mul_recfn(1, #_expwidth, #_sigwidth, $control, $fn_To_Rec_a, $fn_To_Rec_b, /_top['']$_roundingmode, $output_mul, $exception_flags_mul)
+         m4+mul_recfn(1, #_expwidth, #_sigwidth, $control, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_mul, $exception_flags_mul)
          
       $is_operation_div_sqrt = (/_top['']$_operation == 5'h9 || /_top['']$_operation == 5'ha);
       //?$is_operation_div_sqrt
       $div_sqrt_Op = (/_top['']$_operation == 5'h9) ? 1'b0 : 1'b1;
       //<Currently it's just one time>
       $get_valid = /_top['']$_input_valid;
-      $operand_div_sqrt_a[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_To_Rec_a[(#_expwidth + #_sigwidth):0] : $RETAIN;
-      $operand_div_sqrt_b[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_To_Rec_b[(#_expwidth + #_sigwidth):0] : $RETAIN;
+      $operand_div_sqrt_a[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_to_rec_a[(#_expwidth + #_sigwidth):0] : $RETAIN;
+      $operand_div_sqrt_b[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_to_rec_b[(#_expwidth + #_sigwidth):0] : $RETAIN;
       m4+div_sqrt_recfn_small(1, #_expwidth, #_sigwidth, /_top['']$_nreset, /_top['']$_clock, $control, $in_ready, $get_valid, $div_sqrt_Op, $operand_div_sqrt_a, $operand_div_sqrt_b, /_top['']$_roundingmode, $_outvalid, $sqrtresult, $output_div_sqrt, $exception_flags_div_sqrt)
       $result_div_sqrt_temp[(#_expwidth + #_sigwidth):0] = ($_outvalid) ? $output_div_sqrt : $RETAIN;
       
       $is_operation_compare = (/_top['']$_operation == 5'he || /_top['']$_operation == 5'hf || /_top['']$_operation == 5'h13 || /_top['']$_operation == 5'h14 || /_top['']$_operation == 5'h15);
       ?$is_operation_compare
-         $signaling_compare =  ($fn_To_Rec_a == $fn_To_Rec_b) ? 1'b0 : 1'b1;
-         m4+compare_recfn(1, #_expwidth, #_sigwidth, $fn_To_Rec_a, $fn_To_Rec_b, $signaling_compare, $_lt_compare, $_eq_compare, $_gt_compare, $_unordered, $exception_flags_compare)
-         $output_min[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_To_Rec_b : $fn_To_Rec_a;
-         $output_max[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_To_Rec_a : $fn_To_Rec_b;
+         $signaling_compare =  ($fn_to_rec_a == $fn_to_rec_b) ? 1'b0 : 1'b1;
+         m4+compare_recfn(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $fn_to_rec_b, $signaling_compare, $_lt_compare, $_eq_compare, $_gt_compare, $_unordered, $exception_flags_compare)
+         $output_min[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_to_rec_b : $fn_to_rec_a;
+         $output_max[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_to_rec_a : $fn_to_rec_b;
          
       $is_operation_mul_add = (/_top['']$_operation == 5'h2 || /_top['']$_operation == 5'h3 || /_top['']$_operation == 5'h4 || /_top['']$_operation == 5'h5);
       ?$is_operation_mul_add
@@ -3156,7 +3153,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                      (/_top['']$_operation == 5'h3) ? 2'b01 :
                      (/_top['']$_operation == 5'h4) ? 2'b10 :
                      (/_top['']$_operation == 5'h5) ? 2'b11 : 2'hx;
-         m4+mul_add_recfn(1, #_expwidth, #_sigwidth, $control, $op_mul_add, $fn_To_Rec_a, $fn_To_Rec_b, $fn_To_Rec_c, /_top['']$_roundingmode, $output_mul_add, $exception_flags_mul_add)
+         m4+mul_add_recfn(1, #_expwidth, #_sigwidth, $control, $op_mul_add, $fn_to_rec_a, $fn_to_rec_b, $fn_to_rec_c, /_top['']$_roundingmode, $output_mul_add, $exception_flags_mul_add)
          
       $final_output_module[(#_expwidth + #_sigwidth):0] = (/_top['']$_operation == 5'h2 || /_top['']$_operation == 5'h3 || /_top['']$_operation == 5'h4 || /_top['']$_operation == 5'h5) ? $output_mul_add :
                                                       (/_top['']$_operation == 5'h6 || /_top['']$_operation == 5'h7) ? $output_add_sub :
@@ -3170,7 +3167,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $is_operation_recfn_to_int = (/_top['']$_operation == 5'h10  ||  /_top['']$_operation == 5'h11);
       ?$is_operation_recfn_to_int
          $signedout = (/_top['']$_operation == 5'h10) ? 1'b1 : 1'b0 ;
-         m4+recfn_to_int(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedout, $fn_To_Rec_a, /_top['']$_roundingmode, $_int_output, $exception_flags_recfn_to_int)
+         m4+recfn_to_int(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedout, $fn_to_rec_a, /_top['']$_roundingmode, $_int_output, $exception_flags_recfn_to_int)
          
       m4+rec_to_fn(1, #_expwidth, #_sigwidth, $final_output_module, $result_fn)
       m4+rec_to_fn(2, #_expwidth, #_sigwidth, $result_div_sqrt_temp, $result_fn11)
@@ -3191,7 +3188,6 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       {$_exception_invaild_output, $_exception_infinite_output, $_exception_overflow_output, $_exception_underflow_output, $_exception_inexact_output} = $exception_flags_all[4:0];
 
 \TLV f_extension()
-
    
    // RISC-V F-Extension instructions in WARP-V are fixed latency
    // As of today, to handle those instructions, WARP-V pipeline is stalled for the given latency, and the
