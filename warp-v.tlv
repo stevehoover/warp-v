@@ -2326,7 +2326,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
       $ld_st_cond = $ld_st && $valid_exe;
       ?$ld_st_cond
-         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['($is_fsw_instr ? /fpusrc[1]$fpu_reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
+         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['($is_fsw_instr ? /src[1]$fpu_reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
          
          // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
