@@ -1966,7 +1966,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
       $illegal_itype_with_funct7 = ( $is_srli_srai_instr m4_ifelse(M4_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
       $illegal = ($illegal_itype_with_funct7['']m4_illegal_instr_expr) ||
-                 ($raw_opcode[1:0] != 2b11); // All legal instructions have opcode[1:0] == 2'b11. We ignore these bits in decode logic.
+                 ($raw[1:0] != 2b11); // All legal instructions have opcode[1:0] == 2'b11. We ignore these bits in decode logic.
       $conditional_branch = $is_b_type;
    $jump = $is_jal_instr;  // "Jump" in RISC-V means unconditional. (JALR is a separate redirect condition.)
    $branch = $is_b_type;
