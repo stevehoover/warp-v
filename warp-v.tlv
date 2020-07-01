@@ -441,10 +441,6 @@ m4+definitions(['
    m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
    //m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
 
-   m4_define(M4_RISCV_FORMAL_M_EXT, 1)
-
-
-
    // =====Done Defining Configuration=====
    
    // Characterize ISA and apply configuration.
@@ -2054,7 +2050,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $mulblk_valid = $multype_instr && $commit;
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */   
-      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt_int, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
       m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
       /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on WIDTH */
@@ -2950,13 +2946,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
 
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
-   m4_ifelse_block(M4_RISCV_FORMAL_M_EXT, 1, ['
-      m4_define(['M4_DIV_LATENCY'], 16)  // Relative to typical 1-cycle latency instructions.
-      m4_define(['M4_MUL_LATENCY'], 5)
-   '], ['
-      m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
-      m4_define(['M4_MUL_LATENCY'], 5)
-   '])   
+
+   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
    @M4_EXECUTE_STAGE
@@ -2966,7 +2958,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                                      >>1$div_stall ? {1'b1, 1'b0, >>1$stall_cnt + 6'b1} :
                                                      >>1$mul_stall ? {1'b0, 1'b1, >>1$stall_cnt + 6'b1} :
                                                      '0;
-      m4_ifelse_block(M4_RISCV_FORMAL_M_EXT, 1, )                                               
+                                                     
       $stall_cnt_upper_mul = ($stall_cnt == M4_MUL_LATENCY);
       $stall_cnt_upper_div = ($stall_cnt == M4_DIV_LATENCY);
       $trigger_next_pc_div_mul_second_issue = ($div_stall && $stall_cnt_upper_div) || ($mul_stall && $stall_cnt_upper_mul);
@@ -2988,11 +2980,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
       // this module is located in ./muldiv/picorv32_pcpi_fast_mul.sv
       \SV_plus      
-            m4_ifelse_block(M4_RISCV_FORMAL_M_EXT, 1, ['
-            picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(0), .EXTRA_INSN_FFS(0), .MUL_CLKGATE(0)) mul(
-            '],['
             picorv32_pcpi_fast_mul #(.EXTRA_MUL_FFS(1), .EXTRA_INSN_FFS(1), .MUL_CLKGATE(0)) mul(
-            '])   
                   .clk           (/_top$_clk), 
                   .resetn        (/_top$_reset),
                   .pcpi_valid    (/_top$_muldiv_valid),
@@ -3004,7 +2992,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                   .pcpi_wait     (/_top$['']$_wait),
                   .pcpi_ready    (/_top$['']$_ready)
             );
-            
+   
 \TLV warpv_div(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
    /_name
       
