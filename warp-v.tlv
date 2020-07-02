@@ -411,7 +411,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
+            (['M4_EXT_M'], 0),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -1876,9 +1876,10 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 \TLV riscv_rslt_mux_expr()
    $rslt[M4_WORD_RANGE] =
-       $second_issue_ld ? /orig_load_inst$late_rslt :
+       $second_issue_ld ? /orig_load_inst$late_rslt : m4_ifelse_block(M4_EXT_M, 1, ['
        ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
        ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m4_ifelse(M4_RISCV_FORMAL_ALTOPS,1,>>m4_eval(3+M4_NON_PIPELINED_BUBBLES))$mulblock_rslt :
+       '])
                                                                     M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
@@ -3353,7 +3354,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']);
             // Recirculate returning load or the div_mul_result from /orig_inst scope
-            //$ld_mask[3:0] = |fetch/instr/orig_load_inst>>M4_LD_RETURN_ALIGN$ld_mask;
+            
             ?$second_issue_ld
                // This scope holds the original load for a returning load.
                /orig_load_inst
@@ -3364,11 +3365,19 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             ?$second_issue         
                /orig_inst
                   //$ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : m4_ifelse(M4_EXT_M,1,['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F,1,['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
+                  m4_ifelse_block(M4_EXT_M, 1, ['
                   $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY;
+                  '], ['
+                  $ANY = /instr/orig_load_inst$ANY;
+                  '])
                   $ld_mask[3:0] = |fetch/instr/orig_load_inst>>M4_LD_RETURN_ALIGN$ld_mask;
-                  `BOGUS_USE($ld_mask)
+                  `BOGUS_USE($ld_mask)   // only for formal
                   /src[2:1]
+                     m4_ifelse_block(M4_EXT_M, 1, ['
                      $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY;
+                     '], ['
+                     $ANY = /instr/orig_load_inst/src$ANY;
+                     '])
                   
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
@@ -3597,9 +3606,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // This scope is a copy of /instr or /instr/orig_inst if $second_issue.
             /original
-               $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr$second_issue_div_mul ? /instr/hold_inst$ANY : /instr$ANY;
+               $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY m4_ifelse(M4_EXT_M, 1, [': /instr$second_issue_div_mul ? /instr/hold_inst$ANY']) : /instr$ANY;
                /src[2:1]
-                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr$second_issue_div_mul ? /instr/hold_inst/src$ANY : /instr/src$ANY;
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY m4_ifelse(M4_EXT_M, 1, [': /instr$second_issue_div_mul ? /instr/hold_inst/src$ANY']) : /instr/src$ANY;
 
             // /original
             //    $ANY = /instr$second_issue ? /instr/orig_load_inst$ANY : /instr$ANY;
