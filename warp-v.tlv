@@ -1876,13 +1876,14 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
 \TLV riscv_rslt_mux_expr()
    $rslt[M4_WORD_RANGE] =
-       $second_issue ? /orig_inst$late_rslt :
-                       M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
+       $second_issue_ld ? /orig_load_inst$late_rslt :
+       ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
+       ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr$mulblock_rslt :
+                                                                    M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
    // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_prev_instr_valid_through(..).
    ?$valid_decode
-
       // =================================
 
       // Extract fields of $raw (instruction) into $raw_<field>[x:0].
@@ -1919,7 +1920,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $multype_instr = $is_mul_instr ||
                        $is_mulh_instr ||
                        $is_mulhsu_instr ||
-                       $is_mulhu_instr;       
+                       $is_mulhu_instr;   
       $div_mul       = $multype_instr || $divtype_instr;
       '], ['
       $div_mul = 1'b0;
@@ -1990,7 +1991,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$divmul_dest_reg :'])
+   $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
@@ -2054,18 +2055,22 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, $divblk_valid)
       /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on WIDTH */
-      /orig_inst
-         $second_issue = |fetch/instr$second_issue;
-         ?$second_issue
-         // put correctly aligned result for MUL and DIV Verilog modules into /orig_inst scope, 
-         // valid only when we have a second issue (no bogus values propagated)
-            $divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
-            // stall_cnt_upper_div indicates that the results for div module are ready. The second issue of the instruction takes place
-            // M4_NON_PIPELINED_BUBBLES after this point (depending on pipeline depth)
-         // put correctly aligned destination register for MUL and DIV Verilog modules into /orig_inst scope
-         // and RETAIN till next M-type instruction, to be used again at second issue
-         $divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
-      '])
+      ?$second_issue_div_mul
+         /hold_inst
+            //$second_issue = |fetch/instr$second_issue;
+            //?$second_issue
+            // put correctly aligned result for MUL and DIV Verilog modules into /orig_inst scope, 
+            // valid only when we have a second issue (no bogus values propagated)
+               //$divmul_late_rslt[M4_WORD_RANGE] = |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div ? |fetch/instr$divblock_rslt : |fetch/instr$mulblock_rslt;
+               // stall_cnt_upper_div indicates that the results for div module are ready. The second issue of the instruction takes place
+               // M4_NON_PIPELINED_BUBBLES after this point (depending on pipeline depth)
+            // put correctly aligned destination register for MUL and DIV Verilog modules into /orig_inst scope
+            // and RETAIN till next M-type instruction, to be used again at second issue
+            $ANY = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$ANY : >>1$ANY;
+            /src[2:1]
+               $ANY = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr/src$ANY : >>1$ANY;
+            //$divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
+         '])
       m4_ifelse_block(M4_EXT_F, 1, ['
       // "F" Extension.
 
@@ -2294,8 +2299,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
               $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
                             (4'h1 << $addr[1:0]);      // byte
       // Swizzle bytes for load result (assuming natural alignment).
-      ?$second_issue
-         /orig_inst
+      ?$second_issue_ld
+         /orig_load_inst
             $spec_ld_cond = $spec_ld;
             ?$spec_ld_cond
                // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
@@ -2318,7 +2323,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                                     ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
                                                                             {$ld_value[31:24], 4'b1000}};
                `BOGUS_USE($ld_mask) // It's only for formal verification.
-            $late_rslt[M4_WORD_RANGE] = m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? $divmul_late_rslt : ']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? $fpu_div_sqrt_late_rslt : '])$ld_rslt;
+            ///data$late_rslt[M4_WORD_RANGE] = m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? $divmul_late_rslt : ']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? $fpu_div_sqrt_late_rslt : '])$ld_rslt;
+            $late_rslt[M4_WORD_RANGE] = $ld_rslt;
             // either div_mul result or load
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
@@ -3049,7 +3055,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       $is_pos_normal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && ((! (& /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]));
       $is_pos_subnormal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && (! (| /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]);
       
-      m4+fn_to_rec(1, #_expwidth, #_sigwidth, /_top['']$_input1, $fnToRec_a) 
+      m4+fn_to_rec(1, #_expwidth, #_|memsigwidth, /_top['']$_input1, $fnToRec_a) 
       m4+fn_to_rec(2, #_expwidth, #_sigwidth, /_top['']$_input2, $fnToRec_b) 
       m4+fn_to_rec(3, #_expwidth, #_sigwidth, /_top['']$_input3, $fnToRec_c) 
       
@@ -3108,7 +3114,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          
       $final_output_module[(#_expwidth + #_sigwidth):0] = (/_top['']$_operation == 5'h2 || /_top['']$_operation == 5'h3 || /_top['']$_operation == 5'h4 || /_top['']$_operation == 5'h5) ? $output_mul_add :
                                                       (/_top['']$_operation == 5'h6 || /_top['']$_operation == 5'h7) ? $output_add_sub :
-                                                      (/_top['']$_operation == 5'h8) ? $output_mul :
+                                    |mem                  (/_top['']$_operation == 5'h8) ? $output_mul :
                                                       //(/_top['']$_operation == 5'h9 || /_top['']$_operation == 5'ha) ? $output_div_sqrt :
                                                       ( $_outvalid && (/_top['']$_operation == 5'h9 || /_top['']$_operation == 5'ha)) ? $result_div_sqrt_temp :
                                                       (/_top['']$_operation == 5'he) ? $output_min :
@@ -3218,7 +3224,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             // Retire: Commit results of an ISA instruction.
             
             // Control flow:
-            //
+            //|mem
             // Redirects include (earliest to latest):
             //   o Returning load: (aborting) A returning load clobbers an instruction and takes its slot, resulting in a
             //                     one-cycle redirect to repeat the clobbered instruction.
@@ -3247,7 +3253,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             // 3) InstY    ooYyyxxx  (Aborting)
             // 4) InstZ     ooyyxZxx
             // 5) Redir'edY  oyyxxxxx
-            // 6) TargetY     ooxxxxxx
+            // 6) TargetY     ooxxxx|memxx
             // 7) Redir'edX    oxxxxxxx
             // 8) TargetX       oooooooo          Good-path
             // 9) Not redir'edZ  oooooooo         Good-path
@@ -3331,12 +3337,18 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']);
             // Recirculate returning load or the div_mul_result from /orig_inst scope
 
-            ?$second_issue
+            ?$second_issue_ld
                // This scope holds the original load for a returning load.
-               /orig_inst
-                  $ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : m4_ifelse(M4_EXT_M,1,['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F,1,['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
+               /orig_load_inst
+                  $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
+                     
+               /orig_inst
+                  //$ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : m4_ifelse(M4_EXT_M,1,['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F,1,['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY;
+                  /src[2:1]
+                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY;
             
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
@@ -3594,7 +3606,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                *rvfi_rs1_rdata   = /src[1]$is_reg ? /src[1]$reg_value : M4_WORD_CNT'b0;
                *rvfi_rs2_rdata   = /src[2]$is_reg ? /src[2]$reg_value : M4_WORD_CNT'b0;
                *rvfi_rd_addr     = (/instr$dest_reg_valid && ! $abort) ? $raw_rd : 5'b0;
-               *rvfi_rd_wdata    = *rvfi_rd_addr  ? /instr$rslt : 32'b0;
+               *rvfi_rd_wdata    = (| *rvfi_rd_addr) ? /instr$rslt : 32'b0;
             *rvfi_pc_rdata    = {/original$pc[31:2], 2'b00};
             *rvfi_pc_wdata    = {$reset          ? M4_PC_CNT'b0 :
                                  $second_issue   ? /orig_inst$pc + 1'b1 :
