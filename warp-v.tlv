@@ -1,5 +1,6 @@
 \m4_TLV_version 1d: tl-x.org
 \SV
+
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
    // 
@@ -290,7 +291,7 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-
+	m4_default(['M4_RISCV_FORMAL_ALTOPS'], 1)
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
 
@@ -1389,7 +1390,6 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 
    m4_asm(ORI, r8, r0, 1011)
    m4_asm(ORI, r9, r0, 1010)
-   m4_asm(ORI, r10, r0, 10101010)
    m4_asm(MUL, r11, r8, r9)
    m4_asm(ORI, r6, r0, 0)
    m4_asm(SW, r6, r11, 0)
@@ -1878,7 +1878,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    $rslt[M4_WORD_RANGE] =
        $second_issue_ld ? /orig_load_inst$late_rslt :
        ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
-       ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr$mulblock_rslt :
+       ($second_issue_div_mul && |fetch/instr>>M4_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m4_ifelse(M4_RISCV_FORMAL_ALTOPS,1,>>m4_eval(3+M4_NON_PIPELINED_BUBBLES))$mulblock_rslt :
                                                                     M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
 
 \TLV riscv_decode()
@@ -2934,11 +2934,19 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
 \SV
    m4_ifelse_block(M4_EXT_M, 1, ['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
+      m4_ifelse_block(M4_FORMAL, ['1'], ['
+         m4_define(M4_RISCV_FORMAL_ALTOPS, 1)
+      '])
+      m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
+			`define RISCV_FORMAL_ALTOPS
+		'])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */   
-      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v/master/muldiv/picorv32_pcpi_div.sv'])
-      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v/master/muldiv/picorv32_pcpi_fast_mul.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext_formal/muldiv/picorv32_pcpi_div.sv'])
+      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext_formal/muldiv/picorv32_pcpi_fast_mul.sv'])
+      
       /* verilator lint_on WIDTH */
+         
    '])
 
 \TLV m_extension()
@@ -2951,8 +2959,12 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
 
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
-
-   m4_define(['M4_DIV_LATENCY'], 37)  // Relative to typical 1-cycle latency instructions.
+   m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
+        m4_define(['M4_DIV_LATENCY'], 12)
+   '],['
+        m4_define(['M4_DIV_LATENCY'], 37)
+   '])
+     // Relative to typical 1-cycle latency instructions.
    m4_define(['M4_MUL_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
       $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
