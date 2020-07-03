@@ -2188,8 +2188,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          // for Verilog modules instantiation
          $clk = *clk;         
          $resetn = !(*reset);         
-         $instr_type_mul[3:0] = {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr};
-         $instr_type_div[3:0] = {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr};
+         $instr_type_mul[3:0] = $reset ? '0 : $mulblk_valid ? {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr} : $RETAIN;
+         $instr_type_div[3:0] = $reset ? '0 : $divblk_valid ? {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr} : $RETAIN;
          $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
          $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
          $div_in1[M4_WORD_RANGE] = $reset ? '0 : ($div_stall && $commit) ? /src[1]$reg_value : $RETAIN;
@@ -2997,8 +2997,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                      (/_top$_instr_type == 4'b0010) ? 3'b001 : // mulh
                      (/_top$_instr_type == 4'b0100) ? 3'b010 : // mulhsu
                      (/_top$_instr_type == 4'b1000) ? 3'b011 : // mulhu
-                                                      3'b000 ; // default to mul, but this case 
-                                                               // should not be encountered ideally
+                                                      //3'b000 ; // default to mul, but this case 
+                                                      >>1$opcode[2:0];         // should not be encountered ideally
 
       $mul_insn[31:0] = {7'b0000001,10'b0011000101,$opcode,5'b00101,7'b0110011};
                         // {  funct7  ,{rs2, rs1} (X), funct3, rd (X),  opcode  }   
@@ -3242,7 +3242,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             // Retire: Commit results of an ISA instruction.
             
             // Control flow:
-            //|mem
+            //
             // Redirects include (earliest to latest):
             //   o Returning load: (aborting) A returning load clobbers an instruction and takes its slot, resulting in a
             //                     one-cycle redirect to repeat the clobbered instruction.
@@ -3271,7 +3271,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             // 3) InstY    ooYyyxxx  (Aborting)
             // 4) InstZ     ooyyxZxx
             // 5) Redir'edY  oyyxxxxx
-            // 6) TargetY     ooxxxx|memxx
+            // 6) TargetY     ooxxxxxx
             // 7) Redir'edX    oxxxxxxx
             // 8) TargetX       oooooooo          Good-path
             // 9) Not redir'edZ  oooooooo         Good-path
@@ -3651,9 +3651,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                  $indirect_jump  ? $indirect_jump_target :
                                  $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[M4_ADDR_MAX:2], 2'b0} : 0;
-            *rvfi_mem_rmask   = /original$ld ? /orig_inst$ld_mask : 0;
+            *rvfi_mem_rmask   = /original$ld ? /orig_load_inst$ld_mask : 0;
             *rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
-            *rvfi_mem_rdata   = /original$ld ? /orig_inst$ld_value : 0;
+            *rvfi_mem_rdata   = /original$ld ? /orig_load_inst$ld_value : 0;
             *rvfi_mem_wdata   = $valid_st ? $st_value : 0;
 
             `BOGUS_USE(/src[2]$dummy)
