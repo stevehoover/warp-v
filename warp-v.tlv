@@ -3367,8 +3367,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                   '], ['
                   $ANY = /instr/orig_load_inst$ANY;
                   '])
-                  $ld_mask[3:0] = |fetch/instr/orig_load_inst>>M4_LD_RETURN_ALIGN$ld_mask;
-                  `BOGUS_USE($ld_mask)   // only for formal
+                  // $ld_mask[3:0] = |fetch/instr/orig_load_inst>>M4_LD_RETURN_ALIGN$ld_mask;
+                  // `BOGUS_USE($ld_mask)   // only for formal
                   /src[2:1]
                      m4_ifelse_block(M4_EXT_M, 1, ['
                      //$ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY;
