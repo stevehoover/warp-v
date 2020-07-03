@@ -2284,8 +2284,7 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
       $ld_st_cond = $ld_st && $valid_exe;
       ?$ld_st_cond
-         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['$is_fsw_instr ?  /fpusrc[1]$fpu_reg_value + ($ld ? $raw_i_imm : $raw_s_imm) :'])
-                                                 /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
+         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['($is_fsw_instr ? /src[1]$reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
          
          // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
@@ -3363,7 +3362,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                /orig_inst
                   //$ANY = |fetch/instr$second_issue_ld ? /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY : m4_ifelse(M4_EXT_M,1,['|fetch/instr$second_issue_div_mul ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F,1,['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/orig_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
                   m4_ifelse_block(M4_EXT_M, 1, ['
-                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY;
+                  //$ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY;
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : /instr$second_issue_div_mul ? /instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY : >>1$ANY;
                   '], ['
                   $ANY = /instr/orig_load_inst$ANY;
                   '])
@@ -3371,7 +3371,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                   `BOGUS_USE($ld_mask)   // only for formal
                   /src[2:1]
                      m4_ifelse_block(M4_EXT_M, 1, ['
-                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY;
+                     //$ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY;
+                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : /instr$second_issue_div_mul ? /instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY : >>1$ANY;
                      '], ['
                      $ANY = /instr/orig_load_inst/src$ANY;
                      '])
