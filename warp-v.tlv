@@ -2066,8 +2066,8 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
             $ANY = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr/src$ANY : >>1$ANY;
          $ld_mask = 0;
          $ld_value = 0;
-         $pc = 0;
-         $rvfi_order = 0;
+         $pc[M4_PC_RANGE] = 0;
+         $rvfi_order[63:0] = 0;
          `BOGUS_USE($ld_mask $ld_value $pc $rvfi_order) // It's only for formal verification.
          
          //$divmul_dest_reg[M4_REGS_INDEX_RANGE]   = (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit)) ? |fetch/instr$dest_reg : $RETAIN;
@@ -3623,18 +3623,18 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
 
-            $would_reissue = (|fetch/instr$ld) || (|fetch/instr$div_mul);
-            $retire = (|fetch/instr$commit && !$would_reissue ) || |fetch/instr$second_issue;
+            $would_reissue = ($ld) || ($div_mul);
+            $retire = ($commit && !$would_reissue ) || $second_issue;
 
             //$rvfi_valid       = ! <<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
             //                    (($commit && ! $ld) || $rvfi_trap || $second_issue);
             $rvfi_valid       = ! |fetch/instr<<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
-                                ($retire || $rvfi_trap );
+                                ($retire && !$rvfi_trap );
             *rvfi_valid       = $rvfi_valid;
             *rvfi_halt        = $rvfi_trap;
             *rvfi_trap        = $rvfi_trap;
             *rvfi_ixl         = 2'd1;
-            *rvfi_mode        = 2'd3; 
+            *rvfi_mode        = 2'd3;
             /original
                *rvfi_insn        = $raw;
                *rvfi_order       = $rvfi_order;
