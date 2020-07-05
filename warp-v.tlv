@@ -276,7 +276,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['6-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
