@@ -125,8 +125,8 @@ m4+definitions(['
    //     destination register, raw value, rs1/rs2/rd) depending on where they are consumed
    //     need to be retained. $ANY construct is used to make this logic generic and use-dependent. 
    //   o In case of loads, the /orig_load_inst scope is used to hook up the 
-   //     CPU pipeline to the |mem pipeline in first pipestage to reserve slot for the load 
-   //     returning in the second issue.
+   //     mem pipeline to the CPU pipeline in first pipestage (of CPU) to reserve slot for the load 
+   //     flowing from mem to CPU in the second issue.
    //   o For non-pipelined instructions such as mul-div, the /hold_inst scope retains the values
    //     till the second issue. 
    //   o Both the scopes are merged into /orig_inst scope depending on which instruction the second
@@ -1892,8 +1892,12 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    m4_echo(m4_decode_expr)
 
 \TLV riscv_rslt_mux_expr()
-   // in case of second issue, pull the results from /orig_load_inst or /hold_inst with proper alignment.
-   // in case of ALTOPS, the latency of the modules is different and that is accommated conditionally based on m4_defines.
+   // in case of second issue, the results are pulled out of the /orig_inst or /load_inst scope. 
+   // no alignment is needed as the rslt mux and the long latency results both appear in the same pipestage.
+
+   // in the case of second isssue for multiplication with ALTOPS enabled (or running formal checks for M extension), 
+   // the module gives out the result in two cycles but we explicitly flop the $mul_rslt 
+   // (by alignment with 3+NON_PIPELINED_BUBBLES to augment the 5 cycle behavior of the mul operation
 
    $rslt[M4_WORD_RANGE] =
          $second_issue_ld ? /orig_load_inst$ld_rslt : m4_ifelse_block(M4_EXT_M, 1, ['
@@ -2980,8 +2984,9 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
    '],['
         m4_define(['M4_DIV_LATENCY'], 37)
    '])
-   m4_define(['M4_MUL_LATENCY'], 5)       // latency for multiplication is 1 cycle in case of ALTOPS,
-                                          // but we flop it for 5 cycles (in rslt_mux) to verify second issue behavior
+   m4_define(['M4_MUL_LATENCY'], 5)       // latency for multiplication is 2 cycles in case of ALTOPS,
+                                          // but we flop it for 5 cycles (in rslt_mux) to augment the normal
+                                          // second issue behavior
 
    // Relative to typical 1-cycle latency instructions.
 
