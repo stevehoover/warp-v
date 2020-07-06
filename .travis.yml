@@ -21,9 +21,17 @@ install:
 before_script:
   - cd formal
   - if ("$TRAVIS_PULL_REQUEST"); then export BUILD_PATH=$TRAVIS_PULL_REQUEST_SLUG; else export BUILD_PATH=$TRAVIS_REPO_SLUG; fi
-script:
-  # Run riscv-formal for WARP-V.
-  - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+
+jobs :
+  include :
+    - stage : all_configurations
+      script: # Run riscv-formal for WARP-V.
+        -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+        -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+      script: 
+        - sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+        - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+
 after_success:
 after_failure:
   # Upload files for debug.
