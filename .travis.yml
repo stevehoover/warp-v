@@ -24,13 +24,12 @@ before_script:
 
 jobs :
   include :
-    - stage : all_configurations
-      script: # Run riscv-formal for WARP-V.
-        -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
-        -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
-      script: 
-        - sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
-        - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+    - script: # Run riscv-formal for WARP-V.
+      -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+    - script: 
+      - sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+      - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
 
 after_success:
 after_failure:
