@@ -29,10 +29,14 @@ jobs :
       script: # Run riscv-formal for WARP-V.
       -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  sed -i "/insn   /c\insn            20" /home/travis/build/$BUILD_PATH/formal/checks.cfg
+      -  cat /home/travis/build/$BUILD_PATH/formal/checks.cfg
+      -  cat /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
     - script: 
       -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  sed -i "/insn   /c\insn            29" /home/travis/build/$BUILD_PATH/formal/checks.cfg
+      -  cat /home/travis/build/$BUILD_PATH/formal/checks.cfg
+      -  cat /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
       name : "4 Stage"
 
