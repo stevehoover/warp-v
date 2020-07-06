@@ -24,12 +24,17 @@ before_script:
 
 jobs :
   include :
+    - stage : "Check all 3 configs"
+      name : "1 Stage"
     - script: # Run riscv-formal for WARP-V.
       -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+      -  sed -i "/insn   /c\insn            20" checks.cfg
       -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+      name : "4 Stage"
     - script: 
-      - sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
-      - PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+      -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])/" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
+      -  sed -i "/insn   /c\insn            29" checks.cfg
+      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
 
 after_success:
 after_failure:
