@@ -2148,11 +2148,14 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       /* verilator lint_on WIDTH */
       /* verilator lint_on CASEINCOMPLETE */
       '])
+      
+      // hold_inst scope is not needed when long latency instructions are disabled
       m4_ifelse(m4_eval(M4_EXT_M || M4_EXT_F), 1, ['
+      // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M 
       /hold_inst
-         $ANY = m4_ifelse(M4_EXT_M,1,['(|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, m4_ifelse(M4_EXT_M, 1, ['||']) ['(|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) ? |fetch/instr$ANY : >>1$ANY;
+         $ANY = 1'b0 m4_ifelse(M4_EXT_M,1,[' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) ? |fetch/instr$ANY : >>1$ANY;
          /src[2:1]
-            $ANY = m4_ifelse(M4_EXT_M,1,['(|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, m4_ifelse(M4_EXT_M, 1, ['||']) ['(|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) ? |fetch/instr/src$ANY : >>1$ANY;
+            $ANY = 1'b0 m4_ifelse(M4_EXT_M,1,[' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) ? |fetch/instr/src$ANY : >>1$ANY;
       '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
