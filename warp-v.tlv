@@ -3630,8 +3630,11 @@ m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/
       @0
          /arriving
             $ANY = /_cpu|rg_arriving<>0$ANY;
-         $blocked = ! /arriving$body && ! /_cpu/vc[/arriving$vc]|ingress_in$would_bypass;
+         $blocked = 
+            /arriving$body ? ! >>1$trans_valid :   // Body flits may only follow a flit in the last cycle.
+                             ! /_cpu/vc[/arriving$vc]|ingress_in$would_bypass;  // Head flits may only enter an empty FIFO.
          $trans_valid = $avail && ! $blocked;
+         
    /vc[*]
       |egress_out
          @0
