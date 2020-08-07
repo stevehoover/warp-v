@@ -926,86 +926,85 @@ m4+definitions(['
 
    // RVFI TLM
    m4_define(['m4_module_def'],
-             ['m4_ifelse(M4_FORMAL, 0,
-                         ['\SV['']m4_new_line['']m4_makerchip_module'],
-                         ['   module warpv(input logic clk,
-            input logic reset,
-            output logic failed,
-            output logic passed,
-            output logic  rvfi_valid, 
-            output logic [31:0] rvfi_insn,
-            output logic [63 : 0] rvfi_order,
-            output logic rvfi_halt,
-            output logic rvfi_trap,       
-            output logic rvfi_halt,       
-            output logic rvfi_intr,
-            output logic [1: 0] rvfi_ixl,
-            output logic [1: 0] rvfi_mode,
-            output logic [4: 0] rvfi_rs1_addr,   
-            output logic [4: 0] rvfi_rs2_addr,   
-            output logic [31: 0] rvfi_rs1_rdata,  
-            output logic [31: 0] rvfi_rs2_rdata,  
-            output logic [4: 0] rvfi_rd_addr,    
-            output logic [31: 0] rvfi_rd_wdata,   
-            output logic [31:0] rvfi_pc_rdata,   
-            output logic [31:0] rvfi_pc_wdata ,   
-            output logic [31:0] rvfi_mem_addr,   
-            output logic [3: 0] rvfi_mem_rmask,  
-            output logic [3: 0] rvfi_mem_wmask,  
-            output logic [31: 0] rvfi_mem_rdata,  
-            output logic [31: 0] rvfi_mem_wdata);'])'])
-'])
+               ['m4_ifelse_block(M4_FORMAL, 1, ['
+                     module warpv(
+                        input logic clk,
+                        input logic reset,
+                        output logic failed,
+                        output logic passed,
+                        output logic  rvfi_valid, 
+                        output logic [31:0] rvfi_insn,
+                        output logic [63 : 0] rvfi_order,
+                        output logic rvfi_halt,
+                        output logic rvfi_trap,       
+                        output logic rvfi_halt,       
+                        output logic rvfi_intr,
+                        output logic [1: 0] rvfi_ixl,
+                        output logic [1: 0] rvfi_mode,
+                        output logic [4: 0] rvfi_rs1_addr,   
+                        output logic [4: 0] rvfi_rs2_addr,   
+                        output logic [31: 0] rvfi_rs1_rdata,  
+                        output logic [31: 0] rvfi_rs2_rdata,  
+                        output logic [4: 0] rvfi_rd_addr,    
+                        output logic [31: 0] rvfi_rd_wdata,   
+                        output logic [31:0] rvfi_pc_rdata,   
+                        output logic [31:0] rvfi_pc_wdata ,   
+                        output logic [31:0] rvfi_mem_addr,   
+                        output logic [3: 0] rvfi_mem_rmask,  
+                        output logic [3: 0] rvfi_mem_wmask,  
+                        output logic [31: 0] rvfi_mem_rdata,  
+                        output logic [31: 0] rvfi_mem_wdata
+                     );
+                  '], M4_OPENPITON, 1, ['
+                     module warpv_openpiton(
+                        input logic clk,
+                        input logic rst_n,
 
-   // OpenPiton TLM
-   m4_define(['m4_module_def'],
-             ['m4_ifelse(M4_OPENPITON, 0,
-                         ['\SV['']m4_new_line['']m4_makerchip_module'],
-                         ['module warpv_openpiton(
-            input logic clk,
-            input logic rst_n,
+                        // WARP-V --> L1.5
+                        input                           warpv_transducer_mem_valid,
+                        input [31:0]                    warpv_transducer_mem_addr,
+                        input [ 3:0]                    warpv_transducer_mem_wstrb,
 
-            // WARP-V --> L1.5
-            input                           warpv_transducer_mem_valid,
-            input [31:0]                    warpv_transducer_mem_addr,
-            input [ 3:0]                    warpv_transducer_mem_wstrb,
+                        input [31:0]                    warpv_transducer_mem_wdata,
+                        input [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op,
+                        input                           l15_transducer_ack,
+                        input                           l15_transducer_header_ack,
 
-            input [31:0]                    warpv_transducer_mem_wdata,
-            input [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op,
-            input                           l15_transducer_ack,
-            input                           l15_transducer_header_ack,
+                        // outputs warpv uses                    
+                        output [4:0]                    transducer_l15_rqtype,
+                        output [`L15_AMO_OP_WIDTH-1:0]  transducer_l15_amo_op,
+                        output [2:0]                    transducer_l15_size,
+                        output                          transducer_l15_val,
+                        output [`PHY_ADDR_WIDTH-1:0]    transducer_l15_address,
+                        output [63:0]                   transducer_l15_data,
+                        output                          transducer_l15_nc,
 
-            // outputs warpv uses                    
-            output [4:0]                    transducer_l15_rqtype,
-            output [`L15_AMO_OP_WIDTH-1:0]  transducer_l15_amo_op,
-            output [2:0]                    transducer_l15_size,
-            output                          transducer_l15_val,
-            output [`PHY_ADDR_WIDTH-1:0]    transducer_l15_address,
-            output [63:0]                   transducer_l15_data,
-            output                          transducer_l15_nc,
+                        // outputs warpv doesn't use                    
+                        output [0:0]                    transducer_l15_threadid,
+                        output                          transducer_l15_prefetch,
+                        output                          transducer_l15_invalidate_cacheline,
+                        output                          transducer_l15_blockstore,
+                        output                          transducer_l15_blockinitstore,
+                        output [1:0]                    transducer_l15_l1rplway,
+                        output [63:0]                   transducer_l15_data_next_entry,
+                        output [32:0]                   transducer_l15_csm_data,
 
-            // outputs warpv doesn't use                    
-            output [0:0]                    transducer_l15_threadid,
-            output                          transducer_l15_prefetch,
-            output                          transducer_l15_invalidate_cacheline,
-            output                          transducer_l15_blockstore,
-            output                          transducer_l15_blockinitstore,
-            output [1:0]                    transducer_l15_l1rplway,
-            output [63:0]                   transducer_l15_data_next_entry,
-            output [32:0]                   transducer_l15_csm_data,
-
-            //--- L1.5 -> WARP-V
-            input                           l15_transducer_val,
-            input [3:0]                     l15_transducer_returntype,
-            
-            input [63:0]                    l15_transducer_data_0,
-            input [63:0]                    l15_transducer_data_1,
-            
-            output                          transducer_warpv_mem_ready,
-            output [31:0]                   transducer_warpv_mem_rdata,
-            
-            output                          transducer_l15_req_ack,
-            output                          warpv_int);'])'])
-])
+                        //--- L1.5 -> WARP-V
+                        input                           l15_transducer_val,
+                        input [3:0]                     l15_transducer_returntype,
+                        
+                        input [63:0]                    l15_transducer_data_0,
+                        input [63:0]                    l15_transducer_data_1,
+                        
+                        output                          transducer_warpv_mem_ready,
+                        output [31:0]                   transducer_warpv_mem_rdata,
+                        
+                        output                          transducer_l15_req_ack,
+                        output                          warpv_int
+                     );
+                  '], ['\SV['']m4_new_line['']m4_makerchip_module'])
+               '])
+            '])
 
 \SV
    m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/4bcf06b71272556ec7e72269152561902474848e/pipeflow_lib.tlv'])'])
