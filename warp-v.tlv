@@ -578,7 +578,7 @@ m4+definitions(['
    // ==================
    // These may be overridden by specific ISA.
 
-   m4_define(M4_BIG_ENDIAN, ['0'])
+   m4_define(['M4_BIG_ENDIAN'], 0)
 
 
    // =======================
