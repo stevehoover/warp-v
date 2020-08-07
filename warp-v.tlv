@@ -1658,7 +1658,7 @@ m4+definitions(['
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
-   t_reg[M4_REGS_INDEX_RANGE] =  $second_issue_ld  ?  |fetch/instr/orig_inst$dest_reg :
+   $dest_reg[M4_REGS_INDEX_RANGE] =  $second_issue_ld  ?  |fetch/instr/orig_inst$dest_reg :
                                  m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :']) 
                                                       $raw_rd;
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
