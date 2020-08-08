@@ -285,7 +285,7 @@ m4+definitions(['
    // prior to inclusion of this file.
    m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], ['
       // If not externally defined:
-      m4_define_hier(['M4_CORE'], 1)  // Number of cores.
+      m4_define_hier(['M4_CORE'], 2)  // Number of cores.
       m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
       m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
       m4_define(['M4_MAX_PACKET_SIZE'], 3)   // Max number of payload flits in a packet.
@@ -427,7 +427,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
+            (['M4_EXT_M'], 0),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -1190,18 +1190,44 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
- 
-   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
-   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
-   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
-   m4_asm(ORI, r3, r0, 0)        //     out = 0
-   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
-   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
-   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
-   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
+   //m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[1]
+   m4_asm(ORI, r3, r0, 11)        //     store_addr = 0
+   m4_asm(ORI, r1, r0, 1)
+   m4_asm(ORI, r8, r0, 1000) 
+   m4_asm(ORI, r6, r0, 110)        //     cnt = 1
+   m4_asm(ORI, r7, r0, 111)
+   m4_asm(ORI, r2, r0, 10)
+   m4_asm(CSRRW, r0, r1, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   //m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1]
+   
+   m4_asm(CSRRW, r0, r6, 100000000010) //write(8002)
+   //m4_asm(ORI, r0, r0, 111) 
+   //m4_asm(ORI, r0, r0, 111) 
+   m4_asm(ORI, r0, r0, 111)
+   m4_asm(CSRRW, r0, r7, 100000000010) //write(8002)
+   m4_asm(CSRRW, r0, r3, 100000000011) //tail(8003)
+   
+   m4_asm(ORI, r0, r0, 111) // actually need more of these.
+                            // head is diverted due to 
+                            // non-empty packets in ring.
+   m4_asm(ORI, r0, r0, 111)
+   m4_asm(ORI, r0, r0, 111)
+   m4_asm(ORI, r0, r0, 111)
+
+   //m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
+   //m4_asm(ORI, r0, r0, 111)
+   //m4_asm(ORI, r0, r0, 111)
+   //m4_asm(ORI, r0, r0, 111)
+   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r8, r0, 100000001011) //rd      
+   m4_asm(ADDI, r6, r6, 100)     //     
+   //m4_asm(ADDI, r6, r6, 100)     //  
+   //m4_asm(BLT, r1, r2, 1111111110000) //  
+   m4_asm(LW, r4, r6,   111111111100) //  
+   m4_asm(BGE, r1, r2, 1111111010100) //  
 
 \TLV riscv_divmul_test_prog()
    // /==========================\
@@ -1210,22 +1236,31 @@ m4+definitions(['
    //
    //3 MULs followed by 3 DIVs, check r11-r15 for correct results
 
-   m4_asm(ORI, r8, r0, 1011)
-   m4_asm(ORI, r9, r0, 1010)
-   m4_asm(ORI, r10, r0, 10101010)
-   m4_asm(MUL, r11, r8, r9)
-   m4_asm(ORI, r6, r0, 0)
-   m4_asm(SW, r6, r11, 0)
-   m4_asm(MUL, r12, r9, r10)
-   m4_asm(LW, r4, r6, 0)
-   m4_asm(ADDI, r6, r6, 100)
-   m4_asm(SW, r6, r12, 0)
-   m4_asm(MUL, r13, r8, r10)
-   m4_asm(DIV, r14, r11, r8)
-   m4_asm(DIV, r15, r13, r10)
-   m4_asm(LW, r5, r6, 0)
-   m4_asm(ADDI, r4, r0, 101101)
-   m4_asm(BGE, r8, r9, 111111111110)
+   m4_asm(ORI, r3, r0, 11)        //     store_addr = 0
+   m4_asm(ORI, r1, r0, 1) 
+   m4_asm(ORI, r6, r0, 110)        //     cnt = 1
+   m4_asm(ORI, r7, r0, 111)
+   m4_asm(ORI, r8, r0, 1000) 
+   m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1]
+   //m4_asm(CSRRS, r8, r0, 100000001011) pktrd
+   //m4_asm(CSRRS, r3, r0, 100000001010) pktcomp
+   //m4_asm(CSRRW, r0, r1, 100000000100) pktctrl
+   
+   m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
+   //m4_asm(ORI, r0, r0, 111)
+   //m4_asm(ORI, r0, r0, 111)
+   //m4_asm(ORI, r0, r0, 111)
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd      
+   m4_asm(ADDI, r6, r6, 100)     //  
+   
+   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
+   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
+   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
 \TLV riscv_fpu_test_prog()
    // /==========================\
@@ -1318,14 +1353,18 @@ m4+definitions(['
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
-      
-      assign instrs = '{
-         m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
-      };
-      
+      assign instrs = (#core == 1'b0) ? '{ 
+           m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
+           } : 
+           '{ 
+              {12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE}, {12'b1, 5'd0, ORI_INSTR_FUNCT3, 5'd1, ORI_INSTR_OPCODE}, {12'b110, 5'd0, ORI_INSTR_FUNCT3, 5'd6, ORI_INSTR_OPCODE}, {12'b111, 5'd0, ORI_INSTR_FUNCT3, 5'd7, ORI_INSTR_OPCODE}, {12'b1000, 5'd0, ORI_INSTR_FUNCT3, 5'd8, ORI_INSTR_OPCODE}, {12'b100000001000, 5'd1, CSRRS_INSTR_FUNCT3, 5'd0, CSRRS_INSTR_OPCODE}, {12'b100000001000, 5'd0, CSRRS_INSTR_FUNCT3, 5'd1, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100, 5'd6, ADDI_INSTR_FUNCT3, 5'd6, ADDI_INSTR_OPCODE}, {12'b1, 5'd1, ADDI_INSTR_FUNCT3, 5'd1, ADDI_INSTR_OPCODE}, {12'b100, 5'd6, ADDI_INSTR_FUNCT3, 5'd6, ADDI_INSTR_OPCODE}, {1'b1, 6'b111111, 5'd2, 5'd1, BLT_INSTR_FUNCT3, 4'b1000, 1'b1, BLT_INSTR_OPCODE}, {12'b111111111100, 5'd6, LW_INSTR_FUNCT3, 5'd4, LW_INSTR_OPCODE}, {1'b1, 6'b111110, 5'd2, 5'd1, BGE_INSTR_FUNCT3, 4'b1010, 1'b1, BGE_INSTR_OPCODE}, {12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE},{12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE}
+            };
       // String representations of the instructions for debug.
-      assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-
+      assign instr_strs = (#core == 1'b0) ? '{
+           m4_asm_mem_expr "END "} : 
+           '{
+               "(I) ORI r3,r0,11                        ",  "(I) ORI r1,r0,1                         ",  "(I) ORI r6,r0,110                       ",  "(I) ORI r7,r0,111                       ",  "(I) ORI r8,r0,1000                      ",  "(I) CSRRS r0,r1,100000001000            ",  "(I) CSRRS r1,r0,100000001000            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) ADDI r6,r6,100                      ",  "(I) ADDI r1,r1,1                        ",  "(I) ADDI r6,r6,100                      ",  "(B) BLT r1,r2,1111111110000             ",  "(I) LW r4,r6,111111111100 ",  "(B) BGE r1,r2,1111111010100 ",  "(I) ORI r3,r0,11", "(I) ORI r3,r0,11", "END "};
+   
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -3314,6 +3353,7 @@ m4+definitions(['
                                   $csr_pktdest[m4_echo(M4_CORE_INDEX_RANGE)]
                                  };
          /flit
+             // TODO. ADD a WHEN condition.
             {$tail, $flit[M4_WORD_RANGE]} = |egress_in/instr$insert_header ? {1'b0, |egress_in/skid_buffer$header_flit} :
                                                                              {|egress_in/skid_buffer$is_csr_pkttail, |egress_in/skid_buffer$csr_wr_value};
    /vc[*]
