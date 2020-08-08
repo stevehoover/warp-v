@@ -304,7 +304,7 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-	m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
+  m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
                                               // instead of actual mul/div, this is enabled automatically when formal is used, 
                                               // can be enabled manually for testing in Makerchip environment.
 
@@ -1199,11 +1199,8 @@ m4+definitions(['
    m4_asm(ORI, r2, r0, 10)
    m4_asm(CSRRW, r0, r1, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
    m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
-   //m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1]
-   
+   //m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
    m4_asm(CSRRW, r0, r6, 100000000010) //write(8002)
-   //m4_asm(ORI, r0, r0, 111) 
-   //m4_asm(ORI, r0, r0, 111) 
    m4_asm(ORI, r0, r0, 111)
    m4_asm(CSRRW, r0, r7, 100000000010) //write(8002)
    m4_asm(CSRRW, r0, r3, 100000000011) //tail(8003)
@@ -1214,6 +1211,10 @@ m4+definitions(['
    m4_asm(ORI, r0, r0, 111)
    m4_asm(ORI, r0, r0, 111)
    m4_asm(ORI, r0, r0, 111)
+   m4_asm(CSRRW, r0, r6, 100000000010) //write(8002)
+   m4_asm(ORI, r0, r0, 111)
+   m4_asm(CSRRW, r0, r7, 100000000010) //write(8002)
+   m4_asm(CSRRW, r0, r3, 100000000011) //tail(8003)
 
    //m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
    //m4_asm(ORI, r0, r0, 111)
@@ -1226,8 +1227,6 @@ m4+definitions(['
    m4_asm(ADDI, r6, r6, 100)     //     
    //m4_asm(ADDI, r6, r6, 100)     //  
    //m4_asm(BLT, r1, r2, 1111111110000) //  
-   m4_asm(LW, r4, r6,   111111111100) //  
-   m4_asm(BGE, r1, r2, 1111111010100) //  
 
 \TLV riscv_divmul_test_prog()
    // /==========================\
@@ -1245,22 +1244,19 @@ m4+definitions(['
    //m4_asm(CSRRS, r8, r0, 100000001011) pktrd
    //m4_asm(CSRRS, r3, r0, 100000001010) pktcomp
    //m4_asm(CSRRW, r0, r1, 100000000100) pktctrl
-   
    m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
-   //m4_asm(ORI, r0, r0, 111)
-   //m4_asm(ORI, r0, r0, 111)
-   //m4_asm(ORI, r0, r0, 111)
    m4_asm(CSRRS, r8, r0, 100000001011) //rd 
    m4_asm(CSRRS, r8, r0, 100000001011) //rd 
    m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd      
-   m4_asm(ADDI, r6, r6, 100)     //  
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
    
-   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r8, r0, 100000001011) //rd      
+   
    m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
 
 \TLV riscv_fpu_test_prog()
    // /==========================\
@@ -1355,16 +1351,14 @@ m4+definitions(['
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
       assign instrs = (#core == 1'b0) ? '{ 
            m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
-           } : 
-           '{ 
-              {12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE}, {12'b1, 5'd0, ORI_INSTR_FUNCT3, 5'd1, ORI_INSTR_OPCODE}, {12'b110, 5'd0, ORI_INSTR_FUNCT3, 5'd6, ORI_INSTR_OPCODE}, {12'b111, 5'd0, ORI_INSTR_FUNCT3, 5'd7, ORI_INSTR_OPCODE}, {12'b1000, 5'd0, ORI_INSTR_FUNCT3, 5'd8, ORI_INSTR_OPCODE}, {12'b100000001000, 5'd1, CSRRS_INSTR_FUNCT3, 5'd0, CSRRS_INSTR_OPCODE}, {12'b100000001000, 5'd0, CSRRS_INSTR_FUNCT3, 5'd1, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100000001011, 5'd0, CSRRS_INSTR_FUNCT3, 5'd8, CSRRS_INSTR_OPCODE}, {12'b100, 5'd6, ADDI_INSTR_FUNCT3, 5'd6, ADDI_INSTR_OPCODE}, {12'b1, 5'd1, ADDI_INSTR_FUNCT3, 5'd1, ADDI_INSTR_OPCODE}, {12'b100, 5'd6, ADDI_INSTR_FUNCT3, 5'd6, ADDI_INSTR_OPCODE}, {1'b1, 6'b111111, 5'd2, 5'd1, BLT_INSTR_FUNCT3, 4'b1000, 1'b1, BLT_INSTR_OPCODE}, {12'b111111111100, 5'd6, LW_INSTR_FUNCT3, 5'd4, LW_INSTR_OPCODE}, {1'b1, 6'b111110, 5'd2, 5'd1, BGE_INSTR_FUNCT3, 4'b1010, 1'b1, BGE_INSTR_OPCODE}, {12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE},{12'b11, 5'd0, ORI_INSTR_FUNCT3, 5'd3, ORI_INSTR_OPCODE}
-            };
+           } : '{ 
+                       {12'b11, 5'd0, 3'b110, 5'd3, 7'b0010011}, {12'b1, 5'd0, 3'b110, 5'd1, 7'b0010011}, {12'b110, 5'd0, 3'b110, 5'd6, 7'b0010011}, {12'b111, 5'd0, 3'b110, 5'd7, 7'b0010011}, {12'b1000, 5'd0, 3'b110, 5'd8, 7'b0010011}, {12'b100000001000, 5'd1, 3'b010, 5'd0, 7'b1110011}, {12'b100000001000, 5'd0, 3'b010, 5'd1, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}
+                       };
       // String representations of the instructions for debug.
       assign instr_strs = (#core == 1'b0) ? '{
-           m4_asm_mem_expr "END "} : 
-           '{
-               "(I) ORI r3,r0,11                        ",  "(I) ORI r1,r0,1                         ",  "(I) ORI r6,r0,110                       ",  "(I) ORI r7,r0,111                       ",  "(I) ORI r8,r0,1000                      ",  "(I) CSRRS r0,r1,100000001000            ",  "(I) CSRRS r1,r0,100000001000            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) ADDI r6,r6,100                      ",  "(I) ADDI r1,r1,1                        ",  "(I) ADDI r6,r6,100                      ",  "(B) BLT r1,r2,1111111110000             ",  "(I) LW r4,r6,111111111100 ",  "(B) BGE r1,r2,1111111010100 ",  "(I) ORI r3,r0,11", "(I) ORI r3,r0,11", "END "};
-   
+           m4_asm_mem_expr "END "} : '{
+                        "(I) ORI r3,r0,11                        ",  "(I) ORI r1,r0,1                         ",  "(I) ORI r6,r0,110                       ",  "(I) ORI r7,r0,111                       ",  "(I) ORI r8,r0,1000                      ",  "(I) CSRRS r0,r1,100000001000            ",  "(I) CSRRS r1,r0,100000001000            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "END "};
+           
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -2591,8 +2585,8 @@ m4+definitions(['
          m4_define(M4_RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
       '])
       m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
-			`define RISCV_FORMAL_ALTOPS
-		'])
+      `define RISCV_FORMAL_ALTOPS
+    '])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       // TODO : Update links after merge to master!
