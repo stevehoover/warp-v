@@ -957,50 +957,75 @@ m4+definitions(['
                      );
                   '], M4_OPENPITON, 1, ['
                      module warpv_openpiton(
-                        input logic clk,
+                        input logic clk,                 // same as m4_makerchip module, should be fine mostly
                         input logic rst_n,
+                        
+                        // TODO : WARPV would not have a separate transducer
+                        // (or decoder / encoder) and complete interface is defined
+                        // inside this module_def hence input/output nature would alter :)
 
                         // WARP-V --> L1.5
-                        input                           warpv_transducer_mem_valid,
-                        input [31:0]                    warpv_transducer_mem_addr,
-                        input [ 3:0]                    warpv_transducer_mem_wstrb,
+ 
+                        // input                           warpv_transducer_mem_valid,
+                        // input [31:0]                    warpv_transducer_mem_addr,
+                        // input [ 3:0]                    warpv_transducer_mem_wstrb,
 
-                        input [31:0]                    warpv_transducer_mem_wdata,
-                        input [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op,
-                        input                           l15_transducer_ack,
-                        input                           l15_tm4_module_defransducer_header_ack,
+                        // input [31:0]                    warpv_transducer_mem_wdata,
+                        // input [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op,
+                        // input                           l15_transducer_ack,
+                        // input                           l15_transducer_header_ack,
 
-                        // outputs warpv uses                    
-                        output [4:0]                    transducer_l15_rqtype,
-                        output [`L15_AMO_OP_WIDTH-1:0]  transducer_l15_amo_op,
-                        output [2:0]                    transducer_l15_size,
-                        output                          transducer_l15_val,
-                        output [`PHY_ADDR_WIDTH-1:0]    transducer_l15_address,
-                        output [63:0]                   transducer_l15_data,
-                        output                          transducer_l15_nc,
+                        // for making mem requests to the OP system
+
+                        // outputs from core
+                        output reg                          warpv_transducer_mem_valid,
+                        output reg [31:0]                   warpv_transducer_mem_addr,
+                        output reg [ 3:0]                   warpv_transducer_mem_wstrb,
+                        output reg [31:0]                   warpv_transducer_mem_wdata,
+                        output reg [`L15_AMO_OP_WIDTH-1:0]  warpv_transducer_mem_amo_op,
+
+                        // for transducer logic
+                        input wire                          l15_transducer_ack,
+                        input wire                          l15_transducer_header_ack,
+
+                        // outputs warpv uses
+                        // all these go to l15 from transducer - remain output
+                        output reg  [4:0]                   transducer_l15_rqtype,
+                        output      [`L15_AMO_OP_WIDTH-1:0] transducer_l15_amo_op,
+                        output reg  [2:0]                   transducer_l15_size,
+                        output wire                         transducer_l15_val,
+                        output wire [`PHY_ADDR_WIDTH-1:0]   transducer_l15_address,
+                        output wire [63:0]                  transducer_l15_data,
+                        output wire                         transducer_l15_nc,
 
                         // outputs warpv doesn't use                    
-                        output [0:0]                    transducer_l15_threadid,
-                        output                          transducer_l15_prefetch,
-                        output                          transducer_l15_invalidate_cacheline,
-                        output                          transducer_l15_blockstore,
-                        output                          transducer_l15_blockinitstore,
-                        output [1:0]                    transducer_l15_l1rplway,
-                        output [63:0]                   transducer_l15_data_next_entry,
-                        output [32:0]                   transducer_l15_csm_data,
+                        output wire [0:0]                   transducer_l15_threadid,
+                        output wire                         transducer_l15_prefetch,
+                        output wire                         transducer_l15_invalidate_cacheline,
+                        output wire                         transducer_l15_blockstore,
+                        output wire                         transducer_l15_blockinitstore,
+                        output wire [1:0]                   transducer_l15_l1rplway,
+                        output wire [63:0]                  transducer_l15_data_next_entry,
+                        output wire [32:0]                  transducer_l15_csm_data,
+
 
                         //--- L1.5 -> WARP-V
-                        input                           l15_transducer_val,
-                        input [3:0]                     l15_transducer_returntype,
+                        input wire                          l15_transducer_val,
+                        input wire [3:0]                    l15_transducer_returntype,
+
+                        input wire [63:0]                   l15_transducer_data_0,
+                        input wire [63:0]                   l15_transducer_data_1,
                         
-                        input [63:0]                    l15_transducer_data_0,
-                        input [63:0]                    l15_transducer_data_1,
-                        
-                        output                          transducer_warpv_mem_ready,
-                        output [31:0]                   transducer_warpv_mem_rdata,
-                        
-                        output                          transducer_l15_req_ack,
-                        output                          warpv_int
+                        // these two need not be io now? can be regs I believe (used internally)
+                        // output                          transducer_warpv_mem_ready,
+                        // output [31:0]                   transducer_warpv_mem_rdata,
+
+                        reg                                 transducer_warpv_mem_ready,
+                        reg [31:0]                          transducer_warpv_mem_rdata,
+
+                        output wire                         transducer_l15_req_ack,
+                        //output                          warpv_int
+                        reg                                 warpv_int
                      );
                   '], ['\SV['']m4_new_line['']m4_makerchip_module'])
                '])
@@ -3365,6 +3390,15 @@ m4+definitions(['
 
 
 \TLV openpiton_interface()
+   
+   // For Memory interface
+   //    1  warpv_transducer_mem_valid,
+   //    2   warpv_transducer_mem_addr,
+   //    3   warpv_transducer_mem_wstrb,
+   //    4   warpv_transducer_mem_wdata,
+   //    5   warpv_transducer_mem_amo_op,
+
+
    \SV_plus
       // ** DECODER ** //              
       reg current_val;
