@@ -958,7 +958,7 @@ m4+definitions(['
                   '], M4_OPENPITON, 1, ['
                      module warpv_openpiton(
                         input logic clk,                 // same as m4_makerchip module, should be fine mostly
-                        input logic rst_n,
+                        input logic reset,
                         
                         // TODO : WARPV would not have a separate transducer
                         // (or decoder / encoder) and complete interface is defined
@@ -975,6 +975,8 @@ m4+definitions(['
                         // input                           l15_transducer_ack,
                         // input                           l15_transducer_header_ack,
 
+
+                        // TODO : Move reg.... to sv part
                         // for making mem requests to the OP system
 
                         // outputs from core (ip to the transducer), but internal in new mechanism
@@ -3389,6 +3391,7 @@ m4+definitions(['
 ////                        ////
 ////////////////////////////////
 \SV
+   `include "iop.h"
    // ** DECODER ** //              
    //
    localparam ACK_IDLE = 1'b0;
