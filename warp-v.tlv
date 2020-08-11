@@ -981,11 +981,11 @@ m4+definitions(['
 
                         // outputs from core (ip to the transducer), but internal in new mechanism
                         // *these = $pipesig should be fine!
-                        reg                                 warpv_transducer_mem_valid,
-                        reg [31:0]                          warpv_transducer_mem_addr,
-                        reg [ 3:0]                          warpv_transducer_mem_wstrb,
-                        reg [31:0]                          warpv_transducer_mem_wdata,
-                        reg [`L15_AMO_OP_WIDTH-1:0]         warpv_transducer_mem_amo_op,
+                        // reg                                 warpv_transducer_mem_valid,
+                        // reg [31:0]                          warpv_transducer_mem_addr,
+                        // reg [ 3:0]                          warpv_transducer_mem_wstrb,
+                        // reg [31:0]                          warpv_transducer_mem_wdata,
+                        // reg [`L15_AMO_OP_WIDTH-1:0]         warpv_transducer_mem_amo_op,
 
                         // for transducer logic
                         input wire                          l15_transducer_ack,
@@ -1023,12 +1023,12 @@ m4+definitions(['
                         // output                          transducer_warpv_mem_ready,
                         // output [31:0]                   transducer_warpv_mem_rdata,
 
-                        reg                                 transducer_warpv_mem_ready,
-                        reg [31:0]                          transducer_warpv_mem_rdata,
+                        // reg                                 transducer_warpv_mem_ready,
+                        // reg [31:0]                          transducer_warpv_mem_rdata,
 
                         output wire                         transducer_l15_req_ack,
-                        //output                          warpv_int
-                        reg                                 warpv_int
+                        output reg                          warpv_int
+                        // reg                                 warpv_int
                      );
                   '], ['\SV['']m4_new_line['']m4_makerchip_module'])
                '])
@@ -3392,6 +3392,15 @@ m4+definitions(['
 ////////////////////////////////
 \SV
    `include "iop.h"
+   reg                           warpv_transducer_mem_valid;
+   reg [31:0]                    warpv_transducer_mem_addr;
+   reg [ 3:0]                    warpv_transducer_mem_wstrb;
+   reg [31:0]                    warpv_transducer_mem_wdata;
+   reg [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op;
+   reg                           transducer_warpv_mem_ready;
+   reg [31:0]                    transducer_warpv_mem_rdata;
+   //reg                           warpv_int;
+
    // ** DECODER ** //              
    //
    localparam ACK_IDLE = 1'b0;
