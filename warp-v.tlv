@@ -3401,7 +3401,19 @@ m4+definitions(['
    reg [31:0]                    transducer_warpv_mem_rdata;
    //reg                           warpv_int;
 
-   // ** DECODER ** //              
+   // ** DECODER ** //
+   always @ (posedge clk) begin
+      if(!reset_l) begin
+         resetn <= 1'b0; 
+      end
+      else if (mem_la_write & (mem_la_addr == 32'hffffffff)) begin
+         resetn <= 1'b0;
+      end
+      else if (pico_int) begin
+         resetn <= 1'b1; 
+      end
+   end
+
    //
    localparam ACK_IDLE = 1'b0;
    localparam ACK_WAIT = 1'b1;
