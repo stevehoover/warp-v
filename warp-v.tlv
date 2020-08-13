@@ -2670,7 +2670,7 @@ m4+definitions(['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['F-ext supported for RISC-V only.']m4_new_line)'])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */   
-      m4_include_url(['https:/']['/raw.githubusercontent.com/vineetjain07/warp-v/master/fpu/topmodule.tlv'])
+      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
       /* verilator lint_on WIDTH */
    '])
 
@@ -3380,8 +3380,11 @@ m4+definitions(['
       @0
          /arriving
             $ANY = /_cpu|rg_arriving<>0$ANY;
-         $blocked = ! /arriving$body && ! /_cpu/vc[/arriving$vc]|ingress_in$would_bypass;
+         $blocked = 
+            /arriving$body ? ! >>1$trans_valid :   // Body flits may only follow a flit in the last cycle.
+                             ! /_cpu/vc[/arriving$vc]|ingress_in$would_bypass;  // Head flits may only enter an empty FIFO.
          $trans_valid = $avail && ! $blocked;
+         
    /vc[*]
       |egress_out
          @0
