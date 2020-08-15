@@ -3375,7 +3375,7 @@ m4+definitions(['
       |ingress_in
          @0
             $vc_match = /_cpu|rg_arriving>>m4_align(0, 0)$vc == #vc;
-            $vc_trans_valid = /_cpu|ingress_in$trans_valid && $vc_match;
+            $vc_trans_valid = /_cpu|ingress_in$trans_valid && /_cpu|ingress_in/arriving$body && $vc_match;
    |ingress_in
       @0
          /arriving
