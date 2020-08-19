@@ -2556,15 +2556,15 @@ m4+definitions(['
                      .COL_WIDTH(M4_WORD_HIGH / M4_ADDRS_PER_WORD), 
                      .NB_COL(M4_ADDRS_PER_WORD)
                      )
-               dmem_ext (
-                     .clk     ($clk),
-                     .valid_st($valid_st),
-                     .spec_ld ($spec_ld),
-                     .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
-                     .we      ($st_mask),
-                     .din     ($st_value), 
-                     .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
-                     );
+               // dmem_ext (
+               //       .clk     ($clk),
+               //       .valid_st($valid_st),
+               //       .spec_ld ($spec_ld),
+               //       .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
+               //       .we      ($st_mask),
+               //       .din     ($st_value), 
+               //       .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
+               //       );
 
    |mem
       /data
@@ -3406,8 +3406,20 @@ m4+definitions(['
    //    4   warpv_transducer_mem_wdata,
    //    5   warpv_transducer_mem_amo_op,
 
-
-   
+   dmem_ext (
+               //       .clk     ($clk),
+               //       .valid_st($valid_st),
+               //       .spec_ld ($spec_ld),
+               //       .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
+               //       .we      ($st_mask),
+               //       .din     ($st_value), 
+               //       .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
+               //       );
+   // input   clk, valid_st, spec_ld,
+   // input   [NB_COL-1:0]	        we,            // for enabling individual column accessible (for writes)
+   // input   [ADDR_WIDTH-1:0]	    addr,      
+   // input   [NB_COL*COL_WIDTH-1:0]  din,
+   // output  [NB_COL*COL_WIDTH-1:0]  dout
    |fetch
       /instr
          @M4_REG_WR_STAGE
@@ -3422,6 +3434,16 @@ m4+definitions(['
                wire reset;
                reg reset_op_internal;
                assign reset = reset_op_internal;
+               //
+               // ** HOOKUP with WARP-V **//
+               *warpv_transducer_mem_valid  = $valid_st;
+               *warpv_transducer_mem_addr   = $addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS];
+               *warpv_transducer_mem_wstrb  = $st_mask;
+               *warpv_transducer_mem_wdata  = 
+               *warpv_transducer_mem_amo_op = 
+               *transducer_warpv_mem_ready  =
+               *transducer_warpv_mem_rdata  = 
+               //
                // ** DECODER ** //
                // wire mem_la_addr, mem_la_write;
                // assign mem_la_write = 0;
