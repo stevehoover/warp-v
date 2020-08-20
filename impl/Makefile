@@ -13,7 +13,6 @@ all: $(WARPV_OUT)
 out/%/status: warp-v_%.tlv ../warp-v.tlv
 	@echo "Processing $< using SandPiper(TM) SaaS Edition."
 	@mkdir -p out/$(patsubst warp-v_%.tlv,%,$<)
-	@rm -rf out/$(patsubst warp-v_%.tlv,%,$<)/*
 	@cd out/$(patsubst warp-v_%.tlv,%,$<) \
 	  && cp ../../$< . \
 	  && curl -F 'top.tlv=@$<' -F 'files[]=@../../../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout \
