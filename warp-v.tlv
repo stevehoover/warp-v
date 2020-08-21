@@ -307,7 +307,8 @@ m4+definitions(['
 	m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
                                               // instead of actual mul/div, this is enabled automatically when formal is used, 
                                               // can be enabled manually for testing in Makerchip environment.
-   m4_default(['M4_OPENPITON'], 0)  // 1 to generate interface for Openpiton,  For openpiton transducer
+
+   m4_default(['M4_OPENPITON'], 0)            // 1 to generate interface for Openpiton,  For openpiton transducer
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -1034,7 +1035,8 @@ m4+definitions(['
                         output reg                          warpv_int
                         // reg                                 warpv_int
                      );
-                  '], ['\SV['']m4_new_line['']m4_makerchip_module'])
+                  '], ['
+\SV['']m4_new_line['']m4_makerchip_module'])
                '])
             '])
 
@@ -2544,7 +2546,7 @@ m4+definitions(['
 // The memory is placed in the fetch pipeline.
 // TODO: (/_cpu, @_mem, @_align)
 
-\TLV verilog_fake_memory(/_cpu, M4_ALIGNMENT_VALUE)
+\TLV verilog_fake_memory(/_cpu, M4_ALIGNMENT_VALUE, $_valid, $_addr, $_wstrb, $_wdata, $_amo_op, $_ready, $_rdata)
    |fetch
       /instr
          @M4_MEM_WR_STAGE
@@ -2556,15 +2558,15 @@ m4+definitions(['
                      .COL_WIDTH(M4_WORD_HIGH / M4_ADDRS_PER_WORD), 
                      .NB_COL(M4_ADDRS_PER_WORD)
                      )
-               // dmem_ext (
-               //       .clk     ($clk),
-               //       .valid_st($valid_st),
-               //       .spec_ld ($spec_ld),
-               //       .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
-               //       .we      ($st_mask),
-               //       .din     ($st_value), 
-               //       .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
-               //       );
+               dmem_ext (
+                     .clk     ($clk),
+                     .valid_st($valid_st),
+                     .spec_ld ($spec_ld),
+                     .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
+                     .we      ($st_mask),
+                     .din     ($st_value), 
+                     .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
+                     );
 
    |mem
       /data
@@ -3940,7 +3942,6 @@ m4+module_def
    //
    // =================
    
-
    m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
