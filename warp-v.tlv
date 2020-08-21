@@ -434,7 +434,7 @@ m4+definitions(['
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
             (['M4_EXT_C'], 0),
-            (['M4_EXT_B'], 0),
+            (['M4_EXT_B'], 1),
             (['M4_EXT_J'], 0),
             (['M4_EXT_T'], 0),
             (['M4_EXT_P'], 0),
