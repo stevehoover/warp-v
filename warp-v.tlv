@@ -1784,6 +1784,7 @@ m4+definitions(['
       // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
       $clmul_valid = >>1$clmul_stall;
       $crc_valid = >>1$crc_stall;
+      `BOGUS_USE($clmul_valid $crc_valid)
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       /* verilator lint_off PINMISSING */
@@ -3364,9 +3365,9 @@ m4+definitions(['
             ?$second_issue
                /orig_inst
                   // pull values from /orig_load_inst or /hold_inst depending on which second issue
-                  $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst$ANY;
+                  $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
                   /src[2:1]
-                     $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/src$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/src$ANY;
+                     $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/src$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) >>1$ANY;
             
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
@@ -3437,7 +3438,7 @@ m4+definitions(['
                   m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
             $replay_int = | /src[*]$replay || ($is_dest_condition && $dest_pending);
-            
+
             m4_ifelse_block(M4_EXT_F, 1, ['
             //
             // ======
