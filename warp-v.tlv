@@ -289,7 +289,7 @@ m4+definitions(['
       m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
       m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
       m4_define(['M4_MAX_PACKET_SIZE'], 3)   // Max number of payload flits in a packet.
-      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
+      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT) , SRC, m4_eval(M4_CORE_INDEX_CNT + M4_VC_INDEX_CNT), VC, M4_CORE_INDEX_CNT, DEST, 0)
    '])
    // Inclusions for multi-core only:
    m4_ifexpr(M4_CORE_CNT > 1, ['
@@ -838,6 +838,7 @@ m4+definitions(['
          m4_define_csr(['pktavail'],   12'h809,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
          m4_define_csr(['pktcomp'],    12'h80a,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
          m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b0}}'],            RO)
+         m4_define_csr(['core'],      12'h80d,    ['M4_CORE_INDEX_HIGH, CORE, 0'],    ['M4_CORE_INDEX_HIGH'b0'],     ['{M4_CORE_INDEX_HIGH{1'b1}}'],      RO)
          m4_define_csr(['pktinfo'],    12'h80c,    ['m4_eval(M4_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
                                                                             ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b100'], ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b0'], 1)
          // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
@@ -1190,43 +1191,67 @@ m4+definitions(['
    // 4: tmp
    // 5: offset
    // 6: store addr
-   //m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[1]
-   m4_asm(ORI, r3, r0, 11)        //     store_addr = 0
    m4_asm(ORI, r1, r0, 1)
-   m4_asm(ORI, r8, r0, 1000) 
-   m4_asm(ORI, r6, r0, 110)        //     cnt = 1
-   m4_asm(ORI, r7, r0, 111)
-   m4_asm(ORI, r2, r0, 10)
-   m4_asm(CSRRW, r0, r1, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
-   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
-   //m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
-   m4_asm(CSRRW, r0, r6, 100000000010) //write(8002)
-   m4_asm(ORI, r0, r0, 111)
-   m4_asm(CSRRW, r0, r7, 100000000010) //write(8002)
-   m4_asm(CSRRW, r0, r3, 100000000011) //tail(8003)
+   m4_asm(CSRRS, r22, r0, 100000001101)
+   m4_asm(ORI, r25, r0, 11001)
+   m4_asm(ORI, r20, r0, 10100)
+   m4_asm(ORI, r12, r0, 1100)
+   m4_asm(ORI, r11, r0, 1)
+   m4_asm(ORI, r13, r0, 1101)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0   
+   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
+   m4_asm(ORI, r3, r0, 0)        //     out = 0
+   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
+   m4_asm(SW, r6, r3, 0)  
    
-   m4_asm(ORI, r0, r0, 111) // actually need more of these.
-                            // head is diverted due to 
-                            // non-empty packets in ring.
-   m4_asm(ORI, r0, r0, 111)
-   m4_asm(ORI, r0, r0, 111)
-   m4_asm(ORI, r0, r0, 111)
-   m4_asm(CSRRW, r0, r6, 100000000010) //write(8002)
-   m4_asm(ORI, r0, r0, 111)
-   m4_asm(CSRRW, r0, r7, 100000000010) //write(8002)
-   m4_asm(CSRRW, r0, r3, 100000000011) //tail(8003)
-
-   //m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
-   //m4_asm(ORI, r0, r0, 111)
-   //m4_asm(ORI, r0, r0, 111)
-   //m4_asm(ORI, r0, r0, 111)
-   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   //m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   //m4_asm(CSRRS, r8, r0, 100000001011) //rd      
-   m4_asm(ADDI, r6, r6, 100)     //     
-   //m4_asm(ADDI, r6, r6, 100)     //  
-   //m4_asm(BLT, r1, r2, 1111111110000) //  
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r11, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
+   //m4_asm(ORI, r0, r0, 0)
+   
+   m4_asm(CSRRW, r0, r12, 100000000010) //wr(8002)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r13, 100000000010) //wr(8002)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r25, 100000000011) //tail(8003)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(CSRRS, r11, r0, 100000001000) //read_vc(8008)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   
+   
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   m4_asm(CSRRW, r0, r11, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r13, 100000000010) //wr(8002)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r25, 100000000011) //tail(8003)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(CSRRS, r11, r0, 100000001000) //read_vc(8008)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   //m4_asm(CSRRS, r20, r0, 100000001011) //rd 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   
 
 \TLV riscv_divmul_test_prog()
    // /==========================\
@@ -1234,29 +1259,66 @@ m4+definitions(['
    // \==========================/
    //
    //3 MULs followed by 3 DIVs, check r11-r15 for correct results
-
-   m4_asm(ORI, r3, r0, 11)        //     store_addr = 0
-   m4_asm(ORI, r1, r0, 1) 
-   m4_asm(ORI, r6, r0, 110)        //     cnt = 1
-   m4_asm(ORI, r7, r0, 111)
-   m4_asm(ORI, r8, r0, 1000) 
-   m4_asm(CSRRS, r0, r1, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1]
-   //m4_asm(CSRRS, r8, r0, 100000001011) pktrd
-   //m4_asm(CSRRS, r3, r0, 100000001010) pktcomp
-   //m4_asm(CSRRW, r0, r1, 100000000100) pktctrl
-   m4_asm(CSRRS, r1, r0, 100000001000) // vcrd / vc[0]
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r30, r0, 101101)
+   m4_asm(ORI, r16, r0, 10000)
+   m4_asm(ORI, r25, r0, 11001)
+   m4_asm(ORI, r20, r0, 10100)
+   m4_asm(ORI, r12, r0, 1100)
+   m4_asm(ORI, r11, r0, 1)
+   m4_asm(ORI, r13, r0, 1101)
+   m4_asm(ORI, r18, r0, 10010)
    
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   m4_asm(CSRRS, r8, r0, 100000001011) //rd 
-   //m4_asm(CSRRS, r8, r0, 100000001011) //rd      
-   
-   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   m4_asm(CSRRW, r0, r11, 100000001000) //read_vc(8008)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRS, r11, r0, 100000001000) //read_vc(8008)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRS, r25, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r25, r0, 100000001011) //rd 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   m4_asm(CSRRW, r0, r11, 100000001000) //read_vc(8008)
+   //m4_asm(CSRRW, r0, r11, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r20, 100000000011) //tail(8003)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   m4_asm(CSRRW, r0, r11, 100000001000) //read_vc(8008)
+   //m4_asm(CSRRS, r11, r0, 100000001000) //read_vc(8008)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRS, r18, r0, 100000001011) //rd 
+   m4_asm(CSRRS, r18, r0, 100000001011) //rd 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r0, 100000000000) //dest(8000), "0" for Core-0  and "1" for Core-1 to be sender
+   m4_asm(CSRRW, r0, r0, 100000000001) //write_vc(8001) [0]
+   m4_asm(CSRRW, r0, r11, 100000001000) //read_vc(8008)
+   //m4_asm(CSRRW, r0, r11, 100000001000) // read_vc(8008) "1" for /vc[0] and "10" for /vc[1] 
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(CSRRW, r0, r20, 100000000011) //tail(8003)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ANDI, r16, r18, 101101)
+   //m4_asm(BNE, r30, r16, 1111111110000) //     TERMINATE by branching to -1
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   //m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
+   m4_asm(ORI, r0, r0, 0)
 
 \TLV riscv_fpu_test_prog()
    // /==========================\
@@ -1349,16 +1411,21 @@ m4+definitions(['
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
       logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
-      assign instrs = (#core == 1'b0) ? '{ 
-           m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
-           } : '{ 
-                       {12'b11, 5'd0, 3'b110, 5'd3, 7'b0010011}, {12'b1, 5'd0, 3'b110, 5'd1, 7'b0010011}, {12'b110, 5'd0, 3'b110, 5'd6, 7'b0010011}, {12'b111, 5'd0, 3'b110, 5'd7, 7'b0010011}, {12'b1000, 5'd0, 3'b110, 5'd8, 7'b0010011}, {12'b100000001000, 5'd1, 3'b010, 5'd0, 7'b1110011}, {12'b100000001000, 5'd0, 3'b010, 5'd1, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd8, 7'b1110011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}, {12'b100, 5'd6, 3'b000, 5'd6, 7'b0010011}
-                       };
+      assign instrs = '{
+        m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
+       };
+      //assign instrs = (#core == 1'b0) ? '{ 
+      //     m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
+      //     } : '{ 
+      //     {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b101101, 5'd0, 3'b110, 5'd30, 7'b0010011}, {12'b10000, 5'd0, 3'b110, 5'd16, 7'b0010011}, {12'b11001, 5'd0, 3'b110, 5'd25, 7'b0010011}, {12'b10100, 5'd0, 3'b110, 5'd20, 7'b0010011}, {12'b1100, 5'd0, 3'b110, 5'd12, 7'b0010011}, {12'b1, 5'd0, 3'b110, 5'd11, 7'b0010011}, {12'b1101, 5'd0, 3'b110, 5'd13, 7'b0010011}, {12'b10010, 5'd0, 3'b110, 5'd18, 7'b0010011}, {12'b100000000000, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000000001, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000001000, 5'd11, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000001011, 5'd0, 3'b010, 5'd25, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd25, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000000000, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000000001, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000001000, 5'd11, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000000011, 5'd20, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000000000, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000000001, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000001000, 5'd11, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000001011, 5'd0, 3'b010, 5'd18, 7'b1110011}, {12'b100000001011, 5'd0, 3'b010, 5'd18, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000000000, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000000001, 5'd0, 3'b001, 5'd0, 7'b1110011}, {12'b100000001000, 5'd11, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b100000000011, 5'd20, 3'b001, 5'd0, 7'b1110011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}, {12'b101101, 5'd18, 3'b111, 5'd16, 7'b0010011}, {12'b0, 5'd0, 3'b110, 5'd0, 7'b0010011}
+      //     };
       // String representations of the instructions for debug.
-      assign instr_strs = (#core == 1'b0) ? '{
-           m4_asm_mem_expr "END "} : '{
-                        "(I) ORI r3,r0,11                        ",  "(I) ORI r1,r0,1                         ",  "(I) ORI r6,r0,110                       ",  "(I) ORI r7,r0,111                       ",  "(I) ORI r8,r0,1000                      ",  "(I) CSRRS r0,r1,100000001000            ",  "(I) CSRRS r1,r0,100000001000            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) CSRRS r8,r0,100000001011            ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "(I) ADDI r6,r6,100 ",  "END "};
-           
+      assign instr_strs = '{
+        m4_asm_mem_expr "END "};
+     // assign instr_strs = (#core == 1'b0) ? '{
+     //     m4_asm_mem_expr "END "} : '{
+     // "(I) ORI r0,r0,0                         ",  "(I) ORI r30,r0,101101                   ",  "(I) ORI r16,r0,10000                    ",  "(I) ORI r25,r0,11001                    ",  "(I) ORI r20,r0,10100                    ",  "(I) ORI r12,r0,1100                     ",  "(I) ORI r11,r0,1                        ",  "(I) ORI r13,r0,1101                     ",  "(I) ORI r18,r0,10010                    ",  "(I) CSRRW r0,r0,100000000000            ",  "(I) CSRRW r0,r0,100000000001            ",  "(I) CSRRW r0,r11,100000001000           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRS r25,r0,100000001011           ",  "(I) CSRRS r25,r0,100000001011           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRW r0,r0,100000000000            ",  "(I) CSRRW r0,r0,100000000001            ",  "(I) CSRRW r0,r11,100000001000           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRW r0,r20,100000000011           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRW r0,r0,100000000000            ",  "(I) CSRRW r0,r0,100000000001            ",  "(I) CSRRW r0,r11,100000001000           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRS r18,r0,100000001011           ",  "(I) CSRRS r18,r0,100000001011           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRW r0,r0,100000000000            ",  "(I) CSRRW r0,r0,100000000001            ",  "(I) CSRRW r0,r11,100000001000           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) CSRRW r0,r20,100000000011           ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ORI r0,r0,0                         ",  "(I) ANDI r16,r18,101101                 ",  "(I) ORI r0,r0,0                         ", "END "};
+                                          
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -3231,7 +3298,7 @@ m4+definitions(['
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             $passed = ! $reset && $ReachedEnd && $Reg4Became45;
-            $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
+            $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
    // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
@@ -3327,9 +3394,10 @@ m4+definitions(['
             $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$push_blocked;
          @1
             $valid_pkt_wr = $is_pkt_wr && $commit;
-            $insert_header = |egress_in/skid_buffer$is_pkt_wr && ! $InPacket;
-            // Assert after inserting header up to insertion of tail.
-            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$is_csr_pkttail && ! |egress_in/skid_buffer$push_blocked));
+            $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
+            $insert_header = |egress_in/skid_buffer$valid_pkt_wr && ! $InPacket;            // Assert after inserting header up to insertion of tail.
+            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail
+                         && ! |egress_in/skid_buffer$push_blocked));
       @1
 
          /skid_buffer
@@ -3337,7 +3405,9 @@ m4+definitions(['
             // Hold the write if blocked, including the write of the header in separate signals.
             // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
             // Note that signals in this scope are captured versions reflecting the flit and its producing instruction.
-            $push_blocked = $valid_pkt_wr && (/_cpu/vc[$csr_pktwrvc]|egress_in$blocked || ! |egress_in/instr$InPacket);
+            //$push_blocked = $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked);
+            $push_blocked = $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked ||
+                            ! |egress_in/instr$InPacket);
             // Header
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
@@ -3349,7 +3419,7 @@ m4+definitions(['
          /flit
              // TODO. ADD a WHEN condition.
             {$tail, $flit[M4_WORD_RANGE]} = |egress_in/instr$insert_header ? {1'b0, |egress_in/skid_buffer$header_flit} :
-                                                                             {|egress_in/skid_buffer$is_csr_pkttail, |egress_in/skid_buffer$csr_wr_value};
+                                                                             {|egress_in/skid_buffer$valid_pkt_tail, |egress_in/skid_buffer$csr_wr_value};
    /vc[*]
       |egress_in
          @1
@@ -3373,6 +3443,11 @@ m4+definitions(['
    //      - CSR mux and result MUX
    |fetch
       /instr
+         @M4_EXECUTE_STAGE
+            $csr_core = #core;
+   
+   |fetch
+      /instr
          // Data from VC_FIFO is made available by the end of |ingress_out@-1(arb/byp) == M4_EXECUTE_STAGE-1
          // reflecting prior-prior!-stage PKTRDVCS
          // so it can be captured in PKTRD and used by M4_EXECUTE_STAGE (== |ingress_out@0(out))
@@ -3387,13 +3462,28 @@ m4+definitions(['
          // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
          /instr
             $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;
-         $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
+         ///test
+         //   $comm1 = /_cpu|fetch/instr>>3$commit || /_cpu|fetch/instr>>4$commit || /_cpu|fetch/instr>>5$commit || /_cpu|fetch/instr>>6$commit;
+         $is_pktrd = /instr$is_csr_set && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
-         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+         //$do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+         $wrong = (! >>2$is_pktrd && >>1$is_pktrd && (| /flit>>1$flit));
+         $wrongtt = $wrong || >>1$wrong || >>2$wrong || >>3$wrong;
+         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed && ( $wrongtt);
       @0
          // Replay for PKTRD with no data read.
+         //$pktrd_blocked = $is_pktrd && ! $trans_valid && ! /_cpu/vc[0]|ingress_out$blocked;
          $pktrd_blocked = $is_pktrd && ! $trans_valid;
+         /*
+            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$push_blocked;
+         @1
+            $valid_pkt_wr = $is_pkt_wr && $commit;
+            $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
+            $insert_header = |egress_in/skid_buffer$valid_pkt_wr && ! $InPacket;            // Assert after inserting header up to insertion of tail.
+            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail
+                         && ! |egress_in/skid_buffer$push_blocked));
+         */
    /vc[*]
       |ingress_out
          @-1
@@ -3407,7 +3497,9 @@ m4+definitions(['
       |ingress_in
          @0
             $vc_match = /_cpu|rg_arriving>>m4_align(0, 0)$vc == #vc;
-            $vc_trans_valid = /_cpu|ingress_in$trans_valid && $vc_match;
+            //$vc_trans_valid = /_cpu|ingress_in$trans_valid && $vc_match;
+            $vc_trans_valid = /_cpu|ingress_in$trans_valid && /_cpu|ingress_in/arriving$body && $vc_match;
+
    |ingress_in
       @0
          /arriving
@@ -3421,8 +3513,8 @@ m4+definitions(['
       |egress_out
          @0
             // Per-VC backpressure from NoC.
-            $has_credit = ! /_cpu|egress_out$blocked &&   // propagate blocked
-                          (! /_cpu|egress_out$body || (/_cpu|egress_out$body_vc == #vc));   // avoid interleaving packets
+            $has_credit = ((! /_cpu|egress_out$blocked) &&   // propagate blocked
+                          ((! /_cpu|egress_out$body) || (/_cpu|egress_out$body_vc == #vc))) || (*cyc_cnt >= 49 && *cyc_cnt <= 51);   // avoid interleaving packets
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
    |egress_out
       @-1
@@ -3695,6 +3787,10 @@ m4+module_def
 \TLV cpu_viz()
    m4+indirect(M4_isa['_viz_logic'])
    |fetch
+      @2
+         /instr
+            m4_define(['M4_COREOFFSET'],750)
+            $core_index = #core;
       @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
             \viz_alpha
@@ -3708,15 +3804,17 @@ m4+module_def
                      m4_ifelse_block_tmp(['                     '], M4_ISA, ['MINI'], ['
                         let instr_str = '$instr'.goTo(0).asString();
                      '], M4_ISA, ['RISCV'], ['
-                        let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
+                        //let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
+                        let instr_str = '$instr_str'.asString();
                      '], M4_ISA, ['MIPSI'], ['
                         let instr_str = '$instr'.asBinaryStr(NaN);
                      '], ['
                         let instr_str = '$instr'.goTo(0).asString();
                      '])
                      this.getCanvas().add(new fabric.Text(instr_str, {
-                        top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
-                        left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+                        top: (18 * this.getIndex()) - 900 ,  // TODO: Add support for '#instr_mem'.
+                        //left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+                        left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -280, ['MIPSI'], -580, ['DUMMY'], 20),
                         fontSize: 14,
                         fontFamily: "monospace"
                      }));
@@ -3730,13 +3828,15 @@ m4+module_def
                   //
                   // PC instr_mem pointer
                   //
+                  let core_index = this.getScope("core").index;
                   let $Pc = '$Pc';
-                  let color = !('$commit'.asBool()) ? "gray" :
+                  let color = !('$commit'.asBool())    ? "gray" :
                               '$abort'.asBool()        ? "red" :
+                              ('$core_index'.asBool() != 0) ? "orange" :
                                                          "blue";
                   let pcPointer = new fabric.Text("->", {
-                     top: 18 * $Pc.asInt(),
-                     left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
+                     top: 18 * $Pc.asInt() - 900,
+                     left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -300, ['MIPSI'], -600, ['DUMMY'], 0),
                      fill: color,
                      fontSize: 14,
                      fontFamily: "monospace"
@@ -3792,7 +3892,7 @@ m4+module_def
                   '], ['
                   '])
                   let instrWithValues = new fabric.Text(str, {
-                     top: 70,
+                     top: 70 + (140 * ('$core_offset'.asBool())) - 900,
                      left: 90,
                      fill: color,
                      fontSize: 14,
@@ -3806,16 +3906,16 @@ m4+module_def
             
             /regs[M4_REGS_RANGE]  // TODO: Fix [*]
                \viz_alpha
-                   
                   initEach: function() {
+                     let core_index = this.getScope("core").index;
                      let regname = new fabric.Text("Integer", {
-                           top: -20,
+                           top: -20 + (M4_COREOFFSET * core_index) - 900,
                            left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
                            fontSize: 14,
                            fontFamily: "monospace"
                         });
                      let reg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
+                        top: (18 * this.getIndex()) + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
@@ -3836,38 +3936,39 @@ m4+module_def
             /regcsr
                \viz_alpha
                   initEach: function() {
+                  let core_index = this.getScope("core").index;
                      let cycle = new fabric.Text("", {
-                        top: 18 * 33,
+                        top: 18 * 33 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let cycleh = new fabric.Text("", {
-                        top: 18 * 34,
+                        top: 18 * 34 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let time = new fabric.Text("", {
-                        top: 18 * 35,
+                        top: 18 * 35 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let timeh = new fabric.Text("", {
-                        top: 18 * 36,
+                        top: 18 * 36 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let instret = new fabric.Text("", {
-                        top: 18 * 37,
+                        top: 18 * 37 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let instreth = new fabric.Text("", {
-                        top: 18 * 38,
+                        top: 18 * 38 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
@@ -3922,14 +4023,15 @@ m4+module_def
             /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
                \viz_alpha
                   initEach: function() {
+                  let core_index = this.getScope("core").index;
                      let regname = new fabric.Text("Floating Point", {
-                              top: -20,
+                              top: -20 + (M4_COREOFFSET * core_index) - 900,
                               left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 225, ['MIPSI'], 375, ['DUMMY'], 175),
                               fontSize: 14,
                               fontFamily: "monospace"
                            });
                      let fpureg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
+                        top: 18 * this.getIndex() + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
@@ -3950,20 +4052,21 @@ m4+module_def
             /fpucsr
                \viz_alpha
                   initEach: function() {
+                  let core_index = this.getScope("core").index;
                      let fcsr = new fabric.Text("", {
-                        top: 18 * 33,
+                        top: 18 * 33 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let frm = new fabric.Text("", {
-                        top: 18 * 34,
+                        top: 18 * 34 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
                      });
                      let fflags = new fabric.Text("", {
-                        top: 18 * 35,
+                        top: 18 * 35 + (M4_COREOFFSET * core_index) - 900,
                         left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
                         fontSize: 14,
                         fontFamily: "monospace"
@@ -3994,26 +4097,26 @@ m4+module_def
                      this.getInitObject("fflags").setFill( fflagsmod ? "blue" : "black");
                   }
                '])
-
             /bank[M4_ADDRS_PER_WORD-1:0]
                /mem[M4_DATA_MEM_WORDS_RANGE]
                   \viz_alpha
                      initEach: function() {
+                     let core_index = this.getScope("core").index;
                         let regname = new fabric.Text("Data Memory", {
-                                 top: -20,
+                                 top: -20 + (M4_COREOFFSET * core_index) - 900,
                                  left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + this.getScope("bank").index * 30 + 30,
                                  fontSize: 14,
                                  fontFamily: "monospace"
                               });
                         let data = new fabric.Text("", {
-                           top: 18 * this.getIndex(),
+                           top: 18 * this.getIndex() + (M4_COREOFFSET * core_index) - 900,
                            left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30 + 30,
                            fontSize: 14,
                            fontFamily: "monospace"
                         });
                         let index = (this.getScope("bank").index != 0) ? null :
                            new fabric.Text("", {
-                              top: 18 * this.getIndex(),
+                              top: 18 * this.getIndex() + (M4_COREOFFSET * core_index) - 900,
                               left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30,
                               fontSize: 14,
                               fontFamily: "monospace"
@@ -4032,7 +4135,6 @@ m4+module_def
                         this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString() + oldValStr);
                         this.getInitObject("data").setFill(mod ? "blue" : "black");
                      }
-
 
 
 
