@@ -2612,7 +2612,10 @@ m4+definitions(['
             $wait_for_mem[7:0] = $mem_valid && ~>>1$mem_valid  ?  1'b1 :
                                  $mem_valid && >>1$mem_valid   ?  >>1$wait_for_mem + 1'b1 :
                                                                   1'b0 ;
-            $mem_op = $valid_st || $spec_ld;
+
+            //$mem_op = $valid_st || $spec_ld;
+            $mem_op = $valid_st || $valid_ld;
+
             $mem_ready = >>8$mem_op;
 
             \SV_plus
@@ -3152,7 +3155,7 @@ m4+definitions(['
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             // TODO : Variable latency memory!
-            $second_issue_ld = m4_ifelse_block(M4_EXTERNAL_MEMORY, 1, ['
+            $second_issue_ld  =  m4_ifelse_block(M4_EXTERNAL_MEMORY, 1, ['
                                  /_cpu|mem/data>>M4_LD_RETURN_ALIGN$mem_ready'], ['
                                  /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD
                                  ']);
