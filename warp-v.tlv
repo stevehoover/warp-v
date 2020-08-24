@@ -309,6 +309,7 @@ m4+definitions(['
                                               // can be enabled manually for testing in Makerchip environment.
 
    m4_default(['M4_OPENPITON'], 0)            // 1 to generate interface for Openpiton,  For openpiton transducer
+   m4_default(['M4_EXTERNAL_MEMORY'], 1)
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -2545,12 +2546,63 @@ m4+definitions(['
 // A fake memory with fixed latency.
 // The memory is placed in the fetch pipeline.
 // TODO: (/_cpu, @_mem, @_align)
+\SV
+   module dmem_ext #(parameter SIZE = 1024, ADDR_WIDTH = 10, COL_WIDTH = 8, NB_COL	= 4) (
+         input    clk,
+         input    mem_valid,
+         input    mem_instr,
+         output   mem_ready,
+         input    [NB_COL*COL_WIDTH-1:0]  mem_addr,
+         input    [NB_COL*COL_WIDTH-1:0]  mem_wdata,
+         input    [NB_COL-1:0]            mem_wstrb,
+         output   [NB_COL*COL_WIDTH-1:0]  mem_rdata
+      );
+         //
+         assign mem_ready = 1'b1;
+         reg [NB_COL*COL_WIDTH-1:0] outputreg;   
+         reg [NB_COL*COL_WIDTH-1:0] RAM [SIZE-1:0];
+         //
+         always @(posedge clk) begin
+            if(mem_ready && mem_wstrb=='0) begin      //checking wstrb might be optional here
+               outputreg <= RAM[mem_addr];
+            end
+         end
+         //
+         assign mem_rdata = outputreg;
+         //
+         wire valid_write_locn;
+         assign valid_write_locn =  (mem_wstrb == 4'b1111) ||
+                                    (mem_wstrb == 4'b1100) ||
+                                    (mem_wstrb == 4'b0011) ||
+                                    (mem_wstrb == 4'b1000) ||
+                                    (mem_wstrb == 4'b0100) ||
+                                    (mem_wstrb == 4'b0010) ||
+                                    (mem_wstrb == 4'b0001) ;
+         //
+         generate
+               genvar i;
+               for (i = 0; i < NB_COL; i = i+1) begin
+               always @(posedge clk) begin 
+                  if (mem_valid && mem_wstrb[i] && valid_write_locn) 
+                     RAM[mem_addr][(i+1)*COL_WIDTH-1:i*COL_WIDTH] <= mem_wdata[(i+1)*COL_WIDTH-1:i*COL_WIDTH];
+                  end
+               end
+         endgenerate        
+   endmodule
 
 \TLV verilog_fake_memory(/_cpu, M4_ALIGNMENT_VALUE, $_valid, $_addr, $_wstrb, $_wdata, $_amo_op, $_ready, $_rdata)
    |fetch
       /instr
          @M4_MEM_WR_STAGE
-            $clk = *clk;
+            $mem_valid = $valid_st || $spec_ld;
+            $mem_ready = $random;
+
+            $wait_for_mem[7:0] = $mem_valid ? 1'b1 :
+                                 $mem_ready ? 1'b0 :
+                                 >>1$wait_for_mem + 1'b1;
+            
+            $no_fetch_mem  =  $wait_for_mem ;
+
             \SV_plus
                dmem_ext #(
                      .SIZE(M4_DATA_MEM_WORDS_HIGH), 
@@ -2559,13 +2611,14 @@ m4+definitions(['
                      .NB_COL(M4_ADDRS_PER_WORD)
                      )
                dmem_ext (
-                     .clk     ($clk),
-                     .valid_st($valid_st),
-                     .spec_ld ($spec_ld),
-                     .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
-                     .we      ($st_mask),
-                     .din     ($st_value), 
-                     .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
+                     .clk        (*clk),
+                     .mem_valid  ($mem_valid),
+                     .mem_instr  (),
+                     .mem_ready  ($$mem_ready_verilog),
+                     .mem_addr   ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
+                     .mem_wstrb  ($st_mask),
+                     .mem_wdata  ($st_value), 
+                     .mem_rdata  (<<1$$ld_value[31:0]) // TODO : use >>1
                      );
 
    |mem
@@ -3085,7 +3138,8 @@ m4+definitions(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            $second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
+            // TODO : Variable latency memory!
+            $second_issue_ld = m4_ifelse(['M4_EXTERNAL_MEMORY'], 1, ['/_cpu|mem/data$mem_ready'], ['/_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD']);
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']);
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
@@ -3222,7 +3276,7 @@ m4+definitions(['
             // =======
             
             // Execute stage redirect conditions.
-            $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']);
+            $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXTERNAL_MEMORY, 1, ['|| $mem_valid']);
             $replay_trap = m4_cpu_blocked;
             $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
@@ -3270,8 +3324,10 @@ m4+definitions(['
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
-   //m4+verilog_fake_memory(/_cpu, 0)
-   m4+fixed_latency_fake_memory(/_cpu, 0)
+   /* verilator lint_off WIDTH */
+   m4+verilog_fake_memory(/_cpu, 0)
+   /* verilator lint_on WIDTH */
+   // m4+fixed_latency_fake_memory(/_cpu, 0)
    |fetch
       /instr
          @M4_REG_WR_STAGE
