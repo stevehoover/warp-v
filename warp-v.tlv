@@ -276,7 +276,7 @@ m4+definitions(['
    // ISA:
    m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
    // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_default(['M4_STANDARD_CONFIG'], ['1-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
    
    // A multi-core implementation (currently RISC-V only) should:
    //   m4_define_hier(['M4_CORE'], #)
@@ -309,7 +309,7 @@ m4+definitions(['
                                               // can be enabled manually for testing in Makerchip environment.
 
    m4_default(['M4_OPENPITON'], 0)            // 1 to generate interface for Openpiton,  For openpiton transducer
-   m4_default(['M4_EXTERNAL_MEMORY'], 0)
+   m4_default(['M4_EXTERNAL_MEMORY'], 1)
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -430,7 +430,7 @@ m4+definitions(['
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
+            (['M4_EXT_M'], 0),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -741,7 +741,7 @@ m4+definitions(['
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1'],
+      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, m4_ifelse(M4_EXTERNAL_MEMORY, 0, ['$second_issue_ld ? $Pc :'])$pc_inc, 1'],
       ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
       m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
       ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
@@ -1693,8 +1693,8 @@ m4+definitions(['
       `BOGUS_USE($mnemonic)
    // Condition signals must not themselves be conditioned (currently).
    $dest_reg[M4_REGS_INDEX_RANGE] =  $second_issue_ld  ?  |fetch/instr/orig_inst$dest_reg :
-                                 m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :']) 
-                                                      $raw_rd;
+        m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ?  |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :']) 
+                                                          $raw_rd;
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -2551,19 +2551,30 @@ m4+definitions(['
          input    clk,
          input    mem_valid,
          input    mem_instr,
-         output   mem_ready,
+         //output   mem_ready,
+         input    mem_ready,
          input    [NB_COL*COL_WIDTH-1:0]  mem_addr,
          input    [NB_COL*COL_WIDTH-1:0]  mem_wdata,
          input    [NB_COL-1:0]            mem_wstrb,
          output   [NB_COL*COL_WIDTH-1:0]  mem_rdata
       );
          //
-         assign mem_ready = 1'b1;
+         //assign mem_ready = 1'b1;
+      	reg [31:0] counter;
+      	always @(posedge clk) begin
+            //if(reset)
+//               counter <= 0;
+//            else
+            	counter <= counter + 1'b1;
+         end
+      	/* verilator lint_off WIDTH */
+         //assign mem_ready = (counter % 2 == 0);
+      	/* verilator lint_on WIDTH */
          reg [NB_COL*COL_WIDTH-1:0] outputreg;   
          reg [NB_COL*COL_WIDTH-1:0] RAM [SIZE-1:0];
          //
          always @(posedge clk) begin
-            if(mem_ready && mem_wstrb=='0) begin      //checking wstrb might be optional here
+            if(mem_ready) begin      //checking wstrb might be optional here
                outputreg <= RAM[mem_addr];
             end
          end
@@ -2594,14 +2605,15 @@ m4+definitions(['
    |fetch
       /instr
          @M4_MEM_WR_STAGE
-            $mem_valid = $valid_st || $spec_ld;
-            // $mem_ready = $random;
+            $mem_valid  =  ($valid_st || $spec_ld)             ?  1'b1 :
+                           (!>>1$mem_ready && >>1$mem_valid)   ?  1'b1 :
+                                                                  1'b0 ;
 
-            // $wait_for_mem[7:0] = $mem_valid ? 1'b1 :
-            //                      $mem_ready ? 1'b0 :
-            //                      >>1$wait_for_mem + 1'b1;
-            
-            // $no_fetch_mem  =  $wait_for_mem ;
+            $wait_for_mem[7:0] = $mem_valid && ~>>1$mem_valid  ?  1'b1 :
+                                 $mem_valid && >>1$mem_valid   ?  >>1$wait_for_mem + 1'b1 :
+                                                                  1'b0 ;
+            $mem_op = $valid_st || $spec_ld;
+            $mem_ready = >>8$mem_op;
 
             \SV_plus
                dmem_ext #(
@@ -2614,7 +2626,8 @@ m4+definitions(['
                      .clk        (*clk),
                      .mem_valid  ($mem_valid),
                      .mem_instr  (),
-                     .mem_ready  ($$mem_ready_verilog),
+                     //.mem_ready  ($$mem_ready_ver),
+                     .mem_ready  ($mem_ready),
                      .mem_addr   ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
                      .mem_wstrb  ($st_mask),
                      .mem_wdata  ($st_value), 
@@ -3139,8 +3152,8 @@ m4+definitions(['
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             // TODO : Variable latency memory!
-            $second_issue_ld = m4_ifelse_block(['M4_EXTERNAL_MEMORY'], 1, ['
-                                 /_cpu|mem/data$mem_ready'], ['
+            $second_issue_ld = m4_ifelse_block(M4_EXTERNAL_MEMORY, 1, ['
+                                 /_cpu|mem/data>>M4_LD_RETURN_ALIGN$mem_ready'], ['
                                  /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD
                                  ']);
             //$second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
@@ -3280,7 +3293,7 @@ m4+definitions(['
             // =======
             
             // Execute stage redirect conditions.
-            $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXTERNAL_MEMORY, 1, ['|| $mem_valid']);
+            $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXTERNAL_MEMORY, 1, ['|| $ld_st']);
             $replay_trap = m4_cpu_blocked;
             $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
