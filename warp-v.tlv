@@ -2616,7 +2616,7 @@ m4+definitions(['
             //$mem_op = $valid_st || $spec_ld;
             $mem_op = $valid_st || $valid_ld;
 
-            $mem_ready = >>8$mem_op;
+            $mem_ready = >>4$mem_op;
 
             \SV_plus
                dmem_ext #(
