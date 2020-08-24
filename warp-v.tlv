@@ -309,7 +309,7 @@ m4+definitions(['
                                               // can be enabled manually for testing in Makerchip environment.
 
    m4_default(['M4_OPENPITON'], 0)            // 1 to generate interface for Openpiton,  For openpiton transducer
-   m4_default(['M4_EXTERNAL_MEMORY'], 1)
+   m4_default(['M4_EXTERNAL_MEMORY'], 0)
 
    // A hook for a software-controlled reset. None by default.
    m4_define(['m4_soft_reset'], 1'b0)
@@ -2595,13 +2595,13 @@ m4+definitions(['
       /instr
          @M4_MEM_WR_STAGE
             $mem_valid = $valid_st || $spec_ld;
-            $mem_ready = $random;
+            // $mem_ready = $random;
 
-            $wait_for_mem[7:0] = $mem_valid ? 1'b1 :
-                                 $mem_ready ? 1'b0 :
-                                 >>1$wait_for_mem + 1'b1;
+            // $wait_for_mem[7:0] = $mem_valid ? 1'b1 :
+            //                      $mem_ready ? 1'b0 :
+            //                      >>1$wait_for_mem + 1'b1;
             
-            $no_fetch_mem  =  $wait_for_mem ;
+            // $no_fetch_mem  =  $wait_for_mem ;
 
             \SV_plus
                dmem_ext #(
@@ -3139,7 +3139,11 @@ m4+definitions(['
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
             // TODO : Variable latency memory!
-            $second_issue_ld = m4_ifelse(['M4_EXTERNAL_MEMORY'], 1, ['/_cpu|mem/data$mem_ready'], ['/_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD']);
+            $second_issue_ld = m4_ifelse_block(['M4_EXTERNAL_MEMORY'], 1, ['
+                                 /_cpu|mem/data$mem_ready'], ['
+                                 /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD
+                                 ']);
+            //$second_issue_ld = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD;
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']);
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
