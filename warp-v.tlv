@@ -3340,6 +3340,7 @@ m4+definitions(['
             '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
+            `BOGUS_USE($valid_ld $valid_st)
 
    /* verilator lint_off WIDTH */
    m4+verilog_fake_memory(/_cpu, 0)
