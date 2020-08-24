@@ -1796,7 +1796,7 @@ m4+definitions(['
       //$din_valid_rvb_crc = ($is_crc32b_instr || $is_crc32h_instr || $is_crc32w_instr || $is_crc32d_instr || $is_crc32cb_instr || $is_crc32ch_instr || $is_crc32cw_instr || $is_crc32cd_instr) && |fetch/instr$commit;
       $din_valid_rvb_crc = ($is_crc32b_instr || $is_crc32h_instr || $is_crc32w_instr || $is_crc32cb_instr || $is_crc32ch_instr || $is_crc32cw_instr) && |fetch/instr$commit;
       //$din_valid_rvb_shifter = ($is_fsl_instr || $is_fsr_instr || $is_fsri_instr) && |fetch/instr$commit;
-      $din_valid_rvb_shifter = ($is_ror_instr || $is_rori_instr || $is_rol_instr) && |fetch/instr$commit;
+      //$din_valid_rvb_shifter = ($is_ror_instr || $is_rori_instr || $is_rol_instr) && |fetch/instr$commit;
       $din_valid_rvb_bitcnt = ($is_pcnt_instr || $is_sextb_instr || $is_sexth_instr) && |fetch/instr$commit;
       
       m4+clz_final(|fetch/instr, /clz_stage, 32, 0, 1, $input_a, $clz_final_output)
@@ -1824,23 +1824,24 @@ m4+definitions(['
       m4+sro($input_a, $input_b, $sro_output, 32)
       m4+sloi($input_a, $input_b, $sloi_output, 32)
       m4+sroi($input_a, $input_b, $sroi_output, 32)
-      //m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
-      //m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
-      //m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
+      m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
+      m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
+      m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
       m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $din_insn3, $din_insn13, $din_insn14, $din_insn29, $din_insn30, $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
       m4+bfp($input_a, $input_b, $bfp_output, 32)
       m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $din_insn3, $din_insn12, $din_insn13, $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
       m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $din_insn20, $din_insn21, $din_insn23, $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
       //m4+cmix($input_a, $input_b, $input_c, $cmix_output, 32)
       //m4+cmov($input_a, $input_b, $input_c, $cmov_output, 32)
-      m4+rvb_shifter(1, |fetch/instr, 32, 1, 1, $bmi_clk, $bmi_reset, $din_valid_rvb_shifter, $din_ready_rvb_shifter, $input_a, $input_b, $input_c, $din_insn3, $din_insn13, $din_insn14, $din_insn26, $din_insn27, $din_insn29, $din_insn30, $dout_valid_rvb_shifter, $dout_ready_rvb_shifter, $rvb_shifter_output[31:0])
+      //m4+rvb_shifter(1, |fetch/instr, 32, 1, 1, $bmi_clk, $bmi_reset, $din_valid_rvb_shifter, $din_ready_rvb_shifter, $input_a, $input_b, $input_c, $din_insn3, $din_insn13, $din_insn14, $din_insn26, $din_insn27, $din_insn29, $din_insn30, $dout_valid_rvb_shifter, $dout_ready_rvb_shifter, $rvb_shifter_output[31:0])
       m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $din_insn3, $din_insn20, $din_insn21, $din_insn22, $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
       /* verilator lint_on WIDTH */
       /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on PINMISSING */
       /* verilator lint_on CASEOVERLAP */
 
-      `BOGUS_USE($din_ready_rvb_bitcnt $din_ready_rvb_shifter $din_ready_bext_dep $din_ready_rvb_crc $din_ready_clmul)
+      //`BOGUS_USE($din_ready_rvb_bitcnt $din_ready_rvb_shifter $din_ready_bext_dep $din_ready_rvb_crc $din_ready_clmul)
+      `BOGUS_USE($din_ready_rvb_bitcnt $din_ready_bext_dep $din_ready_rvb_crc $din_ready_clmul)
       '])
 
       // hold_inst scope is not needed when long latency instructions are disabled
@@ -2104,7 +2105,7 @@ m4+definitions(['
          // Operands
          $input_a[31:0] = /src[1]$reg_value;
          $input_b[31:0] = $is_src_type_instr ? /src[2]$reg_value : $raw_i_imm;
-         $input_c[31:0] = /src[1]$reg_value; //This is needed for rvb_shifter_output
+         //$input_c[31:0] = /src[1]$reg_value; //This is needed for rvb_shifter_output
          
          $sftamt[4:0] = $input_b[4:0];
          $din_insn3   = |fetch/instr$raw[3];
@@ -2127,28 +2128,28 @@ m4+definitions(['
          $xnor_rslt[M4_WORD_RANGE]   = $xnor_output;
          $slo_rslt[M4_WORD_RANGE]    = $slo_output;
          $sro_rslt[M4_WORD_RANGE]    = $sro_output;
-         $rol_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
-         $ror_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
-         //$rol_rslt[M4_WORD_RANGE]    = $rorl_final_output;
-         //$ror_rslt[M4_WORD_RANGE]    = $rorr_final_output;
+         //$rol_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
+         //$ror_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
+         $rol_rslt[M4_WORD_RANGE]    = $rorl_final_output;
+         $ror_rslt[M4_WORD_RANGE]    = $rorr_final_output;
          $sbclr_rslt[M4_WORD_RANGE]  = $sbclr_output;
          $sbset_rslt[M4_WORD_RANGE]  = $sbset_output;
          $sbinv_rslt[M4_WORD_RANGE]  = $sbinv_output;
          $sbext_rslt[M4_WORD_RANGE]  = $sbext_output;
          $gorc_rslt[M4_WORD_RANGE]   = $bext_dep_output;
-         $grev_rslt[M4_WORD_RANGE]   = $bext_dep_output;
-         //$grev_rslt[M4_WORD_RANGE]   = $grev_final_output;
+         //$grev_rslt[M4_WORD_RANGE]   = $bext_dep_output;
+         $grev_rslt[M4_WORD_RANGE]   = $grev_final_output;
          $sloi_rslt[M4_WORD_RANGE]   = $sloi_output;
          $sroi_rslt[M4_WORD_RANGE]   = $sroi_output;
-         $rori_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
-         //$rori_rslt[M4_WORD_RANGE]   = $rorr_final_output;
+         //$rori_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
+         $rori_rslt[M4_WORD_RANGE]   = $rorr_final_output;
          $sbclri_rslt[M4_WORD_RANGE] = $sbclri_output;
          $sbseti_rslt[M4_WORD_RANGE] = $sbseti_output;
          $sbinvi_rslt[M4_WORD_RANGE] = $sbinvi_output;
          $sbexti_rslt[M4_WORD_RANGE] = $sbexti_output;
          $gorci_rslt[M4_WORD_RANGE]  = $bext_dep_output;
-         $grevi_rslt[M4_WORD_RANGE]   = $bext_dep_output;
-         //$grevi_rslt[M4_WORD_RANGE]  = $grev_final_output;
+         //$grevi_rslt[M4_WORD_RANGE]   = $bext_dep_output;
+         $grevi_rslt[M4_WORD_RANGE]  = $grev_final_output;
          //$cmix_rslt[M4_WORD_RANGE]   = $cmix_output;
          //$cmov_rslt[M4_WORD_RANGE]   = $cmov_output;
          //$fsl_rslt[M4_WORD_RANGE]    = $rvb_shifter_output;
@@ -2233,7 +2234,7 @@ m4+definitions(['
          $dout_ready_bext_dep = $dout_valid_bext_dep && |fetch/instr$commit;
          $dout_ready_clmul = $dout_valid_clmul && |fetch/instr$commit;
          $dout_ready_rvb_crc = $dout_valid_rvb_crc && |fetch/instr$commit;
-         $dout_ready_rvb_shifter = $dout_valid_rvb_shifter && |fetch/instr$commit;
+         //$dout_ready_rvb_shifter = $dout_valid_rvb_shifter && |fetch/instr$commit;
          $dout_ready_rvb_bitcnt = $dout_valid_rvb_bitcnt && |fetch/instr$commit;
          '])
 
@@ -3162,7 +3163,7 @@ m4+definitions(['
       /* verilator lint_off CASEINCOMPLETE */ 
       /* verilator lint_off PINMISSING */
       /* verilator lint_off CASEOVERLAP */
-      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/7caf93b0c6eae25149817e9b410235c6c37f5428/b-ext/top_bext_module.tlv'])
+      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
       /* verilator lint_on WIDTH */
       /* verilator lint_on CASEOVERLAP */
       /* verilator lint_on PINMISSING */   
