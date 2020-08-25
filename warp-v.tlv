@@ -423,6 +423,8 @@ m4+definitions(['
          m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
          // ISA extensions,  1, or 0 (following M4 boolean convention).
          // TODO. Currently formal checks are broken when M4_EXT_F is set to 1.
+         // TODO. Currently formal checks are taking long time  when M4_EXT_B is set to 1.
+         //       Hence, its disabled at present.
          m4_defines(
             (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
@@ -433,7 +435,7 @@ m4+definitions(['
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
             (['M4_EXT_C'], 0),
-            (['M4_EXT_B'], 1),
+            (['M4_EXT_B'], 0),
             (['M4_EXT_J'], 0),
             (['M4_EXT_T'], 0),
             (['M4_EXT_P'], 0),
