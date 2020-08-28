@@ -1823,11 +1823,11 @@ m4+definitions(['
       m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
       m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
       m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
-      m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $din_insn3, $din_insn13, $din_insn14, $din_insn29, $din_insn30, $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
+      m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $raw[3], $raw[13], $raw[14], $raw[29], $raw[30], $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
       m4+bfp($input_a, $input_b, $bfp_output, 32)
-      m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $din_insn3, $din_insn12, $din_insn13, $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
-      m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $din_insn20, $din_insn21, $din_insn23, $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
-      m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $din_insn3, $din_insn20, $din_insn21, $din_insn22, $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
+      m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
+      m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
+      m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
       /* verilator lint_on WIDTH */
       /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on PINMISSING */
@@ -2086,20 +2086,7 @@ m4+definitions(['
          $input_a[31:0] = /src[1]$reg_value;
          $input_b[31:0] = $is_src_type_instr ? /src[2]$reg_value : $raw_i_imm;
          $sftamt[4:0] = $input_b[4:0];
-
-         $din_insn3   = |fetch/instr$raw[3];
-         $din_insn12  = |fetch/instr$raw[12];
-         $din_insn13  = |fetch/instr$raw[13];
-         $din_insn14  = |fetch/instr$raw[14];
-         $din_insn20  = |fetch/instr$raw[20];
-         $din_insn21  = |fetch/instr$raw[21];
-         $din_insn22  = |fetch/instr$raw[22];
-         $din_insn23  = |fetch/instr$raw[23];
-         $din_insn26  = |fetch/instr$raw[26];
-         $din_insn27  = |fetch/instr$raw[27];
-         $din_insn29  = |fetch/instr$raw[29];
-         $din_insn30  = |fetch/instr$raw[30];
-         `BOGUS_USE($is_imm_type_instr $sftamt $din_insn22 $din_insn26 $din_insn27)
+         `BOGUS_USE($is_imm_type_instr $sftamt)
 
          // Results
          $andn_rslt[M4_WORD_RANGE]   = $andn_output;
