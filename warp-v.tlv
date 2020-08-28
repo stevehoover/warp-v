@@ -3069,7 +3069,6 @@ m4+definitions(['
    m4_ifelse_block(M4_EXT_B, 1, ['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['B-ext supported for RISC-V only.']m4_new_line)'])
       /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */ 
       /* verilator lint_off PINMISSING */
       /* verilator lint_off CASEOVERLAP */
       m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
