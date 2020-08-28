@@ -1599,7 +1599,7 @@ m4+definitions(['
       m4_ifelse_block(M4_EXT_F, 1, ['
       // Instruction requires floating point unit and is long-latency.
       // TODO. Current implementation decodes the floating type instructions seperatly.
-      // Hence can have a marco or signal to differentiate the type of instruction related to a particular extension or 
+      // Hence can have a macro or signal to differentiate the type of instruction related to a particular extension or 
       // could be better to use just $op5 decode for this.
       
       // These instructions modifies FP CSR's "frm" and generates "fflags".
@@ -1760,8 +1760,8 @@ m4+definitions(['
       m4_ifelse_block(M4_EXT_F, 1, ['
       // "F" Extension.
 
-      // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
-      // Need to call fpu_exe marco inside this ifelse_block itself and simplify it to optimize the unit.
+      // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
+      // Need to call fpu_exe macro inside this ifelse_block itself and simplify it to optimize the unit.
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       
@@ -1771,7 +1771,7 @@ m4+definitions(['
       // Main FPU execution
       m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
       
-      // Sign-injection marcos
+      // Sign-injection macros
       m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
       m4+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
       m4+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
@@ -1782,9 +1782,9 @@ m4+definitions(['
       
       m4_ifelse_block(M4_EXT_B, 1, ['
       // "B" Extension.
-      // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside marco, hence its latency and generated logic increases.
+      // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
 
-      // Main BMI Marco's
+      // Main BMI Macro's
 
       $din_valid_bext_dep = ($is_gorc_instr || $is_gorci_instr || $is_shfl_instr || $is_unshfl_instr || $is_bdep_instr || $is_bext_instr || $is_shfli_instr || $is_unshfli_instr) && |fetch/instr$commit;
       $din_valid_clmul = ($is_clmul_instr || $is_clmulr_instr || $is_clmulh_instr) && |fetch/instr$commit;
@@ -1954,7 +1954,7 @@ m4+definitions(['
          // "F" Extension.
          
          m4_ifelse_block(M4_EXT_F, 1, ['
-         // Determining the type of fpu_operation according to the fpu_exe marco
+         // Determining the type of fpu_operation according to the fpu_exe macro
          $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
                                ({5{$is_fmsubs_instr }}  & 5'h3 ) |
                                ({5{$is_fnmsubs_instr}}  & 5'h4 ) |
