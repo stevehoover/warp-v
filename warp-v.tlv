@@ -435,7 +435,7 @@ m4+definitions(['
             (['M4_EXT_Q'], 0),
             (['M4_EXT_L'], 0),
             (['M4_EXT_C'], 0),
-            (['M4_EXT_B'], 0),
+            (['M4_EXT_B'], 1),
             (['M4_EXT_J'], 0),
             (['M4_EXT_T'], 0),
             (['M4_EXT_P'], 0),
@@ -2932,6 +2932,7 @@ m4+definitions(['
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */   
       m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
+      /* verilator lint_on CASEINCOMPLETE */
       /* verilator lint_on WIDTH */
    '])
 
@@ -3077,6 +3078,13 @@ m4+definitions(['
       /* verilator lint_on PINMISSING */   
    '])      
 \TLV b_extension()
+
+   // Few of RISC-V B-Extension instructions (CRC and CMUL) in WARP-V are of fixed latency.
+   // At present we refered to the same way latency in M-extension is handled.
+   // Verilog modules for those inst. are inherited from Clifford Wolf's draft implementation, located inside warp-v_includes in ./b-ext directory.
+   // Although the latency of different variant of CRC instr's are different, we are using a common FIXED LATENCY
+   // for those instr's.
+
    m4_define(['M4_CLMUL_LATENCY'], 5)
    m4_define(['M4_CRC_LATENCY'], 5)
    @M4_NEXT_PC_STAGE
