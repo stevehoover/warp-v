@@ -962,7 +962,7 @@ m4+definitions(['
                         input logic clk,                 // same as m4_makerchip module, should be fine mostly
                         input logic reset_op_in,
                         
-                        // TODO : WARPV would not have a separate transducer
+                        // WARPV would not have a separate transducer
                         // (or decoder / encoder) and complete interface is defined
                         // inside this module_def hence input/output nature would alter :)
 
@@ -976,10 +976,6 @@ m4+definitions(['
                         // input [`L15_AMO_OP_WIDTH-1:0]   warpv_transducer_mem_amo_op,
                         // input                           l15_transducer_ack,
                         // input                           l15_transducer_header_ack,
-
-
-                        // TODO : Move reg.... to sv part
-                        // for making mem requests to the OP system
 
                         // outputs from core (ip to the transducer), but internal in new mechanism
                         // *these = $pipesig should be fine!
@@ -1023,7 +1019,6 @@ m4+definitions(['
                         input wire [63:0]                   l15_transducer_data_1,
                         
                         // NOTE: Fetch the next PC, wait for mem response, issue down the pipeline, go to next fetch while wait for next pc 
-
 
                         // these two need not be io now? can be regs I believe (used internally)
                         // output                          transducer_warpv_mem_ready,
@@ -1695,6 +1690,7 @@ m4+definitions(['
    $dest_reg[M4_REGS_INDEX_RANGE] =  $second_issue_ld  ?  |fetch/instr/orig_inst$dest_reg :
         m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ?  |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :']) 
                                                           $raw_rd;
+   // TODO : Does not report valid for store, Check orig_inst scope for valid dest_reg
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -2545,7 +2541,6 @@ m4+definitions(['
 
 // A fake memory with fixed latency.
 // The memory is placed in the fetch pipeline.
-// TODO: (/_cpu, @_mem, @_align)
 \SV
    module dmem_ext #(parameter SIZE = 1024, ADDR_WIDTH = 10, COL_WIDTH = 8, NB_COL	= 4) (
          input    clk,
@@ -2743,7 +2738,6 @@ m4+definitions(['
 		'])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
-      // TODO : Update links after merge to master!
       m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_div.sv'])
       m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_fast_mul.sv'])
       /* verilator lint_on CASEINCOMPLETE */
@@ -3154,7 +3148,6 @@ m4+definitions(['
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            // TODO : Variable latency memory!
             $second_issue_ld  =  m4_ifelse_block(M4_EXTERNAL_MEMORY, 1, ['
                                  /_cpu|mem/data>>M4_LD_RETURN_ALIGN$mem_ready'], ['
                                  /_cpu|mem/data>>M4_LD_RETURN_ALIGN$valid_ld && 1'b['']M4_INJECT_RETURNING_LD
@@ -3163,6 +3156,7 @@ m4+definitions(['
             $second_issue = $second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']);
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
+            // TODO : assignment based on ready, no redirect for stores - logic for monitor stores and their ack - replay if no opportunity to issue
             ?$second_issue_ld
                // This scope holds the original load for a returning load.
                /orig_load_inst
@@ -3232,6 +3226,7 @@ m4+definitions(['
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
+               // TODO : if there is a pending store - replay.
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
             // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
             $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
@@ -3428,7 +3423,7 @@ m4+definitions(['
                /src[2:1]instr
                   $ANY = /instr$second_issue ? /instr/orig_inst/src$ANY : /instr/src$ANY;
 
-            $would_reissue = ($ld || $div_mul);
+            $would_reissue = ($ld_st || $div_mul);
             $retire = ($commit && !$would_reissue ) || $second_issue;
             // a load or div_mul instruction commits results in the second issue, hence the first issue is non-retiring
             // for the first issue of these instructions, $rvfi_valid is not asserted and hence the current outputs are 
@@ -3462,9 +3457,12 @@ m4+definitions(['
                                  $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[M4_ADDR_MAX:2], 2'b0} : 0;
             *rvfi_mem_rmask   = /original$ld ? /orig_load_inst$ld_mask : 0;
-            *rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
+            // Change only for replay
+            //*rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
+            *rvfi_mem_wmask   = /original$st ? /orig_load_inst$st_mask : 0;
             *rvfi_mem_rdata   = /original$ld ? /orig_load_inst$ld_value : 0;
-            *rvfi_mem_wdata   = $valid_st ? $st_value : 0;
+            //*rvfi_mem_wdata   = $valid_st ? $st_value : 0;
+            *rvfi_mem_wdata   = /original$st ? /orig_load_inst$st_value : 0;
 
             `BOGUS_USE(/src[2]$dummy)
 
@@ -3477,28 +3475,6 @@ m4+definitions(['
 \TLV openpiton_interface()
    // NOTE : 2 threads - 1 for instr, one for dmem
    // No fetch for waiting
-
-   // For Memory interface
-   //    1  warpv_transducer_mem_valid,
-   //    2   warpv_transducer_mem_addr,
-   //    3   warpv_transducer_mem_wstrb,
-   //    4   warpv_transducer_mem_wdata,
-   //    5   warpv_transducer_mem_amo_op,
-
-   dmem_ext (
-               //       .clk     ($clk),
-               //       .valid_st($valid_st),
-               //       .spec_ld ($spec_ld),
-               //       .addr    ($addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]),
-               //       .we      ($st_mask),
-               //       .din     ($st_value), 
-               //       .dout    (<<1$$ld_value[31:0]) // TODO : use >>1
-               //       );
-   // input   clk, valid_st, spec_ld,
-   // input   [NB_COL-1:0]	        we,            // for enabling individual column accessible (for writes)
-   // input   [ADDR_WIDTH-1:0]	    addr,      
-   // input   [NB_COL*COL_WIDTH-1:0]  din,
-   // output  [NB_COL*COL_WIDTH-1:0]  dout
    |fetch
       /instr
          @M4_REG_WR_STAGE
