@@ -289,7 +289,8 @@ m4+definitions(['
       m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
       m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
       m4_define(['M4_MAX_PACKET_SIZE'], 3)   // Max number of payload flits in a packet.
-      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT) , SRC, m4_eval(M4_CORE_INDEX_CNT + M4_VC_INDEX_CNT), VC, M4_CORE_INDEX_CNT, DEST, 0)   '])
+      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT) , SRC, m4_eval(M4_CORE_INDEX_CNT + M4_VC_INDEX_CNT), VC, M4_CORE_INDEX_CNT, DEST, 0)
+   '])
    // Inclusions for multi-core only:
    m4_ifexpr(M4_CORE_CNT > 1, ['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['Multi-core supported for RISC-V only.']m4_new_line)'])
@@ -364,6 +365,22 @@ m4+definitions(['
             (M4_MEM_WR_STAGE, 0),
             (M4_LD_RETURN_ALIGN, 1))
          m4_default(['M4_BRANCH_PRED'], ['fallthrough'])
+         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+      '],
+      ['2-stage'], ['
+         // 2-stage pipeline.
+         m4_defines(
+            (M4_NEXT_PC_STAGE, 0),
+            (M4_FETCH_STAGE, 0),
+            (M4_DECODE_STAGE, 0),
+            (M4_BRANCH_PRED_STAGE, 0),
+            (M4_REG_RD_STAGE, 0),
+            (M4_EXECUTE_STAGE, 1),
+            (M4_RESULT_STAGE, 1),
+            (M4_REG_WR_STAGE, 1),
+            (M4_MEM_WR_STAGE, 1),
+            (M4_LD_RETURN_ALIGN, 2))
+         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
          m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
       '],
       ['4-stage'], ['
@@ -840,6 +857,7 @@ m4+definitions(['
          m4_define_csr(['pktavail'],   12'h809,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
          m4_define_csr(['pktcomp'],    12'h80a,    ['M4_VC_HIGH, AVAIL_MASK, 0'],      ['M4_VC_HIGH'b0'],             ['{M4_VC_HIGH{1'b1}}'],              1)
          m4_define_csr(['pktrd'],      12'h80b,    ['M4_WORD_HIGH, DATA, 0'],          ['M4_WORD_HIGH'b0'],           ['{M4_WORD_HIGH{1'b0}}'],            RO)
+         m4_define_csr(['core'],       12'h80d,    ['M4_CORE_INDEX_HIGH, CORE, 0'],    ['M4_CORE_INDEX_HIGH'b0'],     ['{M4_CORE_INDEX_HIGH{1'b1}}'],      RO)
          m4_define_csr(['pktinfo'],    12'h80c,    ['m4_eval(M4_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
                                                                             ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b100'], ['m4_eval(M4_CORE_INDEX_HIGH + 3)'b0'], 1)
          // TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
