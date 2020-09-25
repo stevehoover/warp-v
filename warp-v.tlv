@@ -52,6 +52,9 @@ m4+definitions(['
    //     the potential. While we openly welcome collaboration, there are no current expectations that folks
    //     will be able to evolve the design independently. If you are interested in collaboration,
    //     please contact steve.hoover@redwoodeda.com.
+   //   o If you've come here to learn about RISC-V design with TL-Verilog, you might be better served
+   //     to start with these models created in the Microprocessor for You in Thirty Hours (MYTH) Workshop:
+   //     https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md.
    //   o The preprocessed code is represented in the "Nav-TLV" tab. You can debug using
    //     Nav-TLV and find corresponding source lines by clicking Nav-TLV line numbers.
    //   o The "Diagram" may fail to generate due to the size of the design.
