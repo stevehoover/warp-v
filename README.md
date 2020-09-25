@@ -68,7 +68,7 @@ git submodule update
 
 # Revolutionary Modeling Methodology
 
-As an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank" target="_blank" atom_fix="_">TL-Verilog language spec</a>, WARP-V intentionally pushes the limits of code construction using an M4-based flow. While TL-Verilog documentation and tools are fairly mature, the M4 layer intended only for research.an undocumented proof-of-concept framework (even when old-school Verilog features might suffice).
+As an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank" target="_blank" atom_fix="_">TL-Verilog language spec</a>, WARP-V intentionally pushes the limits of code construction using an M4-based flow. While TL-Verilog documentation and tools are fairly mature, the M4 layer intended only for research.an undocumented proof-of-concept framework (even when old-school Verilog features might suffice). If you've come here to learn about TL-Verilog for RISC-V design, you'd be better served to study [the cores developed in the Microprocessor for You in Thirty Hours Workshop](https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md).
 
 WARP-V uses bleeding-edge modeling methodology that provides an unprecedented level of flexibility without sacrificing gate-level control. To understand WARP-V and how to utilize it, it helps to first gain an appreciation for this methodology, which involves two layers:
 
