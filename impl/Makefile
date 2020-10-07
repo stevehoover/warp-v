@@ -20,7 +20,7 @@ out/%/status: warp-v_%.tlv ../warp-v.tlv
 		&& mv out/* . && rmdir out \
 		&& (exit `cat status`) \
 	  && sed -i 's/wire\( \[[^\[]\+\] L1_Mem_Value_\)/reg\1/' $(patsubst warp-v_%.tlv,warp-v_%.sv,$<) \
-	  && sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_vae_\)/reg\1/' $(patsubst %.tlv,%_gen.sv,$<)
+	  && sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_value_\)/reg\1/' $(patsubst %.tlv,%_gen.sv,$<)
 	@# Above sed HACKS fix bugs in the generated code.
 
 impl:
