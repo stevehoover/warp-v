@@ -1007,7 +1007,9 @@ m4+definitions(['
       }; 
 
 \TLV mini_imem(_prog_name)
-   m4+indirect(['mini_']_prog_name['_prog'])
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_define(['m4_prog'], ['mini_']_prog_name['_prog'])
+   m4+m4_prog()
    m4+instrs_for_viz()
    |fetch
       /instr
@@ -1284,7 +1286,9 @@ m4+definitions(['
    m4_asm(ORI, r0, r0, 0)
    
 \TLV riscv_imem(_prog_name)
-   m4+indirect(['riscv_']_prog_name['_prog'])
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_define(['m4_prog'], ['riscv_']_prog_name['_prog'])
+   m4+m4_prog()
    m4+instrs_for_viz()
    
    // ==============
@@ -1888,7 +1892,7 @@ m4+definitions(['
          
    // CSR logic
    // ---------
-   m4+riscv_csrs((m4_csrs))
+   m4+riscv_csrs([''](m4_csrs)[''])
    @_exe_stage
       m4+riscv_csr_logic()
       
@@ -1997,7 +2001,9 @@ m4+definitions(['
       };
 
 \TLV mipsi_imem(_prog_name)
-   m4+indirect(['mipsi_']_prog_name['_prog'])
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_define(['m4_prog'], ['mipsi_']_prog_name['_prog'])
+   m4+m4_prog()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -2311,7 +2317,9 @@ m4+definitions(['
       };
 
 \TLV power_imem(_prog_name)
-   m4+indirect(['mipsi_']_prog_name['_prog'])
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_define(['m4_prog'], ['power_']_prog_name['_prog'])
+   m4+m4_prog()
    m4+instrs_for_viz()
    |fetch
       /instr
@@ -2810,10 +2818,12 @@ m4+definitions(['
 
 \TLV cpu(/_cpu)
    // Generated logic
-   m4+indirect(M4_isa['_gen'])
+   // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
+   m4_define(['m4_gen'], M4_isa['_gen'])
+   m4+m4_gen()
 
    // Instruction memory and fetch of $raw.
-   m4+indirect(M4_IMEM_MACRO_NAME, M4_PROG_NAME)
+   m4+M4_IMEM_MACRO_NAME(M4_PROG_NAME)
 
 
    // /=========\
@@ -3007,8 +3017,12 @@ m4+definitions(['
             $valid_decode_branch = $valid_decode && $branch;
             // A load that will return later.
             //$split_ld = $spec_ld && 1'b['']M4_INJECT_RETURNING_LD;
-            m4+indirect(M4_isa['_decode'])
-         m4+indirect(['branch_pred_']M4_BRANCH_PRED)
+            // Instantiate the program. (This approach is required for an m4-defined name.)
+            m4_define(['m4_decode_macro_name'], M4_isa['_decode'])
+            m4+m4_decode_macro_name()
+         // Instantiate the program. (This approach is required for an m4-defined name.)
+         m4_define(['m4_branch_pred_macro_name'], ['branch_pred_']M4_BRANCH_PRED)
+         m4+m4_branch_pred_macro_name()
          
          @M4_REG_RD_STAGE
             // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
@@ -3093,7 +3107,10 @@ m4+definitions(['
          // =======
          // Execute
          // =======
-         m4+indirect(M4_isa['_exe'], @M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
+         
+         // Instantiate the program. (This approach is required for an m4-defined name.)
+         m4_define(['m4_exe_macro_name'], M4_isa['_exe'])
+         m4+m4_exe_macro_name(@M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
          
          @M4_BRANCH_PRED_STAGE
             m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
@@ -3134,7 +3151,7 @@ m4+definitions(['
             // $commit = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES + 1), where +1 accounts for this
             // instruction's redirects. However, to meet timing, we consider this instruction separately, so,
             // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
-            m4_ifelse(M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
+            m4_ifelse_block(M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
             // Normal case:
             $commit = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES) && ! $abort;
             '], ['
@@ -3661,7 +3678,9 @@ m4+module_def
    '])
 
 \TLV cpu_viz()
-   m4+indirect(M4_isa['_viz_logic'])
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
+   m4+m4_viz_logic_macro_name()
    |fetch
       @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
