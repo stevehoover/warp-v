@@ -29,7 +29,7 @@ riscv-formal/README.md:
 
 compile: out/warp-v_formal.sv
 
-verif: checks.cfg genchecks.py out/warp-v_formal.sv env riscv-formal
+verif: checks.cfg ./riscv-formal/checks/genchecks.py out/warp-v_formal.sv env riscv-formal
 	@# Should use this, but until Clifford accepts pull request, we have a local copy of genchecks.py.
 	@#python3 riscv-formal/checks/genchecks.py --basedir riscv-formal
 	bison --version
