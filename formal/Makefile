@@ -35,6 +35,7 @@ verif: checks.cfg genchecks.py out/warp-v_formal.sv env riscv-formal
 	bison --version
 	yosys --version
 	python3 ./genchecks.py --basedir ./riscv-formal
+	python3 ./riscv-formal/checks/genchecks.py checks ./riscv-formal .
 	$(MAKE) -k -C checks -j$$(nproc)
 
 all: verif
