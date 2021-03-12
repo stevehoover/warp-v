@@ -19,6 +19,7 @@ install:
   # Record the commit ID of the latest SymbiYosys.
   - git ls-remote --heads https://github.com/cliffordwolf/SymbiYosys.git refs/heads/master > SymbiYosys_latest_commit_id.txt && sed -i 's/\s.*//' SymbiYosys_latest_commit_id.txt
   # Install the Sandpiper-SaaS client
+  - pip uninstall pathlib
   - pip3 install sandpiper-saas --user
 
 before_script:

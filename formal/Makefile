@@ -11,7 +11,7 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 out/warp-v_formal.sv: warp-v_formal.tlv ../warp-v.tlv
 	rm -rf out
 	mkdir out
-	sandpiper -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out
+	yes | sandpiper -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out
 	exit `cat out/status`
 
 env: env/PASSED
