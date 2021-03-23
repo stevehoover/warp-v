@@ -1,6 +1,6 @@
 # TODO: Extend this to add job(s) for simulations, can be run in parallel with risc-v formal.
 
-dist: trusty
+dist: focal
 sudo: false
 language: generic
 
@@ -17,6 +17,8 @@ install:
   - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt
   # Record the commit ID of the latest SymbiYosys.
   - git ls-remote --heads https://github.com/cliffordwolf/SymbiYosys.git refs/heads/master > SymbiYosys_latest_commit_id.txt && sed -i 's/\s.*//' SymbiYosys_latest_commit_id.txt
+  # Install the Sandpiper-SaaS client
+  - pip3 install sandpiper-saas --user
 
 before_script:
   - cd formal
