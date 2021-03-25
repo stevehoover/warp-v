@@ -1,31 +1,8 @@
 # TODO: Extend this to add job(s) for simulations, can be run in parallel with risc-v formal.
 
-dist: linux
+dist: focal
 sudo: false
 language: generic
-
-addons:
-    apt:
-        packages:
-        - g++-4.8
-        - gperf
-        - build-essential
-        - bison
-        - flex
-        - libreadline-dev
-        - gawk
-        - tcl-dev
-        - libffi-dev
-        - git
-        - graphviz
-        - xdot
-        - pkg-config
-        - python
-        - python3
-        - libboost-system-dev
-        - libboost-python-dev
-        - libboost-filesystem-dev
-        - zlib1g-dev
 
 cache:
   directories:
@@ -40,6 +17,8 @@ install:
   - git ls-remote --heads https://github.com/cliffordwolf/yosys.git refs/heads/master > yosys_latest_commit_id.txt && sed -i 's/\s.*//' yosys_latest_commit_id.txt
   # Record the commit ID of the latest SymbiYosys.
   - git ls-remote --heads https://github.com/cliffordwolf/SymbiYosys.git refs/heads/master > SymbiYosys_latest_commit_id.txt && sed -i 's/\s.*//' SymbiYosys_latest_commit_id.txt
+  # Install the Sandpiper-SaaS client
+  - pip3 install sandpiper-saas --user
 
 before_script:
   - cd formal
