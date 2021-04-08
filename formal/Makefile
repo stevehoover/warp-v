@@ -8,7 +8,7 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 
 
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
-compile: warp-v_formal.tlv ../warp-v.tlv
+out/warp-v_formal.sv: warp-v_formal.tlv ../warp-v.tlv
 	rm -rf out
 	mkdir out
 	yes | sandpiper -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs
