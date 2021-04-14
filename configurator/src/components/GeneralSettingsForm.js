@@ -10,12 +10,12 @@ import {
   Stack,
 } from '@chakra-ui/react';
 
-export function GeneralSettingsForm({ generalSettings, setGeneralSettings, formErrors }) {
+export function GeneralSettingsForm({ configuratorGlobalSettings, setConfiguratorGlobalSettings, formErrors }) {
   return <Box>
     <FormControl isInvalid={formErrors.includes('isa')} mb={4}>
       <FormLabel>ISA:</FormLabel>
-      <RadioGroup onChange={value => setGeneralSettings({ ...generalSettings, isa: value })}
-                  value={generalSettings.isa}>
+      <RadioGroup onChange={value => setConfiguratorGlobalSettings({...configuratorGlobalSettings, generalSettings: { ...configuratorGlobalSettings.generalSettings, isa: value }})}
+                  value={configuratorGlobalSettings.generalSettings.isa}>
         <Stack direction='row'>
           <Radio value='RISCV'>RISC-V</Radio>
           <Radio value='MIPSI'>MIPS</Radio>
@@ -26,8 +26,8 @@ export function GeneralSettingsForm({ generalSettings, setGeneralSettings, formE
 
     <FormControl isInvalid={formErrors.includes('depth')} mb={5}>
       <FormLabel>Pipeline Depth:</FormLabel>
-      <RadioGroup onChange={value => setGeneralSettings({ ...generalSettings, depth: parseInt(value) })}
-                  value={generalSettings.depth} defaultValue={4}>
+      <RadioGroup onChange={value => setConfiguratorGlobalSettings({...configuratorGlobalSettings, generalSettings: { ...configuratorGlobalSettings.generalSettings, depth: parseInt(value) }})}
+                  value={configuratorGlobalSettings.generalSettings.depth} defaultValue={4}>
         <Stack direction='row'>
           <Radio value={1}>1-cyc</Radio>
           <Radio value={2}>2-cyc</Radio>
@@ -38,9 +38,9 @@ export function GeneralSettingsForm({ generalSettings, setGeneralSettings, formE
       </RadioGroup>
     </FormControl>
 
-    {generalSettings.isa === 'RISCV' && <FormControl>
+    {configuratorGlobalSettings.generalSettings.isa === 'RISCV' && <FormControl>
       <FormLabel>ISA Extensions (RISC-V only):</FormLabel>
-      <CheckboxGroup onChange={values => setGeneralSettings({ ...generalSettings, isaExtensions: values })}>
+      <CheckboxGroup onChange={values => setConfiguratorGlobalSettings({...configuratorGlobalSettings, generalSettings: {...configuratorGlobalSettings.generalSettings, isaExtensions: values }})}>
         <Stack direction='row'>
           <Checkbox value='E'>E</Checkbox>
           <Checkbox value='M'>M</Checkbox>

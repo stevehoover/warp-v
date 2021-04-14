@@ -3,8 +3,11 @@ import { ConfigurationParameters } from './ConfigurationParameters';
 export const BEGIN_PROGRAM_LINE = "/* BEGIN PROGRAM"
 export const END_PROGRAM_LINE = "END_PROGRAM */"
 
-export function translateParametersToJson(generalSettings, pipelineSettings) {
-  if (generalSettings.isa !== 'RISC-V') delete generalSettings['isaExtensions'];
+export function translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings, pipelineSettings) {
+  if (configuratorGlobalSettings.generalSettings.isa !== 'RISCV' && configuratorGlobalSettings.generalSettings["isaExtensions"] && configuratorGlobalSettings.generalSettings.isaExtensions.length !== 0) {
+    const {isaExtensions, ...rest} = configuratorGlobalSettings
+    setConfiguratorGlobalSettings(rest)
+  }
 }
 
 export function translateJsonToM4Macros(json) {

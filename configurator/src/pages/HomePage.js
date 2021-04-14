@@ -1,19 +1,5 @@
-import {
-    Box,
-    Button,
-    Heading,
-    HStack,
-    Icon,
-    Image,
-    Tab,
-    TabList,
-    TabPanel,
-    TabPanels,
-    Tabs,
-    Text
-} from '@chakra-ui/react';
+import {Box, Button, Heading, HStack, Image, Tab, TabList, TabPanel, TabPanels, Tabs, Text} from '@chakra-ui/react';
 import React, {useEffect, useState} from 'react';
-import {BsFileCode} from 'react-icons/all';
 import {
     getTLVCodeForDefinitions,
     translateJsonToM4Macros,
@@ -25,22 +11,47 @@ import {GenericSettingsFormComponent} from "../components/GenericSettingsFormCom
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
 
+const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))
+const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
+
 export default function HomePage({
-                                     generalSettings,
-                                     setGeneralSettings,
-                                     settings,
-                                     setSettings,
-                                     setCoreJson,
-                                     coreJson,
                                      getSVForTlv,
-                                     tlvForJson,
                                      sVForJson,
-                                     macrosForJson
+                                     setSVForJson,
+                                     tlvForJson,
+                                     macrosForJson,
+                                     configuratorGlobalSettings,
+                                     setConfiguratorGlobalSettings
                                  }) {
     const [formErrors, setFormErrors] = useState([]);
     const [userChangedStages, setUserChangedStages] = useState([])
     const [pipelineDefaultDepth, setPipelineDefaultDepth] = useState()
     const history = useHistory();
+    const [makerchipOpening, setMakerchipOpening] = useState(false)
+    const [downloadingCode, setDownloadingCode] = useState(false)
+
+    useEffect(() => {
+        if (!configuratorGlobalSettings.coreJson) return
+
+        if (!configuratorGlobalSettings.coreJson && (macrosForJson || tlvForJson)) {
+            setConfiguratorGlobalSettings({...configuratorGlobalSettings, macrosForJson: null})
+            setConfiguratorGlobalSettings({...configuratorGlobalSettings, tlvForJson: null})
+        } else {
+            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson)
+            const tlv = getTLVCodeForDefinitions(macros)
+            setConfiguratorGlobalSettings({...configuratorGlobalSettings, macrosForJson: tlv.split("\n")})
+
+            const task = setTimeout(() => {
+                getSVForTlv(tlv, sv => {
+                    setSVForJson(sv)
+                })
+            }, 250)
+
+            return () => {
+                clearTimeout(task)
+            }
+        }
+    }, [configuratorGlobalSettings.coreJson])
 
     function updateDefaultStagesForPipelineDepth(depth) {
         let valuesToSet;
@@ -104,7 +115,7 @@ export default function HomePage({
             }
         }
 
-        const newSettings = {...settings}
+        const newSettings = {...configuratorGlobalSettings.settings}
         if (Object.entries(valuesToSet).length === 0) return;
         Object.entries(valuesToSet).forEach(entry => {
             const [key, value] = entry
@@ -112,30 +123,43 @@ export default function HomePage({
                 newSettings[key] = value
             }
         })
-        setSettings(newSettings)
+        setConfiguratorGlobalSettings({...configuratorGlobalSettings, settings: newSettings})
         setPipelineDefaultDepth(depth)
     }
 
     useEffect(() => {
         validateForm(false);
-        if (generalSettings.depth && pipelineDefaultDepth !== generalSettings.depth) updateDefaultStagesForPipelineDepth(generalSettings.depth)
-    }, [settings, generalSettings]);
+        if (configuratorGlobalSettings.generalSettings.depth && pipelineDefaultDepth !== configuratorGlobalSettings.generalSettings.depth) updateDefaultStagesForPipelineDepth(configuratorGlobalSettings.generalSettings.depth)
+    }, [configuratorGlobalSettings.depth]);
+
 
     function validateForm(err) {
         if (!err) {
-            translateParametersToJson(generalSettings, settings);
-            const json = {general: generalSettings, pipeline: settings};
-            setCoreJson(json);
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(configuratorGlobalSettings.coreJson) !== JSON.stringify(json)) setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                coreJson: json
+            })
             return;
         }
 
-        if (!generalSettings.depth) {
+        if (!configuratorGlobalSettings.generalSettings.depth && !formErrors.includes("depth")) {
             setFormErrors([...formErrors, 'depth']);
         } else {
-            setFormErrors([]);
-            translateParametersToJson(generalSettings, settings);
-            const json = {general: generalSettings, pipeline: settings};
-            setCoreJson(json);
+            if (formErrors.length !== 0) setFormErrors([]);
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(configuratorGlobalSettings.coreJson) !== JSON.stringify(json)) setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                coreJson: json
+            })
             return json;
         }
 
@@ -144,7 +168,8 @@ export default function HomePage({
 
     function handleOpenInMakerchipButtonClicked() {
         if (validateForm(true)) {
-            const macros = translateJsonToM4Macros(coreJson);
+            setMakerchipOpening(true)
+            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
             const formBody = new URLSearchParams();
             formBody.append("source", tlv);
@@ -157,27 +182,24 @@ export default function HomePage({
                         'Content-Type': 'application/x-www-form-urlencoded'
                     }
                 }
-            ).then(resp => resp.json())
+            )
+                .then(resp => resp.json())
                 .then(json => {
                     const url = json.url
                     window.open(`https://makerchip.com${url}`)
+                    setMakerchipOpening(false)
                 })
         }
     }
 
-    function handleGoToCoreDetailsButtonClicked() {
-        const json = validateForm(true);
-        setCoreJson(json);
-        if (!json) return;
-        history.push('/core');
-    }
-
     function handleDownloadRTLVerilogButtonClicked() {
         if (validateForm(true)) {
-            const macros = translateJsonToM4Macros(coreJson);
+            setDownloadingCode(true)
+            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
             getSVForTlv(tlv, sv => {
                 download('verilog.sv', sv);
+                setDownloadingCode(false)
             });
 
         }
@@ -213,31 +235,31 @@ export default function HomePage({
                 </TabList>
                 <TabPanels>
                     <TabPanel>
-                        <GeneralSettingsForm setGeneralSettings={setGeneralSettings}
-                                             generalSettings={generalSettings}
+                        <GeneralSettingsForm configuratorGlobalSettings={configuratorGlobalSettings}
+                                             setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                              formErrors={formErrors}/>
                     </TabPanel>
                     <TabPanel>
-                        <GenericSettingsFormComponent setSettings={setSettings}
-                                                      settings={settings}
-                                                      configurationParametersSubset={(settings["cores"] && settings["cores"] > 1) ? ["cores", "vcs", "prios", "max_packet_size"] : ["cores"]}/>
+                        <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
+                                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                                      configurationParametersSubset={(configuratorGlobalSettings.settings["cores"] && configuratorGlobalSettings.settings["cores"] > 1) ? ["cores", "vcs", "prios", "max_packet_size"] : ["cores"]}/>
                     </TabPanel>
                     <TabPanel>
-                        <GenericSettingsFormComponent setSettings={setSettings}
-                                                      settings={settings}
-                                                      configurationParametersSubset={["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))}
+                        <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
+                                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                                      configurationParametersSubset={pipelineParams}
                                                       userChangedStages={userChangedStages}
                                                       setUserChangedStages={setUserChangedStages}/>
                     </TabPanel>
                     <TabPanel>
-                        <GenericSettingsFormComponent setSettings={setSettings}
-                                                      settings={settings}
+                        <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
+                                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                                       configurationParametersSubset={["branch_pred"]}/>
                     </TabPanel>
                     <TabPanel>
-                        <GenericSettingsFormComponent setSettings={setSettings}
-                                                      settings={settings}
-                                                      configurationParametersSubset={ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)}/>
+                        <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
+                                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                                      configurationParametersSubset={hazardsParams}/>
                     </TabPanel>
                     <TabPanel>
                         <Text>WARP-V currently supports only the CPU core itself, with a small instruction memory and
@@ -258,11 +280,12 @@ export default function HomePage({
 
             <HStack mb={3}>
                 <Box>
-                    <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}>Download
+                    <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
+                            isLoading={downloadingCode} isDisabled={downloadingCode}>Download
                         Verilog</Button>
                 </Box>
-                <Button type='button' colorScheme='blue' onClick={handleOpenInMakerchipButtonClicked}>Open in Makerchip
-                    IDE</Button>
+                <Button type='button' colorScheme='blue' onClick={handleOpenInMakerchipButtonClicked}
+                        isLoading={makerchipOpening} isDisabled={makerchipOpening}>Open in Makerchip IDE</Button>
             </HStack>
 
             <Image src='makerchip-preview.png' w='350px'/>
@@ -270,8 +293,11 @@ export default function HomePage({
 
         </Box>
 
-        <CoreDetailsComponent generalSettings={generalSettings} settings={settings}
-                              coreJson={coreJson} tlvForJson={tlvForJson} macrosForJson={macrosForJson}
+        <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
+                              settings={configuratorGlobalSettings.settings}
+                              coreJson={configuratorGlobalSettings.coreJson}
+                              tlvForJson={tlvForJson}
+                              macrosForJson={macrosForJson}
                               sVForJson={sVForJson}/>
     </>;
 }

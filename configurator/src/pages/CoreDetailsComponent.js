@@ -1,4 +1,4 @@
-import {Box, Heading, HStack, Icon, Image, Link, Text} from '@chakra-ui/react';
+import {Box, Code, Heading, HStack, Icon, Image, Link, Text} from '@chakra-ui/react';
 import {BsArrowRight} from 'react-icons/all';
 import {useState} from 'react';
 
@@ -21,7 +21,7 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('configuration')}>
                     <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>UI Configuration</Text>
-                    <Image src="paramboxpreview.png" maxW={150} mx="auto"/>
+                    <Image src="paramboxpreview.png" maxW={250} mx="auto"/>
                 </Link>
             </Box>
             <Icon as={BsArrowRight}/>
@@ -29,7 +29,7 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
                     <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
-                    <Image src="paramboxpreview.png" maxW={150} mx="auto"/>
+                    <Image src="macropreview.png" maxW={150} mx="auto"/>
                 </Link>
             </Box>
             <Icon as={BsArrowRight}/>
@@ -51,7 +51,7 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
             </Box>
         </HStack>
 
-        <Box>
+        <Box maxW='85vh'>
             {!selectedFile && <Text>No file selected</Text>}
             {selectedFile && <>
                 {selectedFile === 'configuration' && <Text mb={2}><b>Core Configuration</b></Text>}
@@ -59,16 +59,16 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
                 {selectedFile === 'tlv' && <Text mb={2}><b>your_warpv_core_tlv.tlv</b></Text>}
                 {selectedFile === 'rtl' && <Text mb={2}><b>your_warpv_core_verilog.sv</b></Text>}
 
-                <Box borderWidth={3} borderRadius={15} p={2}>
+                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" maxW="85vh">
                     {selectedFile === 'configuration' &&
                     <Text>Your configuration is determined by your core selections on the homepage.</Text>}
-                    {selectedFile === 'm4' && macrosForJson.map((line, index) => <Text
-                        key={index}>{line}</Text>)}
-                    {selectedFile === 'tlv' && tlvForJson && tlvForJson.split("\n").map((line, index) => <Text
-                        key={index}>{line}</Text>)}
-                    {selectedFile === 'rtl' && sVForJson && sVForJson.split("\n").map((line, index) => <Text
-                        key={index}>{line}</Text>)}
-                </Box>
+                    {selectedFile === 'm4' && macrosForJson.join("\n")/*.map((line, index) => <Text
+                        key={index}>{line}</Text>)*/}
+                    {selectedFile === 'tlv' && tlvForJson && tlvForJson/*.split("\n").map((line, index) => <Text
+                        key={index}>{line}</Text>)*/}
+                    {selectedFile === 'rtl' && sVForJson && sVForJson/*.split("\n").map((line, index) => <Text
+                        key={index}>{line}</Text>)*/}
+                </Code>
             </>}
         </Box>
     </Box>;
