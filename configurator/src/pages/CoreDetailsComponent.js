@@ -1,38 +1,66 @@
-import {Box, Code, Heading, HStack, Icon, Image, Link, Text} from '@chakra-ui/react';
-import {BsArrowRight} from 'react-icons/all';
-import {useState} from 'react';
+import {Box, Button, Code, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
+import {FaLongArrowAltRight} from 'react-icons/all';
+import {useState} from "react";
+import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
 
-export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVForJson}) {
-    const [selectedFile, setSelectedFile] = useState();
+const m4fileName = "your_warpv_core_configuration.m4"
+const tlvFileName = "your_warpv_core_tlv.tlv"
+const systemVerilogFileName = "your_warpv_core_verilog.sv"
+
+export function CoreDetailsComponent({
+                                         coreJson,
+                                         tlvForJson,
+                                         macrosForJson,
+                                         sVForJson,
+                                         selectedFile,
+                                         setSelectedFile,
+                                         ...rest
+                                     }) {
+    const [makerchipOpening, setMakerchipOpening] = useState(false)
+
     if (!coreJson || !macrosForJson || !sVForJson) return null;
 
     function handleDisplayButtonClicked(toDisplay) {
         setSelectedFile(toDisplay);
     }
 
-    return <Box mx='auto' maxW='85vh' mb={30}>
+    function handleDownloadSelectedFileClicked() {
+        if (selectedFile === "m4") downloadFile(m4fileName, macrosForJson.join("\n"))
+        else if (selectedFile === "tlv") downloadFile(tlvFileName, tlvForJson)
+        else if (selectedFile === "rtl") downloadFile(systemVerilogFileName, sVForJson)
+    }
+
+    function handleOpenInMakerchipClicked() {
+        if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening)
+        else if (selectedFile === "tlv") openInMakerchip(tlvForJson, setMakerchipOpening)
+        else if (selectedFile === "rtl") openInMakerchip(sVForJson, setMakerchipOpening)
+    }
+
+    return <Box mx='auto' maxW='85vh' mb={30} {...rest}>
         <Box mb={10}>
             <Heading mb={1}>Core Details</Heading>
             <Text mt={5}>Your CPU is constructed in the following steps.</Text>
-            <Text> After generation, any of these can be taken as source and modified by hand.</Text>
         </Box>
 
         <HStack mb={10}>
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('configuration')}>
-                    <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>UI Configuration</Text>
-                    <Image src="paramboxpreview.png" maxW={250} mx="auto"/>
+                    <Image src="paramsboxpreview.png" maxW={250} mx="auto"/>
                 </Link>
             </Box>
-            <Icon as={BsArrowRight}/>
+            <Tooltip label="Your configuration selections are codified.">
+                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+            </Tooltip>
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
                     <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
-                    <Image src="macropreview.png" maxW={150} mx="auto"/>
+                    <Image src="macropreviewlight.png" maxW={150} mx="auto"/>
                 </Link>
             </Box>
-            <Icon as={BsArrowRight}/>
+            <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
+                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+            </Tooltip>
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('tlv')}>
@@ -41,7 +69,10 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
                     <Image src="tlv-tlvpreview.png" maxW={200} mx="auto"/>
                 </Link>
             </Box>
-            <Icon as={BsArrowRight}/>
+            <Tooltip
+                label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
+                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+            </Tooltip>
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('rtl')}>
@@ -55,11 +86,17 @@ export function CoreDetailsComponent({coreJson, tlvForJson, macrosForJson, sVFor
             {!selectedFile && <Text>No file selected</Text>}
             {selectedFile && <>
                 {selectedFile === 'configuration' && <Text mb={2}><b>Core Configuration</b></Text>}
-                {selectedFile === 'm4' && <Text mb={2}><b>your_warpv_core_configuration.m4</b></Text>}
-                {selectedFile === 'tlv' && <Text mb={2}><b>your_warpv_core_tlv.tlv</b></Text>}
-                {selectedFile === 'rtl' && <Text mb={2}><b>your_warpv_core_verilog.sv</b></Text>}
+                {selectedFile === 'm4' && <Text mb={2}><b>{m4fileName}</b></Text>}
+                {selectedFile === 'tlv' && <Text mb={2}><b>{tlvFileName}</b></Text>}
+                {selectedFile === 'rtl' && <Text mb={2}><b>{systemVerilogFileName}</b></Text>}
 
-                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" maxW="85vh">
+                <HStack mb={3}>
+                    <Button colorScheme="teal" onClick={handleDownloadSelectedFileClicked}>Download File</Button>
+                    <Button colorScheme="blue" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
+                            isLoading={makerchipOpening}>Edit this File in Makerchip (as source code)</Button>
+                </HStack>
+
+                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100vh">
                     {selectedFile === 'configuration' &&
                     <Text>Your configuration is determined by your core selections on the homepage.</Text>}
                     {selectedFile === 'm4' && macrosForJson.join("\n")/*.map((line, index) => <Text

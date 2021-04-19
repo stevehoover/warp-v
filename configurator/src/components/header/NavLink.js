@@ -25,14 +25,14 @@ function MobileNavLink(props) {
     <chakra.a
       display='block'
       textAlign='center'
-      fontWeight='bold'
       py='5'
+      fontWeight='bold'
       fontSize='lg'
+      _hover={{
+          bg: 'blackAlpha.200',
+      }}
       color='white'
       w='full'
-      _hover={{
-        bg: 'blackAlpha.200',
-      }}
       {...props}
     />
   );

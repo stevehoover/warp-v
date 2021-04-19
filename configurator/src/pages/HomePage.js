@@ -1,5 +1,5 @@
 import {Box, Button, Heading, HStack, Image, Tab, TabList, TabPanel, TabPanels, Tabs, Text} from '@chakra-ui/react';
-import React, {useEffect, useState} from 'react';
+import React, {createRef, useEffect, useState} from 'react';
 import {
     getTLVCodeForDefinitions,
     translateJsonToM4Macros,
@@ -10,6 +10,7 @@ import {useHistory} from 'react-router-dom';
 import {GenericSettingsFormComponent} from "../components/GenericSettingsFormComponent";
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
+import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
 
 const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))
 const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
@@ -29,6 +30,8 @@ export default function HomePage({
     const history = useHistory();
     const [makerchipOpening, setMakerchipOpening] = useState(false)
     const [downloadingCode, setDownloadingCode] = useState(false)
+    const detailsComponentRef = createRef()
+    const [selectedFile, setSelectedFile] = useState(null)
 
     useEffect(() => {
         if (!configuratorGlobalSettings.coreJson) return
@@ -52,6 +55,11 @@ export default function HomePage({
             }
         }
     }, [configuratorGlobalSettings.coreJson])
+
+    function scrollToDetailsComponent() {
+        setSelectedFile("m4")
+        detailsComponentRef?.current?.scrollIntoView()
+    }
 
     function updateDefaultStagesForPipelineDepth(depth) {
         let valuesToSet;
@@ -171,24 +179,7 @@ export default function HomePage({
             setMakerchipOpening(true)
             const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
-            const formBody = new URLSearchParams();
-            formBody.append("source", tlv);
-            fetch(
-                "https://makerchip.com/project/public",
-                {
-                    method: 'POST',
-                    body: formBody,
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    }
-                }
-            )
-                .then(resp => resp.json())
-                .then(json => {
-                    const url = json.url
-                    window.open(`https://makerchip.com${url}`)
-                    setMakerchipOpening(false)
-                })
+            openInMakerchip(tlv, setMakerchipOpening)
         }
     }
 
@@ -198,7 +189,7 @@ export default function HomePage({
             const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
             getSVForTlv(tlv, sv => {
-                download('verilog.sv', sv);
+                downloadFile('verilog.sv', sv);
                 setDownloadingCode(false)
             });
 
@@ -276,8 +267,9 @@ export default function HomePage({
         </Box>
 
         <Box mt={5} mb={15} mx='auto' maxW='85vh' pb={10} borderBottomWidth={2}>
-            <Heading size='lg' mb={15}>Get your code:</Heading>
-
+            <Heading size='lg' mb={2}>Get your code:</Heading>
+            <Button type="button" mb={3} colorScheme="blue"
+                    onClick={scrollToDetailsComponent}>View Below</Button>
             <HStack mb={3}>
                 <Box>
                     <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
@@ -293,12 +285,16 @@ export default function HomePage({
 
         </Box>
 
-        <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
-                              settings={configuratorGlobalSettings.settings}
-                              coreJson={configuratorGlobalSettings.coreJson}
-                              tlvForJson={tlvForJson}
-                              macrosForJson={macrosForJson}
-                              sVForJson={sVForJson}/>
+        <div ref={detailsComponentRef}>
+            <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
+                                  settings={configuratorGlobalSettings.settings}
+                                  coreJson={configuratorGlobalSettings.coreJson}
+                                  tlvForJson={tlvForJson}
+                                  macrosForJson={macrosForJson}
+                                  sVForJson={sVForJson}
+            selectedFile={selectedFile}
+            setSelectedFile={setSelectedFile}/>
+        </div>
     </>;
 }
 
@@ -310,15 +306,3 @@ function CorePreview({path, info, ...rest}) {
 }
 
 
-function download(filename, text) {
-    const element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
-
-    element.style.display = 'none';
-    document.body.appendChild(element);
-
-    element.click();
-
-    document.body.removeChild(element);
-}

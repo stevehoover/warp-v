@@ -39,8 +39,6 @@ export function GenericSettingsFormComponent({
         setConfiguratorGlobalSettings({...configuratorGlobalSettings, settings: newObj});
     }
 
-   // console.log("re-render")
-//console.log(configuratorGlobalSettings.settings["next_pc_stage"])
 
     const getTitleComponent = (parameter) => <>
         {!parameter.description ? <FormLabel mb={2}>{parameter.readableName}</FormLabel> :
