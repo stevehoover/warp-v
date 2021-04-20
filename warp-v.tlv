@@ -3143,7 +3143,6 @@ m4+definitions(['
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
    m4_define(['m4_gen'], M4_isa['_gen'])
    m4+m4_gen()
-
    // Instruction memory and fetch of $raw.
    m4+M4_IMEM_MACRO_NAME(M4_PROG_NAME)
 
@@ -3529,6 +3528,9 @@ m4+definitions(['
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
+
+            
+
 \TLV warpv_makerchip_cnt10_tb()
    |fetch
       /instr
@@ -3898,6 +3900,24 @@ m4+module_def
    
 
    m4+cpu(/top)
+   
+   m4_ifelse_block(M4_ISA, ['RISCV'], ['
+   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
+   // Multi-core
+   /M4_CORE_HIER
+      m4_ifelse_block(M4_VIZ, 1, ['
+      m4+cpu_viz(/top)
+      '])
+   '], ['
+   m4_ifelse_block(M4_VIZ, 1, ['
+   m4+cpu_viz(/top)
+   '])
+   '])
+   '])
+   
+   
+   
+   
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
    '], [''])
