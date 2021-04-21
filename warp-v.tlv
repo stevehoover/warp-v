@@ -3143,7 +3143,6 @@ m4+definitions(['
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
    m4_define(['m4_gen'], M4_isa['_gen'])
    m4+m4_gen()
-
    // Instruction memory and fetch of $raw.
    m4+M4_IMEM_MACRO_NAME(M4_PROG_NAME)
 
@@ -3529,6 +3528,21 @@ m4+definitions(['
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
+   m4_ifelse_block(M4_ISA, ['RISCV'], ['
+   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
+   // Multi-core
+   /M4_CORE_HIER
+      m4_ifelse_block(M4_VIZ, 1, ['
+      m4+cpu_viz(/top)
+      '])
+   '], ['
+   m4_ifelse_block(M4_VIZ, 1, ['
+   m4+cpu_viz(/top)
+   '])
+   '])
+   '])
+
+
 \TLV warpv_makerchip_cnt10_tb()
    |fetch
       /instr
@@ -3895,7 +3909,7 @@ m4+module_def
    //    THE MODEL
    //
    // =================
-   
+
 
    m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
@@ -4014,7 +4028,7 @@ m4+module_def
                   }
                   if (!global.instr_mem_drawn[this.getIndex()]) {
                      global.instr_mem_drawn[this.getIndex()] = true;
-                     m4_ifelse_block_tmp(['                     '], M4_ISA, ['MINI'], ['
+                     m4_ifelse_block(M4_ISA, ['MINI'], ['
                         let instr_str = '$instr'.goTo(0).asString();
                      '], M4_ISA, ['RISCV'], ['
                         let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
@@ -4371,17 +4385,12 @@ m4+module_def
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    m4+makerchip_pass_fail(/core[*])
-   /M4_CORE_HIER
-      m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(/top)
-      '])
    '], ['
    // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
    m4+makerchip_pass_fail()
    m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(/top)
    '])
    '])
 
