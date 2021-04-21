@@ -4385,17 +4385,12 @@ m4+module_def
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    m4+makerchip_pass_fail(/core[*])
-   /M4_CORE_HIER
-      m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(/top)
-      '])
    '], ['
    // Single Core.
    m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
    m4+makerchip_pass_fail()
    m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(/top)
    '])
    '])
 
