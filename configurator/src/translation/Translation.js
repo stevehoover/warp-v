@@ -13,8 +13,8 @@ export function translateParametersToJson(configuratorGlobalSettings, setConfigu
 export function translateJsonToM4Macros(json) {
   const {general, pipeline} = json;
   const lines = [];
-  lines.push(`m4_define(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
-  lines.push(`m4_define(ISA, ${general.isa})`);
+  lines.push(`m4_def(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
+  lines.push(`m4_def(ISA, ${general.isa})`);
   general.isaExtensions?.forEach(extension => lines.push(`m4_ifndef(['M4_EXT_${extension}'], 1)`));
   Object.entries(pipeline).forEach(entry => {
     const [jsonKey, value] = entry;
@@ -44,8 +44,8 @@ m4+definitions(['
   
 m4+module_def
 \\TLV
-   m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
+   m4+warpv()
    m4+makerchip_pass_fail()
 \\SV
    endmodule

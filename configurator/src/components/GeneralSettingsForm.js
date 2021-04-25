@@ -38,6 +38,15 @@ export function GeneralSettingsForm({ configuratorGlobalSettings, setConfigurato
       </RadioGroup>
     </FormControl>
 
+    <FormControl mb={5}>
+      <FormLabel>Formatting</FormLabel>
+      <CheckboxGroup onChange={values => setConfiguratorGlobalSettings({...configuratorGlobalSettings, generalSettings: {...configuratorGlobalSettings.generalSettings, formattingSettings: values }})}>
+        <Stack direction='row'>
+          <Checkbox value='--fmtNoSource'>Do not generate \source tags for correlating pre- and post-M4 code</Checkbox>
+        </Stack>
+      </CheckboxGroup>
+    </FormControl>
+
     {configuratorGlobalSettings.generalSettings.isa === 'RISCV' && <FormControl>
       <FormLabel>ISA Extensions (RISC-V only):</FormLabel>
       <CheckboxGroup onChange={values => setConfiguratorGlobalSettings({...configuratorGlobalSettings, generalSettings: {...configuratorGlobalSettings.generalSettings, isaExtensions: values }})}>

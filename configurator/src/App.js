@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import {Box, ChakraProvider, theme} from '@chakra-ui/react';
-import {Header} from './components/header/Header';
 import {Route, Switch} from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import useFetch from './utils/useFetch';
@@ -16,7 +15,8 @@ function App() {
         coreJson: null,
         generalSettings: {
             isa: 'RISCV',
-            depth: 4
+            depth: 4,
+            formattingSettings: []
         }
     })
 
@@ -50,7 +50,7 @@ function App() {
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: "-i test.tlv -o test.sv --m4out out/m4out",
+                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.join(" ")}`,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {
@@ -85,7 +85,7 @@ function App() {
                 </Switch>
             </Box>
 
-            <Footer />
+            <Footer/>
         </Box>
     </ChakraProvider>;
 }

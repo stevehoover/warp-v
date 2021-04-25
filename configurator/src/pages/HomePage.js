@@ -27,7 +27,6 @@ export default function HomePage({
     const [formErrors, setFormErrors] = useState([]);
     const [userChangedStages, setUserChangedStages] = useState([])
     const [pipelineDefaultDepth, setPipelineDefaultDepth] = useState()
-    const history = useHistory();
     const [makerchipOpening, setMakerchipOpening] = useState(false)
     const [downloadingCode, setDownloadingCode] = useState(false)
     const detailsComponentRef = createRef()
@@ -292,8 +291,8 @@ export default function HomePage({
                                   tlvForJson={tlvForJson}
                                   macrosForJson={macrosForJson}
                                   sVForJson={sVForJson}
-            selectedFile={selectedFile}
-            setSelectedFile={setSelectedFile}/>
+                                  selectedFile={selectedFile}
+                                  setSelectedFile={setSelectedFile}/>
         </div>
     </>;
 }
