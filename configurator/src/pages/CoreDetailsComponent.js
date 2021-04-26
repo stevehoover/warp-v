@@ -33,7 +33,13 @@ export function CoreDetailsComponent({
     function handleOpenInMakerchipClicked() {
         if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening)
         else if (selectedFile === "tlv") openInMakerchip(tlvForJson, setMakerchipOpening)
-        else if (selectedFile === "rtl") openInMakerchip(sVForJson, setMakerchipOpening)
+        else if (selectedFile === "rtl") {
+            const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
+\\SV
+` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+
+            openInMakerchip(modifiedSVToOpen, setMakerchipOpening)
+        }
     }
 
     return <Box mx='auto' maxW='85vh' mb={30} {...rest}>
@@ -45,7 +51,7 @@ export function CoreDetailsComponent({
         <HStack mb={10}>
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('configuration')}>
-                    <Image src="paramsboxpreview.png" maxW={250} mx="auto"/>
+                    <Image src="paramsboxpreviewleft.png" maxW={150} mx="auto"/>
                 </Link>
             </Box>
             <Tooltip label="Your configuration selections are codified.">

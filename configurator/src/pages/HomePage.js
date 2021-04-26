@@ -6,7 +6,6 @@ import {
     translateParametersToJson,
 } from '../translation/Translation';
 import {GeneralSettingsForm} from '../components/GeneralSettingsForm';
-import {useHistory} from 'react-router-dom';
 import {GenericSettingsFormComponent} from "../components/GenericSettingsFormComponent";
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
@@ -267,9 +266,8 @@ export default function HomePage({
 
         <Box mt={5} mb={15} mx='auto' maxW='85vh' pb={10} borderBottomWidth={2}>
             <Heading size='lg' mb={2}>Get your code:</Heading>
-            <Button type="button" mb={3} colorScheme="blue"
-                    onClick={scrollToDetailsComponent}>View Below</Button>
             <HStack mb={3}>
+                <Button type="button" colorScheme="blue" onClick={scrollToDetailsComponent}>View Below</Button>
                 <Box>
                     <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
                             isLoading={downloadingCode} isDisabled={downloadingCode}>Download

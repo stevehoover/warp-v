@@ -15,6 +15,7 @@ function App() {
         coreJson: null,
         generalSettings: {
             isa: 'RISCV',
+            isaExtensions: ["E","M"],
             depth: 4,
             formattingSettings: []
         }
@@ -50,7 +51,7 @@ function App() {
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.join(" ")}`,
+                args: `-i test.tlv -o test.sv --m4out out/m4out --bestsv ${configuratorGlobalSettings.generalSettings.formattingSettings.join(" ")}`,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {
@@ -60,7 +61,7 @@ function App() {
             false,
         )
 
-        setTlvForJson(data["out/m4out"].split("\n").map(line => line.trim()).filter(line => line.length > 0).join("\n"))
+        setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n"))
         setMacrosForJson(tlv.split("\n"))
         const verilog = data["out/test.sv"].replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
         callback(verilog)
