@@ -4387,8 +4387,8 @@ m4+module_def
    m4+makerchip_pass_fail(/core[*])
    '], ['
    // Single Core.
-   m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
+   m4+warpv()
    m4+makerchip_pass_fail()
    m4_ifelse_block(M4_VIZ, 1, ['
    '])
