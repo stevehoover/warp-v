@@ -2,6 +2,7 @@ import {Box, Button, Code, Heading, HStack, Icon, Image, Link, Text, Tooltip} fr
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
 import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
+import {QuestionOutlineIcon} from "@chakra-ui/icons";
 
 const m4fileName = "your_warpv_core_configuration.m4"
 const tlvFileName = "your_warpv_core_tlv.tlv"
@@ -37,12 +38,13 @@ export function CoreDetailsComponent({
             const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
 \\SV
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+            // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be download when compiled.
 
             openInMakerchip(modifiedSVToOpen, setMakerchipOpening)
         }
     }
 
-    return <Box mx='auto' maxW='85vh' mb={30} {...rest}>
+    return <Box mx='auto' maxW='100vh' mb={30} {...rest}>
         <Box mb={10}>
             <Heading mb={1}>Core Details</Heading>
             <Text mt={5}>Your CPU is constructed in the following steps.</Text>
@@ -55,7 +57,10 @@ export function CoreDetailsComponent({
                 </Link>
             </Box>
             <Tooltip label="Your configuration selections are codified.">
-                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+                <HStack>
+                    <QuestionOutlineIcon/>
+                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
+                </HStack>
             </Tooltip>
 
             <Box>
@@ -65,7 +70,10 @@ export function CoreDetailsComponent({
                 </Link>
             </Box>
             <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
-                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+                <HStack>
+                    <QuestionOutlineIcon />
+                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
+                </HStack>
             </Tooltip>
 
             <Box>
@@ -77,7 +85,10 @@ export function CoreDetailsComponent({
             </Box>
             <Tooltip
                 label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
-                <Box><Icon as={FaLongArrowAltRight} fontSize="30px"/></Box>
+                <HStack>
+                    <QuestionOutlineIcon />
+                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
+                </HStack>
             </Tooltip>
 
             <Box>
@@ -88,7 +99,7 @@ export function CoreDetailsComponent({
             </Box>
         </HStack>
 
-        <Box maxW='85vh'>
+        <Box maxW='100vh'>
             {!selectedFile && <Text>No file selected</Text>}
             {selectedFile && <>
                 {selectedFile === 'configuration' && <Text mb={2}><b>Core Configuration</b></Text>}
