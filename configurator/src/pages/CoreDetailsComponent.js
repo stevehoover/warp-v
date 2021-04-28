@@ -1,4 +1,4 @@
-import {Box, Button, Code, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
+import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Stack, Text, Tooltip} from '@chakra-ui/react';
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
 import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
@@ -57,10 +57,10 @@ export function CoreDetailsComponent({
                 </Link>
             </Box>
             <Tooltip label="Your configuration selections are codified.">
-                <HStack>
-                    <QuestionOutlineIcon/>
+                <Container centerContent mx={0} px={0} width={30}>
                     <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                </HStack>
+                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                </Container>
             </Tooltip>
 
             <Box>
@@ -70,10 +70,10 @@ export function CoreDetailsComponent({
                 </Link>
             </Box>
             <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
-                <HStack>
-                    <QuestionOutlineIcon />
+                <Container centerContent mx={0} px={0} width={30}>
                     <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                </HStack>
+                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                </Container>
             </Tooltip>
 
             <Box>
@@ -85,10 +85,10 @@ export function CoreDetailsComponent({
             </Box>
             <Tooltip
                 label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
-                <HStack>
-                    <QuestionOutlineIcon />
+                <Container centerContent mx={0} px={0} width={30}>
                     <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                </HStack>
+                   <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                </Container>
             </Tooltip>
 
             <Box>
