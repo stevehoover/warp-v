@@ -1,5 +1,4 @@
 import {Box, Icon, Link} from "@chakra-ui/react";
-import {Link as RouterLink} from "react-router-dom"
 import * as React from "react";
 import {MdOpenInNew} from "react-icons/all";
 
@@ -23,6 +22,6 @@ function FooterLink({to, children, ...rest}) {
                      bg: 'blackAlpha.200',
                  }}
                  target="_blank"
-        {...rest}
+                 {...rest}
     >{children}</Link>
 }

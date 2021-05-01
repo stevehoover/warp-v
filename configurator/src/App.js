@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import {Box, ChakraProvider, theme} from '@chakra-ui/react';
-import {Header} from './components/header/Header';
 import {Route, Switch} from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import useFetch from './utils/useFetch';
@@ -16,7 +15,11 @@ function App() {
         coreJson: null,
         generalSettings: {
             isa: 'RISCV',
-            depth: 4
+            isaExtensions: ["E","M"],
+            depth: 4,
+            formattingSettings: [
+                "--bestsv"
+            ]
         }
     })
 
@@ -50,7 +53,7 @@ function App() {
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: "-i test.tlv -o test.sv --m4out out/m4out",
+                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.join(" ")}`,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {
@@ -60,7 +63,7 @@ function App() {
             false,
         )
 
-        setTlvForJson(data["out/m4out"].split("\n").map(line => line.trim()).filter(line => line.length > 0).join("\n"))
+        setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n")) // remove some extra spacing by removing extra newlines
         setMacrosForJson(tlv.split("\n"))
         const verilog = data["out/test.sv"].replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
         callback(verilog)
@@ -85,7 +88,7 @@ function App() {
                 </Switch>
             </Box>
 
-            <Footer />
+            <Footer/>
         </Box>
     </ChakraProvider>;
 }

@@ -307,7 +307,7 @@ m4+definitions(['
    m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
    // Build for formal verification (defaulted to 0).
    m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-	m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
+   m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
                                               // instead of actual mul/div, this is enabled automatically when formal is used, 
                                               // can be enabled manually for testing in Makerchip environment.
 
@@ -422,7 +422,6 @@ m4+definitions(['
       ']
    )
    
-   
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
@@ -446,9 +445,9 @@ m4+definitions(['
          // TODO. Currently formal checks takes long time(~48 mins) when M4_EXT_B is set to 1.
          //       Hence, its disabled at present.
          m4_defines(
-            (['M4_EXT_E'], 1),
             (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
+            (['M4_EXT_E'], 0),
+            (['M4_EXT_M'], 0),
             (['M4_EXT_A'], 0),
             (['M4_EXT_F'], 0),
             (['M4_EXT_D'], 0),
@@ -639,7 +638,7 @@ m4+definitions(['
          m4_define_vector(['M4_ADDR'], 32)
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
-         m4_define_hier(['M4_REGS'], 32, 1)
+         m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
          m4_define_hier(['M4_FPUREGS'], 32, 0)
          
          // Controls SV generation:
@@ -1699,7 +1698,7 @@ m4+definitions(['
       /src[2:1]
          // Reg valid for this source, based on instruction type.
          $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
-         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
+         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[M4_REGS_INDEX_RANGE] : /instr$raw_rs2[M4_REGS_INDEX_RANGE];
          
       // For debug.
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
@@ -1707,7 +1706,7 @@ m4+definitions(['
    // Condition signals must not themselves be conditioned (currently).
    $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     m4_ifelse(M4_EXT_B, 1, ['$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
-                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd[M4_REGS_INDEX_RANGE];
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -1909,13 +1908,13 @@ m4+definitions(['
          $flw_rslt[M4_WORD_RANGE] = 32'b0;
          '])
          '], ['
-         $lb_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lh_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lw_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lbu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
-         $lhu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
+         $lb_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lh_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lw_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lbu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
+         $lhu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
          m4_ifelse_block(M4_EXT_F, 1, ['
-         $flw_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
+         $flw_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
          '])
          '])
          $addi_rslt[M4_WORD_RANGE]  = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
@@ -2842,8 +2841,8 @@ m4+definitions(['
          m4_define(M4_RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
       '])
       m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
-			`define RISCV_FORMAL_ALTOPS
-		'])
+      `define RISCV_FORMAL_ALTOPS
+    '])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       // TODO : Update links after merge to master!
@@ -3582,7 +3581,7 @@ m4+definitions(['
 
             /original
                $ANY = /instr$second_issue ? /instr/orig_inst$ANY : /instr$ANY;
-               /src[2:1]instr
+               /src[2:1]
                   $ANY = /instr$second_issue ? /instr/orig_inst/src$ANY : /instr/src$ANY;
 
             $would_reissue = ($ld || $div_mul);
@@ -4147,7 +4146,7 @@ m4+module_def
                   },
                   renderEach: function() {
                      let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index);
-                     let pending = '$pending'.asBool(false);
+                     m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
                      let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
@@ -4261,7 +4260,7 @@ m4+module_def
                   },
                   renderEach: function() {
                      let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index);
-                     let pending = '$pending_fpu'.asBool(false);
+                     let pending = m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending_fpu'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
                      let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : "";
@@ -4387,8 +4386,8 @@ m4+module_def
    m4+makerchip_pass_fail(/core[*])
    '], ['
    // Single Core.
-   m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
+   m4+warpv()
    m4+makerchip_pass_fail()
    m4_ifelse_block(M4_VIZ, 1, ['
    '])

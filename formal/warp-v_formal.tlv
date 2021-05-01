@@ -1,6 +1,7 @@
 \m4_TLV_version 1d -p verilog: tl-x.org
 m4+definitions
    m4_define(['M4_ISA'], ['RISCV'])
+   m4_define(['M4_EXT_M'], 1)
    // Configure for formal verification.
    m4_define(['M4_FORMAL'], 1)
    m4_define(['M4_RISCV_FORMAL_ALTOPS'], 1)

@@ -1,4 +1,17 @@
-import {Box, Button, Heading, HStack, Image, Tab, TabList, TabPanel, TabPanels, Tabs, Text} from '@chakra-ui/react';
+import {
+    Box,
+    Button, Checkbox, CheckboxGroup,
+    FormControl, FormLabel,
+    Heading,
+    HStack,
+    Image, Stack,
+    Tab,
+    TabList,
+    TabPanel,
+    TabPanels,
+    Tabs,
+    Text
+} from '@chakra-ui/react';
 import React, {createRef, useEffect, useState} from 'react';
 import {
     getTLVCodeForDefinitions,
@@ -6,7 +19,6 @@ import {
     translateParametersToJson,
 } from '../translation/Translation';
 import {GeneralSettingsForm} from '../components/GeneralSettingsForm';
-import {useHistory} from 'react-router-dom';
 import {GenericSettingsFormComponent} from "../components/GenericSettingsFormComponent";
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
@@ -27,7 +39,6 @@ export default function HomePage({
     const [formErrors, setFormErrors] = useState([]);
     const [userChangedStages, setUserChangedStages] = useState([])
     const [pipelineDefaultDepth, setPipelineDefaultDepth] = useState()
-    const history = useHistory();
     const [makerchipOpening, setMakerchipOpening] = useState(false)
     const [downloadingCode, setDownloadingCode] = useState(false)
     const detailsComponentRef = createRef()
@@ -211,7 +222,7 @@ export default function HomePage({
             </HStack>
         </Box>
 
-        <Box mx='auto' maxW='85vh'>
+        <Box mx='auto' maxW='100vh'>
             <Heading size='md' mb={4}>Configure your CPU now</Heading>
             <Tabs borderWidth={1} borderRadius='lg' p={3}>
                 <TabList>
@@ -219,6 +230,7 @@ export default function HomePage({
                     <Tab>Multi-Core</Tab>
                     <Tab>Pipeline</Tab>
                     <Tab>Components</Tab>
+                    <Tab>Code</Tab>
                     <Tab>Hazards</Tab>
                     <Tab>Memory</Tab>
                     <Tab>I/O</Tab>
@@ -248,6 +260,36 @@ export default function HomePage({
                                                       configurationParametersSubset={["branch_pred"]}/>
                     </TabPanel>
                     <TabPanel>
+                        <FormControl mb={5}>
+                            <FormLabel>Formatting</FormLabel>
+                            <CheckboxGroup value={configuratorGlobalSettings.generalSettings.formattingSettings} onChange={values => setConfiguratorGlobalSettings({
+                                ...configuratorGlobalSettings,
+                                generalSettings: {...configuratorGlobalSettings.generalSettings, formattingSettings: values}
+                            })}>
+                                <Stack direction='column'>
+                                    <Checkbox value='--bestsv'>Format to best SV</Checkbox>
+                                    <Checkbox value='--fmtDeclSingleton'> Each HDL signal is declared in its own declaration statement
+                                        with its own type specification.</Checkbox>
+                                    <Checkbox value='--fmtDeclUnifiedHier'>Declare signals in a unified design hierarchy in the
+                                        generated file, as opposed to inline with scope lines in the translated file. (No impact if
+                                        --fmtFlatSignals.)</Checkbox>
+                                    <Checkbox value='--fmtEscapedNames'>Use escaped HDL names that resemble TLV names as closely as
+                                        possible.</Checkbox>
+                                    <Checkbox value='--fmtFlatSignals'>Declare signals at the top level scope in the generated file, and
+                                        do not use hierarchical signal references.</Checkbox>
+                                    <Checkbox value='--fmtFullHdlHier'>Provide HDL hierarchy for all scopes, including non-replicated
+                                        scopes.</Checkbox>
+                                    <Checkbox value='--fmtNoRespace'>Preserve whitespace in HDL expressions as is. Do not adjust
+                                        whitespace to preserve alignment of elements and comments of the expression.</Checkbox>
+                                    <Checkbox value='--fmtPackAll'>Generate HDL signals as packed at all levels of hierarchy.  Also, forces behavior of --fmtFlatSignals.</Checkbox>
+                                    <Checkbox value='--fmtPackBooleans'>Pack an additional level of hierarchy for boolean HDL signals. </Checkbox>
+                                    <Checkbox value='--fmtStripUniquifiers'>Eliminate the use of uniquifiers in HDL names where possible.</Checkbox>
+
+                                </Stack>
+                            </CheckboxGroup>
+                        </FormControl>
+                    </TabPanel>
+                    <TabPanel>
                         <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
                                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                                       configurationParametersSubset={hazardsParams}/>
@@ -266,11 +308,10 @@ export default function HomePage({
             </Tabs>
         </Box>
 
-        <Box mt={5} mb={15} mx='auto' maxW='85vh' pb={10} borderBottomWidth={2}>
+        <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
             <Heading size='lg' mb={2}>Get your code:</Heading>
-            <Button type="button" mb={3} colorScheme="blue"
-                    onClick={scrollToDetailsComponent}>View Below</Button>
             <HStack mb={3}>
+                <Button type="button" colorScheme="blue" onClick={scrollToDetailsComponent}>View Below</Button>
                 <Box>
                     <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
                             isLoading={downloadingCode} isDisabled={downloadingCode}>Download
@@ -292,8 +333,8 @@ export default function HomePage({
                                   tlvForJson={tlvForJson}
                                   macrosForJson={macrosForJson}
                                   sVForJson={sVForJson}
-            selectedFile={selectedFile}
-            setSelectedFile={setSelectedFile}/>
+                                  selectedFile={selectedFile}
+                                  setSelectedFile={setSelectedFile}/>
         </div>
     </>;
 }
