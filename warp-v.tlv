@@ -3991,7 +3991,7 @@ m4+module_def
 \TLV instrs_for_viz()
    m4_ifelse_block(M4_VIZ, 1, ['
    |fetch
-      @M4_REG_WR_STAGE
+      @M4_MEM_WR_STAGE
          m4_ifelse_block(M4_ISA, ['MINI'], [''], ['
          // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
          // has different fields on different clocks, Verilator throws warnings.
@@ -4018,7 +4018,7 @@ m4+module_def
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
    m4+m4_viz_logic_macro_name()
    |fetch
-      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
+      @M4_MEM_WR_STAGE  // Visualize everything happening at the same time.
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
             \viz_alpha
                renderEach: function() {
