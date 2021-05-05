@@ -15,7 +15,7 @@ function App() {
         coreJson: null,
         generalSettings: {
             isa: 'RISCV',
-            isaExtensions: ["E","M"],
+            isaExtensions: [],
             depth: 4,
             formattingSettings: [
                 "--bestsv"
