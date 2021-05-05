@@ -6,6 +6,7 @@ import useFetch from './utils/useFetch';
 import {ConfigurationParameters} from "./translation/ConfigurationParameters";
 import {translateParametersToJson} from "./translation/Translation";
 import {Footer} from "./components/header/Footer";
+import {Header} from "./components/header/Header";
 
 function App() {
     const makerchipFetch = useFetch("https://faas.makerchip.com")
@@ -71,7 +72,7 @@ function App() {
 
     return <ChakraProvider theme={theme}>
         <Box minHeight='480px'>
-            {/*<Header/>*/}
+            {<Header/>}
 
             <Box mx={5} overflowWrap>
                 <Switch>

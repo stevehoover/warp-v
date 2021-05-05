@@ -43,11 +43,11 @@ function MobileNavContent(props) {
 function DesktopNavContent(props) {
     return <>
         <HStack spacing='8' align='stretch' {...props}>
-            {links.map((link, index) => (
+            {/*links.map((link, index) => (
                 <NavLink.Desktop key={index} href={link.href} target={link.target || "_self"}>
                     {link.label}
                 </NavLink.Desktop>
-            ))}
+            ))*/}
         </HStack>
 
         <Box ml="auto" mr={15}>
