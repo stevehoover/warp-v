@@ -239,7 +239,7 @@ console.log("Core json: ")
                 <HStack columns={3}>
                     <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation'/>
                     <Box w={250} textAlign="center">
-                        <Text>...</Text>
+                        <Text fontSize={36}>...</Text>
                     </Box>
                     <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' w={300}/>
                 </HStack>
