@@ -30,7 +30,12 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
         </FormControl>
 
         <FormControl isInvalid={formErrors.includes('depth')} mb={5}>
-            <FormLabel>Pipeline Depth:</FormLabel>
+            {/*Pipeline Depth (updates detailed parameters under "Pipeline")*/}
+            <Tooltip label='Pipeline Depth (updates detailed parameters under "Pipeline")'
+                     fontSize="md">
+                <Box as="span" borderBottomStyle="dashed"
+                     borderBottomWidth={1.5}>Pipeline Depth:<QuestionOutlineIcon ml={2} mb={1}/></Box>
+            </Tooltip>
             <RadioGroup onChange={value => setConfiguratorGlobalSettings({
                 ...configuratorGlobalSettings,
                 generalSettings: {...configuratorGlobalSettings.generalSettings, depth: parseInt(value)}
@@ -41,6 +46,7 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
                     <Radio value={2}>2-cyc</Radio>
                     <Radio value={4}>4-cyc</Radio>
                     <Radio value={6}>6-cyc</Radio>
+                    <Radio isDisabled value={""}>Custom</Radio>
                 </Stack>
                 <FormErrorMessage>Please select a pipeline depth</FormErrorMessage>
             </RadioGroup>

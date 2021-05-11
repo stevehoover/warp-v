@@ -13,7 +13,7 @@ export function translateParametersToJson(configuratorGlobalSettings, setConfigu
 export function translateJsonToM4Macros(json) {
   const {general, pipeline} = json;
   const lines = [];
-  lines.push(`m4_def(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
+  //lines.push(`m4_def(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
   lines.push(`m4_def(ISA, ${general.isa})`);
   general.isaExtensions?.forEach(extension => {
     if (!["E", "M"].includes(extension)) lines.push(`m4_def(EXT_${extension}, 1)`);
@@ -35,7 +35,7 @@ export function translateJsonToM4Macros(json) {
 function tlvM4OutputMapper(input, type) {
   if (typeof input === 'boolean') return input ? `1'b1` : `1'b0`;
   else if (typeof input === 'number') return input;
-  else if (typeof input === 'string') return `"${input}"`;
+  else if (typeof input === 'string') return `${input}`;
 }
 
 export function getTLVCodeForDefinitions(definitions, includeLib) {

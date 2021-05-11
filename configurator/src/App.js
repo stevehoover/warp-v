@@ -21,12 +21,14 @@ function App() {
             formattingSettings: [
                 "--bestsv"
             ]
-        }
+        },
+        needsPipelineInit: true
     })
 
     const [sVForJson, setSVForJson] = useState()
     const [tlvForJson, setTlvForJson] = useState()
     const [macrosForJson, setMacrosForJson] = useState()
+    const [coreJson, setCoreJson] = useState(null)
 
     useEffect(() => {
         translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
@@ -34,11 +36,8 @@ function App() {
             general: configuratorGlobalSettings.generalSettings,
             pipeline: configuratorGlobalSettings.settings
         };
-        if (JSON.stringify(configuratorGlobalSettings.coreJson) !== JSON.stringify(json)) {
-            setConfiguratorGlobalSettings({
-                ...configuratorGlobalSettings,
-                coreJson: json
-            })
+        if (JSON.stringify(coreJson) !== JSON.stringify(json)) {
+            setCoreJson(json)
         }
     }, [configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings]);
 
@@ -83,7 +82,11 @@ function App() {
                                   sVForJson={sVForJson}
                                   setSVForJson={setSVForJson}
                                   macrosForJson={macrosForJson}
+                                  coreJson={coreJson}
+                                  setCoreJson={setCoreJson}
                                   tlvForJson={tlvForJson}
+                                  setTlvForJson={setTlvForJson}
+                                  setMacrosForJson={setMacrosForJson}
                         />
                     </Route>
                 </Switch>

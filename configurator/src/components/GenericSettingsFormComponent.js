@@ -22,23 +22,39 @@ export function GenericSettingsFormComponent({
                                                  setConfiguratorGlobalSettings,
                                                  configurationParametersSubset,
                                                  userChangedStages,
-                                                 setUserChangedStages
+                                                 setUserChangedStages,
+                                                 mustBeMonotonicallyNonDecreasing = false
                                              }) {
-
+    const formParameters = ConfigurationParameters.filter(parameter => configurationParametersSubset.includes(parameter.jsonKey))
 
     function handleValueUpdate(param, key, type, value) {
         const newObj = {...configuratorGlobalSettings.settings};
         if (!value && value !== 0) {
             if (key.endsWith("_stage") && setUserChangedStages) setUserChangedStages(userChangedStages.filter(k => k !== key))
             delete newObj[key]
-        } else if(newObj[key] !== value) {
+        } else if (newObj[key] !== value) {
             if (key.endsWith("_stage") && setUserChangedStages && !userChangedStages.includes(key)) setUserChangedStages([...userChangedStages, key])
             if (!configuratorGlobalSettings.settings[key] && configuratorGlobalSettings.settings[key] !== 0 && param?.defaultValue && param?.type === Int) value += param.defaultValue
             newObj[key] = value;
         }
-        setConfiguratorGlobalSettings({...configuratorGlobalSettings, settings: newObj});
+        if (mustBeMonotonicallyNonDecreasing) {
+            const indexOfElement = formParameters.indexOf(param)
+            const newUserChangedStages = [...userChangedStages]
+            formParameters.slice(indexOfElement + 1).forEach(parameter => {
+                if (!userChangedStages.includes(parameter.jsonKey) || newObj[parameter.jsonKey] < value) {
+                    newObj[parameter.jsonKey] = value
+                    if (!newUserChangedStages.includes(parameter.jsonKey)) newUserChangedStages.push(parameter.jsonKey)
+                }
+            })
+            setUserChangedStages(newUserChangedStages)
+        }
+        if (key.endsWith("_stage")) setConfiguratorGlobalSettings({
+            ...configuratorGlobalSettings,
+            settings: newObj,
+            generalSettings: {...configuratorGlobalSettings.generalSettings, depth: ""}
+        })
+        else setConfiguratorGlobalSettings({...configuratorGlobalSettings, settings: newObj});
     }
-
 
     const getTitleComponent = (parameter) => <>
         {!parameter.description ? <FormLabel mb={2}>{parameter.readableName}</FormLabel> :
@@ -52,14 +68,15 @@ export function GenericSettingsFormComponent({
 
     return <ErrorBoundary>
         <Box>
-            {ConfigurationParameters.filter(parameter => configurationParametersSubset.includes(parameter.jsonKey)).map(configurationParameter => {
+            {formParameters.map((configurationParameter, index) => {
                 const jsonKey = configurationParameter.jsonKey;
                 if (configurationParameter.type === Int) {
                     return <FormControl mb={3} key={configurationParameter.jsonKey}
                                         isInvalid={configurationParameter.validator && configuratorGlobalSettings.settings[jsonKey] !== undefined
                                         && configuratorGlobalSettings.settings[jsonKey] && !configurationParameter.validator(configuratorGlobalSettings.settings[jsonKey], configurationParameter)}>
                         {getTitleComponent(configurationParameter)}
-                        <NumberInput maxW={100} step={1} min={configurationParameter.min}
+                        <NumberInput maxW={100} step={1}
+                                     min={configurationParameter.min}
                                      max={configurationParameter.max}
                                      onChange={(_, valueAsNumber) => handleValueUpdate(configurationParameter, configurationParameter.jsonKey, Int, valueAsNumber)}
                                      value={(configuratorGlobalSettings.settings[jsonKey] || configuratorGlobalSettings.settings[jsonKey] === 0) ? configuratorGlobalSettings.settings[jsonKey] : ""}>
@@ -85,7 +102,8 @@ export function GenericSettingsFormComponent({
                         {getTitleComponent(configurationParameter)}
                         <RadioGroup
                             onChange={value => handleValueUpdate(configurationParameter, configurationParameter.jsonKey, RadioParameter, value === 'None' ? null : value)}
-                            value={configuratorGlobalSettings.settings[configurationParameter.jsonKey] || 'None'} defaultValue='None'>
+                            value={configuratorGlobalSettings.settings[configurationParameter.jsonKey] || 'None'}
+                            defaultValue='None'>
                             <Stack direction='row'>
                                 {configurationParameter.possibleValues.map(possibleValue => <Radio key={possibleValue}
                                                                                                    value={possibleValue}>{possibleValue}</Radio>)}

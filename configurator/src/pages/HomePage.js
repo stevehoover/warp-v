@@ -1,10 +1,15 @@
 import {
     Box,
-    Button, Checkbox, CheckboxGroup,
-    FormControl, FormLabel,
+    Button,
+    Checkbox,
+    CheckboxGroup,
+    Container,
+    FormControl,
+    FormLabel,
     Heading,
     HStack,
-    Image, Stack,
+    Image,
+    Stack,
     Tab,
     TabList,
     TabPanel,
@@ -33,6 +38,10 @@ export default function HomePage({
                                      setSVForJson,
                                      tlvForJson,
                                      macrosForJson,
+                                     setMacrosForJson,
+                                     setTlvForJson,
+                                     coreJson,
+                                     setCoreJson,
                                      configuratorGlobalSettings,
                                      setConfiguratorGlobalSettings
                                  }) {
@@ -45,15 +54,16 @@ export default function HomePage({
     const [selectedFile, setSelectedFile] = useState(null)
 
     useEffect(() => {
-        if (!configuratorGlobalSettings.coreJson) return
-
-        if (!configuratorGlobalSettings.coreJson && (macrosForJson || tlvForJson)) {
-            setConfiguratorGlobalSettings({...configuratorGlobalSettings, macrosForJson: null})
-            setConfiguratorGlobalSettings({...configuratorGlobalSettings, tlvForJson: null})
+        if (!coreJson) return
+console.log("Core json: ")
+        console.log(coreJson)
+        if (!coreJson && (macrosForJson || tlvForJson)) {
+            setMacrosForJson(null)
+            setTlvForJson(null)
         } else {
-            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson)
+            const macros = translateJsonToM4Macros(coreJson)
             const tlv = getTLVCodeForDefinitions(macros)
-            setConfiguratorGlobalSettings({...configuratorGlobalSettings, macrosForJson: tlv.split("\n")})
+            setMacrosForJson(tlv.split("\n"))
 
             const task = setTimeout(() => {
                 getSVForTlv(tlv, sv => {
@@ -65,14 +75,14 @@ export default function HomePage({
                 clearTimeout(task)
             }
         }
-    }, [configuratorGlobalSettings.coreJson])
+    }, [JSON.stringify(coreJson)])
 
     function scrollToDetailsComponent() {
         setSelectedFile("m4")
         detailsComponentRef?.current?.scrollIntoView()
     }
 
-    function updateDefaultStagesForPipelineDepth(depth) {
+    function updateDefaultStagesForPipelineDepth(depth, newJson) {
         let valuesToSet;
         if (depth === 1) {
             valuesToSet = {
@@ -135,21 +145,31 @@ export default function HomePage({
         }
 
         const newSettings = {...configuratorGlobalSettings.settings}
+        const newUserChangedStages = [...userChangedStages]
         if (Object.entries(valuesToSet).length === 0) return;
         Object.entries(valuesToSet).forEach(entry => {
             const [key, value] = entry
-            if (!userChangedStages.includes(key)) {
-                newSettings[key] = value
-            }
+            //if (!userChangedStages.includes(key)) {
+            newSettings[key] = value
+            //}
+            if (!newUserChangedStages.includes(key)) newUserChangedStages.push(key)
         })
-        setConfiguratorGlobalSettings({...configuratorGlobalSettings, settings: newSettings})
         setPipelineDefaultDepth(depth)
+        setUserChangedStages(newUserChangedStages)
+        setConfiguratorGlobalSettings({
+            ...configuratorGlobalSettings,
+            settings: newSettings,
+            needsPipelineInit: false,
+        })
+
     }
 
     useEffect(() => {
-        validateForm(false);
-        if (configuratorGlobalSettings.generalSettings.depth && pipelineDefaultDepth !== configuratorGlobalSettings.generalSettings.depth) updateDefaultStagesForPipelineDepth(configuratorGlobalSettings.generalSettings.depth)
-    }, [configuratorGlobalSettings.depth]);
+        const newJson = validateForm(false);
+        if (configuratorGlobalSettings.generalSettings.depth && (configuratorGlobalSettings.needsPipelineInit || pipelineDefaultDepth !== configuratorGlobalSettings.generalSettings.depth)) {
+            updateDefaultStagesForPipelineDepth(configuratorGlobalSettings.generalSettings.depth, newJson)
+        }
+    }, [configuratorGlobalSettings.generalSettings.depth]);
 
 
     function validateForm(err) {
@@ -159,11 +179,8 @@ export default function HomePage({
                 general: configuratorGlobalSettings.generalSettings,
                 pipeline: configuratorGlobalSettings.settings
             };
-            if (JSON.stringify(configuratorGlobalSettings.coreJson) !== JSON.stringify(json)) setConfiguratorGlobalSettings({
-                ...configuratorGlobalSettings,
-                coreJson: json
-            })
-            return;
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return
         }
 
         if (!configuratorGlobalSettings.generalSettings.depth && !formErrors.includes("depth")) {
@@ -175,11 +192,8 @@ export default function HomePage({
                 general: configuratorGlobalSettings.generalSettings,
                 pipeline: configuratorGlobalSettings.settings
             };
-            if (JSON.stringify(configuratorGlobalSettings.coreJson) !== JSON.stringify(json)) setConfiguratorGlobalSettings({
-                ...configuratorGlobalSettings,
-                coreJson: json
-            })
-            return json;
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return
         }
 
         return null;
@@ -188,7 +202,7 @@ export default function HomePage({
     function handleOpenInMakerchipButtonClicked() {
         if (validateForm(true)) {
             setMakerchipOpening(true)
-            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
+            const macros = translateJsonToM4Macros(coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
             openInMakerchip(tlv, setMakerchipOpening)
         }
@@ -196,8 +210,13 @@ export default function HomePage({
 
     function handleDownloadRTLVerilogButtonClicked() {
         if (validateForm(true)) {
+            const json = validateForm(true)
+            if (json) setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                coreJson: json
+            })
             setDownloadingCode(true)
-            const macros = translateJsonToM4Macros(configuratorGlobalSettings.coreJson);
+            const macros = translateJsonToM4Macros(coreJson);
             const tlv = getTLVCodeForDefinitions(macros);
             getSVForTlv(tlv, sv => {
                 downloadFile('verilog.sv', sv);
@@ -216,10 +235,15 @@ export default function HomePage({
         <Heading textAlign='center' size='md' mb={5}>What CPU core can we build for you today?</Heading>
 
         <Box mx='auto' mb={10}>
-            <HStack columns={2}>
-                <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation'/>
-                <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' w={300}/>
-            </HStack>
+            <Container centerContent>
+                <HStack columns={3}>
+                    <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation'/>
+                    <Box w={250} textAlign="center">
+                        <Text>...</Text>
+                    </Box>
+                    <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' w={300}/>
+                </HStack>
+            </Container>
         </Box>
 
         <Box mx='auto' maxW='100vh'>
@@ -230,10 +254,10 @@ export default function HomePage({
                     <Tab>Multi-Core</Tab>
                     <Tab>Pipeline</Tab>
                     <Tab>Components</Tab>
-                    <Tab>Code</Tab>
                     <Tab>Hazards</Tab>
                     <Tab>Memory</Tab>
                     <Tab>I/O</Tab>
+                    <Tab>Code</Tab>
                     {/*<Tab>Program</Tab>*/}
                 </TabList>
                 <TabPanels>
@@ -252,42 +276,13 @@ export default function HomePage({
                                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                                       configurationParametersSubset={pipelineParams}
                                                       userChangedStages={userChangedStages}
-                                                      setUserChangedStages={setUserChangedStages}/>
+                                                      setUserChangedStages={setUserChangedStages}
+                                                      mustBeMonotonicallyNonDecreasing={true}/>
                     </TabPanel>
                     <TabPanel>
                         <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
                                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                                       configurationParametersSubset={["branch_pred"]}/>
-                    </TabPanel>
-                    <TabPanel>
-                        <FormControl mb={5}>
-                            <FormLabel>Formatting</FormLabel>
-                            <CheckboxGroup value={configuratorGlobalSettings.generalSettings.formattingSettings} onChange={values => setConfiguratorGlobalSettings({
-                                ...configuratorGlobalSettings,
-                                generalSettings: {...configuratorGlobalSettings.generalSettings, formattingSettings: values}
-                            })}>
-                                <Stack direction='column'>
-                                    <Checkbox value='--bestsv'>Format to best SV</Checkbox>
-                                    <Checkbox value='--fmtDeclSingleton'> Each HDL signal is declared in its own declaration statement
-                                        with its own type specification.</Checkbox>
-                                    <Checkbox value='--fmtDeclUnifiedHier'>Declare signals in a unified design hierarchy in the
-                                        generated file, as opposed to inline with scope lines in the translated file. (No impact if
-                                        --fmtFlatSignals.)</Checkbox>
-                                    <Checkbox value='--fmtEscapedNames'>Use escaped HDL names that resemble TLV names as closely as
-                                        possible.</Checkbox>
-                                    <Checkbox value='--fmtFlatSignals'>Declare signals at the top level scope in the generated file, and
-                                        do not use hierarchical signal references.</Checkbox>
-                                    <Checkbox value='--fmtFullHdlHier'>Provide HDL hierarchy for all scopes, including non-replicated
-                                        scopes.</Checkbox>
-                                    <Checkbox value='--fmtNoRespace'>Preserve whitespace in HDL expressions as is. Do not adjust
-                                        whitespace to preserve alignment of elements and comments of the expression.</Checkbox>
-                                    <Checkbox value='--fmtPackAll'>Generate HDL signals as packed at all levels of hierarchy.  Also, forces behavior of --fmtFlatSignals.</Checkbox>
-                                    <Checkbox value='--fmtPackBooleans'>Pack an additional level of hierarchy for boolean HDL signals. </Checkbox>
-                                    <Checkbox value='--fmtStripUniquifiers'>Eliminate the use of uniquifiers in HDL names where possible.</Checkbox>
-
-                                </Stack>
-                            </CheckboxGroup>
-                        </FormControl>
                     </TabPanel>
                     <TabPanel>
                         <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
@@ -302,7 +297,51 @@ export default function HomePage({
                         <Text>WARP-V does not currently provide any I/O components.</Text>
                     </TabPanel>
                     <TabPanel>
-                        <Text>Coming soon!</Text>
+                        <FormControl mb={5}>
+                            <FormLabel>Verilog/SystemVerilog Formatting</FormLabel>
+                            <CheckboxGroup value={configuratorGlobalSettings.generalSettings.formattingSettings}
+                                           onChange={values => setConfiguratorGlobalSettings({
+                                               ...configuratorGlobalSettings,
+                                               generalSettings: {
+                                                   ...configuratorGlobalSettings.generalSettings,
+                                                   formattingSettings: values
+                                               }
+                                           })}>
+                                <Stack direction='column'>
+                                    <Checkbox value='-p verilog'>Verilog (vs. SystemVerilog)</Checkbox>
+                                    <Checkbox value='--bestsv'>Optimize SystemVerilog code for readability (versus
+                                        preserving line association with TL-Verilog source).</Checkbox>
+                                    <Checkbox value='--fmtDeclSingleton'> Each HDL signal is declared in its own
+                                        declaration statement
+                                        with its own type specification.</Checkbox>
+                                    <Checkbox value='--fmtDeclUnifiedHier'>Declare signals in a unified design hierarchy
+                                        in the
+                                        generated file, as opposed to inline with scope lines in the translated file.
+                                        (No impact if
+                                        --fmtFlatSignals.)</Checkbox>
+                                    <Checkbox value='--fmtEscapedNames'>Use escaped HDL names that resemble TLV names as
+                                        closely as
+                                        possible.</Checkbox>
+                                    <Checkbox value='--fmtFlatSignals'>Declare signals at the top level scope in the
+                                        generated file, and
+                                        do not use hierarchical signal references.</Checkbox>
+                                    <Checkbox value='--fmtFullHdlHier'>Provide HDL hierarchy for all scopes, including
+                                        non-replicated
+                                        scopes.</Checkbox>
+                                    <Checkbox value='--fmtNoRespace'>Preserve whitespace in HDL expressions as is. Do
+                                        not adjust
+                                        whitespace to preserve alignment of elements and comments of the
+                                        expression.</Checkbox>
+                                    <Checkbox value='--fmtPackAll'>Generate HDL signals as packed at all levels of
+                                        hierarchy. Also, forces behavior of --fmtFlatSignals.</Checkbox>
+                                    <Checkbox value='--fmtPackBooleans'>Pack an additional level of hierarchy for
+                                        boolean HDL signals. </Checkbox>
+                                    <Checkbox value='--fmtStripUniquifiers'>Eliminate the use of uniquifiers in HDL
+                                        names where possible.</Checkbox>
+
+                                </Stack>
+                            </CheckboxGroup>
+                        </FormControl>
                     </TabPanel>
                 </TabPanels>
             </Tabs>
@@ -329,7 +368,7 @@ export default function HomePage({
         <div ref={detailsComponentRef}>
             <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
                                   settings={configuratorGlobalSettings.settings}
-                                  coreJson={configuratorGlobalSettings.coreJson}
+                                  coreJson={coreJson}
                                   tlvForJson={tlvForJson}
                                   macrosForJson={macrosForJson}
                                   sVForJson={sVForJson}
