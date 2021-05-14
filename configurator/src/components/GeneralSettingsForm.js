@@ -46,7 +46,7 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
                     <Radio value={2}>2-cyc</Radio>
                     <Radio value={4}>4-cyc</Radio>
                     <Radio value={6}>6-cyc</Radio>
-                    <Radio isDisabled value={""}>Custom</Radio>
+                    <Radio isDisabled value={""}>Custom Pipeline</Radio>
                 </Stack>
                 <FormErrorMessage>Please select a pipeline depth</FormErrorMessage>
             </RadioGroup>

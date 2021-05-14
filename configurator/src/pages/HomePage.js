@@ -1,4 +1,5 @@
 import {
+    Alert, AlertIcon,
     Box,
     Button,
     Checkbox,
@@ -123,7 +124,7 @@ console.log("Core json: ")
                 result_stage: 2,
                 register_wr_stage: 3,
                 mem_wr_stage: 3,
-                extra_replay_bubble: 1,
+                extra_replay_bubble: 0,//1,
                 ld_return_align: 4,
                 branch_pred: "two_bit"
             }
@@ -138,7 +139,7 @@ console.log("Core json: ")
                 result_stage: 5,
                 register_wr_stage: 6,
                 mem_wr_stage: 7,
-                extra_replay_bubble: 1,
+                extra_replay_bubble: 0,//1,
                 ld_return_align: 7,
                 branch_pred: "two_bit"
             }
@@ -180,7 +181,7 @@ console.log("Core json: ")
                 pipeline: configuratorGlobalSettings.settings
             };
             if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
-            return
+            return true
         }
 
         if (!configuratorGlobalSettings.generalSettings.depth && !formErrors.includes("depth")) {
@@ -193,7 +194,7 @@ console.log("Core json: ")
                 pipeline: configuratorGlobalSettings.settings
             };
             if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
-            return
+            return true
         }
 
         return null;
@@ -222,7 +223,6 @@ console.log("Core json: ")
                 downloadFile('verilog.sv', sv);
                 setDownloadingCode(false)
             });
-
         }
     }
 
@@ -285,6 +285,11 @@ console.log("Core json: ")
                                                       configurationParametersSubset={["branch_pred"]}/>
                     </TabPanel>
                     <TabPanel>
+                        <Alert status="warning" mb={5}>
+                            <AlertIcon />
+                            EXTRA_*_BUBBLEs (0 or 1). Set to 1 to add a cycle to replay conditions to relax circuit timing. (Not all configurations are valid.)
+                        </Alert>
+
                         <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
                                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                                       configurationParametersSubset={hazardsParams}/>

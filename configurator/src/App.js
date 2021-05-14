@@ -65,7 +65,11 @@ function App() {
 
         setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n")) // remove some extra spacing by removing extra newlines
         setMacrosForJson(tlv.split("\n"))
-        const verilog = data["out/test.sv"].replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
+        const verilog = data["out/test.sv"]
+            .replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
+            .split("\n")
+            .filter(line => !line.startsWith("`include \"sp_default.vh\""))
+            .join("\n")
         callback(verilog)
     }
 

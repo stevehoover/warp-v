@@ -41,7 +41,9 @@ export function GenericSettingsFormComponent({
             const indexOfElement = formParameters.indexOf(param)
             const newUserChangedStages = [...userChangedStages]
             formParameters.slice(indexOfElement + 1).forEach(parameter => {
-                if (!userChangedStages.includes(parameter.jsonKey) || newObj[parameter.jsonKey] < value) {
+                if (!userChangedStages.includes(parameter.jsonKey)
+                    || (parameter.jsonKey === "ld_return_align" ? newObj[parameter.jsonKey] < ((newObj["execute_stage"] || 0) - (newObj["next_pc_stage"] || 0))
+                        : newObj[parameter.jsonKey] < value)) {
                     newObj[parameter.jsonKey] = value
                     if (!newUserChangedStages.includes(parameter.jsonKey)) newUserChangedStages.push(parameter.jsonKey)
                 }
