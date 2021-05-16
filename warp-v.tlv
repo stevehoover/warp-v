@@ -1552,6 +1552,7 @@ m4+definitions(['
    $csr_pktinfo_hw_wr = 1'b0;
    $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
    $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
+   $csr_core = #core;
    '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
@@ -3527,20 +3528,6 @@ m4+definitions(['
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
-   m4_ifelse_block(M4_ISA, ['RISCV'], ['
-   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
-   // Multi-core
-   /M4_CORE_HIER
-      m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(/top)
-      '])
-   '], ['
-   m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(/top)
-   '])
-   '])
-   '])
-
 
 \TLV warpv_makerchip_cnt10_tb()
    |fetch
@@ -4384,12 +4371,22 @@ m4+module_def
       m4+warpv_makerchip_cnt10_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    m4+makerchip_pass_fail(/core[*])
+   /M4_CORE_HIER
+      // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
+      m4_ifelse_block(M4_ISA, ['RISCV'], ['
+      m4_ifelse_block(M4_VIZ, 1, ['
+      m4+cpu_viz()
+      '])
+      '])
    '], ['
    // Single Core.
    m4+warpv_makerchip_cnt10_tb()
    m4+warpv()
    m4+makerchip_pass_fail()
+   m4_ifelse_block(M4_ISA, ['RISCV'], ['
    m4_ifelse_block(M4_VIZ, 1, ['
+   m4+cpu_viz()
+   '])
    '])
    '])
 
