@@ -305,6 +305,8 @@ m4+definitions(['
      MAX_PACKET_SIZE, 3)'])
    
    m4_ifndef(
+     ['# Include visualization'],
+     VIZ, 1,
      ['# For implementation (vs. simulation). (0/1)'],
      IMPL, 0,
      ['# Build for formal verification (0/1).'],
@@ -324,7 +326,6 @@ m4+definitions(['
          Currently, this is envisioned for CSR writes that cannot be processed, such as
          NoC packet writes.'],
      cpu_blocked, 1'b0)
-
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -433,7 +434,6 @@ m4+definitions(['
       EXTRA_NON_PIPELINED_BUBBLE, 1,
       EXTRA_TRAP_BUBBLE, 1)
 
-   
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
@@ -462,9 +462,9 @@ m4+definitions(['
          // TODO. Currently formal checks takes long time(~48 mins) when M4_EXT_B is set to 1.
          //       Hence, its disabled at present.
          m4_ifndef(
-            EXT_E, 1,
             EXT_I, 1,
-            EXT_M, 1,
+            EXT_E, 0,
+            EXT_M, 0,
             EXT_A, 0,
             EXT_F, 0,
             EXT_D, 0,
@@ -666,7 +666,7 @@ m4+definitions(['
          m4_define_vector(['M4_ADDR'], 32)
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
-         m4_define_hier(['M4_REGS'], 32, 1)
+         m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
          m4_define_hier(['M4_FPUREGS'], 32, 0)
          
          // Controls SV generation:
@@ -1727,7 +1727,7 @@ m4+definitions(['
       /src[2:1]
          // Reg valid for this source, based on instruction type.
          $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
-         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
+         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[M4_REGS_INDEX_RANGE] : /instr$raw_rs2[M4_REGS_INDEX_RANGE];
          
       // For debug.
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
@@ -1735,7 +1735,7 @@ m4+definitions(['
    // Condition signals must not themselves be conditioned (currently).
    $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     m4_ifelse(M4_EXT_B, 1, ['$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
-                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd[M4_REGS_INDEX_RANGE];
    $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.
    
@@ -1937,13 +1937,13 @@ m4+definitions(['
          $flw_rslt[M4_WORD_RANGE] = 32'b0;
          '])
          '], ['
-         $lb_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lh_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lw_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lbu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
-         $lhu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
+         $lb_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lh_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lw_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+         $lbu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
+         $lhu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
          m4_ifelse_block(M4_EXT_F, 1, ['
-         $flw_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
+         $flw_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
          '])
          '])
          $addi_rslt[M4_WORD_RANGE]  = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
@@ -2870,8 +2870,8 @@ m4+definitions(['
          m4_define(M4_RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
       '])
       m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
-			`define RISCV_FORMAL_ALTOPS
-		'])
+      `define RISCV_FORMAL_ALTOPS
+    '])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       // TODO : Update links after merge to master!
@@ -3171,7 +3171,6 @@ m4+definitions(['
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
    m4_define(['m4_gen'], M4_isa['_gen'])
    m4+m4_gen()
-
    // Instruction memory and fetch of $raw.
    m4+M4_IMEM_MACRO_NAME(M4_PROG_NAME)
 
@@ -3557,6 +3556,7 @@ m4+definitions(['
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
+
 \TLV warpv_makerchip_cnt10_tb()
    |fetch
       /instr
@@ -3596,7 +3596,7 @@ m4+definitions(['
 
             /original
                $ANY = /instr$second_issue ? /instr/orig_inst$ANY : /instr$ANY;
-               /src[2:1]instr
+               /src[2:1]
                   $ANY = /instr$second_issue ? /instr/orig_inst/src$ANY : /instr/src$ANY;
 
             $would_reissue = ($ld || $div_mul);
@@ -3923,7 +3923,7 @@ m4+module_def
    //    THE MODEL
    //
    // =================
-   
+
 
    m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
@@ -4005,7 +4005,7 @@ m4+module_def
 \TLV instrs_for_viz()
    m4_ifelse_block(M4_VIZ, 1, ['
    |fetch
-      @M4_REG_WR_STAGE
+      @M4_MEM_WR_STAGE
          m4_ifelse_block(M4_ISA, ['MINI'], [''], ['
          // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
          // has different fields on different clocks, Verilator throws warnings.
@@ -4032,7 +4032,7 @@ m4+module_def
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
    m4+m4_viz_logic_macro_name()
    |fetch
-      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
+      @M4_MEM_WR_STAGE  // Visualize everything happening at the same time.
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
             \viz_alpha
                renderEach: function() {
@@ -4042,7 +4042,7 @@ m4+module_def
                   }
                   if (!global.instr_mem_drawn[this.getIndex()]) {
                      global.instr_mem_drawn[this.getIndex()] = true;
-                     m4_ifelse_block_tmp(['                     '], M4_ISA, ['MINI'], ['
+                     m4_ifelse_block(M4_ISA, ['MINI'], ['
                         let instr_str = '$instr'.goTo(0).asString();
                      '], M4_ISA, ['RISCV'], ['
                         let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
@@ -4161,7 +4161,7 @@ m4+module_def
                   },
                   renderEach: function() {
                      let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index);
-                     let pending = '$pending'.asBool(false);
+                     m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
                      let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
@@ -4275,7 +4275,7 @@ m4+module_def
                   },
                   renderEach: function() {
                      let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index);
-                     let pending = '$pending_fpu'.asBool(false);
+                     let pending = m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending_fpu'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
                      let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : "";
@@ -4400,16 +4400,21 @@ m4+module_def
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    m4+makerchip_pass_fail(/core[*])
    /M4_CORE_HIER
+      // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
+      m4_ifelse_block(M4_ISA, ['RISCV'], ['
       m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(/top)
+      m4+cpu_viz()
+      '])
       '])
    '], ['
    // Single Core.
-   m4+warpv()
    m4+warpv_makerchip_cnt10_tb()
+   m4+warpv()
    m4+makerchip_pass_fail()
+   m4_ifelse_block(M4_ISA, ['RISCV'], ['
    m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(/top)
+   m4+cpu_viz()
+   '])
    '])
    '])
 
