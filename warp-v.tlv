@@ -1001,11 +1001,23 @@ m4+definitions(['
             output logic [3: 0] rvfi_mem_wmask,  
             output logic [31: 0] rvfi_mem_rdata,  
             output logic [31: 0] rvfi_mem_wdata);'])'])
+
+   // TODO: Remove after released to Makerchip/SaaS.
+   m4_define(['m4_ifdef_tlv'], ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
 '])
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/4bcf06b71272556ec7e72269152561902474848e/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/1d1023ccf8e7b0a8cf8e8fc4f0a823ebb61008e3/risc-v_defs.tlv'])'])
 
+
+// A default testbench for all ISAs.
+// Requires m4+makerchip_pass_fail(..).
+\TLV default_makerchip_tb()
+   |fetch
+      /instr
+         @M4_MEM_WR_STAGE
+            $passed = ! $reset && $commit && ($Pc == (M4_INSTR_MAX << M4_PC_MIN));
+            $failed = *cyc_cnt > 200;
 
 
 
@@ -1049,7 +1061,7 @@ m4+definitions(['
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
          
-         "0=d;g",  //    store out at store_addr, 
+         "0=d;g",  //    store out at store_addr,
          "e=c-b", //     tmp = nine - cnt
          "p=f?e", //     branch back if tmp >= 0
          "e=0)c", //     load the final value into tmp
@@ -1455,7 +1467,6 @@ m4+definitions(['
             ?$fetch
                `BOGUS_USE($$raw[M4_INSTR_RANGE])
    '])
-   
 
 // Logic for a single CSR.
 \TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, side_effects)
@@ -2264,7 +2275,6 @@ m4+definitions(['
    @_rslt_stage
       // Mux the correct result.
       m4+riscv_rslt_mux_expr()
-   
 
 
 //============================//
@@ -3557,7 +3567,7 @@ m4+definitions(['
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
 
-\TLV warpv_makerchip_cnt10_tb()
+\TLV cnt10_makerchip_tb()
    |fetch
       /instr
          @M4_REG_WR_STAGE
@@ -3568,6 +3578,11 @@ m4+definitions(['
             $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
+   
+   // /=====================\
+   // | Formal Verification |
+   // \=====================/
+   
    // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
    // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
    // is provided in /instr/original. RVFI inputs are generally connected from this context,
@@ -3915,21 +3930,6 @@ m4+definitions(['
    m4_popdef(['m4_prev_hop_index'])
 
 
-m4+module_def
-
-\TLV warpv()
-   // =================
-   //
-   //    THE MODEL
-   //
-   // =================
-
-
-   m4+cpu(/top)
-   m4_ifelse_block(M4_FORMAL, 1, ['
-   m4+formal()
-   '], [''])
-
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
@@ -4028,6 +4028,11 @@ m4+module_def
    '])
 
 \TLV cpu_viz()
+   
+   // /===============\
+   // | Visualization |
+   // \===============/
+   
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
    m4+m4_viz_logic_macro_name()
@@ -4384,7 +4389,20 @@ m4+module_def
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
 
 
-\TLV //disabled_main()
+// Instantiate the chosen testbench, based on M4_isa, M4_PROG_NAME, and/or M4_TESTBENCH_NAME.
+//   - m4+<M4_isa>_<M4_TESTBENCH_NAME>_makerchip_tb
+//   - m4+<M4_TESTBENCH_NAME>_makerchip_tb
+//   - m4+<M4_isa>_<M4_PROG_NAME>_makerchip_tb
+//   - m4+<M4_PROG_NAME>_makerchip_tb
+//   - m4+<M4_isa>_default_makerchip_tb
+//   - m4+default_makerchip_tb
+\TLV warpv_makerchip_tb()
+   m4_ifndef(TESTBENCH_NAME, m4_ifdef_tlv(M4_isa['_']M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, m4_ifdef_tlv(M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, ['default'])))
+   m4_def(tb_macro_name, m4_ifdef_tlv(M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_TESTBENCH_NAME['_makerchip_tb']))
+   m4+m4_tb_macro_name()
+
+
+\TLV warpv_top()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_NUM_CORES > 1), ['1'], ['
    // Multi-core
@@ -4396,7 +4414,7 @@ m4+module_def
       //m4+dummy_noc(/core)
       m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
       m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      m4+warpv_makerchip_cnt10_tb()
+      m4+warpv_makerchip_tb()
    //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
    m4+makerchip_pass_fail(/core[*])
    /M4_CORE_HIER
@@ -4408,15 +4426,26 @@ m4+module_def
       '])
    '], ['
    // Single Core.
-   m4+warpv_makerchip_cnt10_tb()
-   m4+warpv()
+   
+   m4+warpv_makerchip_tb()
+   m4+cpu(/top)
+   
+   m4_ifelse_block(M4_FORMAL, 1, ['
+   m4+formal()
+   '], [''])
+   
    m4+makerchip_pass_fail()
+   
    m4_ifelse_block(M4_ISA, ['RISCV'], ['
    m4_ifelse_block(M4_VIZ, 1, ['
    m4+cpu_viz()
    '])
    '])
    '])
+
+m4+module_def
+\TLV //disabled_main()
+   m4+warpv_top()
 
 \SV
    endmodule
