@@ -38,30 +38,31 @@ function tlvM4OutputMapper(input, type) {
   else if (typeof input === 'string') return `${input}`;
 }
 
-export function getTLVCodeForDefinitions(definitions, includeLib) {
+export function getTLVCodeForDefinitions(definitions, programName, programText, isa) {
   return `\\m4_TLV_version 1d: tl-x.org
+\\SV
+   /*
+   Copyright ${new Date().getFullYear()} Redwood EDA
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   */
 m4+definitions(['
-        ${definitions ? definitions.join("\n") : ""}
+${definitions ? "   " + definitions.join("\n   ") : ""}
 '])
 \\SV
-/*
-Copyright ${new Date().getFullYear()} Redwood EDA
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-// Include WARP-V.
-m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
-  
-m4+module_def
+   // Include WARP-V.
+   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
+   
+\\TLV ${isa.toLowerCase()}_${programName}_prog
+   ${programText.split("\n").join("\n   ")}
+   
+m4+module_def()
 \\TLV
-   m4+warpv()
-   m4+warpv_makerchip_cnt10_tb()
-   m4+makerchip_pass_fail()
+   m4+warpv_top()
 \\SV
    endmodule
             `;

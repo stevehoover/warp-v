@@ -1,4 +1,4 @@
-import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Stack, Text, Tooltip} from '@chakra-ui/react';
+import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
 import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
@@ -87,7 +87,7 @@ export function CoreDetailsComponent({
                 label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
                 <Container centerContent mx={0} px={0} width={30}>
                     <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                   <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
                 </Container>
             </Tooltip>
 

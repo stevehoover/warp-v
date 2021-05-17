@@ -13,13 +13,25 @@ import {
 import {QuestionOutlineIcon} from "@chakra-ui/icons";
 
 export function GeneralSettingsForm({configuratorGlobalSettings, setConfiguratorGlobalSettings, formErrors}) {
+    function handleChangeCoreTypeChanged(value) {
+        if (value !== "MIPSI") {
+            setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                generalSettings: {...configuratorGlobalSettings.generalSettings, isa: value}
+            });
+        } else {
+            setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                generalSettings: {...configuratorGlobalSettings.generalSettings, isa: value},
+                settings: {...configuratorGlobalSettings.settings, cores: 1}
+            });
+        }
+    }
+
     return <Box>
         <FormControl isInvalid={formErrors.includes('isa')} mb={4}>
             <FormLabel>ISA:</FormLabel>
-            <RadioGroup onChange={value => setConfiguratorGlobalSettings({
-                ...configuratorGlobalSettings,
-                generalSettings: {...configuratorGlobalSettings.generalSettings, isa: value}
-            })}
+            <RadioGroup onChange={handleChangeCoreTypeChanged}
                         value={configuratorGlobalSettings.generalSettings.isa}>
                 <Stack direction='row'>
                     <Radio value='RISCV'>RISC-V</Radio>

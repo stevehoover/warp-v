@@ -64,7 +64,7 @@ export const ConfigurationParameters = [
         macroType: "m4_def",
         readableName: "Soft reset",
         verilogName: "soft_reset",
-        defaultValue: true,
+        defaultValue: false,
         jsonKey: "soft_reset",
         type: Boolean,
         configurationCategory: "CPU",

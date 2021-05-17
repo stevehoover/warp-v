@@ -1,5 +1,6 @@
 import {
-    Alert, AlertIcon,
+    Alert,
+    AlertIcon,
     Box,
     Button,
     Checkbox,
@@ -29,6 +30,7 @@ import {GenericSettingsFormComponent} from "../components/GenericSettingsFormCom
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
 import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
+import {EnterProgramForm} from "./EnterProgramForm";
 
 const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))
 const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
@@ -44,7 +46,11 @@ export default function HomePage({
                                      coreJson,
                                      setCoreJson,
                                      configuratorGlobalSettings,
-                                     setConfiguratorGlobalSettings
+                                     setConfiguratorGlobalSettings,
+                                     configuratorCustomProgramName,
+                                     setConfiguratorCustomProgramName,
+                                     programText,
+                                     setProgramText
                                  }) {
     const [formErrors, setFormErrors] = useState([]);
     const [userChangedStages, setUserChangedStages] = useState([])
@@ -56,14 +62,14 @@ export default function HomePage({
 
     useEffect(() => {
         if (!coreJson) return
-console.log("Core json: ")
+        console.log("Core json: ")
         console.log(coreJson)
         if (!coreJson && (macrosForJson || tlvForJson)) {
             setMacrosForJson(null)
             setTlvForJson(null)
         } else {
             const macros = translateJsonToM4Macros(coreJson)
-            const tlv = getTLVCodeForDefinitions(macros)
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa)
             setMacrosForJson(tlv.split("\n"))
 
             const task = setTimeout(() => {
@@ -204,7 +210,7 @@ console.log("Core json: ")
         if (validateForm(true)) {
             setMakerchipOpening(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa);
             openInMakerchip(tlv, setMakerchipOpening)
         }
     }
@@ -218,7 +224,7 @@ console.log("Core json: ")
             })
             setDownloadingCode(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa);
             getSVForTlv(tlv, sv => {
                 downloadFile('verilog.sv', sv);
                 setDownloadingCode(false)
@@ -257,8 +263,8 @@ console.log("Core json: ")
                     <Tab>Hazards</Tab>
                     <Tab>Memory</Tab>
                     <Tab>I/O</Tab>
-                    <Tab>Code</Tab>
-                    {/*<Tab>Program</Tab>*/}
+                    <Tab>Verilog</Tab>
+                    <Tab>Program</Tab>
                 </TabList>
                 <TabPanels>
                     <TabPanel>
@@ -285,9 +291,10 @@ console.log("Core json: ")
                                                       configurationParametersSubset={["branch_pred"]}/>
                     </TabPanel>
                     <TabPanel>
-                        <Alert status="warning" mb={5}>
-                            <AlertIcon />
-                            EXTRA_*_BUBBLEs (0 or 1). Set to 1 to add a cycle to replay conditions to relax circuit timing. (Not all configurations are valid.)
+                        <Alert status="info" mb={5}>
+                            <AlertIcon/>
+                            EXTRA_*_BUBBLEs (0 or 1). Set to 1 to add a cycle to the replay condition and relax circuit
+                            timing. (Not all configurations are valid.)
                         </Alert>
 
                         <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
@@ -347,6 +354,12 @@ console.log("Core json: ")
                                 </Stack>
                             </CheckboxGroup>
                         </FormControl>
+                    </TabPanel>
+                    <TabPanel>
+                        <EnterProgramForm configuratorCustomProgramName={configuratorCustomProgramName}
+                                          setConfiguratorCustomProgramName={setConfiguratorCustomProgramName}
+                                          programText={programText} setProgramText={setProgramText}
+                        />
                     </TabPanel>
                 </TabPanels>
             </Tabs>

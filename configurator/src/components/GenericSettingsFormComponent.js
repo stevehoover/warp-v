@@ -78,7 +78,8 @@ export function GenericSettingsFormComponent({
                                         && configuratorGlobalSettings.settings[jsonKey] && !configurationParameter.validator(configuratorGlobalSettings.settings[jsonKey], configurationParameter)}>
                         {getTitleComponent(configurationParameter)}
                         <NumberInput maxW={100} step={1}
-                                     min={configurationParameter.min}
+                                     isDisabled={jsonKey === "cores" && configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
+                                     min={(index > 0 && jsonKey.endsWith("_stage")) ? configuratorGlobalSettings.settings[formParameters[index - 1].jsonKey] || configurationParameter.min : configurationParameter.min}
                                      max={configurationParameter.max}
                                      onChange={(_, valueAsNumber) => handleValueUpdate(configurationParameter, configurationParameter.jsonKey, Int, valueAsNumber)}
                                      value={(configuratorGlobalSettings.settings[jsonKey] || configuratorGlobalSettings.settings[jsonKey] === 0) ? configuratorGlobalSettings.settings[jsonKey] : ""}>
