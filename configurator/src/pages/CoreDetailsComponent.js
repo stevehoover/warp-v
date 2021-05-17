@@ -51,18 +51,6 @@ export function CoreDetailsComponent({
         </Box>
 
         <HStack mb={10}>
-            {/*<Box>
-                <Link onClick={() => handleDisplayButtonClicked('configuration')}>
-                    <Image src="paramsboxpreviewleft.png" maxW={150} mx="auto"/>
-                </Link>
-            </Box>
-            <Tooltip label="Your configuration selections are codified.">
-                <Container centerContent mx={0} px={0} width={30}>
-                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
-                </Container>
-            </Tooltip>*/}
-
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
                     <Text backgroundColor={selectedFile === "m4" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
