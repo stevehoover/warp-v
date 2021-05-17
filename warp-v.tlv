@@ -4401,6 +4401,12 @@ m4+definitions(['
    m4_def(tb_macro_name, m4_ifdef_tlv(M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_TESTBENCH_NAME['_makerchip_tb']))
    m4+m4_tb_macro_name()
 
+\TLV warpv()
+   m4+cpu(/top)
+   m4_ifelse_block(M4_FORMAL, 1, ['
+   m4+formal()
+   '], [''])
+
 
 \TLV warpv_top()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
@@ -4428,8 +4434,9 @@ m4+definitions(['
    // Single Core.
    
    m4+warpv_makerchip_tb()
-   m4+cpu(/top)
    
+   // m4+warpv() (but inlined to reduce macro depth)
+   m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
    '], [''])
