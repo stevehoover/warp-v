@@ -58,7 +58,7 @@ export default function HomePage({
     const [makerchipOpening, setMakerchipOpening] = useState(false)
     const [downloadingCode, setDownloadingCode] = useState(false)
     const detailsComponentRef = createRef()
-    const [selectedFile, setSelectedFile] = useState(null)
+    const [selectedFile, setSelectedFile] = useState("m4")
 
     useEffect(() => {
         if (!coreJson) return
@@ -323,14 +323,15 @@ export default function HomePage({
                                     <Checkbox value='-p verilog'>Verilog (vs. SystemVerilog)</Checkbox>
                                     <Checkbox value='--bestsv'>Optimize SystemVerilog code for readability (versus
                                         preserving line association with TL-Verilog source).</Checkbox>
+                                    <Checkbox value='--noline'>Disable `line directive in SV output.</Checkbox>
+                                    <Checkbox value='--fmtNoSource'>Do not generate \source tags for correlating pre- and post-M4 code.</Checkbox>
                                     <Checkbox value='--fmtDeclSingleton'> Each HDL signal is declared in its own
                                         declaration statement
                                         with its own type specification.</Checkbox>
                                     <Checkbox value='--fmtDeclUnifiedHier'>Declare signals in a unified design hierarchy
                                         in the
                                         generated file, as opposed to inline with scope lines in the translated file.
-                                        (No impact if
-                                        --fmtFlatSignals.)</Checkbox>
+                                        (No impact if --fmtFlatSignals.)</Checkbox>
                                     <Checkbox value='--fmtEscapedNames'>Use escaped HDL names that resemble TLV names as
                                         closely as
                                         possible.</Checkbox>

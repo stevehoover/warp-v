@@ -19,7 +19,9 @@ function App() {
             isaExtensions: [],
             depth: 4,
             formattingSettings: [
-                "--bestsv"
+                "--bestsv",
+                "--noline",
+                "--fmtNoSource"
             ]
         },
         needsPipelineInit: true
@@ -123,7 +125,7 @@ const initialProgramText = `// -------------------------------------------------
 // but not exactly.
 // -------------------------------------------------------
 
-// /=====================\
+// /=====================\\
 // | Count to 10 Program |
 // =====================/
 //

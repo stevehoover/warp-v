@@ -51,7 +51,7 @@ export function CoreDetailsComponent({
         </Box>
 
         <HStack mb={10}>
-            <Box>
+            {/*<Box>
                 <Link onClick={() => handleDisplayButtonClicked('configuration')}>
                     <Image src="paramsboxpreviewleft.png" maxW={150} mx="auto"/>
                 </Link>
@@ -61,12 +61,12 @@ export function CoreDetailsComponent({
                     <Icon as={FaLongArrowAltRight} fontSize="30px"/>
                     <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
                 </Container>
-            </Tooltip>
+            </Tooltip>*/}
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
-                    <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
-                    <Image src="macropreviewlight.png" maxW={150} mx="auto"/>
+                    <Text backgroundColor={selectedFile === "m4" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
+                    <Image src="macropreviewlight.png" maxW={200} mx="auto"/>
                 </Link>
             </Box>
             <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
@@ -78,7 +78,7 @@ export function CoreDetailsComponent({
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('tlv')}>
-                    <Text borderWidth={1} borderRadius={15} p={2} textAlign='center'>Transaction-Level Design
+                    <Text backgroundColor={selectedFile === "tlv" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center'>Transaction-Level Design
                         (TL-Verilog)</Text>
                     <Image src="tlv-tlvpreview.png" maxW={200} mx="auto"/>
                 </Link>
@@ -93,7 +93,7 @@ export function CoreDetailsComponent({
 
             <Box>
                 <Link onClick={() => handleDisplayButtonClicked('rtl')}>
-                    <Text borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>RTL (Verilog)</Text>
+                    <Text backgroundColor={selectedFile === "rtl" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>RTL (Verilog)</Text>
                     <Image src="rtlpreview.png" maxW={200} mx="auto"/>
                 </Link>
             </Box>
