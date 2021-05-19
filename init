@@ -1,0 +1,12 @@
+ 
+#!/bin/bash
+
+# One-time initialization of this repository, to be run after cloning.
+
+# Install submodules.
+git submodule update --init --recursive
+
+
+# Install required packages
+
+pip3 install sandpiper-saas
