@@ -38,7 +38,19 @@ function tlvM4OutputMapper(input, type) {
   else if (typeof input === 'string') return `${input}`;
 }
 
-export function getTLVCodeForDefinitions(definitions, programName, programText, isa) {
+export function getTLVCodeForDefinitions(definitions, programName, programText, isa, settings) {
+  console.log(settings)
+  const verilatorConfig = new Set()
+  if (settings.isaExtensions.includes("F")) verilatorConfig.add("/* verilator lint_off WIDTH */")
+  if (settings.isaExtensions.includes("M")) {
+    verilatorConfig.add("/* verilator lint_off WIDTH */")
+    verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
+  }
+  if (settings.isaExtensions.includes("B")) {
+    verilatorConfig.add("/* verilator lint_off PINMISSING */")
+    verilatorConfig.add("/* verilator lint_off SELRANGE */")
+  }
+
   return `\\m4_TLV_version 1d: tl-x.org
 \\SV
    /*
@@ -55,6 +67,7 @@ ${definitions ? "   " + [`m4_def(PROG_NAME, ${programName})`].concat(definitions
 '])
 \\SV
    // Include WARP-V.
+   ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
    
 \\TLV ${isa.toLowerCase()}_${programName}_prog()

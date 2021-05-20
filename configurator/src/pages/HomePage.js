@@ -69,7 +69,7 @@ export default function HomePage({
             setTlvForJson(null)
         } else {
             const macros = translateJsonToM4Macros(coreJson)
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa)
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings)
             setMacrosForJson(tlv.split("\n"))
 
             const task = setTimeout(() => {
@@ -210,7 +210,7 @@ export default function HomePage({
         if (validateForm(true)) {
             setMakerchipOpening(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
             openInMakerchip(tlv, setMakerchipOpening)
         }
     }
@@ -224,7 +224,7 @@ export default function HomePage({
             })
             setDownloadingCode(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
             getSVForTlv(tlv, sv => {
                 downloadFile('verilog.sv', sv);
                 setDownloadingCode(false)
@@ -253,7 +253,7 @@ export default function HomePage({
         </Box>
 
         <Box mx='auto' maxW='100vh'>
-            <Heading size='md' mb={4}>Configure your CPU now</Heading>
+            <Heading size='lg' mb={4}>Configure your CPU now</Heading>
             <Tabs borderWidth={1} borderRadius='lg' p={3}>
                 <TabList>
                     <Tab>General</Tab>
@@ -367,7 +367,7 @@ export default function HomePage({
         </Box>
 
         <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
-            <Heading size='lg' mb={2}>Get your code:</Heading>
+            <Heading size='lg' mb={4}>Get your code:</Heading>
             <HStack mb={3}>
                 <Button type="button" colorScheme="blue" onClick={scrollToDetailsComponent}>View Below</Button>
                 <Box>

@@ -31,23 +31,34 @@ export function CoreDetailsComponent({
         else if (selectedFile === "rtl") downloadFile(systemVerilogFileName, sVForJson)
     }
 
+    function replaceImports(old) {
+        return old.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+            .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+    }
+
     function handleOpenInMakerchipClicked() {
         if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening)
-        else if (selectedFile === "tlv") openInMakerchip(tlvForJson, setMakerchipOpening)
+        else if (selectedFile === "tlv") {
+            openInMakerchip(
+                replaceImports(tlvForJson)
+                    .replace("\\TLV_version", "\\m4_TLV_version"),
+                setMakerchipOpening
+            )
+        }
         else if (selectedFile === "rtl") {
             const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
 \\SV
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
             // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be download when compiled.
 
-            openInMakerchip(modifiedSVToOpen, setMakerchipOpening)
+            openInMakerchip(replaceImports(modifiedSVToOpen), setMakerchipOpening)
         }
     }
 
     return <Box mx='auto' maxW='100vh' mb={30} {...rest}>
-        <Box mb={10}>
-            <Heading mb={1}>Core Details</Heading>
-            <Text mt={5}>Your CPU is constructed in the following steps.</Text>
+        <Box mb={3}>
+            <Heading size="lg">Core Details</Heading>
+            <Text mt={1}>Your CPU is constructed in the following steps.</Text>
         </Box>
 
         <HStack mb={10}>
