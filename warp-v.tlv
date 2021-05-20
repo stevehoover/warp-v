@@ -1016,7 +1016,7 @@ m4+definitions(['
    |fetch
       /instr
          @M4_MEM_WR_STAGE
-            $passed = ! $reset && $commit && ($Pc == (M4_INSTR_MAX << M4_PC_MIN));
+            $passed = ! $reset && $good_path && ($Pc == (M4_INSTR_MAX << M4_PC_MIN));
             $failed = *cyc_cnt > 200;
 
 
@@ -3512,7 +3512,8 @@ m4+definitions(['
             // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
             m4_ifelse_block(M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
             // Normal case:
-            $commit = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES) && ! $abort;
+            $good_path = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES);
+            $commit = $good_path && ! $abort;
             '], ['
             // For the retiming experiments, $commit is determined too late, and it is inconvenient to make the $GoodPathMask
             // logic retimable. Let's drive it to 1'b1 for now, and give synthesis the benefit of the doubt.
