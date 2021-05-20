@@ -1016,7 +1016,7 @@ m4+definitions(['
    |fetch
       /instr
          @M4_MEM_WR_STAGE
-            $passed = ! $reset && ($Pc == M4_INSTR_MAX) && $good_path;
+            $passed = ! $reset && ($Pc == (M4_NUM_INSTRS - 1)) && $good_path;
             $failed = *cyc_cnt > 200;
 
 
