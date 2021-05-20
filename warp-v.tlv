@@ -4434,10 +4434,10 @@ m4+definitions(['
    '], ['
    // Single Core.
    
-   m4+warpv_makerchip_tb()
    
    // m4+warpv() (but inlined to reduce macro depth)
    m4+cpu(/top)
+   m4+warpv_makerchip_tb()
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
    '], [''])
