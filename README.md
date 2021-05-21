@@ -11,23 +11,20 @@ WARP-V includes CPU core logic only with no current support for virtual memory, 
 
 
 
-# Quick Links
+# Links
 
-### Explore WARP-V
+## Explore WARP-V
 
-WARP-V is easiest to explore in Makerchip. You can:
-  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">open the entire WARP-V model as a single file</a>
-  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v_config.tlv" target="_blank" atom_fix="_">open a small configuration file to explore a given configuration</a>.
+We built a <a href="https://warp-v.org">configurator</a>, so you can quickly build a CPU to suit your needs!
 
-
-### Publications
+## Publications
 
   - Steve Hoover, "Pipelining RISC-V", Udemy 2018, <a href="http://www.makerchip.com/module/Pane/CourseSlides.pdf" target="_blank" target="_blank" atom_fix="_">webinar</a>
   - Steve Hoover, "Overcoming RTL", DAC 2018: <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank" target="_blank" atom_fix="_">slides</a>
   - Akos Hadnagy, "Formal Verification of WARP-V", ORConf 2018 and VSDOpen 2018: <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank" target="_blank" atom_fix="_">slides</a>, <a href="https://www.youtube.com/watch?v=fqr4Z9wLNvQ&list=PLUg3wIOWD8yoZLznLfhXjlICGlx2tuwvT&index=14&t=21s" target="_blank">video</a>, and <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank" atom_fix="_">paper</a>
   - Steve Hoover: "Verifying a RISC-V in 1 Page of Code!", <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank" atom_fix="_">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank" target="_blank" atom_fix="_">SemiWiki</a>
 
-### Collaboration
+## Collaboration
 
   - A Google Drive for this and other <a href="https://drive.google.com/drive/folders/1l9YTvpNZ0km3IlzlPaMvoLdriLw9B8Yk?usp=sharing" target="_blank" target="_blank" atom_fix="_">open-source TL-Verilog projects</a> including some <a href="https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit#slide=id.g480b08c3a2_0_11" target="_blank" target="_blank" atom_fix="_">WARP-V block diagrams</a>
   - A <a href="https://gitter.im/librecores/warp-v" target="_blank" atom_fix="_">LibreCores WARP-V Gitter Room</a> for public discussion
