@@ -4384,7 +4384,7 @@ m4+definitions(['
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
 \TLV makerchip_pass_fail(/_hier)
    |done
-      @0
+      @M4_MEM_WR_STAGE
          // Assert these to end simulation (before Makerchip cycle limit).
          *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
