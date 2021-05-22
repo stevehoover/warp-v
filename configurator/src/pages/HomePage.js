@@ -62,8 +62,6 @@ export default function HomePage({
 
     useEffect(() => {
         if (!coreJson) return
-        console.log("Core json: ")
-        console.log(coreJson)
         if (!coreJson && (macrosForJson || tlvForJson)) {
             setMacrosForJson(null)
             setTlvForJson(null)
@@ -357,8 +355,8 @@ export default function HomePage({
                         </FormControl>
                     </TabPanel>
                     <TabPanel>
-                        <EnterProgramForm configuratorCustomProgramName={configuratorCustomProgramName}
-                                          setConfiguratorCustomProgramName={setConfiguratorCustomProgramName}
+                        <EnterProgramForm configuratorGlobalSettings={configuratorGlobalSettings}
+                                          setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                           programText={programText} setProgramText={setProgramText}
                         />
                     </TabPanel>

@@ -22,7 +22,8 @@ function App() {
                 "--bestsv",
                 "--noline",
                 "--fmtNoSource"
-            ]
+            ],
+            customProgramEnabled: false
         },
         needsPipelineInit: true
     })
@@ -58,7 +59,7 @@ function App() {
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.join(" ")}`,
+                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {
@@ -67,8 +68,8 @@ function App() {
             },
             false,
         )
-        console.log(tlv)
-        console.log(data)
+        //console.log(tlv)
+        //console.log(data)
         if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n")) // remove some extra spacing by removing extra newlines
         else toast({
             title: "Failed compilation",
@@ -118,14 +119,7 @@ function App() {
     </ChakraProvider>;
 }
 
-const initialProgramText = `// -------------------------------------------------------
-// Here you can provide your own assembly program that
-// will be hardcoded into the instruction memory of your core.
-// The syntax roughly mimics that defined by the RISC-V ISA,
-// but not exactly.
-// -------------------------------------------------------
-
-// /=====================\\
+const initialProgramText = `// /=====================\\
 // | Count to 10 Program |
 // =====================/
 //
