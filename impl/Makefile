@@ -16,9 +16,7 @@ out/%/status: warp-v_%.tlv ../warp-v.tlv
 	@rm -rf out/$(patsubst warp-v_%.tlv,%,$<)/*
 	@cd out/$(patsubst warp-v_%.tlv,%,$<) \
 	  && cp ../../$< . \
-	  && curl -F 'top.tlv=@$<' -F 'files[]=@../../../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout \
-		&& mv out/* . && rmdir out \
-		&& (exit `cat status`) \
+	  && yes | sandpiper -i $< -f ../../../warp-v.tlv -o warp-v_$(patsubst warp-v_%.tlv,%,$<).sv --sv_url_inc --iArgs \
 	  && sed -i 's/wire\( \[[^\[]\+\] L1_Mem_Value_\)/reg\1/' $(patsubst warp-v_%.tlv,warp-v_%.sv,$<) \
 	  && sed -i 's/wire\( \[[^\[]\+\] FETCH_Instr_Regs_vae_\)/reg\1/' $(patsubst %.tlv,%_gen.sv,$<)
 	@# Above sed HACKS fix bugs in the generated code.
