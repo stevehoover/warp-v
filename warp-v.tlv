@@ -1591,7 +1591,7 @@ m4+definitions(['
    $csr_pktinfo_hw_wr = 1'b0;
    $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
    $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
-   $csr_core = #core;
+   $csr_core[M4_CORE_INDEX_RANGE] = #core;
    '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
@@ -3576,7 +3576,7 @@ m4+definitions(['
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             $passed = ! $reset && $ReachedEnd && $Reg4Became45;
-            $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
+            $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
    
@@ -3693,8 +3693,8 @@ m4+definitions(['
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
             $header_flit[31:0] = {{M4_FLIT_UNUSED_CNT{1'b0}},
-                                  $src,
                                   $vc,
+                                  $src,
                                   $csr_pktdest[m4_echo(M4_CORE_INDEX_RANGE)]
                                  };
          /flit
@@ -3742,16 +3742,29 @@ m4+definitions(['
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
          $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+         
+
+         $posedge_pktrd = $do_pktrd && ! >>1$do_pktrd; // 1st cycle
+         $negedge_pktrd = ! $do_pktrd &&  >>1$do_pktrd; // last cycle
+
+
       @0
-         // Replay for PKTRD with no data read.
-         $pktrd_blocked = $is_pktrd && ! $trans_valid;
+         // Replay for PKTRD with no data read.(and if 1st cycle of PKTRD flit is invalid)
+
+         $pktrd_blocked = $posedge_pktrd ? ($is_pktrd && ! $trans_valid) : 
+                          $negedge_pktrd ? '0 : $RETAIN;
+
+
    /vc[*]
       |ingress_out
          @-1
             $has_credit = /_cpu|ingress_out/instr>>1$csr_pktrdvcs[#vc] &&
-                          /_cpu|ingress_out$do_pktrd;
+                          /_cpu|ingress_out$do_pktrd &&
+                          ! /_cpu|ingress_out>>1$pktrd_blocked;
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
    m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
+
+
 
 \TLV noc_insertion_ring(/_cpu, #_depth)
    /vc[*]
