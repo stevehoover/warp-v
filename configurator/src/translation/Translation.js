@@ -15,13 +15,15 @@ export function translateJsonToM4Macros(json) {
     const lines = [];
     //lines.push(`m4_def(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
     lines.push(`m4_def(ISA, ${general.isa})`);
-    general.isaExtensions?.forEach(extension => {
+    general.isa !== "MIPSI" && general.isaExtensions?.forEach(extension => {
         lines.push(`m4_def(EXT_${extension}, 1)`);
     });
-    if (!general.isaExtensions?.includes("E")) lines.push(`m4_def(EXT_E, 0)`);
-    if (!general.isaExtensions?.includes("M")) lines.push(`m4_def(EXT_M, 0)`);
-    if (!general.isaExtensions?.includes("F")) lines.push(`m4_def(EXT_F, 0)`);
-    if (!general.isaExtensions?.includes("B")) lines.push(`m4_def(EXT_B, 0)`);
+    if (general.isa !== "MIPSI") {
+        if (!general.isaExtensions?.includes("E")) lines.push(`m4_def(EXT_E, 0)`);
+        if (!general.isaExtensions?.includes("M")) lines.push(`m4_def(EXT_M, 0)`);
+        if (!general.isaExtensions?.includes("F")) lines.push(`m4_def(EXT_F, 0)`);
+        if (!general.isaExtensions?.includes("B")) lines.push(`m4_def(EXT_B, 0)`);
+    }
 
     Object.entries(pipeline).forEach(entry => {
         const [jsonKey, value] = entry;
@@ -83,6 +85,7 @@ ${settings.customProgramEnabled ? `m4+module_def()
    m4+warpv_makerchip_cnt10_tb()
    m4+warpv()
    m4+makerchip_pass_fail()
+   m4+warpv_top()
 \\SV
    endmodule`}
 `

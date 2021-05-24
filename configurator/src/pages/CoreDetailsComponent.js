@@ -117,9 +117,9 @@ export function CoreDetailsComponent({
                     <Text>Your configuration is determined by your core selections on the homepage.</Text>}
                     {selectedFile === 'm4' && macrosForJson.join("\n")/*.map((line, index) => <Text
                         key={index}>{line}</Text>)*/}
-                    {selectedFile === 'tlv' && tlvForJson && tlvForJson/*.split("\n").map((line, index) => <Text
+                    {selectedFile === 'tlv' && tlvForJson && replaceImports(tlvForJson)/*.split("\n").map((line, index) => <Text
                         key={index}>{line}</Text>)*/}
-                    {selectedFile === 'rtl' && sVForJson && sVForJson/*.split("\n").map((line, index) => <Text
+                    {selectedFile === 'rtl' && sVForJson && replaceImports(sVForJson)/*.split("\n").map((line, index) => <Text
                         key={index}>{line}</Text>)*/}
                 </Code>
             </>}

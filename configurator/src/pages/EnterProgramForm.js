@@ -10,6 +10,7 @@ export function EnterProgramForm({
     return <>
         <Box>
             <Checkbox mb={5} value={configuratorGlobalSettings.generalSettings.customProgramEnabled}
+                      isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                       onChange={e => setConfiguratorGlobalSettings({
                           ...configuratorGlobalSettings,
                           generalSettings: {

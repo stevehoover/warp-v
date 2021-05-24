@@ -17,12 +17,20 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
         if (value !== "MIPSI") {
             setConfiguratorGlobalSettings({
                 ...configuratorGlobalSettings,
-                generalSettings: {...configuratorGlobalSettings.generalSettings, isa: value}
+                generalSettings: {
+                    ...configuratorGlobalSettings.generalSettings,
+                    isa: value
+                }
             });
         } else {
             setConfiguratorGlobalSettings({
                 ...configuratorGlobalSettings,
-                generalSettings: {...configuratorGlobalSettings.generalSettings, isa: value},
+                generalSettings: {
+                    ...configuratorGlobalSettings.generalSettings,
+                    isa: value,
+                    customProgramEnabled: false,
+                    isaExtensions: []
+                },
                 settings: {...configuratorGlobalSettings.settings, cores: 1}
             });
         }
@@ -81,24 +89,28 @@ The standard extensions are specified to work with all of the standard bases, an
                            })}>
                 <Stack direction='row'>
                     <Checkbox value='E'
+                              isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                               isChecked={configuratorGlobalSettings.generalSettings.isaExtensions?.includes("E")}>
                         <Tooltip label="Base Integer Instruction Set (embedded)">
                             <Box as="span">E <QuestionOutlineIcon/></Box>
                         </Tooltip>
                     </Checkbox>
                     <Checkbox value='M'
+                              isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                               isChecked={configuratorGlobalSettings.generalSettings.isaExtensions?.includes("M")}>
                         <Tooltip label="Standard Extension for Integer Multiplication and Division">
                             <Box as="span">M <QuestionOutlineIcon/></Box>
                         </Tooltip>
                     </Checkbox>
                     <Checkbox value='F'
+                              isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                               isChecked={configuratorGlobalSettings.generalSettings.isaExtensions?.includes("F")}>
                         <Tooltip label="Standard Extension for Single-Precision Floating-Point">
                             <Box as="span">F <QuestionOutlineIcon/></Box>
                         </Tooltip>
                     </Checkbox>
                     <Checkbox value='B'
+                              isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                               isChecked={configuratorGlobalSettings.generalSettings.isaExtensions?.includes("B")}>
                         <Tooltip label="Standard Extension for Bit Manipulation">
                             <Box as="span">B <QuestionOutlineIcon/></Box>
