@@ -3749,7 +3749,7 @@ m4+definitions(['
          $do_pktrd = $is_pktrd && ! $pktrdvcs_changed && /instr$replayed; // non-speculative do_pktrd
 
       @0
-         // Replay for PKTRD with no data transcation.
+         // Replay for PKTRD with no data transaction.
          $pktrd_blocked = $is_pktrd && ! $trans_valid;
 
    /vc[*]
@@ -4353,7 +4353,7 @@ m4+definitions(['
                      initEach: function() {
                         let regname = new fabric.Text("Data Memory", {
                                  top: -20,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 30),
+                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 30), // single title, center aligned
                                  fontSize: 14,
                                  fontFamily: "monospace"
                               });
