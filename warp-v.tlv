@@ -3247,7 +3247,7 @@ m4+definitions(['
             // instructions are on the current path with a $GoodPathMask. $GoodPathMask[n] of an instruction indicates
             // whether the instruction n instructions prior to this instruction is on its path.
             //
-            //                 $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
+            //                 $GoodPathMask for Redir'edX => {o,X,o,y,y,y,o,o} == {1,1,1,1,0,0,1,1}
             // Waterfall View: |
             //                 V
             // 0)       oooooooo                  Good-path
@@ -3733,6 +3733,11 @@ m4+definitions(['
             $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
             ?$csr_pktrd_valid
                $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
+            $non_spec_abort = $aborting_trap && $good_path;
+         @0
+            // Mark instructions that are replayed. These are non-speculative. We use this indication for CSR pkt reads,
+            // which can only pull flits from ingress FIFOs non-speculatively (currently).
+            $replayed = >>m4_eval(M4_TRAP_BUBBLES + 1)$non_spec_abort;
    |ingress_out
       @-1
          // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
@@ -3741,26 +3746,17 @@ m4+definitions(['
          $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
-         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
-         
-
-         $posedge_pktrd = $do_pktrd && ! >>1$do_pktrd; // 1st cycle
-         $negedge_pktrd = ! $do_pktrd &&  >>1$do_pktrd; // last cycle
-
+         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed && /instr$replayed; // non-speculative do_pktrd
 
       @0
-         // Replay for PKTRD with no data read.(and if 1st cycle of PKTRD flit is invalid)
-
-         $pktrd_blocked = $posedge_pktrd ? ($is_pktrd && ! $trans_valid) : 
-                          $negedge_pktrd ? '0 : $RETAIN;
-
+         // Replay for PKTRD with no data transcation.
+         $pktrd_blocked = $is_pktrd && ! $trans_valid;
 
    /vc[*]
       |ingress_out
          @-1
             $has_credit = /_cpu|ingress_out/instr>>1$csr_pktrdvcs[#vc] &&
-                          /_cpu|ingress_out$do_pktrd &&
-                          ! /_cpu|ingress_out>>1$pktrd_blocked;
+                          /_cpu|ingress_out$do_pktrd;
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
    m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
 
@@ -4351,33 +4347,32 @@ m4+definitions(['
                   }
                '])
 
-            /bank[M4_ADDRS_PER_WORD-1:0]
+            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
                /mem[M4_DATA_MEM_WORDS_RANGE]
                   \viz_alpha
                      initEach: function() {
                         let regname = new fabric.Text("Data Memory", {
                                  top: -20,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + this.getScope("bank").index * 30 + 30,
+                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 30),
                                  fontSize: 14,
                                  fontFamily: "monospace"
                               });
                         let data = new fabric.Text("", {
                            top: 18 * this.getIndex(),
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30 + 30,
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 60 + 30,
                            fontSize: 14,
                            fontFamily: "monospace"
                         });
                         let index = (this.getScope("bank").index != 0) ? null :
                            new fabric.Text("", {
                               top: 18 * this.getIndex(),
-                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30,
+                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 60,
                               fontSize: 14,
                               fontFamily: "monospace"
                            });
                         return {objects: {regname: regname, data: data, index: index}};
                      },
                      renderEach: function() {
-                        // BUG: It seems this is not getting called for every /bank[*].
                         console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
                         let mod = '/instr$st'.asBool(false) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex());
                         let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString()})` : "";
