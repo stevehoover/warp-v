@@ -3734,7 +3734,7 @@ m4+definitions(['
             ?$csr_pktrd_valid
                $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
             $non_spec_abort = $aborting_trap && $good_path;
-         @0
+         @M4_NEXT_PC_STAGE
             // Mark instructions that are replayed. These are non-speculative. We use this indication for CSR pkt reads,
             // which can only pull flits from ingress FIFOs non-speculatively (currently).
             $replayed = >>m4_eval(M4_TRAP_BUBBLES + 1)$non_spec_abort;
