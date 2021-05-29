@@ -4160,7 +4160,7 @@ m4+definitions(['
                \viz_alpha
                    
                   initEach: function() {
-                     let regname = new fabric.Text("Integer", {
+                     let regname = new fabric.Text("Integer (hex)", {
                            top: -20,
                            left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
                            fontSize: 14,
@@ -4179,10 +4179,10 @@ m4+definitions(['
                      m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
+                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : "";
                      this.getInitObject("reg").setText(
                         regIdent + ": " +
-                        '$value'.step(1).asInt(NaN).toString() + oldValStr);
+                        '$value'.step(1).asInt(NaN).toString(16) + oldValStr);
                      this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
                   }
             /regcsr
@@ -4274,7 +4274,7 @@ m4+definitions(['
             /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
                \viz_alpha
                   initEach: function() {
-                     let regname = new fabric.Text("Floating Point", {
+                     let regname = new fabric.Text("Floating Point (hex)", {
                               top: -20,
                               left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 225, ['MIPSI'], 375, ['DUMMY'], 175),
                               fontSize: 14,
@@ -4351,36 +4351,49 @@ m4+definitions(['
                /mem[M4_DATA_MEM_WORDS_RANGE]
                   \viz_alpha
                      initEach: function() {
-                        let regname = new fabric.Text("Data Memory", {
-                                 top: -20,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 30), // single title, center aligned
+                        let regname = new fabric.Text("Data Memory (hex)", {
+                                 top: -40,
+                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 15), // Center aligned
                                  fontSize: 14,
                                  fontFamily: "monospace"
                               });
-                        let data = new fabric.Text("", {
-                           top: 18 * this.getIndex(),
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 60 + 30,
+                        let bankname = new fabric.Text("bank", {
+                           top: -20,
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
                            fontSize: 14,
                            fontFamily: "monospace"
                         });
-                        let index = (this.getScope("bank").index != 0) ? null :
+                        let banknum = new fabric.Text(String(this.getScope("bank").index), {
+                           top: -20,
+                           left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60,
+                           fontSize: 14,
+                           fontFamily: "monospace"
+                        });
+                        let data = new fabric.Text("", {
+                           top: 18 * this.getIndex(),
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10, // bank: 3 2 1 0 format
+                           fontSize: 14,
+                           fontFamily: "monospace"
+                        });
+                        //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+                        let index =
                            new fabric.Text("", {
                               top: 18 * this.getIndex(),
-                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 60,
+                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
                               fontSize: 14,
                               fontFamily: "monospace"
                            });
-                        return {objects: {regname: regname, data: data, index: index}};
+                        return {objects: { banknum: banknum, bankname: bankname, regname: regname, data: data, index: index}};
                      },
                      renderEach: function() {
                         console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
-                        let mod = '/instr$st'.asBool(false) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex());
-                        let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString()})` : "";
+                        var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()); // selects which bank to write on
+                        //let oldValStr = mod ? `(${'$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0]'.asInt(NaN).toString(16)})` : ""; // old value for dmem
                         if (this.getInitObject("index")) {
                            let addrStr = parseInt(this.getIndex()).toString();
                            this.getInitObject("index").setText(addrStr + ":");
                         }
-                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString() + oldValStr);
+                        this.getInitObject("data").setText('$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0]'.step(1).asInt(NaN).toString(16).padStart(2,"0"));
                         this.getInitObject("data").setFill(mod ? "blue" : "black");
                      }
 
