@@ -2795,7 +2795,7 @@ m4+definitions(['
          // Load
          // ====
          @M4_MEM_WR_STAGE
-            /bank[M4_ADDRS_PER_WORD-1:0]
+            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
                $ANY = /instr$ANY; // Find signal from outside of /bank.
                /mem[M4_DATA_MEM_WORDS_RANGE]
                ?$spec_ld
