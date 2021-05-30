@@ -4388,12 +4388,12 @@ m4+definitions(['
                      renderEach: function() {
                         console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
                         var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()); // selects which bank to write on
-                        //let oldValStr = mod ? `(${'$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0]'.asInt(NaN).toString(16)})` : ""; // old value for dmem
+                        //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : ""; // old value for dmem
                         if (this.getInitObject("index")) {
                            let addrStr = parseInt(this.getIndex()).toString();
                            this.getInitObject("index").setText(addrStr + ":");
                         }
-                        this.getInitObject("data").setText('$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0]'.step(1).asInt(NaN).toString(16).padStart(2,"0"));
+                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"));
                         this.getInitObject("data").setFill(mod ? "blue" : "black");
                      }
 
