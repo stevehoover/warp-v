@@ -33,7 +33,7 @@ export function CoreDetailsComponent({
 
     function replaceImports(old) {
         return old.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
-            .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+           // .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
     }
 
     function handleOpenInMakerchipClicked() {
