@@ -1590,7 +1590,7 @@ m4+definitions(['
    $csr_pktinfo_hw_wr = 1'b0;
    $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
    $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
-   $csr_core = #core;
+   $csr_core[M4_CORE_INDEX_RANGE] = #core;
    '])
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
@@ -2794,7 +2794,7 @@ m4+definitions(['
          // Load
          // ====
          @M4_MEM_WR_STAGE
-            /bank[M4_ADDRS_PER_WORD-1:0]
+            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
                $ANY = /instr$ANY; // Find signal from outside of /bank.
                /mem[M4_DATA_MEM_WORDS_RANGE]
                ?$spec_ld
@@ -3246,7 +3246,7 @@ m4+definitions(['
             // instructions are on the current path with a $GoodPathMask. $GoodPathMask[n] of an instruction indicates
             // whether the instruction n instructions prior to this instruction is on its path.
             //
-            //                 $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
+            //                 $GoodPathMask for Redir'edX => {o,X,o,y,y,y,o,o} == {1,1,1,1,0,0,1,1}
             // Waterfall View: |
             //                 V
             // 0)       oooooooo                  Good-path
@@ -3575,7 +3575,7 @@ m4+definitions(['
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             $passed = ! $reset && $ReachedEnd && $Reg4Became45;
-            $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
+            $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
    
@@ -3692,8 +3692,8 @@ m4+definitions(['
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
             $header_flit[31:0] = {{M4_FLIT_UNUSED_CNT{1'b0}},
-                                  $src,
                                   $vc,
+                                  $src,
                                   $csr_pktdest[m4_echo(M4_CORE_INDEX_RANGE)]
                                  };
          /flit
@@ -3732,6 +3732,11 @@ m4+definitions(['
             $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
             ?$csr_pktrd_valid
                $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
+            $non_spec_abort = $aborting_trap && $good_path;
+         @M4_NEXT_PC_STAGE
+            // Mark instructions that are replayed. These are non-speculative. We use this indication for CSR pkt reads,
+            // which can only pull flits from ingress FIFOs non-speculatively (currently).
+            $replayed = >>m4_eval(M4_TRAP_BUBBLES + 1)$non_spec_abort;
    |ingress_out
       @-1
          // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
@@ -3740,10 +3745,12 @@ m4+definitions(['
          $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
-         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed && /instr$replayed; // non-speculative do_pktrd
+
       @0
-         // Replay for PKTRD with no data read.
+         // Replay for PKTRD with no data transaction.
          $pktrd_blocked = $is_pktrd && ! $trans_valid;
+
    /vc[*]
       |ingress_out
          @-1
@@ -3751,6 +3758,8 @@ m4+definitions(['
                           /_cpu|ingress_out$do_pktrd;
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
    m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
+
+
 
 \TLV noc_insertion_ring(/_cpu, #_depth)
    /vc[*]
@@ -4150,7 +4159,7 @@ m4+definitions(['
                \viz_alpha
                    
                   initEach: function() {
-                     let regname = new fabric.Text("Integer", {
+                     let regname = new fabric.Text("Integer (hex)", {
                            top: -20,
                            left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
                            fontSize: 14,
@@ -4169,10 +4178,10 @@ m4+definitions(['
                      m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending'.asBool(false)'], ['false']);
                      let reg = parseInt(this.getIndex());
                      let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
+                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : "";
                      this.getInitObject("reg").setText(
                         regIdent + ": " +
-                        '$value'.step(1).asInt(NaN).toString() + oldValStr);
+                        '$value'.step(1).asInt(NaN).toString(16) + oldValStr);
                      this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
                   }
             /regcsr
@@ -4264,7 +4273,7 @@ m4+definitions(['
             /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
                \viz_alpha
                   initEach: function() {
-                     let regname = new fabric.Text("Floating Point", {
+                     let regname = new fabric.Text("Floating Point (hex)", {
                               top: -20,
                               left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 225, ['MIPSI'], 375, ['DUMMY'], 175),
                               fontSize: 14,
@@ -4337,41 +4346,53 @@ m4+definitions(['
                   }
                '])
 
-            /bank[M4_ADDRS_PER_WORD-1:0]
+            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
                /mem[M4_DATA_MEM_WORDS_RANGE]
                   \viz_alpha
                      initEach: function() {
-                        let regname = new fabric.Text("Data Memory", {
-                                 top: -20,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + this.getScope("bank").index * 30 + 30,
+                        let regname = new fabric.Text("Data Memory (hex)", {
+                                 top: -40,
+                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 15), // Center aligned
                                  fontSize: 14,
                                  fontFamily: "monospace"
                               });
-                        let data = new fabric.Text("", {
-                           top: 18 * this.getIndex(),
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30 + 30,
+                        let bankname = new fabric.Text("bank", {
+                           top: -20,
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
                            fontSize: 14,
                            fontFamily: "monospace"
                         });
-                        let index = (this.getScope("bank").index != 0) ? null :
+                        let banknum = new fabric.Text(String(this.getScope("bank").index), {
+                           top: -20,
+                           left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60,
+                           fontSize: 14,
+                           fontFamily: "monospace"
+                        });
+                        let data = new fabric.Text("", {
+                           top: 18 * this.getIndex(),
+                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10, // bank: 3 2 1 0 format
+                           fontSize: 14,
+                           fontFamily: "monospace"
+                        });
+                        //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+                        let index =
                            new fabric.Text("", {
                               top: 18 * this.getIndex(),
-                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30,
+                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
                               fontSize: 14,
                               fontFamily: "monospace"
                            });
-                        return {objects: {regname: regname, data: data, index: index}};
+                        return {objects: { banknum: banknum, bankname: bankname, regname: regname, data: data, index: index}};
                      },
                      renderEach: function() {
-                        // BUG: It seems this is not getting called for every /bank[*].
                         console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
-                        let mod = '/instr$st'.asBool(false) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex());
-                        let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString()})` : "";
+                        var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()); // selects which bank to write on
+                        //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : ""; // old value for dmem
                         if (this.getInitObject("index")) {
                            let addrStr = parseInt(this.getIndex()).toString();
                            this.getInitObject("index").setText(addrStr + ":");
                         }
-                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString() + oldValStr);
+                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"));
                         this.getInitObject("data").setFill(mod ? "blue" : "black");
                      }
 
@@ -4383,7 +4404,7 @@ m4+definitions(['
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
 \TLV makerchip_pass_fail(/_hier)
    |done
-      @0
+      @M4_MEM_WR_STAGE
          // Assert these to end simulation (before Makerchip cycle limit).
          *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
@@ -4456,3 +4477,4 @@ m4+module_def
 
 \SV
    endmodule
+   
