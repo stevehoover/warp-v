@@ -4422,13 +4422,15 @@ m4+definitions(['
    m4_def(tb_macro_name, m4_ifdef_tlv(M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_TESTBENCH_NAME['_makerchip_tb']))
    m4+m4_tb_macro_name()
 
+// A top-level macro supporting one core and no test-bench.
 \TLV warpv()
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4+cpu(/top)
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+formal()
    '], [''])
 
-
+// A top-level macro for WARP-V.
 \TLV warpv_top()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    m4_ifelse_block(m4_eval(M4_NUM_CORES > 1), ['1'], ['
