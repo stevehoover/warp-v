@@ -19,6 +19,7 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
                 ...configuratorGlobalSettings,
                 generalSettings: {
                     ...configuratorGlobalSettings.generalSettings,
+                    customProgramEnabled: true,
                     isa: value
                 }
             });

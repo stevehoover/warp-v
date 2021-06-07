@@ -7,6 +7,8 @@ import {ConfigurationParameters} from "./translation/ConfigurationParameters";
 import {translateParametersToJson} from "./translation/Translation";
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
+import {getWarpVFileForCommit, warpVLatestSupportedCommit} from "./utils/WarpVUtils";
+
 
 function App() {
     const makerchipFetch = useFetch("https://faas.makerchip.com")
@@ -15,6 +17,7 @@ function App() {
         settings: getInitialSettings(),
         coreJson: null,
         generalSettings: {
+            warpVVersion: getWarpVFileForCommit(warpVLatestSupportedCommit),
             isa: 'RISCV',
             isaExtensions: [],
             depth: 4,
@@ -59,7 +62,7 @@ function App() {
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: `-i test.tlv -o test.sv --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
+                args: `-i test.tlv -o test.sv --iArgs --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {
@@ -70,7 +73,7 @@ function App() {
         )
         //console.log(tlv)
         //console.log(data)
-        if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n")) // remove some extra spacing by removing extra newlines
+        if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
         else toast({
             title: "Failed compilation",
             status: "error"

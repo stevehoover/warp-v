@@ -51,10 +51,16 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
         verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
     }
     if (settings.isaExtensions.includes("B")) {
+        verilatorConfig.add("/* verilator lint_off WIDTH */")
         verilatorConfig.add("/* verilator lint_off PINMISSING */")
         verilatorConfig.add("/* verilator lint_off SELRANGE */")
     }
-    return `\\m4_TLV_version 1d ${settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource").join(" ")}: tl-x.org
+    if (settings.formattingSettings.includes("--fmtPackAll")) {
+        verilatorConfig.add("/* verilator lint_on WIDTH */ // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613")
+        verilatorConfig.delete("/* verilator lint_off WIDTH */")
+    }
+    const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
+    return `\\m4_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
    Copyright ${new Date().getFullYear()} Redwood EDA
@@ -71,7 +77,7 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${p
 \\SV
    // Include WARP-V.
    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
+   m4_include_lib(['${settings.warpVVersion}'])
    
 ${settings.customProgramEnabled ? `\\TLV ${isa.toLowerCase()}_${programName}_prog()
    ${programText.split("\n").join("\n   ")}` : ``}

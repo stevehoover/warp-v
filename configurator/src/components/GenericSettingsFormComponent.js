@@ -81,8 +81,11 @@ export function GenericSettingsFormComponent({
                         {getTitleComponent(configurationParameter)}
                         <NumberInput maxW={100} step={1}
                                      isDisabled={jsonKey === "cores" && configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
-                                     min={(index > 0 && jsonKey.endsWith("_stage")) ? configuratorGlobalSettings.settings[formParameters[index - 1].jsonKey] || configurationParameter.min
-                                         : (jsonKey === "ld_return_align" ?  configuratorGlobalSettings.settings.execute_stage - configuratorGlobalSettings.settings.next_pc_stage: configurationParameter.min)}
+                                     min={(index > 0 && jsonKey.endsWith("_stage")) ?
+                                         configuratorGlobalSettings.settings[formParameters[index - 1].jsonKey] || configurationParameter.min
+                                         : (jsonKey === "ld_return_align"
+                                             ? configuratorGlobalSettings.settings.execute_stage - configuratorGlobalSettings.settings.next_pc_stage
+                                             : configurationParameter.min)}
                                      max={configurationParameter.max}
                                      onChange={(_, valueAsNumber) => handleValueUpdate(configurationParameter, configurationParameter.jsonKey, Int, valueAsNumber)}
                                      value={(configuratorGlobalSettings.settings[jsonKey] || configuratorGlobalSettings.settings[jsonKey] === 0) ? configuratorGlobalSettings.settings[jsonKey] : ""}>

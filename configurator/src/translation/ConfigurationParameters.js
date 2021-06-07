@@ -21,8 +21,8 @@ export const ConfigurationParameters = [
         defaultValue: 2,
         jsonKey: "vcs",
         type: Int,
-        min: 0,
-        validator: (input) => input >= 0,
+        min: 2,
+        validator: (input) => input >= 2,
         configurationCategory: "CPU",
         description: "VCs (meaningful if > 1 core)"
     },
@@ -33,8 +33,8 @@ export const ConfigurationParameters = [
         defaultValue: 2,
         jsonKey: "prios",
         type: Int,
-        min: 0,
-        validator: (input) => input >= 0,
+        min: 2,
+        validator: (input) => input >= 2,
         configurationCategory: "CPU",
         description: "Number of priority levels in the NoC"
     },
@@ -45,8 +45,8 @@ export const ConfigurationParameters = [
         defaultValue: 8,
         jsonKey: "max_packet_size",
         type: Int,
-        min: 0,
-        validator: (input) => input >= 0,
+        min: 3,
+        validator: (input) => input >= 3,
         configurationCategory: "CPU",
         description: "Max number of payload flits in a packet"
     },
