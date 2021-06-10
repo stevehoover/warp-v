@@ -979,27 +979,26 @@ m4+definitions(['
             input logic reset,
             output logic failed,
             output logic passed,
-            output logic  rvfi_valid, 
+            output logic  rvfi_valid,
             output logic [31:0] rvfi_insn,
             output logic [63 : 0] rvfi_order,
             output logic rvfi_halt,
-            output logic rvfi_trap,       
-            output logic rvfi_halt,       
+            output logic rvfi_trap,
             output logic rvfi_intr,
             output logic [1: 0] rvfi_ixl,
             output logic [1: 0] rvfi_mode,
-            output logic [4: 0] rvfi_rs1_addr,   
-            output logic [4: 0] rvfi_rs2_addr,   
-            output logic [31: 0] rvfi_rs1_rdata,  
-            output logic [31: 0] rvfi_rs2_rdata,  
-            output logic [4: 0] rvfi_rd_addr,    
-            output logic [31: 0] rvfi_rd_wdata,   
-            output logic [31:0] rvfi_pc_rdata,   
-            output logic [31:0] rvfi_pc_wdata ,   
-            output logic [31:0] rvfi_mem_addr,   
-            output logic [3: 0] rvfi_mem_rmask,  
-            output logic [3: 0] rvfi_mem_wmask,  
-            output logic [31: 0] rvfi_mem_rdata,  
+            output logic [4: 0] rvfi_rs1_addr,
+            output logic [4: 0] rvfi_rs2_addr,
+            output logic [31: 0] rvfi_rs1_rdata,
+            output logic [31: 0] rvfi_rs2_rdata,
+            output logic [4: 0] rvfi_rd_addr,
+            output logic [31: 0] rvfi_rd_wdata,
+            output logic [31:0] rvfi_pc_rdata,
+            output logic [31:0] rvfi_pc_wdata,
+            output logic [31:0] rvfi_mem_addr,
+            output logic [3: 0] rvfi_mem_rmask,
+            output logic [3: 0] rvfi_mem_wmask,
+            output logic [31: 0] rvfi_mem_rdata,
             output logic [31: 0] rvfi_mem_wdata);'])'])
 
    // TODO: Remove after released to Makerchip/SaaS.
@@ -3482,7 +3481,7 @@ m4+definitions(['
             // Execute stage redirect conditions.
             $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXT_B, 1, ['|| $clmul_crc_type_instr']);
             $replay_trap = m4_cpu_blocked;
-            $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
+            $aborting_trap = $replay_trap || ($valid_decode && $illegal) || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
             ?$valid_decode_branch
