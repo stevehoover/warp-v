@@ -230,28 +230,28 @@ export default function HomePage({
 
     return <>
         <Box textAlign='center' mb={25}>
-            <Image src='warpv-logo.png' w={250} mx='auto'/>
+            <Image src='warpv-logo.png' maxW={250} mx='auto'/>
             <Text>The open-source RISC-V core IP you can shape to your needs!</Text>
         </Box>
 
         <Heading textAlign='center' size='md' mb={5}>What CPU core can we build for you today?</Heading>
 
-        <Box mx='auto' mb={10}>
+        <Box mx='auto' mb={10} maxW="85%">
             <Container centerContent>
-                <HStack columns={3}>
-                    <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation'/>
-                    <Box w={250} textAlign="center">
+                <HStack columns={3} flexWrap="wrap">
+                    <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation' mb={3}/>
+                    <Box maxW={250} textAlign="center" mb={3}>
                         <Text fontSize={36}>...</Text>
                     </Box>
-                    <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' w={300}/>
+                    <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' maxW={300} mb={3}/>
                 </HStack>
             </Container>
         </Box>
 
         <Box mx='auto' w={{base: "100%", md: "100vh"}}>
             <Heading size='lg' mb={4}>Configure your CPU now</Heading>
-            <Tabs borderWidth={1} borderRadius='lg' p={3}>
-                <TabList>
+            <Tabs borderWidth={1} borderRadius='lg' p={3} isFitted>
+                <TabList className="tab-list">
                     <Tab>General</Tab>
                     <Tab>Multi-Core</Tab>
                     <Tab>Pipeline</Tab>

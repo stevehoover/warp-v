@@ -33,7 +33,7 @@ export function CoreDetailsComponent({
 
     function replaceImports(old) {
         return old.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
-           // .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
+        // .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
     }
 
     function handleOpenInMakerchipClicked() {
@@ -44,8 +44,7 @@ export function CoreDetailsComponent({
                     .replace("\\TLV_version", "\\m4_TLV_version"),
                 setMakerchipOpening
             )
-        }
-        else if (selectedFile === "rtl") {
+        } else if (selectedFile === "rtl") {
             const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
 \\SV
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
@@ -61,27 +60,28 @@ export function CoreDetailsComponent({
             <Text mt={1}>Your CPU is constructed in the following steps.</Text>
         </Box>
 
-        <HStack mb={10}>
-            <Box>
+        <HStack mb={10} flexWrap="wrap">
+            <HStack mb={5} mx="auto">
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
-                    <Text backgroundColor={selectedFile === "m4" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
+                    <Text backgroundColor={selectedFile === "m4" ? "#CDCDCD" : null} borderWidth={1}
+                          borderRadius={15} p={2} textAlign='center' mb={2}>Macro Configuration</Text>
                     <Image src="macropreviewlight.png" maxW={200} mx="auto"/>
                 </Link>
-            </Box>
-            <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
-                <Container centerContent mx={0} px={0} width={30}>
-                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
-                </Container>
-            </Tooltip>
+                <Tooltip label="A macro-preprocessor (M4) applies parameters and instantiates components.">
+                    <Container centerContent mx={0} px={0} width={30}>
+                        <Icon as={FaLongArrowAltRight} fontSize="30px"/>
+                        <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                    </Container>
+                </Tooltip>
+            </HStack>
 
-            <Box>
+            <HStack mb={5} mx="auto">
                 <Link onClick={() => handleDisplayButtonClicked('tlv')}>
-                    <Text backgroundColor={selectedFile === "tlv" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center'>Transaction-Level Design
+                    <Text backgroundColor={selectedFile === "tlv" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15}
+                          p={1} textAlign='center'>Transaction-Level Design
                         (TL-Verilog)</Text>
                     <Image src="tlv-tlvpreview.png" maxW={200} mx="auto"/>
                 </Link>
-            </Box>
             <Tooltip
                 label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
                 <Container centerContent mx={0} px={0} width={30}>
@@ -89,13 +89,15 @@ export function CoreDetailsComponent({
                     <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
                 </Container>
             </Tooltip>
+            </HStack>
 
-            <Box>
+            <HStack mx="auto">
                 <Link onClick={() => handleDisplayButtonClicked('rtl')}>
-                    <Text backgroundColor={selectedFile === "rtl" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15} p={2} textAlign='center' mb={2}>RTL (Verilog)</Text>
+                    <Text backgroundColor={selectedFile === "rtl" ? "#CDCDCD" : null} borderWidth={1} borderRadius={15}
+                          p={2} textAlign='center' mb={2}>RTL (Verilog)</Text>
                     <Image src="rtlpreview.png" maxW={200} mx="auto"/>
                 </Link>
-            </Box>
+            </HStack>
         </HStack>
 
         <Box maxW='100vh'>
@@ -109,10 +111,10 @@ export function CoreDetailsComponent({
                 <HStack mb={3}>
                     <Button colorScheme="teal" onClick={handleDownloadSelectedFileClicked}>Download File</Button>
                     <Button colorScheme="blue" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
-                            isLoading={makerchipOpening}>Edit this File in Makerchip (as source code)</Button>
+                            isLoading={makerchipOpening}>Edit in Makerchip as source</Button>
                 </HStack>
 
-                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100vh">
+                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100vh" maxW="100%">
                     {selectedFile === 'configuration' &&
                     <Text>Your configuration is determined by your core selections on the homepage.</Text>}
                     {selectedFile === 'm4' && macrosForJson.join("\n")/*.map((line, index) => <Text

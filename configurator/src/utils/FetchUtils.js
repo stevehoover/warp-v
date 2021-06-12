@@ -28,7 +28,7 @@ export function openInMakerchip(source, setMakerchipOpening) {
         .then(resp => resp.json())
         .then(json => {
             const url = json.url
-            window.open(`https://makerchip.com${url}`)
+            window.open(`https://makerchip.com${url}`, '_blank').focus()
             setMakerchipOpening(false)
         })
 }
