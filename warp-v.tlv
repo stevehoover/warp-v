@@ -3539,11 +3539,13 @@ m4+definitions(['
             // =========
 
             $reg_write = $reset ? 1'b0 : $valid_dest_reg_valid;
+            /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
             \SV_plus
                always @ (posedge clk) begin
                   if ($reg_write)
                      /regs[$dest_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
                end
+            /* verilator lint_on WIDTH */
             m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
             // Write $pending along with $value, but coded differently because it must be reset.
             /regs[*]
