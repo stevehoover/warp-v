@@ -10,7 +10,6 @@ WARP-V is an open-source CPU core generator written in TL-Verilog with support f
 WARP-V includes CPU core logic only with no current support for virtual memory, caches, or IOs. RISC-V implementations are formally verified using open-source tools in continuous integration testing.
 
 
-
 # Links
 
 ## Explore WARP-V
