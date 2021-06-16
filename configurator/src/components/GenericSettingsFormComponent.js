@@ -41,8 +41,8 @@ export function GenericSettingsFormComponent({
             const indexOfElement = formParameters.indexOf(param)
             const newUserChangedStages = [...userChangedStages]
             formParameters.slice(indexOfElement + 1).forEach(parameter => {
-                console.log(`ld_return_align: ${newObj.ld_return_align}`)
-                console.log(`diff: ${(newObj["execute_stage"] || 0) - (newObj["next_pc_stage"] || 0)}`)
+                //console.log(`ld_return_align: ${newObj.ld_return_align}`)
+                //console.log(`diff: ${(newObj["execute_stage"] || 0) - (newObj["next_pc_stage"] || 0)}`)
                 if (!userChangedStages.includes(parameter.jsonKey)
                     || (parameter.jsonKey === "ld_return_align" ? newObj[parameter.jsonKey] < ((newObj["execute_stage"] || 0) - (newObj["next_pc_stage"] || 0))
                         : newObj[parameter.jsonKey] < value)) {

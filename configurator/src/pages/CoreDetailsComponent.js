@@ -1,4 +1,17 @@
-import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
+import {
+    Box,
+    Button,
+    Code,
+    Container,
+    Heading,
+    HStack,
+    Icon,
+    Image,
+    Link,
+    Text,
+    Tooltip,
+    useDisclosure
+} from '@chakra-ui/react';
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
 import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
@@ -15,11 +28,13 @@ export function CoreDetailsComponent({
                                          sVForJson,
                                          selectedFile,
                                          setSelectedFile,
+                                         setDiscloureAndUrl,
                                          ...rest
                                      }) {
     const [makerchipOpening, setMakerchipOpening] = useState(false)
 
     if (!coreJson || !macrosForJson || !sVForJson) return null;
+
 
     function handleDisplayButtonClicked(toDisplay) {
         setSelectedFile(toDisplay);
@@ -37,12 +52,13 @@ export function CoreDetailsComponent({
     }
 
     function handleOpenInMakerchipClicked() {
-        if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening)
+        if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening, setDiscloureAndUrl)
         else if (selectedFile === "tlv") {
             openInMakerchip(
                 replaceImports(tlvForJson)
                     .replace("\\TLV_version", "\\m4_TLV_version"),
-                setMakerchipOpening
+                setMakerchipOpening,
+                setDiscloureAndUrl
             )
         } else if (selectedFile === "rtl") {
             const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
@@ -50,7 +66,7 @@ export function CoreDetailsComponent({
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
             // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be download when compiled.
 
-            openInMakerchip(replaceImports(modifiedSVToOpen), setMakerchipOpening)
+            openInMakerchip(replaceImports(modifiedSVToOpen), setMakerchipOpening, setDiscloureAndUrl)
         }
     }
 
@@ -82,13 +98,13 @@ export function CoreDetailsComponent({
                         (TL-Verilog)</Text>
                     <Image src="tlv-tlvpreview.png" maxW={200} mx="auto"/>
                 </Link>
-            <Tooltip
-                label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
-                <Container centerContent mx={0} px={0} width={30}>
-                    <Icon as={FaLongArrowAltRight} fontSize="30px"/>
-                    <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
-                </Container>
-            </Tooltip>
+                <Tooltip
+                    label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
+                    <Container centerContent mx={0} px={0} width={30}>
+                        <Icon as={FaLongArrowAltRight} fontSize="30px"/>
+                        <QuestionOutlineIcon mx="auto" marginLeft="auto"/>
+                    </Container>
+                </Tooltip>
             </HStack>
 
             <HStack mx="auto">

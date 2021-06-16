@@ -12,7 +12,8 @@ import {
     TabPanel,
     TabPanels,
     Tabs,
-    Text
+    Text,
+    useDisclosure
 } from '@chakra-ui/react';
 import React, {createRef, useEffect, useState} from 'react';
 import {
@@ -24,11 +25,9 @@ import {GeneralSettingsForm} from '../components/GeneralSettingsForm';
 import {GenericSettingsFormComponent} from "../components/GenericSettingsFormComponent";
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
-import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
+import {downloadFile, openInMakerchip, OpenInMakerchipModal} from "../utils/FetchUtils";
 import {EnterProgramForm} from "./EnterProgramForm";
-import * as PropTypes from "prop-types";
 import {VerilogSettingsForm} from "./VerilogSettingsForm";
-import {getWarpVFileForCommit} from "../utils/WarpVUtils";
 
 const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))
 const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
@@ -57,6 +56,13 @@ export default function HomePage({
     const [downloadingCode, setDownloadingCode] = useState(false)
     const detailsComponentRef = createRef()
     const [selectedFile, setSelectedFile] = useState("m4")
+    const openInMakerchipDisclosure = useDisclosure()
+    const [openInMakerchipUrl, setOpenInMakerchipUrl] = useState()
+
+    function setDisclosureAndUrl(newUrl) {
+        setOpenInMakerchipUrl(newUrl)
+        openInMakerchipDisclosure.onOpen()
+    }
 
     useEffect(() => {
         if (!coreJson) return
@@ -207,7 +213,7 @@ export default function HomePage({
             setMakerchipOpening(true)
             const macros = translateJsonToM4Macros(coreJson);
             const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
-            openInMakerchip(tlv, setMakerchipOpening)
+            openInMakerchip(tlv, setMakerchipOpening, setDisclosureAndUrl)
         }
     }
 
@@ -235,19 +241,17 @@ export default function HomePage({
         </Box>
 
         <Heading textAlign='center' size='md' mb={5}>What CPU core can we build for you today?</Heading>
-
-        <Box mx='auto' mb={10} maxW="85%">
-            <Container centerContent>
-                <HStack columns={3} flexWrap="wrap">
-                    <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation' mb={3}/>
-                    <Box maxW={250} textAlign="center" mb={3}>
-                        <Text fontSize={36}>...</Text>
-                    </Box>
-                    <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' maxW={300} mb={3}/>
-                </HStack>
-            </Container>
-        </Box>
-
+        <Container maxW="fit-content">
+            <HStack spacing={25} flexWrap="wrap" mx="auto" mb={10}>
+                <CorePreview path='warpv-core-small.png' info='Low-Power, Low-Freq 1-cyc FPGA Implementation'
+                             mb={3}/>
+                <Box maxW={250} textAlign="center" mb={3}>
+                    <Text fontSize={36}>...</Text>
+                </Box>
+                <CorePreview path='warpv-core-big.png' info='High-Freq 6-cyc ASIC Implementation' maxW={300}
+                             mb={3}/>
+            </HStack>
+        </Container>
         <Box mx='auto' w={{base: "100%", md: "100vh"}}>
             <Heading size='lg' mb={4}>Configure your CPU now</Heading>
             <Tabs borderWidth={1} borderRadius='lg' p={3} isFitted>
@@ -358,13 +362,17 @@ export default function HomePage({
                                   macrosForJson={macrosForJson}
                                   sVForJson={sVForJson}
                                   selectedFile={selectedFile}
-                                  setSelectedFile={setSelectedFile}/>
+                                  setSelectedFile={setSelectedFile}
+                                  setDiscloureAndUrl={setDisclosureAndUrl}
+            />
         </div>
+
+        <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure} />
     </>;
 }
 
 function CorePreview({path, info, ...rest}) {
-    return <Box mx='auto'>
+    return <Box>
         <Image src={path} mx='auto' {...rest} />
         <Text mx='auto' textAlign='center' maxW={160}>{info}</Text>
     </Box>;
