@@ -6,7 +6,7 @@ export function Footer() {
     return <>
         <Box textAlign="center" mt={13} mb={10} mx="auto">
             <FooterLink to="https://github.com/stevehoover/warp-v" mr={30}>
-                Dig deeper in the github repository <Icon as={MdOpenInNew}/>
+                Dig deeper or report bugs in the github repository <Icon as={MdOpenInNew}/>
             </FooterLink>
 
             <FooterLink to="https://www.redwoodeda.com">

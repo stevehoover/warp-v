@@ -31,9 +31,6 @@ function MobileNavContent(props) {
                             <NavLink.Mobile href={link.href}>{link.label}</NavLink.Mobile>
                         </NavItemTransition>
                     ))}
-                    <NavItemTransition style={{flex: '1'}}>
-                        <NavLink.Mobile href='#'>Get started</NavLink.Mobile>
-                    </NavItemTransition>
                 </Stack>
             </NavListTransition>
         </Box>

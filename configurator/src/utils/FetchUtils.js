@@ -28,7 +28,13 @@ export function openInMakerchip(source, setMakerchipOpening) {
         .then(resp => resp.json())
         .then(json => {
             const url = json.url
-            window.open(`https://makerchip.com${url}`, '_blank').focus()
+            openInNewTabOrFallBack(`https://makerchip.com${url}`, '_blank')
             setMakerchipOpening(false)
         })
+}
+
+function openInNewTabOrFallBack(urlToRedirectTo, target) {
+    const newWindow = window.open(urlToRedirectTo, target)
+
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') window.location.href = urlToRedirectTo // fallback
 }
