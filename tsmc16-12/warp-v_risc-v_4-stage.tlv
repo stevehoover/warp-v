@@ -11,5 +11,11 @@ m4+definitions(['
 m4+module_def
 \TLV
    m4+warpv()
+   // Connect *passed/*failed to preserve logic.
+   |fetch
+      /instr
+         @M4_EXECUTE_STAGE
+            *passed = $valid_exe && ! $reset && $Pc == '1;
+            *failed = 1'b0;
 \SV
    endmodule

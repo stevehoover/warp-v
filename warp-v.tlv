@@ -281,7 +281,7 @@ m4+definitions(['
    m4_ifndef(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
      ISA, RISCV,
-     ['# A standard configuration that provides default values. (1-stage, 4-stage, 6-stage, none (and define individual parameters))'],
+     ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
      STANDARD_CONFIG, 4-stage,
      ['# Number of words in the data memory.'],
      DMEM_SIZE, 32)
@@ -2221,7 +2221,7 @@ m4+definitions(['
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
       $ld_st_cond = $ld_st && $valid_exe;
       ?$ld_st_cond
-         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['($is_fsw_instr ? /src[1]$reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
+         $addr[M4_ADDR_RANGE] = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
          
          // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
