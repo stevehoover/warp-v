@@ -252,7 +252,7 @@ export default function HomePage({
                              mb={3}/>
             </HStack>
         </Container>
-        <Box mx='auto' w={{base: "100%", md: "100vh"}}>
+        <Box mx='auto' w={{base: "100%", xlg: "100vh"}}>
             <Heading size='lg' mb={4}>Configure your CPU now</Heading>
             <Tabs borderWidth={1} borderRadius='lg' p={3} isFitted>
                 <TabList className="tab-list">
