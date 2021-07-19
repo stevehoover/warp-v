@@ -35,15 +35,9 @@ We built a <a href="https://warp-v.org">configurator</a>, so you can quickly bui
 In a clean directory:
 
 ```sh
-git clone --recurse-submodules https://github.com/stevehoover/warp-v.git
-```
-
-Note the use of `--recurse-submodules`. If you already cloned without it, you can:
-
-```sh
+git clone https://github.com/stevehoover/warp-v.git
 cd warp-v
-git submodule init
-git submodule update
+./init
 ```
 
 

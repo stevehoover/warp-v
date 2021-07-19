@@ -835,11 +835,15 @@ m4+definitions(['
    // Variables set by this macro:
    // List of CSRs.
    m4_define(['m4_csrs'], [''])
+   m4_define(['m4_num_csrs'], ['0'])
    // Arguments given to this macro for each CSR.
    // Initial value of CSR read result expression, initialized to ternary default case (X).
    m4_define(['m4_csrrx_rslt_expr'], ['M4_WORD_CNT'bx'])
    // Initial value of OR expression for whether CSR index is valid.
    m4_define(['m4_valid_csr_expr'], ['1'b0'])
+   // VIZ initEach and renderEach JS code to define fabricjs objects for the CSRs.
+   m4_define(['m4_csr_viz_init_each'], [''])
+   m4_define(['m4_csr_viz_render_each'], [''])
 
    // m4_define_csr(name, index (12-bit SV-value), fields (as in m4_define_vector), reset_value (SV-value), writable_mask (SV-value), side-effect_writes (bool))
    // Adds a CSR.
@@ -847,12 +851,16 @@ m4+definitions(['
    m4_define(
       ['m4_define_csr'],
       ['m4_define_vector_with_fields(['M4_CSR_']m4_to_upper(['$1']), $3)
-        m4_define(['m4_csrs'], 
+        m4_define(['m4_csrs'],
                   m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
         m4_define(['m4_csr_']$1['_args'], ['$@'])
         // 32'b0 = ['{{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
         m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
         m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
+        // VIZ
+        m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each[' csr_objs["$1_box"] = new fabric.Rect({top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
+        m4_define(['m4_csr_viz_render_each'], m4_csr_viz_render_each['var $1mod = '/instr$csr_$1_hw_wr'.asBool(false); var $1name = String("$1"); var oldVal$1    = $1mod    ? `(${'/instr$csr_$1'.asInt(NaN).toString()})` : ""; this.getInitObject("$1").setText($1name + ": " + '/instr$csr_$1'.step(1).asInt(NaN).toString() + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
+        m4_define(['m4_num_csrs'], m4_eval(m4_num_csrs + 1))
       ']
    )
    
@@ -3480,6 +3488,10 @@ m4+definitions(['
             // Control
             // =======
             
+            // A version of PC we can pull through $ANYs.
+            m4_ifelse(00, M4_VIZ['']M4_FORMAL, , $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];)
+            
+            
             // Execute stage redirect conditions.
             $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXT_B, 1, ['|| $clmul_crc_type_instr']);
             $replay_trap = m4_cpu_blocked;
@@ -3597,7 +3609,6 @@ m4+definitions(['
          @M4_EXECUTE_STAGE
             // characterise non-speculatively in execute stage
 
-            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // RVFI interface for formal verification.
             $trap = $aborting_trap ||
                     $non_aborting_trap;
@@ -4039,370 +4050,623 @@ m4+definitions(['
             '], ['DUMMY'], ['
             '])
    '])
+   
+   
 
-\TLV cpu_viz()
-   
-   // /===============\
-   // | Visualization |
-   // \===============/
-   
+\TLV instruction_in_memory()
+   \viz_alpha
+      initEach() {
+         // Instruction and binary value text.
+         let instr_str = new fabric.Text("" , {
+            top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
+            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            fontSize: 14,
+            fontFamily: "monospace",
+            visible: false
+         })
+         let instr_asm_box = new fabric.Rect({
+            top: 18 * this.getIndex(),
+            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            fill: "white",
+            width: 300,
+            height: 14,
+            visible: false
+         })
+         let instr_binary_box = new fabric.Rect({
+            top: 18 * this.getIndex(),
+            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'],-230, ['MIPSI'], -580, ['DUMMY'], 20),
+            fill: "white",
+            width: 280,
+            height: 14,
+            visible: false
+         })
+         return {objects: {instr_binary_box, instr_asm_box, instr_str}}
+      },
+      renderEach() {
+         // Instruction memory is constant, so just create it once.
+         m4_ifelse_block(M4_ISA, ['MINI'], ['
+            let instr_str = '$instr'.goTo(0).asString("?")
+         '], M4_ISA, ['RISCV'], ['
+            let instr_str = '$instr_str'.asString("?") + "  " + '$instr'.asBinaryStr(NaN)
+         '], M4_ISA, ['MIPSI'], ['
+            let instr_str = '$instr'.asBinaryStr("?")
+         '], ['
+            let instr_str = '$instr'.goTo(0).asString("?")
+         '])
+          if(instr_str != 0) {
+             //console.log("yes5") 
+             this.getInitObject("instr_str").setVisible(true)
+             this.getInitObject("instr_asm_box").setVisible(true)
+             this.getInitObject("instr_binary_box").setVisible(true)
+             this.getInitObject("instr_str").setText(`${instr_str}`)
+         }
+      }
+         
+\TLV registers()
+   // TODO: Fix [*]
+   \viz_alpha
+      initEach() {
+         let regname = new fabric.Text("Integer (hex)", {
+               top: -15,
+               left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
+               fontSize: 14,
+               fontFamily: "monospace",
+               fill: "white",
+               visible: false
+            })
+         let reg = new fabric.Text("", {
+            top: 18 * this.getIndex(),
+            left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 367, ['MIPSI'], 400, ['DUMMY'], 200),
+            fontSize: 14,
+            fontFamily: "monospace"
+         })
+         let rf_hex_box = new fabric.Rect({
+            top: 18 * this.getIndex(),
+            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 360, ['MIPSI'], -580, ['DUMMY'], 20),
+            fill: "white",
+            width: 125,
+            height: 14,
+            visible: false
+         })
+         return {objects: {rf_hex_box, regname, reg}}
+      },
+      renderEach() {
+         let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index)
+         let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
+         let reg = parseInt(this.getIndex())
+         let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
+         let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
+         this.getInitObject("regname").setVisible(true) 
+         this.getInitObject("rf_hex_box").setVisible(true) 
+         this.getInitObject("reg").setText(
+            regIdent + ": " +
+            '$value'.step(1).asInt(NaN).toString(16) + oldValStr)
+         this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black")
+      }
+      
+\TLV register_csr(/_csr) 
+   /_csr
+      \viz_alpha
+         initEach() {
+            let csr_objs = {}
+            let csr_boxes = {}
+            //debugger
+            m4_csr_viz_init_each
+            return {objects: {...csr_objs, ...csr_boxes}}
+            },
+            renderEach() {
+               //debugger
+               m4_csr_viz_render_each
+            }
+            
+\TLV register_fpu(/_fpu_size) 
+   /_fpu_size
+      // TODO: Fix [*]
+      \viz_alpha
+         initEach() {
+            let regname = new fabric.Text("Floating Point (hex)", {
+                     top: -20,
+                     left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 420 ['MIPSI'], 375, ['DUMMY'], 175),
+                     fontSize: 14,
+                     fontFamily: "monospace",
+                     fill: "white"
+                  })
+            let fpureg = new fabric.Text("", {
+               top: 18 * this.getIndex(),
+               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 500, ['MIPSI'], 400, ['DUMMY'], 200),
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let fpu_rf_hex_box = new fabric.Rect({
+               top: 18 * this.getIndex(),
+               left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 360, ['MIPSI'], -580, ['DUMMY'], 20),
+               fill: "white",
+               width: 125,
+               height: 14,
+               visible: false
+            })
+            return {objects: {fpu_rf_hex_box, regname, fpureg}}
+         },
+         renderEach() {
+            let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index)
+            let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending_fpu'.asBool(false)'], ['false'])
+            let reg = parseInt(this.getIndex())
+            let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
+            let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : ""
+            //this.getInitObject("fpu_rf_hex_box").setVisible(true) 
+            this.getInitObject("fpureg").setText(
+               regIdent + ": " +
+               '$fpuvalue'.step(1).asInt(NaN).toString(16) + oldValStr)
+            this.getInitObject("fpureg").setFill(pending ? "red" : mod ? "blue" : "black")
+         }
+         
+\TLV instruction()
+   \viz_alpha
+      renderEach() {
+         //debugger
+         objects = {}
+         //
+         // PC instr_mem pointer
+         //
+         let pc = '$Pc'.asInt(-1)
+         let commit = '$commit'.asBool(false)
+         let color = !commit                ? "gray" :
+                     '$abort'.asBool(false) ? "red" :
+                                              "blue"
+         objects.pc_pointer = new fabric.Text("👉", {
+            top: 18 * pc,
+            left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            opacity: commit ? 1 : 0.5
+         })
+         if ('$second_issue'.asBool(false)) {
+            let second_issue_pc = '/orig_inst$pc'.asInt(-1)
+            objects.second_issue_pointer = new fabric.Text("👉🏿", {
+               top: 18 * second_issue_pc,
+               left: m4_case(M4_ISA, ['MINI'], 3, ['RISCV'], -603, ['MIPSI'], -603, ['DUMMY'], 3),
+               fill: color,
+               fontSize: 14,
+               fontFamily: "monospace",
+               opacity: 0.75
+            })
+         }
+         //
+         //
+         // Fetch Instruction
+         //
+         // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
+         //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
+         //   top: 50,
+         //   left: 90,
+         //   fill: color,
+         //   fontSize: 14,
+         //   fontFamily: "monospace"
+         //})
+         //
+         // Instruction with values.
+         //
+         m4_ifelse_block(M4_ISA, ['MINI'], ['
+            let str = '$dest_char'.asString("?")
+            str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n ="
+            str += '/src[1]$char'.asString("?")
+            str += "(" + ('/src[1]$valid'.asBool(false) ? '/src[1]$value'.asInt(NaN) : "--") + ")\n   "
+            str += '/op$char'.asString("-")
+            str += '/src[2]$char'.asString("?")
+            str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")"
+         '], M4_ISA, ['RISCV'], ['
+            let regStr = (valid, regNum, regValue) => {
+               return valid ? `x${regNum} (${regValue})` : `xX`
+            }
+            let srcStr = (src) => {
+               return '/src[src]$unconditioned_is_reg'.asBool(false)
+                          ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                          : ""
+            }
+            let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+                      `  = ${'$mnemonic'.asString("?")}${srcStr(1)}${srcStr(2)}\n` +
+                      `      i[${'$imm_value'.asInt(NaN)}]`
+         '], M4_ISA, ['MIPSI'], ['
+            // TODO: Almost same as RISC-V. Avoid cut-n-paste.
+            let regStr = (valid, regNum, regValue) => {
+               return valid ? `x${regNum} (${regValue})` : `xX`
+            }
+            let srcStr = (src) => {
+               return '/src[src]$unconditioned_is_reg'.asBool(false)
+                          ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                          : ""
+            }
+            let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+                      `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
+                      `      i[${'$imm_value'.asInt(NaN)}]`
+         '], ['
+         '])
+         //console.log("pc =" , pc) 
+         objects.pc_arrow = new fabric.Line([-303, 18 * pc + 6, 86, -8], {
+            stroke: "#00afdf",
+            strokeWidth: 2
+         })
+         let reg_addr1 = '$raw_rs1'.asInt()
+         let rs1_valid = '/src[1]$is_reg'.asBool()
+         objects.rs1_arrow = new fabric.Line([360, 18 * reg_addr1 + 6, 210, 58], {
+            stroke: "#00afdf",
+            strokeWidth: 2, 
+            visible: rs1_valid
+         })
+         
+         let reg_addr2 = '$raw_rs2'.asInt()
+         let rs2_valid = '/src[2]$is_reg'.asBool()
+         objects.rs2_arrow = new fabric.Line([360, 18 * reg_addr2 + 6, 210, 76], {
+            stroke: "#00afdf",
+            strokeWidth: 2,
+            visible: rs2_valid
+         })
+         
+         let dest_reg = '$dest_reg'.asInt(0)
+         let rd_valid = '$dest_reg_valid'.asBool(false)
+         objects.rd_arrow = new fabric.Line([360, 18 * dest_reg + 6, 157, 20 ], {
+            stroke: "#00bfff",
+            strokeWidth: 3,
+            visible: rd_valid
+         })
+         
+         let ld_st_addr = ('$addr'.asInt() / 4)
+         let ld_valid = '$valid_ld'.asBool(false)
+         objects.ld_arrow = new fabric.Line([550, 18 * ld_st_addr + 6  , 475, 5 + 18 * dest_reg], {
+            stroke: "#d0d0ff",
+            strokeWidth: 3,
+            visible: ld_valid
+         })
+         
+         let st_valid = '$valid_st'.asBool()
+         objects.st_arrow = new fabric.Line([210, 76, 550, 18 * ld_st_addr + 6], {
+            stroke: "#00bfff",
+            strokeWidth: 3,
+            visible: st_valid
+         })
+         
+         let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
+         let instr_string = $instr_str ? $instr_str.asString("?") : "?"
+         objects.fetch_instr_viz = new fabric.Text(instr_string, {
+                  top: 18 * pc,
+                  left: -532,
+                  fill: color,
+                  fontSize: 14,
+                  fontFamily: "monospace"
+         })
+         
+         objects.fetch_instr_viz.animate({top: -12, left: 85}, {
+              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+              duration: 500
+         })
+         
+         objects.instr_with_values = new fabric.Text(str, {
+            top: 15,
+            left: 110,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace"
+         })
+         
+         let src1_value = '/src[1]$unconditioned_reg_value'.asInt().toString()
+         objects.src1_value_viz = new fabric.Text(src1_value, {
+            left: 316 + 8 * 4,
+            top: 18 * reg_addr1,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (rs1_valid) {
+            setTimeout(() => {
+               objects.src1_value_viz.setVisible(true)
+               objects.src1_value_viz.animate({left: 195, top: 18 * 2 + 15}, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  objects.src1_value_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 500)
+         }
+         let src2_value = '/src[2]$unconditioned_reg_value'.asInt().toString()
+         objects.src2_value_viz = new fabric.Text(src2_value, {
+            left: 316 + 8 * 4,
+            top: 18 * reg_addr2,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (rs2_valid) {
+            setTimeout(() => {
+               objects.src2_value_viz.setVisible(true)
+               objects.src2_value_viz.animate({left: 195, top: 18 * 3 + 15 }, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  if ('$valid_decode'.asBool(false) && '$st'.asBool(false) && commit) {
+                     // Animate src2 value being stored.
+                     objects.src2_value_viz.animate({left: 550, top: 18 * ld_st_addr}, {
+                        onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                        duration: 500
+                     })
+                     setTimeout(() => {
+                        objects.src2_value_viz.setVisible(false)
+                        this.global.canvas.renderAll.bind(this.global.canvas)()
+                     }, 500)
+                  } else {
+                     // Hide src2 value.
+                     objects.src2_value_viz.setVisible(false)
+                     this.global.canvas.renderAll.bind(this.global.canvas)()
+                  }
+               }, 500)
+            }, 500)
+         }
+         
+         let res_value = '$rslt'.asInt().toString(16)
+         objects.result_viz = new fabric.Text(res_value, {
+            left: 150,
+            top: 16,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (rd_valid && commit) {
+            setTimeout(() => {
+               objects.result_viz.setVisible(true)
+               objects.result_viz.animate({left: 393, top: 18 * dest_reg}, {
+                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                 duration: 500
+               })
+               setTimeout(() => {
+                  objects.result_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 1000)
+         }
+         return {objects: Object.values(objects)}
+      }
+
+\TLV fpu_csr(/_fpu)
+   /_fpu
+      \viz_alpha
+         initEach() {
+            let fcsr = new fabric.Text("", {
+               top: 18 * 33,
+               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let frm = new fabric.Text("", {
+               top: 18 * 34,
+               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let fflags = new fabric.Text("", {
+               top: 18 * 35,
+               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            return {objects: {fcsr: fcsr, frm: frm, fflags: fflags}}
+         },
+         renderEach() {
+            var fcsrmod = '/instr$csr_fcsr_hw_wr'.asBool(false)
+            var frmmod = '/instr$csr_frm_hw_wr'.asBool(false)
+            var fflagsmod = '/instr$csr_fflags_hw_wr'.asBool(false)
+            var fcsrname = String("fcsr")
+            var frmname = String("frm")
+            var fflagsname = String("fflags")
+            var oldValfcsr = fcsrmod ? `(${'/instr$csr_fcsr'.asInt(NaN).toString(16)})` : ""
+            var oldValfrm =  frmmod ? `(${'/instr$csr_frm'.asInt(NaN).toString(16)})` : ""
+            var oldValfflags = fflagsmod ? `(${'/instr$csr_fflags'.asInt(NaN).toString(16)})` : ""
+            this.getInitObject("fcsr").setText(
+               fcsrname + ": " +
+               '/instr$csr_fcsr'.step(1).asInt(NaN).toString(16) + oldValfcsr)
+            this.getInitObject("frm").setText(
+               frmname + ": " +
+               '/instr$csr_frm'.step(1).asInt(NaN).toString(16) + oldValfrm)
+            this.getInitObject("fflags").setText(
+               fflagsname + ": " +
+               '/instr$csr_fflags'.step(1).asInt(NaN).toString(16) + oldValfflags)
+            this.getInitObject("fcsr").setFill( fcsrmod ? "blue" : "black")
+            this.getInitObject("frm").setFill( frmmod ? "blue" : "black")
+            this.getInitObject("fflags").setFill( fflagsmod ? "blue" : "black")
+         }
+         
+\TLV memory(/_bank_size , /_mem_size)
+   /_bank_size
+      /_mem_size
+         \viz_alpha
+            initEach() {
+               let index_val_box = new fabric.Rect({
+                  top: 18 * this.getIndex(),
+                  left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 540, ['MIPSI'], -580, ['DUMMY'], 20) ,
+                  fill: "white",
+                  width: 40,
+                  height: 14,
+                  visible: false
+               })
+               let bank_val_box = new fabric.Rect({
+                  top: 18 * this.getIndex(),
+                  left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 550, ['MIPSI'], -580, ['DUMMY'], 20) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10,
+                  fill: "white",
+                  width: 25,
+                  height: 14,
+                  visible: false
+               })
+               let regname = new fabric.Text("Data Memory (hex)", {
+                        top: -40,
+                        left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 500, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 15), // Center aligned
+                        fontSize: 14,
+                        fontFamily: "monospace",
+                        fill: "white"
+                     })
+               let bankname = new fabric.Text("bank", {
+                  top: -20,
+                  left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 545, ['MIPSI'], 500, ['DUMMY'], 300),
+                  fontSize: 14,
+                  fontFamily: "monospace",
+                        fill: "white"
+               })
+               let banknum = new fabric.Text(String(this.getScope("bank").index), {
+                  top: -20,
+                  left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 510, ['MIPSI'], 455, ['DUMMY'], 255) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60,
+                  fontSize: 14,
+                  fontFamily: "monospace",
+                        fill: "white"
+               })
+               let data = new fabric.Text("", {
+                  top: 18 * this.getIndex(),
+                  left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 555, ['MIPSI'], 500, ['DUMMY'], 300) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10, // bank: 3 2 1 0 format
+                  fontSize: 14,
+                  fontFamily: "monospace"
+               })
+               //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+               let index =
+                  new fabric.Text("", {
+                     top: 18 * this.getIndex(),
+                     left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 550, ['MIPSI'], 500, ['DUMMY'], 300),
+                     fontSize: 14,
+                     fontFamily: "monospace"
+                  })
+               return {objects: {index_val_box, bank_val_box, banknum, bankname, regname, data, index}}
+            },
+            renderEach() {
+               //console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`)
+               var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+               //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
+               if (this.getInitObject("index")) {
+                  let addrStr = parseInt(this.getIndex()).toString()
+                  this.getInitObject("index").setText(addrStr + ":")
+               }
+               this.getInitObject("index_val_box").setVisible(true) 
+               this.getInitObject("bank_val_box").setVisible(true) 
+               this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"))
+               this.getInitObject("data").setFill(mod ? "blue" : "black")
+            }
+            
+\TLV layout_viz(/_screen) 
+   /_screen 
+      \viz_alpha 
+         initEach() { 
+         let imem_box = new fabric.Rect({
+            top: -50,
+            left: -25 + m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            fill: "#208028",
+            width: 670,
+            height: 76 + 18 * M4_NUM_INSTRS,
+            stroke: "black",
+            visible: false
+         })
+         let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+            top: -40,
+            left: 250 + m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            fontSize: 20,
+            fontWeight: 800,
+            fontFamily: "monospace",
+            fill: "white"
+         })
+         let decode_header = new fabric.Text("⚙️ Instr. Decode", {
+            top: -45,
+            left: 100,
+            fill: "maroon",
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: "monospace"
+         })
+         let decode_box = new fabric.Rect({
+            top: -50,
+            left: 80,
+            fill: "#f8f0e8",
+            width: 230,
+            height: 160,
+            stroke: "#ff8060",
+            visible: false
+         })
+         let csr_header = new fabric.Text("📂 CSRs", {
+            top: 125,
+            left: 100,
+            fill: "white",
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: "monospace"
+         })
+         let reg_box = new fabric.Rect({
+            top: 120,
+            left: 80,
+            fill: "#2028b0",
+            width: 220,
+            height: 160,
+            stroke: "black"
+         })
+         let rf_box = new fabric.Rect({
+            top: -60,
+            left: 350,
+            fill: "#2028b0",
+            width: 145,
+            height: 650,
+            stroke: "black",
+            visible: false
+         })
+         let rf_header = new fabric.Text("📂 Reg File", {
+            top: -45,
+            left: 360,
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: "monospace",
+            fill: "white"
+         })
+         let bank_box = new fabric.Rect({
+            top: -60,
+            left: 530,
+            fill: "#208028",
+            width: 190,
+            height: 650,
+            stroke: "black"
+         })
+         return {objects : {bank_box, rf_box, reg_box, decode_box, imem_box, rf_header, csr_header, decode_header, imem_header}}
+        },
+        renderEach() {
+             this.getInitObject("imem_box").setVisible(true)
+             this.getInitObject("decode_box").setVisible(true)
+             this.getInitObject("rf_box").setVisible(true)
+         }
+            
+   //////// VIZUALIZING THE MAIN CPU //////////////
+\TLV cpu_viz(/_des_pipe , @_M4_stage)
+
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
    m4+m4_viz_logic_macro_name()
-   |fetch
-      @M4_MEM_WR_STAGE  // Visualize everything happening at the same time.
-         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
-            \viz_alpha
-               renderEach: function() {
-                  // Instruction memory is constant, so just create it once.
-                  if (!global.instr_mem_drawn) {
-                     global.instr_mem_drawn = [];
-                  }
-                  if (!global.instr_mem_drawn[this.getIndex()]) {
-                     global.instr_mem_drawn[this.getIndex()] = true;
-                     m4_ifelse_block(M4_ISA, ['MINI'], ['
-                        let instr_str = '$instr'.goTo(0).asString();
-                     '], M4_ISA, ['RISCV'], ['
-                        let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
-                     '], M4_ISA, ['MIPSI'], ['
-                        let instr_str = '$instr'.asBinaryStr(NaN);
-                     '], ['
-                        let instr_str = '$instr'.goTo(0).asString();
-                     '])
-                     this.getCanvas().add(new fabric.Text(instr_str, {
-                        top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
-                        left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     }));
-                  }
-               }
+   /_des_pipe
+      @_M4_stage  // Visualize everything happening at the same time.
+         m4+layout_viz(/layout)
+         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
+            m4+instruction_in_memory()
+         //
+         // Register file
+         //
          /instr
-            \viz_alpha
-               //
-               renderEach: function() {
-                  debugger;
-                  //
-                  // PC instr_mem pointer
-                  //
-                  let $Pc = '$Pc';
-                  let color = !('$commit'.asBool()) ? "gray" :
-                              '$abort'.asBool()        ? "red" :
-                                                         "blue";
-                  let pcPointer = new fabric.Text("->", {
-                     top: 18 * $Pc.asInt(),
-                     left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
-                     fill: color,
-                     fontSize: 14,
-                     fontFamily: "monospace"
-                  });
-                  //
-                  //
-                  // Fetch Instruction
-                  //
-                  // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
-                  //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
-                  //   top: 50,
-                  //   left: 90,
-                  //   fill: color,
-                  //   fontSize: 14,
-                  //   fontFamily: "monospace"
-                  //});
-                  //
-                  // Instruction with values.
-                  //
-                  m4_ifelse_block(M4_ISA, ['MINI'], ['
-                     let str = '$dest_char'.asString();
-                     str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n =";
-                     str += '/src[1]$char'.asString();
-                     str += "(" + ('/src[1]$valid'.asBool(false) ? '/src[1]$value'.asInt(NaN) : "--") + ")\n   ";
-                     str += '/op$char'.asString("-");
-                     str += '/src[2]$char'.asString();
-                     str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")";
-                  '], M4_ISA, ['RISCV'], ['
-                     let regStr = (valid, regNum, regValue) => {
-                        return valid ? `r${regNum} (${regValue})` : `rX`;
-                     };
-                     let srcStr = (src) => {
-                        return '/src[src]$unconditioned_is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
-                                   : "";
-                     };
-                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
-                               `  = ${'$mnemonic'.asString()}${srcStr(1)}${srcStr(2)}\n` +
-                               `      i[${'$imm_value'.asInt(NaN)}]`;
-                  '], M4_ISA, ['MIPSI'], ['
-                     // TODO: Almost same as RISC-V. Avoid cut-n-paste.
-                     let regStr = (valid, regNum, regValue) => {
-                        return valid ? `r${regNum} (${regValue})` : `rX`;
-                     };
-                     let srcStr = (src) => {
-                        return '/src[src]$unconditioned_is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
-                                   : "";
-                     };
-                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
-                               `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
-                               `      i[${'$imm_value'.asInt(NaN)}]`;
-                  '], ['
-                  '])
-                  let instrWithValues = new fabric.Text(str, {
-                     top: 70,
-                     left: 90,
-                     fill: color,
-                     fontSize: 14,
-                     fontFamily: "monospace"
-                  });
-                  return {objects: [pcPointer, instrWithValues]};
-               }
-            //
-            // Register file
-            //
-            
-            /regs[M4_REGS_RANGE]  // TODO: Fix [*]
-               \viz_alpha
-                   
-                  initEach: function() {
-                     let regname = new fabric.Text("Integer (hex)", {
-                           top: -20,
-                           left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                     let reg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {regname: regname, reg: reg}};
-                  },
-                  renderEach: function() {
-                     let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index);
-                     m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending'.asBool(false)'], ['false']);
-                     let reg = parseInt(this.getIndex());
-                     let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : "";
-                     this.getInitObject("reg").setText(
-                        regIdent + ": " +
-                        '$value'.step(1).asInt(NaN).toString(16) + oldValStr);
-                     this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
-                  }
-            /regcsr
-               \viz_alpha
-                  initEach: function() {
-                     let cycle = new fabric.Text("", {
-                        top: 18 * 33,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let cycleh = new fabric.Text("", {
-                        top: 18 * 34,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let time = new fabric.Text("", {
-                        top: 18 * 35,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let timeh = new fabric.Text("", {
-                        top: 18 * 36,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let instret = new fabric.Text("", {
-                        top: 18 * 37,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let instreth = new fabric.Text("", {
-                        top: 18 * 38,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {cycle: cycle, cycleh: cycleh, time: time, timeh: timeh, instret: instret, instreth: instreth}};
-                     },
-                     renderEach: function() {
-                        var cyclemod = '/instr$csr_cycle_hw_wr'.asBool(false);
-                        var cyclehmod = '/instr$csr_cycleh_hw_wr'.asBool(false);
-                        var timemod = '/instr$csr_time_hw_wr'.asBool(false);
-                        var timehmod = '/instr$csr_timeh_hw_wr'.asBool(false);
-                        var instretmod = '/instr$csr_instret_hw_wr'.asBool(false);
-                        var instrethmod = '/instr$csr_instreth_hw_wr'.asBool(false);
-                        var cyclename    = String("cycle");
-                        var cyclehname   = String("cycleh");
-                        var timename     = String("time");
-                        var timehname    = String("timeh");
-                        var instretname  = String("instret");
-                        var instrethname = String("instreth");
-                        var oldValcycle    = cyclemod    ? `(${'/instr$csr_cycle'.asInt(NaN).toString()})` : "";
-                        var oldValcycleh   = cyclehmod   ? `(${'/instr$csr_cycleh'.asInt(NaN).toString()})` : "";
-                        var oldValtime     = timemod     ? `(${'/instr$csr_time'.asInt(NaN).toString()})` : "";
-                        var oldValtimeh    = timehmod    ? `(${'/instr$csr_timeh'.asInt(NaN).toString()})` : "";
-                        var oldValinstret  = instretmod  ? `(${'/instr$csr_instret'.asInt(NaN).toString()})` : "";
-                        var oldValinstreth = instrethmod ? `(${'/instr$csr_instreth'.asInt(NaN).toString()})` : "";
-                        this.getInitObject("cycle").setText(
-                           cyclename + ": " +
-                           '/instr$csr_cycle'.step(1).asInt(NaN).toString() + oldValcycle);
-                        this.getInitObject("cycleh").setText(
-                           cyclehname + ": " +
-                           '/instr$csr_cycleh'.step(1).asInt(NaN).toString() + oldValcycleh);
-                        this.getInitObject("time").setText(
-                           timename + ": " +
-                           '/instr$csr_time'.step(1).asInt(NaN).toString() + oldValtime);
-                        this.getInitObject("timeh").setText(
-                           timehname + ": " +
-                           '/instr$csr_timeh'.step(1).asInt(NaN).toString() + oldValtimeh);
-                        this.getInitObject("instret").setText(
-                           instretname + ": " +
-                           '/instr$csr_instret'.step(1).asInt(NaN).toString() + oldValinstret);
-                        this.getInitObject("instreth").setText(
-                           instrethname + ": " +
-                           '/instr$csr_instreth'.step(1).asInt(NaN).toString() + oldValinstreth);
-                        this.getInitObject("cycle").setFill( cyclemod ? "blue" : "black");
-                        this.getInitObject("cycleh").setFill( cyclehmod ? "blue" : "black");
-                        this.getInitObject("time").setFill( timemod ? "blue" : "black");
-                        this.getInitObject("timeh").setFill( timehmod ? "blue" : "black");
-                        this.getInitObject("instret").setFill( instretmod ? "blue" : "black");
-                        this.getInitObject("instreth").setFill( instrethmod ? "blue" : "black");
-                     }
+            m4+instruction()
+            /regs[M4_REGS_RANGE]
+               m4+registers()
+            m4+register_csr(/regcsr)
             m4_ifelse_block(M4_EXT_F, 1, ['
-            /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
-               \viz_alpha
-                  initEach: function() {
-                     let regname = new fabric.Text("Floating Point (hex)", {
-                              top: -20,
-                              left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 225, ['MIPSI'], 375, ['DUMMY'], 175),
-                              fontSize: 14,
-                              fontFamily: "monospace"
-                           });
-                     let fpureg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {regname :regname, fpureg: fpureg}};
-                  },
-                  renderEach: function() {
-                     let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index);
-                     let pending = m4_ifelse(['M4_PENDING_ENABLED'], 1, [''$pending_fpu'.asBool(false)'], ['false']);
-                     let reg = parseInt(this.getIndex());
-                     let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : "";
-                     this.getInitObject("fpureg").setText(
-                        regIdent + ": " +
-                        '$fpuvalue'.step(1).asInt(NaN).toString(16) + oldValStr);
-                     this.getInitObject("fpureg").setFill(pending ? "red" : mod ? "blue" : "black");
-                  }
-            /fpucsr
-               \viz_alpha
-                  initEach: function() {
-                     let fcsr = new fabric.Text("", {
-                        top: 18 * 33,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let frm = new fabric.Text("", {
-                        top: 18 * 34,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let fflags = new fabric.Text("", {
-                        top: 18 * 35,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {fcsr: fcsr, frm: frm, fflags: fflags}};
-                  },
-                  renderEach: function() {
-                     var fcsrmod = '/instr$csr_fcsr_hw_wr'.asBool(false);
-                     var frmmod = '/instr$csr_frm_hw_wr'.asBool(false);
-                     var fflagsmod = '/instr$csr_fflags_hw_wr'.asBool(false);
-                     var fcsrname = String("fcsr");
-                     var frmname = String("frm");
-                     var fflagsname = String("fflags");
-                     var oldValfcsr = fcsrmod ? `(${'/instr$csr_fcsr'.asInt(NaN).toString(16)})` : "";
-                     var oldValfrm =  frmmod ? `(${'/instr$csr_frm'.asInt(NaN).toString(16)})` : "";
-                     var oldValfflags = fflagsmod ? `(${'/instr$csr_fflags'.asInt(NaN).toString(16)})` : "";
-                     this.getInitObject("fcsr").setText(
-                        fcsrname + ": " +
-                        '/instr$csr_fcsr'.step(1).asInt(NaN).toString(16) + oldValfcsr);
-                     this.getInitObject("frm").setText(
-                        frmname + ": " +
-                        '/instr$csr_frm'.step(1).asInt(NaN).toString(16) + oldValfrm);
-                     this.getInitObject("fflags").setText(
-                        fflagsname + ": " +
-                        '/instr$csr_fflags'.step(1).asInt(NaN).toString(16) + oldValfflags);
-                     this.getInitObject("fcsr").setFill( fcsrmod ? "blue" : "black");
-                     this.getInitObject("frm").setFill( frmmod ? "blue" : "black");
-                     this.getInitObject("fflags").setFill( fflagsmod ? "blue" : "black");
-                  }
-               '])
-
-            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
-               /mem[M4_DATA_MEM_WORDS_RANGE]
-                  \viz_alpha
-                     initEach: function() {
-                        let regname = new fabric.Text("Data Memory (hex)", {
-                                 top: -40,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 15), // Center aligned
-                                 fontSize: 14,
-                                 fontFamily: "monospace"
-                              });
-                        let bankname = new fabric.Text("bank", {
-                           top: -20,
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                        let banknum = new fabric.Text(String(this.getScope("bank").index), {
-                           top: -20,
-                           left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60,
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                        let data = new fabric.Text("", {
-                           top: 18 * this.getIndex(),
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10, // bank: 3 2 1 0 format
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                        //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
-                        let index =
-                           new fabric.Text("", {
-                              top: 18 * this.getIndex(),
-                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300),
-                              fontSize: 14,
-                              fontFamily: "monospace"
-                           });
-                        return {objects: { banknum: banknum, bankname: bankname, regname: regname, data: data, index: index}};
-                     },
-                     renderEach: function() {
-                        console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
-                        var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()); // selects which bank to write on
-                        //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : ""; // old value for dmem
-                        if (this.getInitObject("index")) {
-                           let addrStr = parseInt(this.getIndex()).toString();
-                           this.getInitObject("index").setText(addrStr + ":");
-                        }
-                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"));
-                        this.getInitObject("data").setFill(mod ? "blue" : "black");
-                     }
-
-
-
-
+            m4+register_fpu(/fpuregs[M4_FPUREGS_RANGE])
+            m4+fpu_csr(/fpucsr)
+            '])
+            m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE]) 
+        
 // Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
 // Args:
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
@@ -4454,7 +4718,7 @@ m4+definitions(['
       // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
       m4_ifelse_block(M4_ISA, ['RISCV'], ['
       m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz()
+      m4+cpu_viz(|fetch , @M4_MEM_WR_STAGE)
       '])
       '])
    '], ['
@@ -4472,7 +4736,7 @@ m4+definitions(['
    
    m4_ifelse_block(M4_ISA, ['RISCV'], ['
    m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz()
+   m4+cpu_viz(|fetch , @M4_MEM_WR_STAGE)
    '])
    '])
    '])

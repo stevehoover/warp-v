@@ -10,3 +10,11 @@ git submodule update --init --recursive
 # Install required packages
 
 pip3 install sandpiper-saas
+# To use Makerchip for editing.
+pip3 install makerchip-app
+
+# To avoid a bug with `gitk` and `git gui` that results from our use of special unicode
+# character in warp-v.tlv (for visualization):
+if which apt > /dev/null; then
+  sudo apt install unifont
+fi
