@@ -3953,7 +3953,7 @@ m4+definitions(['
    |_in1
       @_in1
          $blocked = /_top|_out>>m4_align(@_out, @_in1)$blocked ||
-                    /_top|_in2>>m4_align(@_in2, @_out)$avail;
+                    (/_top|_in2>>m4_align(@_in2, @_out)$avail && /_top|_in2>>m4_align(@_in2 + 1, @_out)$accepted);
    // In2 is blocked if output is blocked or in1 is available.
    |_in2
       @_in2
