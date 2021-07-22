@@ -3877,7 +3877,7 @@ m4+definitions(['
          $blocked = /_hop[(#m4_hop_name + 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
    // Fork off ring
 
-
+   //m4+fork(/_hop, |_name['']_arriving, @0, $head_out, |_name['']_off_ramp, @0, $true, |_name['']_continuing, @0, /_flit)
    m4+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
    
    // Fork from continuing to non_deflected or into FIFO
@@ -3892,7 +3892,7 @@ m4+definitions(['
    // Block FIFO output until a full packet is ready (tail from node in FIFO)
    m4+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
    // Ring
-   m4+arb2(/_hop, |_name['']_fifo_inj, @0, |_name['']_not_deflected, @0, |_name, @0, /_flit)
+   m4+arb3(/_hop, |_name['']_not_deflected, @0, |_name['']_fifo_inj, @0, |_name, @0, /_flit)
 
 
    // Decode arriving header flit.
@@ -3911,13 +3911,15 @@ m4+definitions(['
          // The ring is expanded through the insertion FIFO (or one additional staging flop before it)
          // Asserts with the first absorbed flit, deasserts for the first flit that can stay on the ring.
          $valid_dest = $dest == #m4_hop_name;
+         //$head_out = ! /_hop|_out<>0$blocked && $valid_dest;
          $head_out = ! /_hop|_out<>0$blocked && $valid_dest;
          $head_out_inv = ! $head_out;
          $true = 1'b1; // (ok signal for fork along out path)
    |_name['']_continuing
       @0
          //$head_out = ! /_hop|_name['']_not_deflected<>0$blocked && (/_hop|_name['']_arriving<>0$valid_head ? 1'b1 : /_hop|_name['']_arriving<>0$valid_tail ? 1'b0 : $RETAIN );
-         $head_out = ! (/_hop|_name['']_not_deflected<>0$blocked || (/_hop|_name['']_arriving<>0$valid_head ? 1'b1 : (/_hop|_name['']_not_deflected>>1$blocked && (! /_hop|_name['']_not_deflected<>0$blocked)) ? 1'b0 : $RETAIN ));
+         //$head_out = ! (/_hop|_name['']_not_deflected<>0$blocked || (/_hop|_name['']_arriving<>0$valid_head ? 1'b1 : (/_hop|_name['']_not_deflected>>1$blocked && (! /_hop|_name['']_not_deflected<>0$blocked)) ? 1'b0 : $RETAIN ));
+         $head_out = ! /_hop|_name['']_not_deflected<>0$blocked;
          $true = 1'b1;  // (ok signal for fork to FIFO)
    |_name['']_in_present
       @0
@@ -3943,7 +3945,34 @@ m4+definitions(['
    m4_popdef(['M4_HOP'])
    m4_popdef(['m4_prev_hop_index'])
 
-
+\TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
+   m4+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
+   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
+   // In1 is blocked if output is blocked.
+   // In1 is blocked if output is blocked or in2 is available.
+   |_in1
+      @_in1
+         $blocked = /_top|_out>>m4_align(@_out, @_in1)$blocked ||
+                    /_top|_in2>>m4_align(@_in2, @_out)$avail;
+   // In2 is blocked if output is blocked or in1 is available.
+   |_in2
+      @_in2
+         $blocked = /_top|_out>>m4_align(@_out, @_in2)$blocked ||
+                    /_top|_in1>>m4_align(@_in1, @_in2)$avail;
+   // Output comes from in1 if available, otherwise, in2.
+   |_out
+      @_out
+         $reset = /_top|_in1>>m4_align(@_in1, @_out)$reset_in;
+         // Output is available if either input is available.
+         $avail = /_top|_in1>>m4_align(@_in1, @_out)$avail ||
+                  /_top|_in2>>m4_align(@_in2, @_out)$avail;
+         ?$avail
+            /_trans
+         m4_trans_ind   $ANY = /_top|_in1>>m4_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m4_align(@_in1, @_out)$ANY :
+                                                                          /_top|_in2/_trans>>m4_align(@_in2, @_out)$ANY;
+   m4_popdef(['m4_trans_ind'])
+   
+   
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
@@ -4710,77 +4739,34 @@ m4+definitions(['
             m4_define(['M4_INVAILD_COLOR'],"grey")
             m4_define(['M4_EGRESS_OUT_TOP'],-200)
             m4_define(['M4_EGRESS_OUT_LEFT'],0)
-            m4_define(['M4_EGRESS_SKID_TOP'],-175)
-            m4_define(['M4_EGRESS_SKID_LEFT'],0)
-            m4_define(['M4_IN_PRESENT_TOP'],-175)
-            m4_define(['M4_IN_PRESENT_LEFT'],0)
-            m4_define(['M4_NODE_TO_FIFO_TOP'],-150) //
-            m4_define(['M4_NODE_TO_FIFO_LEFT'],0) //
-            m4_define(['M4_FIFO_IN_TOP'],-100) //
-            m4_define(['M4_FIFO_IN_LEFT'],100) //
-            m4_define(['M4_FIFO_OUT_INPUTA_TOP'],-75)
-            m4_define(['M4_FIFO_OUT_INPUTA_LEFT'],100)
-            m4_define(['M4_FIFO_OUT_INPUTB_TOP'],-75)
-            m4_define(['M4_FIFO_OUT_INPUTB_LEFT'],200)
-            m4_define(['M4_FIFO_OUT_INPUTC_TOP'],-100)
-            m4_define(['M4_FIFO_OUT_INPUTC_LEFT'],200)
-            m4_define(['M4_FIFO_OUT_TOP'],-100) //
-            m4_define(['M4_FIFO_OUT_LEFT'],350) //
-            m4_define(['M4_FIFO_INJ_TOP'],0) //
-            m4_define(['M4_FIFO_INJ_LEFT'],350) //
+            m4_define(['M4_FIFO_IN_TOP'],-125) //
+            m4_define(['M4_FIFO_IN_LEFT'],50) //
+            m4_define(['M4_FIFO_OUT_TOP'],-125) //
+            m4_define(['M4_FIFO_OUT_LEFT'],550) //
             m4_define(['M4_RG_TOP'],25) //
-            m4_define(['M4_RG_LEFT'],400) //
-            m4_define(['M4_RG_ST1_TOP'],25) //
-            m4_define(['M4_RG_ST1_LEFT'],425) //
+            m4_define(['M4_RG_LEFT'],575) //
             m4_define(['M4_INGRESS_IN_TOP'],-200) //
-            m4_define(['M4_INGRESS_IN_LEFT'],-150) //
-            m4_define(['M4_INGRESS_CONTINUING_FORK_TOP'],50) //
-            m4_define(['M4_INGRESS_CONTINUING_FORK_LEFT'],-150) //
-            m4_define(['M4_ARRIVING_TOP'],50) //
-            m4_define(['M4_ARRIVING_LEFT'],-250) //
-            m4_define(['M4_DEFLECTED_NOTDEFLECTED_FORK_TOP'],50) //
-            m4_define(['M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT'],-50) //
-            m4_define(['M4_NOT_DEFLECTED_TOP'],50) //
-            m4_define(['M4_NOT_DEFLECTED_LEFT'],350) //
-            m4_define(['M4_DEFLECTED_TOP'],-50) //
-            m4_define(['M4_DEFLECTED_LEFT'],-50) //
-            m4_define(['M4_DEFLECTED_ST1_TOP'],-50) //
-            m4_define(['M4_DEFLECTED_ST1_LEFT'],0) //
-            m4_define(['M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP'],-100) //
-            m4_define(['M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT'],50) //
-            m4_define(['M4_RG_INPUTA_TOP'],25) //
-            m4_define(['M4_RG_INPUTA_LEFT'],375) //
+            m4_define(['M4_INGRESS_IN_LEFT'],-75) //
+            m4_define(['M4_ARRIVING_TOP'],25) //
+            m4_define(['M4_ARRIVING_LEFT'],-150) //
+            m4_define(['M4_DEFLECTED_TOP'],-75) //
+            m4_define(['M4_DEFLECTED_LEFT'],-25) //
             m4_define(['M4_ENTRY_START_TOP'],-125)
-            m4_define(['M4_ENTRY_START_LEFT'],125)
-            m4_define(['M4_ENTRY_START_SPACE_LEFT'],25)
+            m4_define(['M4_ENTRY_START_LEFT'],100)
+            m4_define(['M4_ENTRY_START_SPACE_LEFT'],50)
             /skid1
                $egress_is_head = ! *reset && (/top/core|egress_out>>1$valid_head);
                $egress_is_tail = ! *reset && (/top/core|egress_out>>1$valid_tail);
                $egress_flit_size = $egress_is_head ? 1'b1 : >>1$egress_is_tail ? 1'b0 : $RETAIN;
                $egress_flit[31:0] = (! *reset) ? (/top/core|egress_out/flit>>1$flit) : '0;
+               $vc[M4_VC_INDEX_RANGE] = $egress_is_head ? $egress_flit[M4_FLIT_VC_RANGE] : $RETAIN;
                $valid = 1;
-               $count_val[31:0] = *reset ? '0 : 
-                                   $egress_flit_size ? >>1$count_val + 1 :
-                                    '0;
-            /fork1
-               $valid = 1;
-            /fifo
-               $valid = 1;
-            /arb
-               $valid = 1;
-   /_name
+
+   /M4_CORE_HIER
       \viz_alpha
          initEach() {
-            context.global.canvas.add(new fabric.Rect({
-               top: 5,
-               left: 10,
-               height: 3 * 20,
-               width: 20,
-               stroke: "black",
-               fill: "#FFFFFF00"
-            }))
             debugger;
-            this.global.transObj = {foo: 4}
+            this.global.transObj = {counting: 0}
             return {
                objects : {
                },
@@ -4789,36 +4775,29 @@ m4+definitions(['
          },
          renderEach() {
          debugger;
-            // Make every transaction invisible (and other render methods will make them visible again.
-            for (const uid in this.fromInit().transObj) {
+         for (const uid in this.fromInit().transObj) {
                const trans = this.fromInit().transObj[uid]
                //trans.wasVisible = trans.visible
                trans.visible = false
-            }
-            }
-   /M4_CORE_HIER
-      \viz_alpha
-         initEach() {
-         debugger;
-         },
-         renderEach() {
-         debugger;
+         }
          if (typeof this.getContext().preppedTrace === "undefined") {
             let $egress_flit_size = '/top/core|ringviz/skid1<>0$egress_flit_size'.goTo(-1)
             let $uid = '/top/core|egress_out/flit>>1$uid'
             let $data = '/top/core|ringviz/skid1<>0$egress_flit'
             let $is_head = '/top/core|ringviz/skid1<>0$egress_is_head'
             let $is_tail = '/top/core|ringviz/skid1<>0$egress_is_tail'
+            let $vc = '/top/core|ringviz/skid1<>0$vc'
             while ($egress_flit_size.forwardToValue(1)) {
                let uid  = $uid .goTo($egress_flit_size.getCycle()).asInt()
                let data = $data.goTo($egress_flit_size.getCycle()).asInt()
                let is_head = $is_head.goTo($egress_flit_size.getCycle()).asBool()
                let is_tail = $is_tail.goTo($egress_flit_size.getCycle()).asBool()
+               let vc = $vc.goTo($egress_flit_size.getCycle()).asBool()
                let ring_scope = this.getScope("name")
                let transRect = new fabric.Rect({
                   width: 45,
                   height: 20,
-                  fill: is_head ? "pink" : is_tail ? "blue" : "#208028",
+                  fill: vc ? "blue" : "orange",
                   left: 0,
                   top: 0
                })
@@ -4828,23 +4807,16 @@ m4+definitions(['
                   fontSize: 24,
                   fill: "white"
                })
-               let transHead = new fabric.Circle({
+               let transCircle = new fabric.Circle({
                   left: 10+20,
                   top: 0,
                   radius: 1,
-                  fill: is_head ? "pink" : "white"
-               })
-               let transTail = new fabric.Circle({
-                  left: 15+30,
-                  top: 0,
-                  radius: 1,
-                  fill: is_tail ? "yellow" : "white"
+                  fill: is_head ? "pink" : is_tail ? "blue" : "#208028",
                })
                let transObj = new fabric.Group(
                   [transRect,
                    transText,
-                   transHead,
-                   transTail
+                   transCircle
                   ],
                   {width: 45,
                    height: 20,
@@ -4852,7 +4824,6 @@ m4+definitions(['
                )
                context.global.canvas.add(transObj)
                this.global.transObj[uid] = transObj
-               //this.getScope("m4_strip_prefix(/_name)").initResults.transObj[uid] = transObj
                debugger;
             }
             this.getContext().preppedTrace = true
@@ -4868,244 +4839,114 @@ m4+definitions(['
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
-               let egress_skid = new fabric.Circle({
-                  top: M4_EGRESS_SKID_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_EGRESS_SKID_LEFT,
+               let fifo_in = new fabric.Circle({
+                  top: M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
+                  left: M4_FIFO_IN_LEFT,
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
-               let in_present = new fabric.Circle({
-                  top: M4_IN_PRESENT_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_IN_PRESENT_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let node_to_fifo = new fabric.Circle({
-                  top: M4_NODE_TO_FIFO_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_NODE_TO_FIFO_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               //return {objects : {egress_out, egress_skid, in_present, node_to_fifo}}
-               return {objects : {egress_out}}
+               return {objects : {egress_out, fifo_in}}
             },
             renderEach() {
             debugger;
-               var arriving_fork1_avail = '/top/core|rg_arriving<>0$avail'.asBool();
-               var arriving_fork1_blocked = '/top/core|rg_arriving<>0$blocked'.asBool();
-               let arriving_fork1_arrow = new fabric.Line([M4_INGRESS_CONTINUING_FORK_LEFT, M4_INGRESS_CONTINUING_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: arriving_fork1_blocked ? M4_BLOCKED_COLOR : arriving_fork1_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var arriving_ingress_avail = '/top/core|ingress_in<>0$avail'.asBool();
+               var arriving_ingress_blocked = '/top/core|ingress_in<>0$blocked'.asBool();
+               let arriving_ingress_arrow = new fabric.Line([M4_INGRESS_IN_LEFT, M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: arriving_ingress_blocked ? M4_BLOCKED_COLOR : arriving_ingress_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var fork1_fork2_avail = '/top/core|rg_continuing<>0$avail'.asBool();
-               var fork1_fork2_blocked = '/top/core|rg_continuing<>0$blocked'.asBool();
-               let fork1_fork2_arrow = new fabric.Line([M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT, M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_INGRESS_CONTINUING_FORK_LEFT, M4_INGRESS_CONTINUING_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: fork1_fork2_blocked ? M4_BLOCKED_COLOR : fork1_fork2_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var arriving_deflected_avail = '/top/core|rg_deflected<>0$avail'.asBool();
+               var arriving_deflected_blocked = '/top/core|rg_deflected<>0$blocked'.asBool();
+               let arriving_deflected_arrow = new fabric.Line([M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: arriving_deflected_blocked ? M4_BLOCKED_COLOR : arriving_deflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var fork1_ingress_avail = '/top/core|ingress_in<>0$avail'.asBool();
-               var fork1_ingress_blocked = '/top/core|ingress_in<>0$blocked'.asBool();
-               let fork1_ingress_arrow = new fabric.Line([M4_INGRESS_IN_LEFT, M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_INGRESS_CONTINUING_FORK_LEFT, M4_INGRESS_CONTINUING_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: fork1_ingress_blocked ? M4_BLOCKED_COLOR : fork1_ingress_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var arriving_rg_avail = '/top/core|rg_not_deflected<>0$avail'.asBool();
+               var arriving_rg_blocked = '/top/core|rg_not_deflected<>0$blocked'.asBool();
+               let arriving_rg_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: arriving_rg_blocked ? M4_BLOCKED_COLOR : arriving_rg_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var fork2_deflected_avail = '/top/core|rg_deflected<>0$avail'.asBool();
-               var fork2_deflected_blocked = '/top/core|rg_deflected<>0$blocked'.asBool();
-               let fork2_deflected_arrow = new fabric.Line([M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT, M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: fork2_deflected_blocked ? M4_BLOCKED_COLOR : fork2_deflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var deflected_fifoin_avail = '/top/core|rg_deflected_st1<>0$avail'.asBool();
+               var deflected_fifoin_blocked = '/top/core|rg_deflected_st1>>1$blocked'.asBool();
+               let deflected_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: deflected_fifoin_blocked ? M4_BLOCKED_COLOR : deflected_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var fork2_notdeflected_avail = '/top/core|rg_not_deflected<>0$avail'.asBool();
-               var fork2_notdeflected_blocked = '/top/core|rg_not_deflected<>0$blocked'.asBool();
-               let fork2_notdeflected_arrow = new fabric.Line([M4_NOT_DEFLECTED_LEFT, M4_NOT_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT, M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: fork2_notdeflected_blocked ? M4_BLOCKED_COLOR : fork2_notdeflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var egressout_fifoin_avail = '/top/core|rg_node_to_fifo<>0$avail'.asBool();
+               var egressout_fifoin_blocked = '/top/core|rg_node_to_fifo<>0$blocked'.asBool();
+               let egressout_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_EGRESS_OUT_LEFT, M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: egressout_fifoin_blocked ? M4_BLOCKED_COLOR : egressout_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var deflected_deflectedst1_avail = '/top/core|rg_deflected_st1<>0$avail'.asBool();
-               var deflected_deflectedst1_blocked = '/top/core|rg_deflected_st1>>1$blocked'.asBool();
-               let deflected_deflectedst1_arrow = new fabric.Line([M4_DEFLECTED_ST1_LEFT, M4_DEFLECTED_ST1_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: deflected_deflectedst1_blocked ? M4_BLOCKED_COLOR : deflected_deflectedst1_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               var rg_fifoout_avail = '/top/core|rg_fifo_inj<>0$avail'.asBool();
+               var rg_fifoout_blocked = '/top/core|rg_fifo_inj<>0$blocked'.asBool();
+               let rg_fifoout_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_FIFO_OUT_LEFT, M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+                  stroke: rg_fifoout_blocked ? M4_BLOCKED_COLOR : rg_fifoout_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
                   strokeWidth: 2,
                   visible: 1
                })
-               var deflectedst1_fifoin_avail = '/top/core|rg_deflected_st1<>0$avail'.asBool();
-               var deflectedst1_fifoin_blocked = '/top/core|rg_deflected_st1>>1$blocked'.asBool();
-               let deflectedst1_fifoin_arrow = new fabric.Line([M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT, M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_ST1_LEFT, M4_DEFLECTED_ST1_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: deflectedst1_fifoin_blocked ? M4_BLOCKED_COLOR : deflectedst1_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
+               let uid = '/top/core|egress_out/flit>>1$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               if (trans) {
+                  /*trans.set("visible", true)
+                  debugger;
+                  if ('/top/core|rg_fifo_in<>0$accepted'.asBool()) {
+                     let core = this.getScope("core").index;
+                     trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     trans.set("left", M4_EGRESS_OUT_LEFT)
+                     trans.set("opacity", 0)
+                     trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500})
+                  } else {
+                  debugger
+                  console.log(`Transaction ${uid} not found.`)
+                  }*/ 
+               }
+               return {objects: [arriving_ingress_arrow, arriving_deflected_arrow, arriving_rg_arrow, deflected_fifoin_arrow, egressout_fifoin_arrow, rg_fifoout_arrow]}
+            }
+
+      /skid2
+         \viz_alpha
+            initEach() {
+               debugger;
+               let deflected = new fabric.Circle({
+                  top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
+                  left: M4_DEFLECTED_LEFT,
+                  radius: M4_NODES_RADIUS,
+                  fill: M4_NODES_COLOR
                })
-               var nodefifo_fifoin_avail = '/top/core|rg_node_to_fifo<>0$avail'.asBool();
-               var nodefifo_fifoin_blocked = '/top/core|rg_node_to_fifo<>0$blocked'.asBool();
-               let nodefifo_fifoin_arrow = new fabric.Line([M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT, M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_NODE_TO_FIFO_LEFT, M4_NODE_TO_FIFO_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: nodefifo_fifoin_blocked ? M4_BLOCKED_COLOR : nodefifo_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var arb_fifoin_outside_avail = '/top/core|rg_fifo_in<>0$avail'.asBool();
-               var arb_fifoin_outside_blocked = '/top/core|rg_fifo_in<>0$blocked'.asBool();
-               let arb_fifoin_outside_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT, M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: arb_fifoin_outside_blocked ? M4_BLOCKED_COLOR : arb_fifoin_outside_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var inpresent_nodefifo_avail = '/top/core|rg_node_to_fifo<>0$avail'.asBool();
-               var inpresent_nodefifo_blocked = '/top/core|rg_node_to_fifo<>0$blocked'.asBool();
-               let inpresent_nodefifo_arrow = new fabric.Line([M4_NODE_TO_FIFO_LEFT, M4_NODE_TO_FIFO_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_IN_PRESENT_LEFT, M4_IN_PRESENT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: inpresent_nodefifo_blocked ? M4_BLOCKED_COLOR : inpresent_nodefifo_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var egressout_inpresent_avail = '/top/core|rg_in_present<>0$avail'.asBool();
-               var egressout_inpresent_blocked = '/top/core|rg_in_present<>0$blocked'.asBool();
-               let egressout_inpresent_arrow = new fabric.Line([M4_IN_PRESENT_LEFT, M4_IN_PRESENT_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_EGRESS_OUT_LEFT, M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: egressout_inpresent_blocked ? M4_BLOCKED_COLOR : egressout_inpresent_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var fifoinj_fifoout_avail = '/top/core|rg_fifo_inj<>0$avail'.asBool();
-               var fifoinj_fifoout_blocked = '/top/core|rg_fifo_inj<>0$blocked'.asBool();
-               let fifoinj_fifoout_arrow = new fabric.Line([M4_FIFO_INJ_LEFT, M4_FIFO_INJ_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_FIFO_OUT_LEFT, M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: fifoinj_fifoout_blocked ? M4_BLOCKED_COLOR : fifoinj_fifoout_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var rg_fifoinj_avail = '/top/core|rg_fifo_inj<>0$avail'.asBool();
-               var rg_fifoinj_blocked = '/top/core|rg_fifo_inj<>0$blocked'.asBool();
-               let rg_fifoinj_arrow = new fabric.Line([M4_RG_INPUTA_LEFT, M4_RG_INPUTA_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_FIFO_INJ_LEFT, M4_FIFO_INJ_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: rg_fifoinj_blocked ? M4_BLOCKED_COLOR : rg_fifoinj_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var rg_notdeflected_avail = '/top/core|rg_not_deflected<>0$avail'.asBool();
-               var rg_notdeflected_blocked = '/top/core|rg_not_deflected<>0$blocked'.asBool();
-               let rg_notdeflected_arrow = new fabric.Line([M4_RG_INPUTA_LEFT, M4_RG_INPUTA_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_NOT_DEFLECTED_LEFT, M4_NOT_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: rg_notdeflected_blocked ? M4_BLOCKED_COLOR : rg_notdeflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               var arb2_rg_outside_avail = '/top/core|rg<>0$avail'.asBool();
-               var arb2_rg_outside_blocked = '/top/core|rg<>0$blocked'.asBool();
-               let arb2_rg_outside_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_RG_INPUTA_LEFT, M4_RG_INPUTA_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
-                  stroke: arb2_rg_outside_blocked ? M4_BLOCKED_COLOR : arb2_rg_outside_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
-                  strokeWidth: 2,
-                  visible: 1
-               })
-               if ('/core|ringviz/skid1<>0$valid'.asBool()) {
-                  let uid = '/top/core|egress_out/flit>>1$uid'.asInt()
-                  //let for_trans = this.getScope("m4_strip_prefix(/_name)")
-                  //let trans = for_trans.initResults.transObj[uid]
-                  let trans = this.global.transObj[uid]
-                  if (trans) {
-                     trans.set("visible", true)
-                     debugger;
-                     if ('/top/core|rg_in_present<>0$accepted'.asBool()) {
-                        let core = this.getScope("core").index;
-                        let path1 = '/top/core|rg_node_to_fifo<>0$accepted'.asBool();
-                        let path2 = '/top/core|rg_fifo_in<>0$accepted'.asBool();
-                        let path3 = ! '/top/core|rg_fifo_in<>0$push'.asBool();
-                        let path4 = '/top/core|rg_fifo_inj<>0$accepted'.asBool();
-                        let path5 = '/top/core|rg<>0$accepted'.asBool();
-                        let counter = '/top/core|ringviz/skid1<>0$count_val'.asInt();
-                        trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
-                        trans.set("left", M4_EGRESS_OUT_LEFT)
-                        trans.set("opacity", 0)
-                        trans.animate({top: M4_IN_PRESENT_TOP + (core * M4_COREOFFSET), left: M4_IN_PRESENT_LEFT, opacity: 1}, {
-                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                    duration: 500,
-                                    onComplete: () => {
-                                       if(path1) {
-                                       debugger;
-                                          trans.animate({top: M4_NODE_TO_FIFO_TOP + (core * M4_COREOFFSET), left: M4_NODE_TO_FIFO_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                       if(path2) {
-                                       debugger;
-                                          trans.animate({top: M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                               trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
-                                                               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                               duration: 500,
-                                                               onComplete: () => {
-                                          if (path3) {
-                                          debugger;
-                                             trans.animate({top: M4_FIFO_OUT_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTA_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                               trans.animate({top: M4_FIFO_OUT_INPUTB_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTB_LEFT, opacity: 1}, {
-                                                                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                  duration: 500,
-                                                                  onComplete: () => {
-                                                                     trans.animate({top: M4_FIFO_OUT_INPUTC_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTC_LEFT, opacity: 1}, {
-                                                                        onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                        duration: 500,
-                                                                        onComplete: () => {
-                                                                           trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
-                                                                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                              duration: 500,
-                                                                              onComplete: () => {
-                                          if (path4) {
-                                          debugger;
-                                             trans.animate({top: M4_FIFO_INJ_TOP + (core * M4_COREOFFSET), left: M4_FIFO_INJ_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                          if (path5) {
-                                          debugger;
-                                             trans.animate({top: M4_RG_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_RG_INPUTA_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                            trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
-                                                                           onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                           duration: 500
-                                                                           })
-                                                            }
-                                                         })
-                                          }
-                                                            }
-                                                         })
-                                          }
-                                                            }
-                                                                           })
-                                                                        }
-                                                                     })
-                                                                  }
-                                                               })
-                                                            }
-                                                         })
-                                          } else {
-                                             trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET), left: M4_ENTRY_START_LEFT + ((counter) * M4_ENTRY_START_SPACE_LEFT ), opacity: 1}, {
-                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                             duration: 500})
-                                          }
-                                                               }
-                                                                           })
-                                                            }
-                                                         })
-                                       }
-                                    }
-                                                         })
-                                       }
-                                    }
-                                 })
-                     } else {
-                     debugger
-                     console.log(`Transaction ${uid} not found.`)
-                     }
+               return {objects : {deflected}}
+            },
+            renderEach() {
+            debugger;
+               let uid = '/top/core|rg_deflected/flit>>1$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               if (trans) {
+                  trans.set("visible", true)
+                  debugger;
+                  if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
+                     let core = this.getScope("core").index;
+                     trans.set("top", M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     trans.set("left", M4_DEFLECTED_LEFT)
+                     trans.set("opacity", 0)
+                     trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500})
+                  } else {
+                  debugger
+                  console.log(`Transaction ${uid} not found.`)
                   }
                }
-               return {objects: [arriving_fork1_arrow, fork1_fork2_arrow, fork1_ingress_arrow, fork2_deflected_arrow, fork2_notdeflected_arrow, deflected_deflectedst1_arrow, deflectedst1_fifoin_arrow, nodefifo_fifoin_arrow, arb_fifoin_outside_arrow, inpresent_nodefifo_arrow, egressout_inpresent_arrow, fifoinj_fifoout_arrow, rg_fifoinj_arrow, rg_notdeflected_arrow, arb2_rg_outside_arrow]}
+            
             }
+
       /fork1
          \viz_alpha
             initEach() {
@@ -5116,27 +4957,9 @@ m4+definitions(['
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
-               let ingress_continuing_fork = new fabric.Circle({
-                  top: M4_INGRESS_CONTINUING_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_INGRESS_CONTINUING_FORK_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
                let arriving = new fabric.Circle({
                   top: M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET),
                   left: M4_ARRIVING_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let deflected_notdeflected_fork = new fabric.Circle({
-                  top: M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let not_deflected = new fabric.Circle({
-                  top: M4_NOT_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_NOT_DEFLECTED_LEFT,
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
@@ -5146,91 +4969,47 @@ m4+definitions(['
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
-               let deflected_st1 = new fabric.Circle({
-                  top: M4_DEFLECTED_ST1_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_DEFLECTED_ST1_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               //return {objects : {ingress_in, ingress_continuing_fork, arriving, deflected, deflected_notdeflected_fork, not_deflected, deflected_st1}}
                return {objects : {ingress_in, arriving, deflected}}
             },
             renderEach() {
             debugger;
-               if ('/core|ringviz/fork1<>0$valid'.asBool()) {
-                  let uid = '/top/core|rg_arriving/flit<>0$uid'.asInt()
-                  //let for_trans = this.getScope("m4_strip_prefix(/_name)")
-                  //let trans = for_trans.initResults.transObj[uid]
-                  let trans = this.global.transObj[uid]
-                  if (trans) {
-                     trans.set("visible", true)
-                     debugger;
-                     if ('/core|ingress_in<>0$trans_valid'.asBool()) {
-                        let core = this.getScope("core").index;
-                        trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
-                        trans.set("left", M4_ARRIVING_LEFT)
-                        trans.set("opacity", 0)
-                        trans.animate({top: M4_INGRESS_CONTINUING_FORK_TOP + (this.getScope("core").index * M4_COREOFFSET), left: M4_INGRESS_CONTINUING_FORK_LEFT, opacity: 1}, {
-                                      onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                      duration: 500,
-                                      onComplete: () => {
-                                             trans.animate({top: M4_INGRESS_IN_TOP + (core * M4_COREOFFSET), left: M4_INGRESS_IN_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 1000
-                                                           })
-                                          }
-                                 })
-                     }
-                     else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
-                        trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
-                        trans.set("left", M4_ARRIVING_LEFT)
-                        trans.set("opacity", 0)
-                        let core = this.getScope("core").index;
-                        trans.animate({top: M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT, opacity: 1}, {
-                                      onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                      duration: 1000,
-                                      onComplete: () => {
-                                             trans.animate({top: M4_DEFLECTED_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500
-                                                           })
-                                          }
-                                 })
-                     }
-                     else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool()) {
-                        let core = this.getScope("core").index;
-                        let path_notdeflected_rg = '/top/core|rg<>0$accepted'.asBool();
-                        trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
-                        trans.set("left", M4_ARRIVING_LEFT)
-                        trans.set("opacity", 0)
-                        trans.animate({top: M4_DEFLECTED_NOTDEFLECTED_FORK_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_NOTDEFLECTED_FORK_LEFT, opacity: 1}, {
-                                      onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                      duration: 1000,
-                                      onComplete: () => {
-                                             trans.animate({top: M4_NOT_DEFLECTED_TOP + (core * M4_COREOFFSET), left: M4_NOT_DEFLECTED_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 1000,
-                                                            onComplete: () => {
-                                          if (path_notdeflected_rg) {
-                                             trans.animate({top: M4_RG_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_RG_INPUTA_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                            trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
-                                                                           onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                           duration: 500
-                                                                           })
-                                                            }
-                                                         })
-                                          }
-                                                            }
-                                                           })
-                                          }
-                                 })
-                     } else {
-                     debugger
-                     console.log(`Transaction ${uid} not found.`)
-                     }
+               let uid = '/top/core|rg_arriving/flit<>0$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               if (trans) {
+                  trans.set("visible", true)
+                  debugger;
+                  if ('/core|ingress_in<>0$trans_valid'.asBool()) {
+                     let core = this.getScope("core").index;
+                     trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     trans.set("left", M4_ARRIVING_LEFT)
+                     trans.set("opacity", 0)
+                     trans.animate({top: M4_INGRESS_IN_TOP + (core * M4_COREOFFSET), left: M4_INGRESS_IN_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 1000
+                                    })
+                  }
+                  else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
+                     let core = this.getScope("core").index;
+                     trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     trans.set("left", M4_ARRIVING_LEFT)
+                     trans.set("opacity", 0)
+                     trans.animate({top: M4_DEFLECTED_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500
+                                    })
+                  }
+                  else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool() && '/top/core|rg<>0$accepted'.asBool()) {
+                     let core = this.getScope("core").index;
+                     trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     trans.set("left", M4_ARRIVING_LEFT)
+                     trans.set("opacity", 0)
+                     trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500
+                                    })
+                  } else {
+                  debugger
+                  console.log(`Transaction ${uid} not found.`)
                   }
                }
             }
@@ -5238,51 +5017,9 @@ m4+definitions(['
          \viz_alpha
             initEach() {
             debugger;
-               let deflected = new fabric.Circle({
-                  top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_DEFLECTED_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let deflected_st1 = new fabric.Circle({
-                  top: M4_DEFLECTED_ST1_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_DEFLECTED_ST1_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let node_to_fifo = new fabric.Circle({
-                  top: M4_NODE_TO_FIFO_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_NODE_TO_FIFO_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let deflectedst1_nodetofifo_node = new fabric.Circle({
-                  top: M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let fifo_in = new fabric.Circle({
-                  top: M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_FIFO_IN_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
                let fifo_out = new fabric.Circle({
                   top: M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
                   left: M4_FIFO_OUT_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let fifo_inj = new fabric.Circle({
-                  top: M4_FIFO_INJ_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_FIFO_INJ_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let fifoout_fifoinj_node = new fabric.Circle({
-                  top: M4_RG_INPUTA_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_RG_INPUTA_LEFT,
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
@@ -5292,96 +5029,34 @@ m4+definitions(['
                   radius: M4_NODES_RADIUS,
                   fill: M4_NODES_COLOR
                })
-               //return {objects : {deflected, deflected_st1, node_to_fifo, deflectedst1_nodetofifo_node, fifo_in, fifo_out, fifo_inj, fifoout_fifoinj_node, rg}}
-               return {objects : {deflected, fifo_in, fifo_out, rg}}
+               return {objects : {fifo_out, rg}}
             },
             renderEach() {
             debugger;
-               if ('/core|ringviz/arb<>0$valid'.asBool()) {
-                  let uid = '/top/core|rg_fifo_in/flit<>0$uid'.asInt()
-                  //let for_trans = this.getScope("m4_strip_prefix(/_name)")
-                  //let trans = for_trans.initResults.transObj[uid]
+                  let uid = '/top/core|rg_fifo_out/flit<>0$uid'.asInt()
                   let trans = this.global.transObj[uid]
                   if (trans) {
                      trans.set("visible", true)
                      console.log(`uid  ${uid} .`)
-                     if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
+                     if ('/top/core|rg<>0$accepted'.asBool() && '/top/core|rg_fifo_inj<>0$accepted'.asBool()) {
                         let core = this.getScope("core").index;
-                        let path1 = '/top/core|rg_fifo_out<>0$accepted'.asBool() && ( '/top/core|rg_fifo_in>>1$empty'.asBool());
-                        let path2 = '/top/core|rg_fifo_inj<>0$accepted'.asBool();
-                        let path3 = '/top/core|rg<>0$accepted'.asBool();
-                        debugger;
-                        trans.animate({top: M4_DEFLECTED_ST1_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_ST1_LEFT, opacity: 1}, {
-                           onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                           duration: 500,
-                           onComplete: () => {
-                              trans.animate({top: M4_DEFLECTEDST1_NODETOFIFO_NODE_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTEDST1_NODETOFIFO_NODE_LEFT, opacity: 1}, {
-                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                              duration: 500,
-                              onComplete: () => {
-                                 trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
-                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                duration: 500,
-                                                onComplete: () => {
-                                                         debugger;
-                                          if (path1) {
-                                             trans.animate({top: M4_FIFO_OUT_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTA_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                               trans.animate({top: M4_FIFO_OUT_INPUTB_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTB_LEFT, opacity: 1}, {
-                                                                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                  duration: 500,
-                                                                  onComplete: () => {
-                                                                     trans.animate({top: M4_FIFO_OUT_INPUTC_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_INPUTC_LEFT, opacity: 1}, {
-                                                                        onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                        duration: 500,
-                                                                        onComplete: () => {
-                                                                           trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
-                                                                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                              duration: 500,
-                                                                              onComplete: () => {
-                                          if (path2) {
-                                             trans.animate({top: M4_FIFO_INJ_TOP + (core * M4_COREOFFSET), left: M4_FIFO_INJ_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                          if (path3) {
-                                             trans.animate({top: M4_RG_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_RG_INPUTA_LEFT, opacity: 1}, {
-                                                            onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                            duration: 500,
-                                                            onComplete: () => {
-                                                            trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
-                                                                           onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                                           duration: 500
-                                                                           })
-                                                            }
-                                                         })
-                                          }
-                                                            }
-                                                         })
-                                          }
-                                                            }
-                                                                           })
-                                                                        }
-                                                                     })
-                                                                  }
-                                                               })
-                                                            }
-                                                         })
-                                          }
-                                                }
-                                                })
-                              }
-                                             })
-                           }
-                                           })
+                        //trans.set("top", M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                        //trans.set("left", M4_FIFO_OUT_LEFT)
+                        //trans.set("opacity", 0)
+                        trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
+                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                       duration: 500,
+                                       onComplete: () => {
+                                          trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                          duration: 500})
+                                       }
+                                       })
                      } else {
                      debugger
                      console.log(`Transaction ${uid} not found.`)
                   }
                }
-            }
             }
       |rg_fifo_in
          @0
@@ -5399,117 +5074,68 @@ m4+definitions(['
                   renderEach() {
                         let uid = '/flit$uid'.asInt()
                         let push = '$push'.asInt()
+                        let header_point = '>>1$prev_entry_was_tail'.asInt()
                         debugger;
-                        //let for_trans = this.getScope("m4_strip_prefix(/core)")
-                        //let trans = for_trans.initResults.transObj[uid]
-                        //let for_trans = this.getScope("top").children.m4_strip_prefix(/_name)
-                        //let trans = for_trans.parentInstance.initResults.transObj[uid]
                         let trans = this.global.transObj[uid]
                         if (trans) {
                            trans.set("visible", true)
                            console.log(`uid  ${uid} .`)
-                           if (push) {
+                           /*
+                           if (push && header_point) {
                               let core = this.getScope("core").index;
                               let entry = this.getScope("entry").index;
-                              //trans.animate({top: -150 + (core * M4_COREOFFSET), left: 100 + (entry * 50 ), opacity: 1}, {
-                              //               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                              //               duration: 500})
+                              trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                              trans.set("left", M4_EGRESS_OUT_LEFT)
+                              trans.set("opacity", 0)
+                              this.global.transObj[counting] = entry;
+                              trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500, 
+                                             onComplete: () => {
+                                                trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET), left: M4_ENTRY_START_LEFT + ((8) * M4_ENTRY_START_SPACE_LEFT ), opacity: 1}, {
+                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                duration: 500})
+                                             }
+                                             })
+                           } else if (push) {
+                              let core = this.getScope("core").index;
+                              let entry = this.getScope("entry").index;
+                              let left_att = m4_eval(M4_MAX_PACKET_SIZE) + 2 - this.global.transObj[counting] - entry;
+                              trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                              trans.set("left", M4_EGRESS_OUT_LEFT)
+                              trans.set("opacity", 0)
+                              trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500, 
+                                             onComplete: () => {
+                                                trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET), left: M4_ENTRY_START_LEFT + ((left_att) * M4_ENTRY_START_SPACE_LEFT ), opacity: 1}, {
+                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                duration: 500})
+                                             }
+                                             })
+                           } */
+                           if (push) {
+                                 let core = this.getScope("core").index;
+                                 let entry = this.getScope("entry").index;
+                                 trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                                 trans.set("left", M4_EGRESS_OUT_LEFT)
+                                 trans.set("opacity", 0)
+                                 trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                duration: 500, 
+                                                onComplete: () => {
+                                                   trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET), left: M4_ENTRY_START_LEFT + ((8 - entry) * M4_ENTRY_START_SPACE_LEFT ), opacity: 1}, {
+                                                   onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                   duration: 500})
+                                                }
+                                                })
                            } else {
                            debugger
                            console.log(`Transaction ${uid} not found.`)
                         }
                         }
                   }
-      /fifo
-         \viz_alpha
-            initEach() {
-            debugger;
-               let fifo_out = new fabric.Circle({
-                  top: M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_FIFO_OUT_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let fifo_inj = new fabric.Circle({
-                  top: M4_FIFO_INJ_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_FIFO_INJ_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let fifoout_fifoinj_node = new fabric.Circle({
-                  top: M4_RG_INPUTA_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_RG_INPUTA_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let rg_node = new fabric.Circle({
-                  top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_RG_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               let rg_st1_node = new fabric.Circle({
-                  top: M4_RG_ST1_TOP + (this.getScope("core").index * M4_COREOFFSET),
-                  left: M4_RG_ST1_LEFT,
-                  radius: M4_NODES_RADIUS,
-                  fill: M4_NODES_COLOR
-               })
-               //return {objects : {fifo_out, fifo_inj, fifoout_fifoinj_node, rg_node, rg_st1_node}}
-               return {objects : {fifo_out}}
-            },
-            renderEach() {
-            debugger;
-               if ('/core|ringviz/fifo<>0$valid'.asBool()) {
-                  let uid = '/top/core|rg_fifo_out/flit<>0$uid'.asInt()
-                  debugger;
-                  //let for_trans = this.getScope("m4_strip_prefix(/_name)")
-                  //let trans = for_trans.initResults.transObj[uid]
-                  let trans = this.global.transObj[uid]
-                  if (trans) {
-                     trans.set("visible", true)
-                     console.log(`uid  ${uid} .`)
-                     let path1 = '/top/core|rg_fifo_inj<>0$accepted'.asBool();
-                     let path2 = '/top/core|rg<>0$accepted'.asBool();
-                     if ('/top/core|rg_fifo_out<>0$accepted'.asBool() && ( ! '/top/core|rg_fifo_in>>1$empty'.asBool())) {
-                        let core = this.getScope("core").index;
-                        trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
-                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                          duration: 1000,
-                                          onComplete: () => {
-                        // trans.set("top", M4_FIFO_OUT_TOP + (core * M4_COREOFFSET))
-                        // trans.set("left", M4_FIFO_OUT_LEFT)
-                        // trans.set("opacity", 0)
-                        if (path1) {
-                           trans.animate({top: M4_FIFO_INJ_TOP + (core * M4_COREOFFSET), left: M4_FIFO_INJ_LEFT, opacity: 1}, {
-                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                          duration: 1000,
-                                          onComplete: () => {
-                        if (path2) {
-                           trans.animate({top: M4_RG_INPUTA_TOP + (core * M4_COREOFFSET), left: M4_RG_INPUTA_LEFT, opacity: 1}, {
-                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                          duration: 500,
-                                          onComplete: () => {
-                                          trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
-                                                         onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                                         duration: 500
-                                                         })
-                                          }
-                                       })
-                        }
-                                          }
-                                       })
-                        }
-                                          }
-                                       })
-                     }
-                  } else {
-                     debugger
-                     console.log(`Transaction ${uid} not found.`)
-                  }
-               }
-            }
-         
-         
+
 m4+module_def
 \TLV //disabled_main()
    m4+warpv_top()
