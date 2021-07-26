@@ -466,7 +466,7 @@ m4+definitions(['
             EXT_E, 0,
             EXT_M, 0,
             EXT_A, 0,
-            EXT_F, 1,
+            EXT_F, 0,
             EXT_D, 0,
             EXT_Q, 0,
             EXT_L, 0,
