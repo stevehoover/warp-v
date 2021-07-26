@@ -30,7 +30,7 @@
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
 m4+definitions(['
-
+   m4_define(['M4_PROG_NAME'], fpu_test)
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -466,7 +466,7 @@ m4+definitions(['
             EXT_E, 0,
             EXT_M, 0,
             EXT_A, 0,
-            EXT_F, 0,
+            EXT_F, 1,
             EXT_D, 0,
             EXT_Q, 0,
             EXT_L, 0,
@@ -667,7 +667,7 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
-         m4_define_hier(['M4_FPUREGS'], 32, 0)
+         m4_define_hier(['M4_FPU_REGS'], 32, 0)
          
          // Controls SV generation:
          m4_define(['m4_use_localparams'], 0)
@@ -704,6 +704,18 @@ m4+definitions(['
    m4_define(['M4_INJECT_RETURNING_LD'], m4_eval(M4_LD_RETURN_ALIGN > 0))
    m4_define(['M4_PENDING_ENABLED'], M4_INJECT_RETURNING_LD)
    
+                                                    
+   // ==============
+   // VIZ Parameters                               
+   // ==============
+   
+                                                    
+   // Amount to shift mem left (to make room for FP regs).
+   m4_define(
+      ['M4_VIZ_MEM_LEFT_ADJUST'],
+      m4_ifelse(M4_EXT_F, 1, 170, 0))
+
+
    
    // =========
    // Redirects
@@ -867,7 +879,7 @@ m4+definitions(['
    m4_case(M4_ISA, ['RISCV'], ['
       m4_ifelse(M4_NO_COUNTER_CSRS, ['1'], [''], ['
          // Define Counter CSRs
-         //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
+         //            Name            Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
          m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['time'],       12'hC01,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
@@ -1673,6 +1685,14 @@ m4+definitions(['
       // Hence can have a macro or signal to differentiate the type of instruction related to a particular extension or 
       // could be better to use just $op5 decode for this.
       
+      // Categorize FP instrs that read int regs.
+      $fcvts_w_type_instr = $is_fcvtsw_instr ||
+                            $is_fcvtswu_instr;
+      $fcvtw_s_type_instr = $is_fcvtws_instr ||
+                            $is_fcvtwus_instr;
+      $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
+      $fmvxw_type_instr = $is_fmvxw_instr;
+      $fmvwx_type_instr = $is_fmvwx_instr;
       // These instructions modifies FP CSR's "frm" and generates "fflags".
       $fpu_csr_fflags_type_instr = $is_fmadds_instr ||
                                    $is_fmsubs_instr ||
@@ -1683,10 +1703,8 @@ m4+definitions(['
                                    $is_fmuls_instr ||
                                    $is_fdivs_instr ||
                                    $is_fsqrts_instr ||
-                                   $is_fcvtws_instr ||
-                                   $is_fcvtwus_instr ||
-                                   $is_fcvtsw_instr ||
-                                   $is_fcvtswu_instr;
+                                   $fcvtw_s_type_instr ||
+                                   $fcvts_w_type_instr;
       // These instructions do not modify FP CSR's "frm", but they do generate "fflags".
       $fpu_fflags_type_instr = $is_fmins_instr ||
                                $is_fmaxs_instr ||
@@ -1696,17 +1714,26 @@ m4+definitions(['
       // Generalized FP instrucions.                               
       $fpu_type_instr = $fpu_csr_fflags_type_instr ||
                         $fpu_fflags_type_instr ||
+                        $fmvxw_type_instr ||
+                        $fmvwx_type_instr ||
                         $is_flw_instr ||
                         $is_fsw_instr ||
                         $is_fsgnjs_instr ||
                         $is_fsgnjns_instr ||
                         $is_fsgnjxs_instr ||
-                        $is_fmvxw_instr ||
-                        $is_fclasss_instr ||
-                        $is_fmvwx_instr;
-      $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
-      $fmvxw_type_instr = $is_fmvxw_instr;
-      $fcvtw_s_type_instr = $is_fcvtws_instr || $is_fcvtwus_instr;
+                        $is_fclasss_instr;
+      // FPU instrs with int dest reg.
+      $fpu_instr_with_int_dest = $is_feqs_instr ||
+                                 $is_flts_instr ||
+                                 $is_fles_instr ||
+                                 $is_fclasss_instr ||
+                                 $fmvxw_type_instr ||
+                                 $fcvtw_s_type_instr;
+      // FPU instrs with all int srcs.
+      $fpu_instr_with_int_src = $fcvts_w_type_instr ||
+                                $fmvwx_type_instr ||
+                                $is_flw_instr;
+      $fpu_instr_with_int_src1 = $is_fsw_instr;
       '])
       
       m4_ifelse_block(M4_EXT_B, 1, ['
@@ -1744,7 +1771,9 @@ m4+definitions(['
       // Output signals.
       /src[2:1]
          // Reg valid for this source, based on instruction type.
-         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
+         $is_reg =
+             m4_ifelse(M4_EXT_F, 1, (! /instr$fpu_type_instr || /instr$fpu_instr_with_int_src || ((#src == 1) && /instr$fpu_instr_with_int_src1)) &&)
+             (/instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type);
          $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[M4_REGS_INDEX_RANGE] : /instr$raw_rs2[M4_REGS_INDEX_RANGE];
          
       // For debug.
@@ -1754,21 +1783,27 @@ m4+definitions(['
    $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     m4_ifelse(M4_EXT_B, 1, ['$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd[M4_REGS_INDEX_RANGE];
-   $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
-                     | $dest_reg;   // r0 not valid.
+   $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) || $fpu_instr_with_int_dest) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
+                     | $dest_reg;   // r0 not valid.  TODO: Huh? What about FP? No formal failure?
    
    m4_ifelse_block(M4_EXT_F, 1, ['
    // Implementing a different encoding for floating point instructions.
    ?$valid_decode
       // Output signals. seperate FPU source
-      /fpusrc[3:1]
+      /fpu_src[3:1]
          // Reg valid for this fpu source, based on instruction type.
-         $is_fpu_reg = ( (#fpusrc != 3) && /instr$is_r_type) || /instr$is_r4_type || ( (#fpusrc != 3) && /instr$is_r2_type) || (/instr$is_i_type && (#fpusrc == 1) && (#fpusrc != 3)) || ( (#fpusrc != 3) && /instr$is_s_type);
-         $fpu_reg[M4_FPUREGS_INDEX_RANGE] = (#fpusrc == 1) ? /instr$raw_rs1 : (#fpusrc == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
+         $is_reg = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_src && ! ((#fpu_src == 1) && /instr$fpu_instr_with_int_src1)) &&
+                   (((#fpu_src != 3) && /instr$is_r_type) ||
+                    /instr$is_r4_type ||
+                    ((#fpu_src != 3) && /instr$is_r2_type) ||
+                    (/instr$is_i_type && (#fpu_src == 1) && (#fpu_src != 3)) ||
+                    ((#fpu_src != 3) && /instr$is_s_type)
+                   );
+         $reg[M4_FPU_REGS_INDEX_RANGE] = (#fpu_src == 1) ? /instr$raw_rs1 : (#fpu_src == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
          
-   $dest_fpu_reg[M4_FPUREGS_INDEX_RANGE] = $fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_fpu_reg :
+   $dest_fpu_reg[M4_FPU_REGS_INDEX_RANGE] = $fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_fpu_reg :
                                     $second_issue_ld ? |fetch/instr/orig_inst$dest_fpu_reg : $raw_rd;
-   $dest_fpu_reg_valid = ($fpu_type_instr && (! $fmvxw_type_instr) && (! $fcvtw_s_type_instr) ) && (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue);
+   $dest_fpu_reg_valid = ($fpu_type_instr && ! $fpu_instr_with_int_dest) && (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue);
    '])
    
    // Actually load.
@@ -2055,9 +2090,9 @@ m4+definitions(['
          $clock = *clk;
 
          // Operands
-         $operand_a[31:0] = /fpusrc[1]$fpu_reg_value;
-         $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
-         $operand_c[31:0] = /fpusrc[3]$fpu_reg_value;
+         $operand_a[31:0] = /fpu_src[1]$reg_value;
+         $operand_b[31:0] = /fpu_src[2]$reg_value;
+         $operand_c[31:0] = /fpu_src[3]$reg_value;
          // rounding mode as per the RISC-V specs (synchronizing with HardFloat module)
          $rounding_mode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
                                (|fetch/instr$raw_rm == 3'b001) ? 3'b010 :
@@ -2082,7 +2117,7 @@ m4+definitions(['
          $fmaxs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
          $fcvtws_rslt[M4_WORD_RANGE]  = /fpu1$int_output;
          $fcvtwus_rslt[M4_WORD_RANGE] = /fpu1$int_output;
-         $fmvxw_rslt[M4_WORD_RANGE]   = /fpusrc[1]$fpu_reg_value;
+         $fmvxw_rslt[M4_WORD_RANGE]   = /fpu_src[1]$reg_value;
          $feqs_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
          $flts_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
          $fles_rslt[M4_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
@@ -2235,7 +2270,7 @@ m4+definitions(['
       $st_cond = $st && $valid_exe;
       ?$st_cond
          // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
-         $st_reg_value[M4_WORD_RANGE] = m4_ifelse_block(M4_EXT_F, 1, ['$is_fsw_instr ? /fpusrc[2]$fpu_reg_value :'])
+         $st_reg_value[M4_WORD_RANGE] = m4_ifelse_block(M4_EXT_F, 1, ['$is_fsw_instr ? /fpu_src[2]$reg_value :'])
                                                         /src[2]$reg_value;
          $st_value[M4_WORD_RANGE] =
               $ld_st_word ? $st_reg_value :            // word
@@ -2464,7 +2499,7 @@ m4+definitions(['
          // Reg valid for this source, based on instruction type.
          $is_reg =
              (#src == 1) ? ! /instr$jtype :
-                           /instr$rtype || /instr$st || /instr$is_beq || /instr$is_bne;
+                            /instr$rtype || /instr$st || /instr$is_beq || /instr$is_bne;
          $reg[M4_REGS_INDEX_RANGE] =
              (#src == 1) ? /instr$raw_rs :
                            /instr$raw_rt;
@@ -3415,9 +3450,9 @@ m4+definitions(['
                      m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
                      // Bypass stages. Both register and pending are bypassed.
                      // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
                      {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
                   /* verilator lint_on WIDTH */
                // Replay if this source register is pending.
@@ -3429,9 +3464,9 @@ m4+definitions(['
                $dest_pending =
                   m4_ifelse(M4_ISA, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
                   // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$valid_dest_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
                   m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
             $replay_int = | /src[*]$replay || ($is_dest_condition && $dest_pending);
@@ -3442,20 +3477,20 @@ m4+definitions(['
             // Reg Rd for Floating Point Unit
             // ======
             // 
-            /M4_FPUREGS_HIER
-            /fpusrc[3:1]
-               $is_fpu_reg_condition = $is_fpu_reg && /instr$valid_decode;  // Note: $is_fpu_reg can be set for RISC-V sr0.
-               ?$is_fpu_reg_condition
-                  {$fpu_reg_value[M4_WORD_RANGE], $pending_fpu} =
+            /M4_FPU_REGS_HIER
+            /fpu_src[3:1]
+               $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
+               ?$is_reg_condition
+                  {$reg_value[M4_WORD_RANGE], $pending} =
                      m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
                      // Bypass stages. Both register and pending are bypassed.
                      // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_fpu_reg == $fpu_reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_fpu_reg == $fpu_reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_fpu_reg == $fpu_reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                     {/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$fpuvalue, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu'])};
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_fpu_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_fpu_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_fpu_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                     {/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
                // Replay if FPU source register is pending.
-               $replay_fpu = $is_fpu_reg_condition && $pending_fpu;
+               $replay_fpu = $is_reg_condition && $pending;
 
             // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
             $is_dest_fpu_condition = $dest_fpu_reg_valid && /instr$valid_decode;
@@ -3463,12 +3498,12 @@ m4+definitions(['
                $dest_fpu_pending =
                   m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
                   // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_fpu_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_fpu_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_fpu_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
-                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/fpuregs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu']);
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_fpu_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_fpu_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$valid_dest_fpu_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
+                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/fpu_regs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
-            $replay_fpu = | /fpusrc[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
+            $replay_fpu = | /fpu_src[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
             '])
             $replay = $replay_int m4_ifelse(M4_EXT_F, 1, ['|| $replay_fpu']);
          
@@ -3534,7 +3569,7 @@ m4+definitions(['
             '])
             
             // Conditions that commit results.
-            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m4_ifelse_block(M4_EXT_F, 1, ['&&  (!>>M4_LD_RETURN_ALIGN$is_flw_instr) && (!$fpu_second_issue_div_sqrt)']) );
+            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m4_ifelse_block(M4_EXT_F, 1, ['&&  (! >>M4_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
             m4_ifelse_block(M4_EXT_F, 1, ['
             $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || ($fpu_second_issue_div_sqrt || ($second_issue && >>M4_LD_RETURN_ALIGN$is_flw_instr));
@@ -3570,12 +3605,12 @@ m4+definitions(['
             \SV_plus
                always @ (posedge clk) begin
                   if ($fpu_reg_write)
-                     /fpuregs[$dest_fpu_reg]<<0$$^fpuvalue[M4_WORD_RANGE] <= $rslt;
+                     /fpu_regs[$dest_fpu_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
                end
             m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
             // Write $pending along with $value, but coded differently because it must be reset.
-            /fpuregs[*]
-               <<1$pending_fpu = ! /instr$reset && (((#fpuregs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending_fpu);
+            /fpu_regs[*]
+               <<1$pending = ! /instr$reset && (((#fpu_regs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending);
               '])
             '])
             
@@ -4021,6 +4056,7 @@ m4+definitions(['
                  ({M4_WORD_CNT{$is_b_type}} & $raw_b_imm) |
                  ({M4_WORD_CNT{$is_u_type}} & $raw_u_imm) |
                  ({M4_WORD_CNT{$is_j_type}} & $raw_j_imm);
+            $imm_valid = $is_i_type || $is_r_type || $is_s_type || $is_b_type || $is_u_type || $is_j_type;
 
 \TLV dummy_viz_logic()
    // dummy
@@ -4039,10 +4075,16 @@ m4+definitions(['
                $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
                $unconditioned_is_reg = $is_reg;
                $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
-         /instr_mem
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            /fpu_src[*]
+               $unconditioned_reg[M4_FPU_REGS_INDEX_RANGE] = $reg;
+               $unconditioned_is_reg = $is_reg;
+               $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
+            '])
+         /instr_mem[*]
             $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
          '])
-         /instr_mem
+         /instr_mem[*]
             m4_case(M4_ISA, ['MINI'], ['
             '], ['RISCV'], ['
             $instr_str[40*8-1:0] = *instr_strs[instr_mem];
@@ -4053,97 +4095,166 @@ m4+definitions(['
    
    
 
-\TLV instruction_in_memory()
+\TLV instruction_in_memory(|_top)
    \viz_alpha
+      initAll() {
+         let imem_box = new fabric.Rect({
+            top: -50,
+            left: -25 + -580,
+            fill: "#208028",
+            width: 670,
+            height: 76 + 18 * M4_NUM_INSTRS,
+            stroke: "black"
+         })
+         let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+            top: -40,
+            left: 250 + -580,
+            fontSize: 20,
+            fontWeight: 800,
+            fontFamily: "monospace",
+            fill: "white"
+         })
+         return {objects: {imem_box, imem_header}}
+      },
       initEach() {
          // Instruction and binary value text.
          let instr_str = new fabric.Text("" , {
             top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
-            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            left: -577,
             fontSize: 14,
-            fontFamily: "monospace",
-            visible: false
+            fontFamily: "monospace"
          })
          let instr_asm_box = new fabric.Rect({
             top: 18 * this.getIndex(),
-            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
+            left: -260,
             fill: "white",
             width: 300,
-            height: 14,
-            visible: false
+            height: 14
          })
          let instr_binary_box = new fabric.Rect({
             top: 18 * this.getIndex(),
-            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'],-230, ['MIPSI'], -580, ['DUMMY'], 20),
+            left: -580,
             fill: "white",
             width: 280,
-            height: 14,
-            visible: false
+            height: 14
          })
          return {objects: {instr_binary_box, instr_asm_box, instr_str}}
+      },
+      renderAll() {
+         // Update fetch instruction highlighting and 2nd issue instruction.
+         // (We record and clear the old highlighting so we don't have to render each instruction individually.)
+         // Unhighlight fetch instruction.
+         let instance = this.context.instances[this.fromInit().highlighted_addr]
+         if (typeof instance != "undefined") {
+            instance.initObjects.instr_binary_box.setFill("white")
+            instance.initObjects.instr_asm_box.setFill("white")
+         }
+         // Unhighlight 2nd issue instruction.
+         let instance2 = this.context.instances[this.fromInit().highlighted_addr2]
+         if (typeof instance2 != "undefined") {
+            instance2.initObjects.instr_binary_box.setFill("white")
+            instance2.initObjects.instr_asm_box.setFill("white")
+         }
+         // Highlight fetch instruction.
+         let pc = '['']|_top/instr$pc'.asInt(-1)
+         this.fromInit().highlighted_addr = pc
+         instance = this.context.instances[pc]
+         if (typeof instance !== "undefined") {
+            let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
+            instance.initObjects.instr_binary_box.setFill(color)
+            instance.initObjects.instr_asm_box.setFill(color)
+         }
+         // Highlight 2nd issue instruction.
+         let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
+         this.fromInit().highlighted_addr2 = pc2
+         instance2 = this.context.instances[pc2]
+         if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
+            let color = "#ffd0b0"
+            instance2.initObjects.instr_binary_box.setFill(color)
+            instance2.initObjects.instr_asm_box.setFill(color)
+         }
       },
       renderEach() {
          // Instruction memory is constant, so just create it once.
          m4_ifelse_block(M4_ISA, ['MINI'], ['
             let instr_str = '$instr'.goTo(0).asString("?")
          '], M4_ISA, ['RISCV'], ['
-            let instr_str = '$instr_str'.asString("?") + "  " + '$instr'.asBinaryStr(NaN)
+            let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
          '], M4_ISA, ['MIPSI'], ['
             let instr_str = '$instr'.asBinaryStr("?")
          '], ['
             let instr_str = '$instr'.goTo(0).asString("?")
          '])
-          if(instr_str != 0) {
-             //console.log("yes5") 
-             this.getInitObject("instr_str").setVisible(true)
-             this.getInitObject("instr_asm_box").setVisible(true)
-             this.getInitObject("instr_binary_box").setVisible(true)
-             this.getInitObject("instr_str").setText(`${instr_str}`)
-         }
+         this.getInitObject("instr_str").setText(`${instr_str}`)
       }
          
-\TLV registers()
-   // TODO: Fix [*]
-   \viz_alpha
-      initEach() {
-         let regname = new fabric.Text("Integer (hex)", {
-               top: -15,
-               left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
+\TLV registers(_name, _heading, _sig_prefix, _num_srcs, _left_adjust)
+   // /regs or /fpu_regs
+   /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
+      \viz_alpha
+         initAll() {
+            let rf_box = new fabric.Rect({
+               top: -60,
+               left: 350 + _left_adjust,
+               fill: "#2028b0",
+               width: 145,
+               height: 650,
+               stroke: "black"
+            })
+            let rf_header = new fabric.Text("📂 _heading", {
+               top: -45,
+               left: 360 + _left_adjust,
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            let rf_header2 = new fabric.Text("Integer (hex)", {
+               top: -17,
+               left: 367 + _left_adjust,
                fontSize: 14,
                fontFamily: "monospace",
-               fill: "white",
-               visible: false
+               fill: "white"
             })
-         let reg = new fabric.Text("", {
-            top: 18 * this.getIndex(),
-            left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 367, ['MIPSI'], 400, ['DUMMY'], 200),
-            fontSize: 14,
-            fontFamily: "monospace"
-         })
-         let rf_hex_box = new fabric.Rect({
-            top: 18 * this.getIndex(),
-            left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 360, ['MIPSI'], -580, ['DUMMY'], 20),
-            fill: "white",
-            width: 125,
-            height: 14,
-            visible: false
-         })
-         return {objects: {rf_hex_box, regname, reg}}
-      },
-      renderEach() {
-         let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index)
-         let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
-         let reg = parseInt(this.getIndex())
-         let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
-         let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
-         this.getInitObject("regname").setVisible(true) 
-         this.getInitObject("rf_hex_box").setVisible(true) 
-         this.getInitObject("reg").setText(
-            regIdent + ": " +
-            '$value'.step(1).asInt(NaN).toString(16) + oldValStr)
-         this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black")
-      }
-      
+            return {objects: {rf_box, rf_header, rf_header2}}
+         },
+         initEach() {
+            let reg = new fabric.Text("", {
+               top: 18 * this.getIndex(),
+               left: 367 + _left_adjust,
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let reg_box = new fabric.Rect({
+               top: 18 * this.getIndex(),
+               left: 360 + _left_adjust,
+               fill: "white",
+               width: 125,
+               height: 14
+            })
+            return {objects: {reg_box, reg}}
+         },
+         renderEach() {
+            //debugger
+            // TODO: This is inefficient as is the same for every entry.
+            let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getScope("['']_sig_prefix['']regs").index)
+            let rs_valid = []
+            let read_valid = false
+            for (let i = 1; i <= _num_srcs; i++) {
+               rs_valid[i] = '/instr/['']_sig_prefix['']src[i]$is_reg'.asBool(false) && this.getIndex() === '/instr/['']_sig_prefix['']src[i]$reg'.asInt(-1)
+               read_valid |= rs_valid[i]
+            }
+            let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
+            let reg = parseInt(this.getIndex())
+            let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
+            let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
+            this.getInitObject("reg").setText(
+               regIdent + ": " +
+               '$value'.step(1).asInt(NaN).toString(16) + oldValStr)
+            this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black")
+            this.getInitObject("reg_box").setFill(mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white")
+         }
+
 \TLV register_csr(/_csr) 
    /_csr
       \viz_alpha
@@ -4153,57 +4264,16 @@ m4+definitions(['
             //debugger
             m4_csr_viz_init_each
             return {objects: {...csr_objs, ...csr_boxes}}
-            },
-            renderEach() {
-               //debugger
-               m4_csr_viz_render_each
-            }
-            
-\TLV register_fpu(/_fpu_size) 
-   /_fpu_size
-      // TODO: Fix [*]
-      \viz_alpha
-         initEach() {
-            let regname = new fabric.Text("Floating Point (hex)", {
-                     top: -20,
-                     left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 420 ['MIPSI'], 375, ['DUMMY'], 175),
-                     fontSize: 14,
-                     fontFamily: "monospace",
-                     fill: "white"
-                  })
-            let fpureg = new fabric.Text("", {
-               top: 18 * this.getIndex(),
-               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 500, ['MIPSI'], 400, ['DUMMY'], 200),
-               fontSize: 14,
-               fontFamily: "monospace"
-            })
-            let fpu_rf_hex_box = new fabric.Rect({
-               top: 18 * this.getIndex(),
-               left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 360, ['MIPSI'], -580, ['DUMMY'], 20),
-               fill: "white",
-               width: 125,
-               height: 14,
-               visible: false
-            })
-            return {objects: {fpu_rf_hex_box, regname, fpureg}}
          },
          renderEach() {
-            let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index)
-            let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending_fpu'.asBool(false)'], ['false'])
-            let reg = parseInt(this.getIndex())
-            let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
-            let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : ""
-            //this.getInitObject("fpu_rf_hex_box").setVisible(true) 
-            this.getInitObject("fpureg").setText(
-               regIdent + ": " +
-               '$fpuvalue'.step(1).asInt(NaN).toString(16) + oldValStr)
-            this.getInitObject("fpureg").setFill(pending ? "red" : mod ? "blue" : "black")
+            //debugger
+            m4_csr_viz_render_each
          }
-         
-\TLV instruction()
+
+
+\TLV instruction(/_top)
    \viz_alpha
       renderEach() {
-         //debugger
          objects = {}
          //
          // PC instr_mem pointer
@@ -4215,7 +4285,7 @@ m4+definitions(['
                                               "blue"
          objects.pc_pointer = new fabric.Text("👉", {
             top: 18 * pc,
-            left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
+            left: -281,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -4225,7 +4295,7 @@ m4+definitions(['
             let second_issue_pc = '/orig_inst$pc'.asInt(-1)
             objects.second_issue_pointer = new fabric.Text("👉🏿", {
                top: 18 * second_issue_pc,
-               left: m4_case(M4_ISA, ['MINI'], 3, ['RISCV'], -603, ['MIPSI'], -603, ['DUMMY'], 3),
+               left: -281,
                fill: color,
                fontSize: 14,
                fontFamily: "monospace",
@@ -4256,17 +4326,34 @@ m4+definitions(['
             str += '/src[2]$char'.asString("?")
             str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")"
          '], M4_ISA, ['RISCV'], ['
-            let regStr = (valid, regNum, regValue) => {
-               return valid ? `x${regNum} (${regValue})` : `xX`
+            let regStr = (type_char, valid, regNum, regValue) => {
+               return type_char + (valid ? `${regNum} (${regValue})` : `X`)
             }
             let srcStr = (src) => {
-               return '/src[src]$unconditioned_is_reg'.asBool(false)
-                          ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
-                          : ""
+               let ret = ""
+               if ((src < 3) &&
+                   '/src[src]$unconditioned_is_reg'.asBool(false)) {
+                  ret += `\n      ${regStr("x", true, '/src[src]$unconditioned_reg'.asInt(NaN),     '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+               }
+               m4_ifelse_block(M4_EXT_F, 1, ['
+               if ('/fpu_src[src]$unconditioned_is_reg'.asBool(false)) {
+                  ret += `\n      ${regStr("f", true, '/fpu_src[src]$unconditioned_reg'.asInt(NaN), '/fpu_src[src]$unconditioned_reg_value'.asInt(NaN))}`
+               }
+               '])
+               return ret
             }
-            let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
-                      `  = ${'$mnemonic'.asString("?")}${srcStr(1)}${srcStr(2)}\n` +
-                      `      i[${'$imm_value'.asInt(NaN)}]`
+            let dest_reg_valid = '$dest_reg_valid'.asBool(false)
+            let str = `${regStr("x", dest_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            let dest_fpu_reg_valid = '$dest_fpu_reg_valid'.asBool(false)
+            if (dest_fpu_reg_valid) {
+               str = `${regStr("f", dest_fpu_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+            }
+            '])
+            str += `  = ${'$mnemonic'.asString("?")}${srcStr(1)}${srcStr(2)}${srcStr(3)}`
+            if ('$imm_valid'.asBool()) {
+               str += `\n      i[${'$imm_value'.asInt(NaN)}]`
+            }
          '], M4_ISA, ['MIPSI'], ['
             // TODO: Almost same as RISC-V. Avoid cut-n-paste.
             let regStr = (valid, regNum, regValue) => {
@@ -4277,70 +4364,96 @@ m4+definitions(['
                           ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                           : ""
             }
-            let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+            let str = `${regStr(dest_reg_valid, '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
                       `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
-                      `      i[${'$imm_value'.asInt(NaN)}]`
+                      ('$imm_valid` ? `i[${'$imm_value'.asInt(NaN)}]` : ""
          '], ['
          '])
-         //console.log("pc =" , pc) 
-         objects.pc_arrow = new fabric.Line([-303, 18 * pc + 6, 86, -8], {
-            stroke: "#00afdf",
+         //
+         newSrcArrow = function(name, fp, addr, valid, pos) {
+            if (valid) {
+               objects[name + "_arrow"] = new fabric.Line([360 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0), 18 * addr + 6, 210, 40 + 18 * pos], {
+                  stroke: "#b0c8df",
+                  strokeWidth: 2
+               })
+            }
+         }
+         objects.pc_arrow = new fabric.Line([10, 18 * pc + 6, 86, -8], {
+            stroke: "#b0c8df",
             strokeWidth: 2
          })
+         // Create rsX arrows for int and FP regs.
          let reg_addr1 = '$raw_rs1'.asInt()
-         let rs1_valid = '/src[1]$is_reg'.asBool()
-         objects.rs1_arrow = new fabric.Line([360, 18 * reg_addr1 + 6, 210, 58], {
-            stroke: "#00afdf",
-            strokeWidth: 2, 
-            visible: rs1_valid
-         })
-         
          let reg_addr2 = '$raw_rs2'.asInt()
+         let reg_addr3 = '$raw_rs3'.asInt()
+         let rs1_valid = '/src[1]$is_reg'.asBool()
          let rs2_valid = '/src[2]$is_reg'.asBool()
-         objects.rs2_arrow = new fabric.Line([360, 18 * reg_addr2 + 6, 210, 76], {
-            stroke: "#00afdf",
-            strokeWidth: 2,
-            visible: rs2_valid
-         })
-         
+         let rs3_valid = false
+         let fpu_rs1_valid = false
+         let fpu_rs2_valid = false
+         let fpu_rs3_valid = false
+         newSrcArrow("rs1", false, reg_addr1, rs1_valid, 1)
+         newSrcArrow("rs2", false, reg_addr2, rs2_valid, 2)
+         let src1_value = '/src[1]$unconditioned_reg_value'.asInt()
+         let src2_value = '/src[2]$unconditioned_reg_value'.asInt()
+         let src3_value = 0
          let dest_reg = '$dest_reg'.asInt(0)
-         let rd_valid = '$dest_reg_valid'.asBool(false)
-         objects.rd_arrow = new fabric.Line([360, 18 * dest_reg + 6, 157, 20 ], {
-            stroke: "#00bfff",
+         let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
+         let valid_dest_fpu_reg_valid = false
+         m4_ifelse_block(M4_EXT_F, 1, ['
+         fpu_rs1_valid = '/fpu_src[1]$is_reg'.asBool()
+         fpu_rs2_valid = '/fpu_src[2]$is_reg'.asBool()
+         fpu_rs3_valid = '/fpu_src[3]$is_reg'.asBool()
+         let dest_fpu_reg = '$dest_fpu_reg'.asInt(0)
+         newSrcArrow("fp_rs1", true, reg_addr1, fpu_rs1_valid, 1)
+         newSrcArrow("fp_rs2", true, reg_addr2, fpu_rs2_valid, 2)
+         newSrcArrow("fp_rs3", true, reg_addr3, fpu_rs3_valid, 3)
+         if (fpu_rs1_valid) {src1_value = '/fpu_src[1]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs2_valid) {src2_value = '/fpu_src[2]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs3_valid) {src3_value = '/fpu_src[3]$unconditioned_reg_value'.asInt()}
+         valid_dest_fpu_reg_valid = '$valid_dest_fpu_reg_valid'.asBool(false)
+         debugger
+         '])
+         let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
+         //
+         let second_issue = '$second_issue'.asBool()
+         objects.rd_arrow = new fabric.Line([157, 20, valid_dest_fpu_reg_valid ? 360 + M4_VIZ_MEM_LEFT_ADJUST : 360, 18 * the_dest_reg + 6], {
+            stroke: '$second_issue'.asBool() ? "#c03050" : commit ? "#a0dfff" : "#d0d0d0",
             strokeWidth: 3,
-            visible: rd_valid
+            visible: valid_dest_reg_valid || valid_dest_fpu_reg_valid
          })
-         
+         //
          let ld_st_addr = ('$addr'.asInt() / 4)
          let ld_valid = '$valid_ld'.asBool(false)
-         objects.ld_arrow = new fabric.Line([550, 18 * ld_st_addr + 6  , 475, 5 + 18 * dest_reg], {
-            stroke: "#d0d0ff",
+         objects.ld_arrow = new fabric.Line([550 + M4_VIZ_MEM_LEFT_ADJUST, 18 * ld_st_addr + 6, 475 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 5 + 18 * the_dest_reg], {
+            stroke: "#c03050",
             strokeWidth: 3,
             visible: ld_valid
          })
-         
+         //
          let st_valid = '$valid_st'.asBool()
-         objects.st_arrow = new fabric.Line([210, 76, 550, 18 * ld_st_addr + 6], {
-            stroke: "#00bfff",
+         objects.st_arrow = new fabric.Line(
+            [210, 76, 550 + M4_VIZ_MEM_LEFT_ADJUST, 18 * ld_st_addr + 6], {
+            stroke: "#a0dfff",
             strokeWidth: 3,
             visible: st_valid
          })
-         
+         //
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
                   top: 18 * pc,
-                  left: -532,
+                  left: -250,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
          })
-         
+         //
          objects.fetch_instr_viz.animate({top: -12, left: 85}, {
               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
               duration: 500
          })
-         
+         //
          objects.instr_with_values = new fabric.Text(str, {
             top: 15,
             left: 110,
@@ -4348,20 +4461,19 @@ m4+definitions(['
             fontSize: 14,
             fontFamily: "monospace"
          })
-         
-         let src1_value = '/src[1]$unconditioned_reg_value'.asInt().toString()
-         objects.src1_value_viz = new fabric.Text(src1_value, {
-            left: 316 + 8 * 4,
-            top: 18 * reg_addr1,
+         //
+         objects.src1_value_viz = new fabric.Text(src1_value.toString(), {
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
             fontWeight: 800,
             visible: false
          })
-         if (rs1_valid) {
+         if (rs1_valid || fpu_rs1_valid) {
             setTimeout(() => {
-               objects.src1_value_viz.setVisible(true)
+               objects.src1_value_viz.set({left: 316 + 8 * 4 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr1,
+                                           visible: true})
                objects.src1_value_viz.animate({left: 195, top: 18 * 2 + 15}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
@@ -4372,18 +4484,19 @@ m4+definitions(['
                }, 500)
             }, 500)
          }
-         let src2_value = '/src[2]$unconditioned_reg_value'.asInt().toString()
-         objects.src2_value_viz = new fabric.Text(src2_value, {
-            left: 316 + 8 * 4,
-            top: 18 * reg_addr2,
+         debugger
+         objects.src2_value_viz = new fabric.Text(src2_value.toString(), {
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
             fontWeight: 800,
             visible: false
          })
-         if (rs2_valid) {
+         if (rs2_valid || fpu_rs2_valid) {
             setTimeout(() => {
+               objects.src2_value_viz.set({left: 316 + 8 * 4 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr2,
+                                           visible: true})
                objects.src2_value_viz.setVisible(true)
                objects.src2_value_viz.animate({left: 195, top: 18 * 3 + 15 }, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
@@ -4392,7 +4505,7 @@ m4+definitions(['
                setTimeout(() => {
                   if ('$valid_decode'.asBool(false) && '$st'.asBool(false) && commit) {
                      // Animate src2 value being stored.
-                     objects.src2_value_viz.animate({left: 550, top: 18 * ld_st_addr}, {
+                     objects.src2_value_viz.animate({left: 550 + M4_VIZ_MEM_LEFT_ADJUST, top: 18 * ld_st_addr}, {
                         onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                         duration: 500
                      })
@@ -4408,6 +4521,28 @@ m4+definitions(['
                }, 500)
             }, 500)
          }
+         objects.src3_value_viz = new fabric.Text(src3_value.toString(), {
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (fpu_rs3_valid) {
+            setTimeout(() => {
+               objects.src3_value_viz.set({left: 316 + 8 * 4 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr3,
+                                           visible: true})
+               objects.src3_value_viz.animate({left: 195, top: 18 * 2 + 15}, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  objects.src3_value_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 500)
+         }
          
          let res_value = '$rslt'.asInt().toString(16)
          objects.result_viz = new fabric.Text(res_value, {
@@ -4419,10 +4554,10 @@ m4+definitions(['
             fontWeight: 800,
             visible: false
          })
-         if (rd_valid && commit) {
+         if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
             setTimeout(() => {
                objects.result_viz.setVisible(true)
-               objects.result_viz.animate({left: 393, top: 18 * dest_reg}, {
+               objects.result_viz.animate({left: valid_dest_fpu_reg_valid ? 393 + M4_VIZ_MEM_LEFT_ADJUST : 393, top: 18 * dest_reg}, {
                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                  duration: 500
                })
@@ -4435,235 +4570,183 @@ m4+definitions(['
          return {objects: Object.values(objects)}
       }
 
-\TLV fpu_csr(/_fpu)
-   /_fpu
+
+\TLV memory(/_bank_size, /_mem_size)
+   /_mem_size
       \viz_alpha
          initEach() {
-            let fcsr = new fabric.Text("", {
-               top: 18 * 33,
-               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-               fontSize: 14,
-               fontFamily: "monospace"
+            let index_val_box = new fabric.Rect({
+               top: 18 * this.getIndex(),
+               left: 540 + M4_VIZ_MEM_LEFT_ADJUST,
+               fill: "white",
+               width: 40,
+               height: 14
             })
-            let frm = new fabric.Text("", {
-               top: 18 * 34,
-               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-               fontSize: 14,
-               fontFamily: "monospace"
-            })
-            let fflags = new fabric.Text("", {
-               top: 18 * 35,
-               left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-               fontSize: 14,
-               fontFamily: "monospace"
-            })
-            return {objects: {fcsr: fcsr, frm: frm, fflags: fflags}}
-         },
-         renderEach() {
-            var fcsrmod = '/instr$csr_fcsr_hw_wr'.asBool(false)
-            var frmmod = '/instr$csr_frm_hw_wr'.asBool(false)
-            var fflagsmod = '/instr$csr_fflags_hw_wr'.asBool(false)
-            var fcsrname = String("fcsr")
-            var frmname = String("frm")
-            var fflagsname = String("fflags")
-            var oldValfcsr = fcsrmod ? `(${'/instr$csr_fcsr'.asInt(NaN).toString(16)})` : ""
-            var oldValfrm =  frmmod ? `(${'/instr$csr_frm'.asInt(NaN).toString(16)})` : ""
-            var oldValfflags = fflagsmod ? `(${'/instr$csr_fflags'.asInt(NaN).toString(16)})` : ""
-            this.getInitObject("fcsr").setText(
-               fcsrname + ": " +
-               '/instr$csr_fcsr'.step(1).asInt(NaN).toString(16) + oldValfcsr)
-            this.getInitObject("frm").setText(
-               frmname + ": " +
-               '/instr$csr_frm'.step(1).asInt(NaN).toString(16) + oldValfrm)
-            this.getInitObject("fflags").setText(
-               fflagsname + ": " +
-               '/instr$csr_fflags'.step(1).asInt(NaN).toString(16) + oldValfflags)
-            this.getInitObject("fcsr").setFill( fcsrmod ? "blue" : "black")
-            this.getInitObject("frm").setFill( frmmod ? "blue" : "black")
-            this.getInitObject("fflags").setFill( fflagsmod ? "blue" : "black")
-         }
-         
-\TLV memory(/_bank_size , /_mem_size)
-   /_bank_size
-      /_mem_size
-         \viz_alpha
-            initEach() {
-               let index_val_box = new fabric.Rect({
+            //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+            let index =
+               new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
                   top: 18 * this.getIndex(),
-                  left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 540, ['MIPSI'], -580, ['DUMMY'], 20) ,
-                  fill: "white",
-                  width: 40,
-                  height: 14,
-                  visible: false
-               })
-               let bank_val_box = new fabric.Rect({
-                  top: 18 * this.getIndex(),
-                  left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], 550, ['MIPSI'], -580, ['DUMMY'], 20) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10,
-                  fill: "white",
-                  width: 25,
-                  height: 14,
-                  visible: false
-               })
-               let regname = new fabric.Text("Data Memory (hex)", {
-                        top: -40,
-                        left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 500, ['MIPSI'], 455, ['DUMMY'], 255) + m4_eval(M4_ADDRS_PER_WORD * 15), // Center aligned
-                        fontSize: 14,
-                        fontFamily: "monospace",
-                        fill: "white"
-                     })
-               let bankname = new fabric.Text("bank", {
-                  top: -20,
-                  left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 545, ['MIPSI'], 500, ['DUMMY'], 300),
-                  fontSize: 14,
-                  fontFamily: "monospace",
-                        fill: "white"
-               })
-               let banknum = new fabric.Text(String(this.getScope("bank").index), {
-                  top: -20,
-                  left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 510, ['MIPSI'], 455, ['DUMMY'], 255) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60,
-                  fontSize: 14,
-                  fontFamily: "monospace",
-                        fill: "white"
-               })
-               let data = new fabric.Text("", {
-                  top: 18 * this.getIndex(),
-                  left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 555, ['MIPSI'], 500, ['DUMMY'], 300) + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10, // bank: 3 2 1 0 format
+                  left: 550 + M4_VIZ_MEM_LEFT_ADJUST,
                   fontSize: 14,
                   fontFamily: "monospace"
                })
-               //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
-               let index =
-                  new fabric.Text("", {
-                     top: 18 * this.getIndex(),
-                     left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 550, ['MIPSI'], 500, ['DUMMY'], 300),
-                     fontSize: 14,
-                     fontFamily: "monospace"
-                  })
-               return {objects: {index_val_box, bank_val_box, banknum, bankname, regname, data, index}}
+            return {objects: {index_val_box, index}}
+         }
+   /_bank_size
+      \viz_alpha
+         initEach() {
+            let banknum = new fabric.Text(String(this.getScope("bank").index), {
+               top: -20,
+               left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST,
+               fontSize: 14,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            return {objects: {banknum}}
+         },
+         initAll() {
+            return {}
+         },
+         renderAll() {
+            // Update write address highlighting.
+            // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
+            // Unhighlight
+            let unhighlight_addr = this.fromInit().highlighted_addr
+            let unhighlight = typeof unhighlight_addr != "undefined"
+            let valid_ld = '/instr$valid_ld'.asBool(false)
+            let valid_st = '/instr$valid_st'.asBool(false)
+            let st_mask = '/instr$st_mask'.asInt(0)
+            let addr = '/instr$addr'.asInt(-1) >> 2 // (word-address)
+            let color = valid_st ? "#b0ffff" : "#b0ffff"
+            debugger
+            let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
+            // Re-highlight index.
+            //debugger
+            if (unhighlight) {
+               this.getScope("instr").children.mem.instances[unhighlight_addr].initObjects.index_val_box.setFill("white")
+            }
+            if (highlight) {
+               this.getScope("instr").children.mem.instances[addr].initObjects.index_val_box.setFill(color)
+            }
+            for (let i = 0; i < 4; i++) {
+               if (unhighlight) {
+                  this.getScope("instr").children.bank.instances[i].children.mem.instances[unhighlight_addr].initObjects.bank_val_box.setFill("white")
+               }
+               if (highlight && ((st_mask >> i) & 1 != 0)) {
+                  this.getScope("instr").children.bank.instances[i].children.mem.instances[addr].initObjects.bank_val_box.setFill(color)
+               }
+            }
+            this.fromInit().highlighted_addr = highlight ? addr : undefined
+         },
+      /_mem_size
+         \viz_alpha
+            initEach() {
+               let bank_val_box = new fabric.Rect({
+                  top: 18 * this.getIndex(),
+                  left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST,
+                  fill: "white",
+                  width: 25,
+                  height: 14
+               })
+               let data = new fabric.Text("", {
+                  top: 18 * this.getIndex(),
+                  left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST, // bank: 3 2 1 0 format
+                  fontSize: 14,
+                  fontFamily: "monospace"
+               })
+               return {objects: {bank_val_box, data}}
             },
             renderEach() {
                //console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`)
-               var mod = ('/instr/bank[this.getScope("bank").index]$valid_st'.asBool(false)) && ((('/instr/bank[this.getScope("bank").index]$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+               var mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
                //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
-               if (this.getInitObject("index")) {
-                  let addrStr = parseInt(this.getIndex()).toString()
-                  this.getInitObject("index").setText(addrStr + ":")
-               }
-               this.getInitObject("index_val_box").setVisible(true) 
-               this.getInitObject("bank_val_box").setVisible(true) 
                this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"))
                this.getInitObject("data").setFill(mod ? "blue" : "black")
             }
-            
-\TLV layout_viz(/_screen) 
+
+\TLV layout_viz(/_screen, |_top) 
    /_screen 
       \viz_alpha 
          initEach() { 
-         let imem_box = new fabric.Rect({
-            top: -50,
-            left: -25 + m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
-            fill: "#208028",
-            width: 670,
-            height: 76 + 18 * M4_NUM_INSTRS,
-            stroke: "black",
-            visible: false
-         })
-         let imem_header = new fabric.Text("🗃️ Instr. Memory", {
-            top: -40,
-            left: 250 + m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
-            fontSize: 20,
-            fontWeight: 800,
-            fontFamily: "monospace",
-            fill: "white"
-         })
-         let decode_header = new fabric.Text("⚙️ Instr. Decode", {
-            top: -45,
-            left: 100,
-            fill: "maroon",
-            fontSize: 18,
-            fontWeight: 800,
-            fontFamily: "monospace"
-         })
-         let decode_box = new fabric.Rect({
-            top: -50,
-            left: 80,
-            fill: "#f8f0e8",
-            width: 230,
-            height: 160,
-            stroke: "#ff8060",
-            visible: false
-         })
-         let csr_header = new fabric.Text("📂 CSRs", {
-            top: 125,
-            left: 100,
-            fill: "white",
-            fontSize: 18,
-            fontWeight: 800,
-            fontFamily: "monospace"
-         })
-         let reg_box = new fabric.Rect({
-            top: 120,
-            left: 80,
-            fill: "#2028b0",
-            width: 220,
-            height: 160,
-            stroke: "black"
-         })
-         let rf_box = new fabric.Rect({
-            top: -60,
-            left: 350,
-            fill: "#2028b0",
-            width: 145,
-            height: 650,
-            stroke: "black",
-            visible: false
-         })
-         let rf_header = new fabric.Text("📂 Reg File", {
-            top: -45,
-            left: 360,
-            fontSize: 18,
-            fontWeight: 800,
-            fontFamily: "monospace",
-            fill: "white"
-         })
-         let bank_box = new fabric.Rect({
-            top: -60,
-            left: 530,
-            fill: "#208028",
-            width: 190,
-            height: 650,
-            stroke: "black"
-         })
-         return {objects : {bank_box, rf_box, reg_box, decode_box, imem_box, rf_header, csr_header, decode_header, imem_header}}
-        },
-        renderEach() {
-             this.getInitObject("imem_box").setVisible(true)
-             this.getInitObject("decode_box").setVisible(true)
-             this.getInitObject("rf_box").setVisible(true)
+            let decode_header = new fabric.Text("⚙️ Instr. Decode", {
+               top: -45,
+               left: 100,
+               fill: "maroon",
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace"
+            })
+            let decode_box = new fabric.Rect({
+               top: -50,
+               left: 80,
+               fill: "#f8f0e8",
+               width: 230,
+               height: 160,
+               stroke: "#ff8060"
+            })
+            let csr_header = new fabric.Text("📂 CSRs", {
+               top: 125,
+               left: 100,
+               fill: "white",
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace"
+            })
+            let csr_box = new fabric.Rect({
+               top: 120,
+               left: 80,
+               fill: "#2028b0",
+               width: 220,
+               height: 18 * m4_num_csrs + 52,
+               stroke: "black"
+            })
+            let dmem_box = new fabric.Rect({
+               top: -60,
+               left: 530 + M4_VIZ_MEM_LEFT_ADJUST,
+               fill: "#208028",
+               width: 190,
+               height: 650,
+               stroke: "black"
+            })
+            let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
+               top: -45,
+               left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST, // Center aligned
+               fontSize: 20,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            let bankname = new fabric.Text("bank", {
+               top: -20,
+               left: 545 + M4_VIZ_MEM_LEFT_ADJUST,
+               fontSize: 14,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            return {objects: {csr_box, decode_box, csr_header, decode_header, dmem_box, dmem_header, bankname}}
          }
-            
+         
    //////// VIZUALIZING THE MAIN CPU //////////////
-\TLV cpu_viz(/_des_pipe , @_M4_stage)
-
+\TLV cpu_viz(/_des_pipe, @_M4_stage)
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
    m4+m4_viz_logic_macro_name()
    /_des_pipe
       @_M4_stage  // Visualize everything happening at the same time.
-         m4+layout_viz(/layout)
+         m4+layout_viz(/layout, /_des_pipe)
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
-            m4+instruction_in_memory()
+            m4+instruction_in_memory(/_des_pipe)
          //
          // Register file
          //
          /instr
             m4+instruction()
-            /regs[M4_REGS_RANGE]
-               m4+registers()
+            m4+registers(int, Int RF, , 2, 0)
             m4+register_csr(/regcsr)
             m4_ifelse_block(M4_EXT_F, 1, ['
-            m4+register_fpu(/fpuregs[M4_FPUREGS_RANGE])
-            m4+fpu_csr(/fpucsr)
+            m4+registers(fp, FP RF, fpu_, 3, M4_VIZ_MEM_LEFT_ADJUST)
             '])
             m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE]) 
         
@@ -4718,7 +4801,7 @@ m4+definitions(['
       // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
       m4_ifelse_block(M4_ISA, ['RISCV'], ['
       m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(|fetch , @M4_MEM_WR_STAGE)
+      m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
       '])
       '])
    '], ['
@@ -4736,7 +4819,7 @@ m4+definitions(['
    
    m4_ifelse_block(M4_ISA, ['RISCV'], ['
    m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(|fetch , @M4_MEM_WR_STAGE)
+   m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
    '])
    '])
    '])
@@ -4747,4 +4830,3 @@ m4+module_def
 
 \SV
    endmodule
-   
