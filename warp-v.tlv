@@ -30,7 +30,7 @@
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
 m4+definitions(['
-   m4_define(['M4_PROG_NAME'], fpu_test)
+   
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
