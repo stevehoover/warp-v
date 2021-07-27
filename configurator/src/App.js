@@ -1,13 +1,19 @@
-import React, {useEffect, useState} from 'react';
-import {Box, ChakraProvider, theme, useToast} from '@chakra-ui/react';
+import React, {createRef, useEffect, useState} from 'react';
+import {Box, ChakraProvider, theme, useDisclosure, useToast} from '@chakra-ui/react';
 import {Route, Switch} from 'react-router-dom';
-import HomePage from './pages/HomePage';
+import HomePage from './components/pages/HomePage';
 import useFetch from './utils/useFetch';
-import {ConfigurationParameters} from "./translation/ConfigurationParameters";
-import {translateParametersToJson} from "./translation/Translation";
+import {ConfigurationParameters} from "./components/translation/ConfigurationParameters";
+import {
+    getTLVCodeForDefinitions,
+    translateJsonToM4Macros,
+    translateParametersToJson
+} from "./components/translation/Translation";
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {getWarpVFileForCommit, warpVLatestSupportedCommit} from "./utils/WarpVUtils";
+import {WarpVPageBase} from "./components/pages/WarpVPageBase";
+import {downloadFile, openInMakerchip} from "./utils/FetchUtils";
 
 
 function App() {
@@ -37,8 +43,65 @@ function App() {
     const [coreJson, setCoreJson] = useState(null)
     const [configuratorCustomProgramName, setConfiguratorCustomProgramName] = useState("my_custom")
     const [programText, setProgramText] = useState(initialProgramText)
+    const [formErrors, setFormErrors] = useState([]);
 
     const toast = useToast()
+
+    const [userChangedStages, setUserChangedStages] = useState([])
+    const [pipelineDefaultDepth, setPipelineDefaultDepth] = useState()
+    const [makerchipOpening, setMakerchipOpening] = useState(false)
+    const [downloadingCode, setDownloadingCode] = useState(false)
+    const detailsComponentRef = createRef()
+    const [selectedFile, setSelectedFile] = useState("m4")
+    const openInMakerchipDisclosure = useDisclosure()
+    const [openInMakerchipUrl, setOpenInMakerchipUrl] = useState()
+
+    function getInitialSettings() {
+        const settings = {
+            cores: 1
+        }
+        ConfigurationParameters.forEach(param => settings[param.jsonKey] = param.defaultValue)
+        return settings
+    }
+
+    function setDisclosureAndUrl(newUrl) {
+        setOpenInMakerchipUrl(newUrl)
+        openInMakerchipDisclosure.onOpen()
+    }
+
+    async function getSVForTlv(tlv, callback) {
+        const data = await makerchipFetch.post(
+            "/function/sandpiper-faas",
+            {
+                args: `-i test.tlv -o test.sv --iArgs --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
+                responseType: "json",
+                sv_url_inc: true,
+                files: {
+                    "test.tlv": tlv
+                }
+            },
+            false,
+        )
+        //console.log(tlv)
+        //console.log(data)
+        if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
+        else toast({
+            title: "Failed compilation",
+            status: "error"
+        })
+        setMacrosForJson(tlv.split("\n"))
+
+        if (data["out/test.sv"]) {
+            const verilog = data["out/test.sv"]
+                .replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
+                .split("\n")
+                .filter(line => !line.startsWith("`include \"sp_default.vh\""))
+                .join("\n")
+            callback(verilog)
+        }
+    }
+
+
     useEffect(() => {
         translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
         const json = {
@@ -90,6 +153,64 @@ function App() {
         }
     }
 
+    function scrollToDetailsComponent() {
+        setSelectedFile("m4")
+        detailsComponentRef?.current?.scrollIntoView()
+    }
+
+    function validateForm(err) {
+        if (!err) {
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return true
+        }
+
+        if (!configuratorGlobalSettings.generalSettings.depth && !formErrors.includes("depth")) {
+            setFormErrors([...formErrors, 'depth']);
+        } else {
+            if (formErrors.length !== 0) setFormErrors([]);
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return true
+        }
+
+        return null;
+    }
+
+    function handleOpenInMakerchipButtonClicked() {
+        if (validateForm(true)) {
+            setMakerchipOpening(true)
+            const macros = translateJsonToM4Macros(coreJson);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            openInMakerchip(tlv, setMakerchipOpening, setDisclosureAndUrl)
+        }
+    }
+
+    function handleDownloadRTLVerilogButtonClicked() {
+        if (validateForm(true)) {
+            const json = validateForm(true)
+            if (json) setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                coreJson: json
+            })
+            setDownloadingCode(true)
+            const macros = translateJsonToM4Macros(coreJson);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            getSVForTlv(tlv, sv => {
+                downloadFile('verilog.sv', sv);
+                setDownloadingCode(false)
+            });
+        }
+    }
+
     return <ChakraProvider theme={theme}>
         <Box minHeight='480px'>
             {<Header/>}
@@ -97,22 +218,64 @@ function App() {
             <Box mx={5} overflowWrap>
                 <Switch>
                     <Route exact path='/'>
-                        <HomePage configuratorGlobalSettings={configuratorGlobalSettings}
-                                  setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
-                                  getSVForTlv={getSVForTlv}
-                                  sVForJson={sVForJson}
-                                  setSVForJson={setSVForJson}
-                                  macrosForJson={macrosForJson}
-                                  coreJson={coreJson}
-                                  setCoreJson={setCoreJson}
-                                  tlvForJson={tlvForJson}
-                                  setTlvForJson={setTlvForJson}
-                                  setMacrosForJson={setMacrosForJson}
-                                  configuratorCustomProgramName={configuratorCustomProgramName}
-                                  setConfiguratorCustomProgramName={setConfiguratorCustomProgramName}
-                                  programText={programText}
-                                  setProgramText={setProgramText}
-                        />
+                        <WarpVPageBase programText={programText}
+                                       setProgramText={setProgramText}
+                                       formErrors={formErrors}
+                                       setFormErrors={setFormErrors}
+                                       tlvForJson={tlvForJson}
+                                       sVForJson={sVForJson}
+                                       selectedFile={selectedFile} setSelectedFile={setSelectedFile}
+                                       setUserChangedStages={setUserChangedStages} userChangedStages={userChangedStages}
+                                       downloadingCode={downloadingCode} detailsComponentRef={detailsComponentRef}
+                                       openInMakerchipDisclosure={openInMakerchipDisclosure}
+                                       openInMakerchipUrl={openInMakerchipUrl} makerchipOpening={makerchipOpening}
+                                       setDisclosureAndUrl={setDisclosureAndUrl}
+                                       configuratorCustomProgramName={configuratorCustomProgramName}
+                                       configuratorGlobalSettings={configuratorGlobalSettings}
+                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                       getSVForTlv={getSVForTlv} coreJson={coreJson} setCoreJson={setCoreJson}
+                                       macrosForJson={macrosForJson} setMacrosForJson={setMacrosForJson}
+                                       setSVForJson={setSVForJson} setTlvForJson={setTlvForJson}
+                                       pipelineDefaultDepth={pipelineDefaultDepth}
+                                       setPipelineDefaultDepth={setPipelineDefaultDepth}
+                                       setDownloadingCode={setDownloadingCode}
+                                       setMakerchipOpening={setMakerchipOpening}
+                                       validateForm={validateForm} scrollToDetailsComponent={scrollToDetailsComponent}
+                                       handleOpenInMakerchipButtonClicked={handleOpenInMakerchipButtonClicked}
+                                       handleDownloadRTLVerilogButtonClicked={handleDownloadRTLVerilogButtonClicked}
+                        >
+                            <HomePage configuratorGlobalSettings={configuratorGlobalSettings}
+                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                      getSVForTlv={getSVForTlv}
+                                      sVForJson={sVForJson}
+                                      setSVForJson={setSVForJson}
+                                      macrosForJson={macrosForJson}
+                                      coreJson={coreJson}
+                                      setCoreJson={setCoreJson}
+                                      tlvForJson={tlvForJson}
+                                      setTlvForJson={setTlvForJson}
+                                      setMacrosForJson={setMacrosForJson}
+                                      configuratorCustomProgramName={configuratorCustomProgramName}
+                                      setConfiguratorCustomProgramName={setConfiguratorCustomProgramName}
+                                      programText={programText}
+                                      setProgramText={setProgramText}
+                                      userChangedStages={userChangedStages}
+                                      downloadingCode={downloadingCode}
+                                      detailsComponentRef={detailsComponentRef}
+                                      openInMakerchipDisclosure={openInMakerchipDisclosure}
+                                      openInMakerchipUrl={openInMakerchipUrl}
+                                      setFormErrors={setFormErrors}
+                                      formErrors={formErrors}
+                                      setDisclosureAndUrl={setDisclosureAndUrl}
+                                      handleDownloadRTLVerilogButtonClicked={handleDownloadRTLVerilogButtonClicked}
+                                      handleOpenInMakerchipButtonClicked={handleOpenInMakerchipButtonClicked}
+                                      makerchipOpening={makerchipOpening}
+                                      scrollToDetailsComponent={scrollToDetailsComponent}
+                                      selectedFile={selectedFile}
+                                      setSelectedFile={setSelectedFile}
+                                      setUserChangedStages={setUserChangedStages}
+                            />
+                        </WarpVPageBase>
                     </Route>
                 </Switch>
             </Box>

@@ -1,7 +1,7 @@
 {
   "name": "warpv-configurator-chakra",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "dependencies": {
     "@chakra-ui/icons": "^1.0.8",
     "@chakra-ui/react": "^1.0.0",
@@ -11,7 +11,9 @@
     "@testing-library/react": "^10.2.1",
     "@testing-library/user-event": "^12.0.2",
     "@types/react": "^17.0.3",
+    "babel-preset-react-app": "^10.0.0",
     "framer-motion": "^4.0.0",
+    "prop-types": "^15.7.2",
     "react": "^17.0.1",
     "react-debounce-input": "^3.2.3",
     "react-dom": "^17.0.1",
@@ -27,7 +29,8 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "publish:npm": "rm -rf dist && mkdir dist && babel src/components -d dist --copy-files"
   },
   "eslintConfig": {
     "extends": "react-app"
@@ -43,5 +46,35 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "description": "My app description",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "babel": {
+    "presets": [
+      "@babel/react"
+    ],
+    "plugins": [
+      [
+        "@babel/plugin-proposal-class-properties",
+        {
+          "loose": true
+        }
+      ]
+    ]
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.14.5",
+    "@babel/plugin-proposal-class-properties": "^7.14.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stevehoover/warp-v.git"
+  },
+  "author": "John",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/stevehoover/warp-v"
+  },
+  "homepage": "https://redwoodeda.com"
 }

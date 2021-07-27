@@ -1,7 +1,7 @@
 import {Box, Checkbox, CheckboxGroup, FormControl, FormLabel, Input, Stack} from "@chakra-ui/react";
 import React from "react";
 import {DebounceInput} from "react-debounce-input";
-import {getWarpVFileForCommit, warpVLatestSupportedCommit, warpVLatestVersionCommit} from "../utils/WarpVUtils";
+import {getWarpVFileForCommit, warpVLatestSupportedCommit, warpVLatestVersionCommit} from "../../utils/WarpVUtils";
 
 export function VerilogSettingsForm({generalSettings, onFormattingChange, onVersionChange}) {
     return <>

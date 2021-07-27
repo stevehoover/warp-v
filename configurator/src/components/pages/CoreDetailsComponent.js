@@ -1,20 +1,7 @@
-import {
-    Box,
-    Button,
-    Code,
-    Container,
-    Heading,
-    HStack,
-    Icon,
-    Image,
-    Link,
-    Text,
-    Tooltip,
-    useDisclosure
-} from '@chakra-ui/react';
+import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
-import {downloadFile, openInMakerchip} from "../utils/FetchUtils";
+import {downloadFile, openInMakerchip} from "../../utils/FetchUtils";
 import {QuestionOutlineIcon} from "@chakra-ui/icons";
 
 const m4fileName = "your_warpv_core_configuration.m4"
