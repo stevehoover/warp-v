@@ -871,7 +871,7 @@ m4+definitions(['
         m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
         m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each[' csr_objs["$1_box"] = new fabric.Rect({top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
-        m4_define(['m4_csr_viz_render_each'], m4_csr_viz_render_each['var $1mod = '/instr$csr_$1_hw_wr'.asBool(false); var $1name = String("$1"); var oldVal$1    = $1mod    ? `(${'/instr$csr_$1'.asInt(NaN).toString()})` : ""; this.getInitObject("$1").setText($1name + ": " + '/instr$csr_$1'.step(1).asInt(NaN).toString() + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
+        m4_define(['m4_csr_viz_render_each'], m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").setText($1name + ": " + val_$1 + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
         m4_define(['m4_num_csrs'], m4_eval(m4_num_csrs + 1))
       ']
    )
@@ -3524,7 +3524,8 @@ m4+definitions(['
             // =======
             
             // A version of PC we can pull through $ANYs.
-            m4_ifelse(00, M4_VIZ['']M4_FORMAL, , $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];)
+            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];
+            `BOGUS_USE($pc)
             
             
             // Execute stage redirect conditions.
@@ -4241,7 +4242,7 @@ m4+definitions(['
             let rs_valid = []
             let read_valid = false
             for (let i = 1; i <= _num_srcs; i++) {
-               rs_valid[i] = '/instr/['']_sig_prefix['']src[i]$is_reg'.asBool(false) && this.getIndex() === '/instr/['']_sig_prefix['']src[i]$reg'.asInt(-1)
+               rs_valid[i] = '/instr/['']_sig_prefix['']src[i]$unconditioned_is_reg'.asBool(false) && this.getIndex() === '/instr/['']_sig_prefix['']src[i]$unconditioned_reg'.asInt(-1)
                read_valid |= rs_valid[i]
             }
             let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
@@ -4386,8 +4387,8 @@ m4+definitions(['
          let reg_addr1 = '$raw_rs1'.asInt()
          let reg_addr2 = '$raw_rs2'.asInt()
          let reg_addr3 = '$raw_rs3'.asInt()
-         let rs1_valid = '/src[1]$is_reg'.asBool()
-         let rs2_valid = '/src[2]$is_reg'.asBool()
+         let rs1_valid = '/src[1]$unconditioned_is_reg'.asBool()
+         let rs2_valid = '/src[2]$unconditioned_is_reg'.asBool()
          let rs3_valid = false
          let fpu_rs1_valid = false
          let fpu_rs2_valid = false
@@ -4401,9 +4402,9 @@ m4+definitions(['
          let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
          let valid_dest_fpu_reg_valid = false
          m4_ifelse_block(M4_EXT_F, 1, ['
-         fpu_rs1_valid = '/fpu_src[1]$is_reg'.asBool()
-         fpu_rs2_valid = '/fpu_src[2]$is_reg'.asBool()
-         fpu_rs3_valid = '/fpu_src[3]$is_reg'.asBool()
+         fpu_rs1_valid = '/fpu_src[1]$unconditioned_is_reg'.asBool()
+         fpu_rs2_valid = '/fpu_src[2]$unconditioned_is_reg'.asBool()
+         fpu_rs3_valid = '/fpu_src[3]$unconditioned_is_reg'.asBool()
          let dest_fpu_reg = '$dest_fpu_reg'.asInt(0)
          newSrcArrow("fp_rs1", true, reg_addr1, fpu_rs1_valid, 1)
          newSrcArrow("fp_rs2", true, reg_addr2, fpu_rs2_valid, 2)
@@ -4659,7 +4660,7 @@ m4+definitions(['
             },
             renderEach() {
                //console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`)
-               var mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+               let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
                //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
                this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"))
                this.getInitObject("data").setFill(mod ? "blue" : "black")
