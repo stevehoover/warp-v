@@ -1934,7 +1934,7 @@ m4+definitions(['
       m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
       m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
       m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
-      // Verilator reports MULTIDRIVER for $raw because not all bits are pulled to this stage. Rather than lint_on, this will pull all bits.
+      // %Warning-MULTIDRIVEN reported by Verilator for $raw because not all bits are pulled to this stage. Rather than lint_on, this will pull all bits.
       `BOGUS_USE($raw)
       /* verilator lint_on WIDTH */
       /* verilator lint_on CASEINCOMPLETE */
