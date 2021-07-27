@@ -1,3 +1,15 @@
+import {
+    Button,
+    Modal,
+    ModalBody,
+    ModalCloseButton,
+    ModalContent,
+    ModalFooter,
+    ModalHeader,
+    ModalOverlay,
+    Text
+} from "@chakra-ui/react";
+
 export function downloadFile(filename, text) {
     const element = document.createElement('a');
     element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
@@ -11,7 +23,27 @@ export function downloadFile(filename, text) {
     document.body.removeChild(element);
 }
 
-export function openInMakerchip(source, setMakerchipOpening) {
+export function OpenInMakerchipModal({disclosure, url}) {
+    const {isOpen, onClose} = disclosure
+    return <Modal isOpen={isOpen} onClose={onClose}>
+        <ModalOverlay/>
+        <ModalContent>
+            <ModalHeader>Your project is ready.</ModalHeader>
+            <ModalCloseButton/>
+            <ModalBody>
+                <Text>To avoid this confirmation in the future, disable your browser's pop-up blocker for this
+                    site.</Text>
+            </ModalBody>
+
+            <ModalFooter>
+                <Button variant="ghost" mr={3} onClick={onClose}>Close</Button>
+                <Button colorScheme="blue" onClick={() => window.open(url)}>Open in Makerchip</Button>
+            </ModalFooter>
+        </ModalContent>
+    </Modal>
+}
+
+export function openInMakerchip(source, setMakerchipOpening, setDisclosureAndUrl) {
     setMakerchipOpening(true)
     const formBody = new URLSearchParams();
     formBody.append("source", source);
@@ -28,7 +60,15 @@ export function openInMakerchip(source, setMakerchipOpening) {
         .then(resp => resp.json())
         .then(json => {
             const url = json.url
-            window.open(`https://makerchip.com${url}`)
+            openInNewTabOrFallBack(`https://makerchip.com${url}`, "_blank", setDisclosureAndUrl)
             setMakerchipOpening(false)
         })
+}
+
+function openInNewTabOrFallBack(urlToRedirectTo, target, setDisclosureAndUrl) {
+    const newWindow = window.open(urlToRedirectTo, target)
+
+    if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        setDisclosureAndUrl(urlToRedirectTo)
+    } // fallback
 }
