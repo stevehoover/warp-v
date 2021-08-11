@@ -19,7 +19,8 @@ export function ConfigureCpuComponent({
                                           userChangedStages,
                                           userChangedStages1
                                       }) {
-    return <Box mx="auto" w={{sm: "100%", lg: "70%"}}>
+    return <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
+
         <Heading size="lg" mb={4}>Configure your CPU now</Heading>
         <Tabs borderWidth={1} borderRadius="lg" p={3} isFitted>
             <TabList className="tab-list">
