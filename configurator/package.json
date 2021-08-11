@@ -1,6 +1,6 @@
 {
   "name": "warpv-configurator-chakra",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": false,
   "dependencies": {
     "@chakra-ui/icons": "^1.0.8",
