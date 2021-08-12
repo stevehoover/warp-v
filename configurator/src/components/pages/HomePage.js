@@ -9,36 +9,13 @@ export const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters
 export const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
 
 export default function HomePage({
-                                     getSVForTlv,
-                                     sVForJson,
-                                     setSVForJson,
-                                     tlvForJson,
-                                     macrosForJson,
-                                     setMacrosForJson,
-                                     setTlvForJson,
-                                     coreJson,
-                                     setCoreJson,
                                      configuratorGlobalSettings,
                                      setConfiguratorGlobalSettings,
-                                     configuratorCustomProgramName,
-                                     setConfiguratorCustomProgramName,
                                      programText,
                                      setProgramText,
                                      userChangedStages,
                                      setUserChangedStages,
-                                     scrollToDetailsComponent,
-                                     handleDownloadRTLVerilogButtonClicked,
-                                     downloadingCode,
-                                     handleOpenInMakerchipButtonClicked,
-                                     makerchipOpening,
-                                     detailsComponentRef,
-                                     openInMakerchipUrl,
-                                     openInMakerchipDisclosure,
-                                     selectedFile,
-                                     setSelectedFile,
-                                     setDisclosureAndUrl,
-                                     formErrors,
-                                     setFormErrors
+                                     formErrors
                                  }) {
     return <>
         <Box textAlign='center' mb={25}>
