@@ -9,6 +9,7 @@ SHELL=/bin/bash
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
 out/%/top.sv: %.tlv ../warp-v.tlv
 	rm -rf out
+	# TODO: Update to sandpiper-saas.
 	curl -F 'top.tlv=@$<' -F 'files[]=@../warp-v.tlv' http://saas.makerchip.com/sandpiper | tar -zx && cat out/stdout
 	exit `cat out/$*/status`
 

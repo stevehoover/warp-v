@@ -11,6 +11,7 @@ export function Header() {
       mx='auto'
       ps={{ base: '6', md: '8' }}
       pe={{ base: '5', md: '0' }}
+      mb={5}
     >
       <Flex
         as='nav'
