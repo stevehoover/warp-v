@@ -518,7 +518,7 @@ m4+definitions(['
       
       // Inclusions.
       m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_lib/481188115b4338567df916460d462ca82401e211/fundamentals_lib.tlv'])
-      //m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
+      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/ring_and_viz/pipeflow_lib.tlv'])
    '])
 
    // Characterize ISA and apply configuration.
