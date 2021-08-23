@@ -4805,45 +4805,41 @@ m4+definitions(['
 \TLV warpv_top()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    // TODO: Avoiding m4+ifelse until makerchip can track lines within an external macro.
-   m4_ifelse_block(m4_eval(M4_NUM_CORES > 1), 1, ['
-   // Multi-core
-   /M4_CORE_HIER
-      // TODO: Find a better place for this:
-      // Block CPU |fetch pipeline if blocked.
-      m4_def(cpu_blocked, m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
-      m4+cpu(/core)
-      //m4+dummy_noc(/core)
-      m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      m4+warpv_makerchip_tb()
-   //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
-   m4+makerchip_pass_fail(/core[*])
-   /M4_CORE_HIER
-      // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
-      m4_ifelse_block(M4_ISA, ['RISCV'], ['
-      m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
-      '])
-      '])
-   '], ['
-   // Single Core.
+   m4+ifelse(m4_eval(M4_NUM_CORES > 1), 1,
+      \TLV
+         // Multi-core
+         /M4_CORE_HIER
+            // TODO: Find a better place for this:
+            // Block CPU |fetch pipeline if blocked.
+            m4_def(cpu_blocked, m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
+            m4+cpu(/core)
+            //m4+dummy_noc(/core)
+            m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+            m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+            m4+warpv_makerchip_tb()
+         //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
+         m4+makerchip_pass_fail(/core[*])
+         /M4_CORE_HIER
+            // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
+            m4_ifelse_block(M4_ISA, ['RISCV'], ['
+            m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)'])
+            '])
+      ,
+      \TLV
+         // Single Core.
+
+
+         // m4+warpv() (but inlined to reduce macro depth)
+         m4+cpu(/top)
+         m4+warpv_makerchip_tb()
+         m4_ifelse(M4_FORMAL, 1, ['m4+formal()'])
    
-   
-   // m4+warpv() (but inlined to reduce macro depth)
-   m4+cpu(/top)
-   m4+warpv_makerchip_tb()
-   m4_ifelse_block(M4_FORMAL, 1, ['
-   m4+formal()
-   '], [''])
-   
-   m4+makerchip_pass_fail()
-   
-   m4_ifelse_block(M4_ISA, ['RISCV'], ['
-   m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
-   '])
-   '])
-   '])
+         m4+makerchip_pass_fail()
+
+         m4_ifelse_block(M4_ISA, ['RISCV'], ['
+         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)'])
+         '])
+      )
 
 m4+module_def
 \TLV //disabled_main()
