@@ -870,7 +870,7 @@ m4+definitions(['
         m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
         m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
-        m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each[' csr_objs["$1_box"] = new fabric.Rect({top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 162 + 18 * ']m4_num_csrs[', left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
+        m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each[' csr_objs["$1_box"] = new fabric.Rect({top: (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
         m4_define(['m4_csr_viz_render_each'], m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").setText($1name + ": " + val_$1 + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
         m4_define(['m4_num_csrs'], m4_eval(m4_num_csrs + 1))
       ']
@@ -2264,7 +2264,7 @@ m4+definitions(['
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
       $ld_st_cond = $ld_st && $valid_exe;
       ?$ld_st_cond
-         $addr[M4_ADDR_RANGE] = /src[1]$reg_value + ($ld ? $raw_i_imm : $raw_s_imm);
+         $addr[M4_ADDR_RANGE] = m4_ifelse(M4_EXT_F, 1, ['($is_fsw_instr ? /src[1]$reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
          
          // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
@@ -3928,9 +3928,11 @@ m4+definitions(['
       @0
          $blocked = /_hop[(#m4_hop_name + 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
    // Fork off ring
-   m4+fork(/_hop, |_name['']_arriving, @0, $head_out, |_name['']_off_ramp, @0, $true, |_name['']_continuing, @0, /_flit)
-   // Fork from off-ramp out or into FIFO
-   m4+fork(/_hop, |_name['']_off_ramp, @0, $head_out, |_out, @_out, $true, |_name['']_deflected, @0, /_flit)
+   m4+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
+   
+   // Fork from continuing to non_deflected or into FIFO
+   m4+fork(/_hop, |_name['']_continuing, @0, $head_out, |_name['']_not_deflected, @0, $true, |_name['']_deflected, @0, /_flit)
+   
    // Flop prior to FIFO.
    m4+stage(ff, /_hop, |_name['']_deflected, @0, |_name['']_deflected_st1, @1, /_flit)
    // Mux into FIFO. (Priority to deflected blocks node.)
@@ -3940,7 +3942,7 @@ m4+definitions(['
    // Block FIFO output until a full packet is ready (tail from node in FIFO)
    m4+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
    // Ring
-   m4+arb2(/_hop, |_name['']_fifo_inj, @0, |_name['']_continuing, @0, |_name, @0, /_flit)
+   m4+arb3(/_hop, |_name['']_not_deflected, @0, |_name['']_fifo_inj, @0, |_name, @0, /_flit)
 
 
    // Decode arriving header flit.
@@ -3960,10 +3962,12 @@ m4+definitions(['
          // Asserts with the first absorbed flit, deasserts for the first flit that can stay on the ring.
          $valid_dest = $dest == #m4_hop_name;
          $head_out = ! /_hop|_out<>0$blocked && $valid_dest;
-         $true = 1'b1; // (ok signal for fork along continuing path)
-   |_name['']_off_ramp
+         $head_out_inv = ! $head_out;
+         $true = 1'b1; // (ok signal for fork along out path)
+   |_name['']_continuing
       @0
-         $head_out = /_hop|_name['']_arriving<>0$head_out;
+
+         $head_out = ! /_hop|_name['']_not_deflected<>0$blocked;
          $true = 1'b1;  // (ok signal for fork to FIFO)
    |_name['']_in_present
       @0
@@ -3979,7 +3983,7 @@ m4+definitions(['
          // XXX It will deassert for a minimum of 1 cycle (since $would_bypass enables a flit from node).
          $node_tail_flit_in_fifo =
               $reset ? 1'b0 :
-              /_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail ? 1'b1 :
+              ((/_hop|_name['']_deflected_st1>>1$avail && /_hop|_name['']_deflected_st1>>1$accepted) || (/_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail)) ? 1'b1 :
               $would_bypass ? 1'b0 :
                    $RETAIN;
 
@@ -3989,7 +3993,34 @@ m4+definitions(['
    m4_popdef(['M4_HOP'])
    m4_popdef(['m4_prev_hop_index'])
 
-
+\TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
+   m4+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
+   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
+   // In1 is blocked if output is blocked.
+   // In1 is blocked if output is blocked or in2 is available.
+   |_in1
+      @_in1
+         $blocked = /_top|_out>>m4_align(@_out, @_in1)$blocked ||
+                    (/_top|_in2>>m4_align(@_in2, @_out)$avail && /_top|_in2>>m4_align(@_in2 + 1, @_out)$accepted);
+   // In2 is blocked if output is blocked or in1 is available.
+   |_in2
+      @_in2
+         $blocked = /_top|_out>>m4_align(@_out, @_in2)$blocked ||
+                    /_top|_in1>>m4_align(@_in1, @_in2)$avail;
+   // Output comes from in1 if available, otherwise, in2.
+   |_out
+      @_out
+         $reset = /_top|_in1>>m4_align(@_in1, @_out)$reset_in;
+         // Output is available if either input is available.
+         $avail = /_top|_in1>>m4_align(@_in1, @_out)$avail ||
+                  /_top|_in2>>m4_align(@_in2, @_out)$avail;
+         ?$avail
+            /_trans
+         m4_trans_ind   $ANY = /_top|_in1>>m4_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m4_align(@_in1, @_out)$ANY :
+                                                                          /_top|_in2/_trans>>m4_align(@_in2, @_out)$ANY;
+   m4_popdef(['m4_trans_ind'])
+   
+   
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
@@ -4100,16 +4131,16 @@ m4+definitions(['
    \viz_alpha
       initAll() {
          let imem_box = new fabric.Rect({
-            top: -50,
-            left: -25 + -580,
+            top: -50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            left: -25 + -580 + M4_ALL_LEFT,
             fill: "#208028",
             width: 670,
             height: 76 + 18 * M4_NUM_INSTRS,
             stroke: "black"
          })
          let imem_header = new fabric.Text("🗃️ Instr. Memory", {
-            top: -40,
-            left: 250 + -580,
+            top: -40 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            left: 250 + -580 + M4_ALL_LEFT,
             fontSize: 20,
             fontWeight: 800,
             fontFamily: "monospace",
@@ -4120,21 +4151,21 @@ m4+definitions(['
       initEach() {
          // Instruction and binary value text.
          let instr_str = new fabric.Text("" , {
-            top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
-            left: -577,
+            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,  // TODO: Add support for '#instr_mem'.
+            left: -577 + M4_ALL_LEFT,
             fontSize: 14,
             fontFamily: "monospace"
          })
          let instr_asm_box = new fabric.Rect({
-            top: 18 * this.getIndex(),
-            left: -260,
+            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            left: -260 + M4_ALL_LEFT,
             fill: "white",
             width: 300,
             height: 14
          })
          let instr_binary_box = new fabric.Rect({
-            top: 18 * this.getIndex(),
-            left: -580,
+            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            left: -580 + M4_ALL_LEFT,
             fill: "white",
             width: 280,
             height: 14
@@ -4195,24 +4226,24 @@ m4+definitions(['
       \viz_alpha
          initAll() {
             let rf_box = new fabric.Rect({
-               top: -60,
-               left: 350 + _left_adjust,
+               top: -60 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 350 + _left_adjust + M4_ALL_LEFT,
                fill: "#2028b0",
                width: 145,
                height: 650,
                stroke: "black"
             })
             let rf_header = new fabric.Text("📂 _heading", {
-               top: -45,
-               left: 360 + _left_adjust,
+               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 360 + _left_adjust + M4_ALL_LEFT,
                fontSize: 18,
                fontWeight: 800,
                fontFamily: "monospace",
                fill: "white"
             })
             let rf_header2 = new fabric.Text("Integer (hex)", {
-               top: -17,
-               left: 367 + _left_adjust,
+               top: -17 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 367 + _left_adjust + M4_ALL_LEFT,
                fontSize: 14,
                fontFamily: "monospace",
                fill: "white"
@@ -4221,14 +4252,14 @@ m4+definitions(['
          },
          initEach() {
             let reg = new fabric.Text("", {
-               top: 18 * this.getIndex(),
-               left: 367 + _left_adjust,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 367 + _left_adjust + M4_ALL_LEFT,
                fontSize: 14,
                fontFamily: "monospace"
             })
             let reg_box = new fabric.Rect({
-               top: 18 * this.getIndex(),
-               left: 360 + _left_adjust,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 360 + _left_adjust + M4_ALL_LEFT,
                fill: "white",
                width: 125,
                height: 14
@@ -4284,9 +4315,10 @@ m4+definitions(['
          let color = !commit                ? "gray" :
                      '$abort'.asBool(false) ? "red" :
                                               "blue"
+         let core = this.getScope("core").index
          objects.pc_pointer = new fabric.Text("👉", {
-            top: 18 * pc,
-            left: -281,
+            top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: -281 + M4_ALL_LEFT,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -4295,8 +4327,8 @@ m4+definitions(['
          if ('$second_issue'.asBool(false)) {
             let second_issue_pc = '/orig_inst$pc'.asInt(-1)
             objects.second_issue_pointer = new fabric.Text("👉🏿", {
-               top: 18 * second_issue_pc,
-               left: -281,
+               top: 18 * second_issue_pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: -281 + M4_ALL_LEFT,
                fill: color,
                fontSize: 14,
                fontFamily: "monospace",
@@ -4309,8 +4341,8 @@ m4+definitions(['
          //
          // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
          //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
-         //   top: 50,
-         //   left: 90,
+         //   top: 50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+         //   left: 90 + M4_ALL_LEFT,
          //   fill: color,
          //   fontSize: 14,
          //   fontFamily: "monospace"
@@ -4373,13 +4405,13 @@ m4+definitions(['
          //
          newSrcArrow = function(name, fp, addr, valid, pos) {
             if (valid) {
-               objects[name + "_arrow"] = new fabric.Line([360 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0), 18 * addr + 6, 210, 40 + 18 * pos], {
+               objects[name + "_arrow"] = new fabric.Line([360 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0) + M4_ALL_LEFT, 18 * addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 210 + M4_ALL_LEFT, 40 + 18 * pos + (M4_COREOFFSET * core) + M4_ALL_TOP], {
                   stroke: "#b0c8df",
                   strokeWidth: 2
                })
             }
          }
-         objects.pc_arrow = new fabric.Line([10, 18 * pc + 6, 86, -8], {
+         objects.pc_arrow = new fabric.Line([10 + M4_ALL_LEFT, 18 * pc + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 86 + M4_ALL_LEFT, -8 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
             stroke: "#b0c8df",
             strokeWidth: 2
          })
@@ -4418,7 +4450,7 @@ m4+definitions(['
          let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
          //
          let second_issue = '$second_issue'.asBool()
-         objects.rd_arrow = new fabric.Line([157, 20, valid_dest_fpu_reg_valid ? 360 + M4_VIZ_MEM_LEFT_ADJUST : 360, 18 * the_dest_reg + 6], {
+         objects.rd_arrow = new fabric.Line([157 + M4_ALL_LEFT, 20 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 360 + M4_VIZ_MEM_LEFT_ADJUST : 360), (18 * the_dest_reg) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
             stroke: '$second_issue'.asBool() ? "#c03050" : commit ? "#a0dfff" : "#d0d0d0",
             strokeWidth: 3,
             visible: valid_dest_reg_valid || valid_dest_fpu_reg_valid
@@ -4426,7 +4458,7 @@ m4+definitions(['
          //
          let ld_st_addr = ('$addr'.asInt() / 4)
          let ld_valid = '$valid_ld'.asBool(false)
-         objects.ld_arrow = new fabric.Line([550 + M4_VIZ_MEM_LEFT_ADJUST, 18 * ld_st_addr + 6, 475 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 5 + 18 * the_dest_reg], {
+         objects.ld_arrow = new fabric.Line([550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, (18 * ld_st_addr) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + 475 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 5 + 18 * the_dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP], {
             stroke: "#c03050",
             strokeWidth: 3,
             visible: ld_valid
@@ -4434,7 +4466,7 @@ m4+definitions(['
          //
          let st_valid = '$valid_st'.asBool()
          objects.st_arrow = new fabric.Line(
-            [210, 76, 550 + M4_VIZ_MEM_LEFT_ADJUST, 18 * ld_st_addr + 6], {
+            [210 + M4_ALL_LEFT, 76 + (M4_COREOFFSET * core) + M4_ALL_TOP, 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, 18 * ld_st_addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
             stroke: "#a0dfff",
             strokeWidth: 3,
             visible: st_valid
@@ -4443,21 +4475,21 @@ m4+definitions(['
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
-                  top: 18 * pc,
-                  left: -250,
+                  top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                  left: -250 + M4_ALL_LEFT,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
          })
          //
-         objects.fetch_instr_viz.animate({top: -12, left: 85}, {
+         objects.fetch_instr_viz.animate({top: -12 + (M4_COREOFFSET * core) + M4_ALL_TOP, left: 85 + M4_ALL_LEFT}, {
               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
               duration: 500
          })
          //
          objects.instr_with_values = new fabric.Text(str, {
-            top: 15,
-            left: 110,
+            top: 15 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: 110 + M4_ALL_LEFT,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace"
@@ -4472,10 +4504,10 @@ m4+definitions(['
          })
          if (rs1_valid || fpu_rs1_valid) {
             setTimeout(() => {
-               objects.src1_value_viz.set({left: 316 + 8 * 4 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: 18 * reg_addr1,
+               objects.src1_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr1 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                                            visible: true})
-               objects.src1_value_viz.animate({left: 195, top: 18 * 2 + 15}, {
+               objects.src1_value_viz.animate({left: 195 + M4_ALL_LEFT, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
@@ -4493,20 +4525,21 @@ m4+definitions(['
             fontWeight: 800,
             visible: false
          })
+         let src2_being_stored = '$valid_decode'.asBool(false) && '$st'.asBool(false) && commit; // Animate src2 value being stored.
          if (rs2_valid || fpu_rs2_valid) {
-            setTimeout(() => {
-               objects.src2_value_viz.set({left: 316 + 8 * 4 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: 18 * reg_addr2,
+               setTimeout(() => {
+               objects.src2_value_viz.set({left: (8 * 4) + M4_ALL_LEFT + 316 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: (18 * reg_addr2) + (M4_COREOFFSET * core) + M4_ALL_TOP,
                                            visible: true})
                objects.src2_value_viz.setVisible(true)
-               objects.src2_value_viz.animate({left: 195, top: 18 * 3 + 15 }, {
+               objects.src2_value_viz.animate({left: 195 + M4_ALL_LEFT, top: (18 * 3) + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
                setTimeout(() => {
-                  if ('$valid_decode'.asBool(false) && '$st'.asBool(false) && commit) {
+                  if (src2_being_stored) {
                      // Animate src2 value being stored.
-                     objects.src2_value_viz.animate({left: 550 + M4_VIZ_MEM_LEFT_ADJUST, top: 18 * ld_st_addr}, {
+                     objects.src2_value_viz.animate({left: M4_ALL_LEFT + 550 + M4_VIZ_MEM_LEFT_ADJUST, top: 18 * ld_st_addr + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
                         onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                         duration: 500
                      })
@@ -4531,10 +4564,10 @@ m4+definitions(['
          })
          if (fpu_rs3_valid) {
             setTimeout(() => {
-               objects.src3_value_viz.set({left: 316 + 8 * 4 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: 18 * reg_addr3,
+               objects.src3_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr + (M4_COREOFFSET * core) + M4_ALL_TOP,
                                            visible: true})
-               objects.src3_value_viz.animate({left: 195, top: 18 * 2 + 15}, {
+               objects.src3_value_viz.animate({left: M4_ALL_LEFT + 195, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
@@ -4544,11 +4577,10 @@ m4+definitions(['
                }, 500)
             }, 500)
          }
-         
          let res_value = '$rslt'.asInt().toString(16)
          objects.result_viz = new fabric.Text(res_value, {
-            left: 150,
-            top: 16,
+            top: 16 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: 150 + M4_ALL_LEFT,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -4558,7 +4590,7 @@ m4+definitions(['
          if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
             setTimeout(() => {
                objects.result_viz.setVisible(true)
-               objects.result_viz.animate({left: valid_dest_fpu_reg_valid ? 393 + M4_VIZ_MEM_LEFT_ADJUST : 393, top: 18 * dest_reg}, {
+               objects.result_viz.animate({left: M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 393 + M4_VIZ_MEM_LEFT_ADJUST : 393), top: 18 * dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                  duration: 500
                })
@@ -4577,8 +4609,8 @@ m4+definitions(['
       \viz_alpha
          initEach() {
             let index_val_box = new fabric.Rect({
-               top: 18 * this.getIndex(),
-               left: 540 + M4_VIZ_MEM_LEFT_ADJUST,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 540 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fill: "white",
                width: 40,
                height: 14
@@ -4586,8 +4618,8 @@ m4+definitions(['
             //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
             let index =
                new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
-                  top: 18 * this.getIndex(),
-                  left: 550 + M4_VIZ_MEM_LEFT_ADJUST,
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  left: 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                   fontSize: 14,
                   fontFamily: "monospace"
                })
@@ -4597,8 +4629,8 @@ m4+definitions(['
       \viz_alpha
          initEach() {
             let banknum = new fabric.Text(String(this.getScope("bank").index), {
-               top: -20,
-               left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST,
+               top: -20 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fontSize: 14,
                fontWeight: 800,
                fontFamily: "monospace",
@@ -4644,15 +4676,15 @@ m4+definitions(['
          \viz_alpha
             initEach() {
                let bank_val_box = new fabric.Rect({
-                  top: 18 * this.getIndex(),
-                  left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST,
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                   fill: "white",
                   width: 25,
                   height: 14
                })
                let data = new fabric.Text("", {
-                  top: 18 * this.getIndex(),
-                  left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST, // bank: 3 2 1 0 format
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // bank: 3 2 1 0 format
                   fontSize: 14,
                   fontFamily: "monospace"
                })
@@ -4671,56 +4703,56 @@ m4+definitions(['
       \viz_alpha 
          initEach() { 
             let decode_header = new fabric.Text("⚙️ Instr. Decode", {
-               top: -45,
-               left: 100,
+               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 100 + M4_ALL_LEFT,
                fill: "maroon",
                fontSize: 18,
                fontWeight: 800,
                fontFamily: "monospace"
             })
             let decode_box = new fabric.Rect({
-               top: -50,
-               left: 80,
+               top: -50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 80 + M4_ALL_LEFT,
                fill: "#f8f0e8",
                width: 230,
                height: 160,
                stroke: "#ff8060"
             })
             let csr_header = new fabric.Text("📂 CSRs", {
-               top: 125,
-               left: 100,
+               top: 125 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 100 + M4_ALL_LEFT,
                fill: "white",
                fontSize: 18,
                fontWeight: 800,
                fontFamily: "monospace"
             })
             let csr_box = new fabric.Rect({
-               top: 120,
-               left: 80,
+               top: 120 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 80 + M4_ALL_LEFT,
                fill: "#2028b0",
                width: 220,
                height: 18 * m4_num_csrs + 52,
                stroke: "black"
             })
             let dmem_box = new fabric.Rect({
-               top: -60,
-               left: 530 + M4_VIZ_MEM_LEFT_ADJUST,
+               top: -60 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 530 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fill: "#208028",
                width: 190,
                height: 650,
                stroke: "black"
             })
             let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
-               top: -45,
-               left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST, // Center aligned
+               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // Center aligned
                fontSize: 20,
                fontWeight: 800,
                fontFamily: "monospace",
                fill: "white"
             })
             let bankname = new fabric.Text("bank", {
-               top: -20,
-               left: 545 + M4_VIZ_MEM_LEFT_ADJUST,
+               top: -20 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               left: 545 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fontSize: 14,
                fontWeight: 800,
                fontFamily: "monospace",
@@ -4733,6 +4765,9 @@ m4+definitions(['
 \TLV cpu_viz(/_des_pipe, @_M4_stage)
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
+   m4_define(['M4_COREOFFSET'],750)
+   m4_define(['M4_ALL_TOP'],-1000)
+   m4_define(['M4_ALL_LEFT'],-500)
    m4+m4_viz_logic_macro_name()
    /_des_pipe
       @_M4_stage  // Visualize everything happening at the same time.
@@ -4750,7 +4785,462 @@ m4+definitions(['
             m4+registers(fp, FP RF, fpu_, 3, M4_VIZ_MEM_LEFT_ADJUST)
             '])
             m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE]) 
-        
+      
+      //////// VIZUALIZING THE INSERTION RING //////////////
+\TLV ring_viz(/_name)
+   m4_define(['M4_RINGVIZ_REF_TOP'],-100)
+   m4_define(['M4_RINGVIZ_REF_LEFT'],700)
+   m4_define(['M4_RINGVIZ_GLOBAL_TOP'], M4_ALL_TOP + M4_RINGVIZ_REF_TOP)
+   m4_define(['M4_RINGVIZ_GLOBAL_LEFT'], M4_ALL_LEFT + M4_RINGVIZ_REF_LEFT)
+   |egress_out
+      @1
+         /flit
+            $src[1:0] = #core;
+            $uid[31:0] = {$src, *cyc_cnt[29:0]};  // Attach Unique Identifier along with transaction which enters into the ring
+   |ringviz
+      @0
+         // Bunch of define statements parameterizing the VIZ
+         m4_define(['M4_NODES_RADIUS'],3)
+         m4_define(['M4_NODES_COLOR'],"#208028")
+         m4_define(['M4_AVAIL_COLOR'],"blue")
+         m4_define(['M4_BLOCKED_COLOR'],"red")
+         m4_define(['M4_INVAILD_COLOR'],"grey")
+         m4_define(['M4_EGRESS_OUT_TOP'], 200 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_EGRESS_OUT_LEFT'],515 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_FIFO_IN_TOP'],100 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_FIFO_IN_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_FIFO_OUT_TOP'], 600 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_FIFO_OUT_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_RG_TOP'],650 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_RG_LEFT'],765 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_INGRESS_IN_TOP'],25 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_INGRESS_IN_LEFT'],515 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ARRIVING_TOP'],0 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_ARRIVING_LEFT'],765 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_DEFLECTED_TOP'],75 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_DEFLECTED_LEFT'],665 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ENTRY_START_TOP'],150 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_ENTRY_START_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ENTRY_START_SPACE_TOP'],50)
+
+         /skid1
+            $egress_is_head = ! *reset && (/top/core|egress_out>>1$valid_head);
+            $egress_is_tail = ! *reset && (/top/core|egress_out>>1$valid_tail);
+            $egress_flit_size = $egress_is_head ? 1'b1 : >>1$egress_is_tail ? 1'b0 : $RETAIN;
+            $egress_flit[31:0] = (! *reset) ? (/top/core|egress_out/flit>>1$flit) : '0;
+            $vc[M4_VC_INDEX_RANGE] = $egress_is_head ? $egress_flit[M4_FLIT_VC_RANGE] : $RETAIN;
+            $valid = 1;
+   \viz_alpha
+      initEach() {
+         debugger;
+         this.global.transObj = {counting: 0}
+         return {
+            objects : {
+            },
+            transObj: {}
+         }
+      },
+      renderEach() {
+      debugger;
+      for (const uid in this.fromInit().transObj) {
+            const trans = this.fromInit().transObj[uid]
+            //trans.wasVisible = trans.visible
+            trans.visible = false
+      }
+      if (typeof this.getContext().preppedTrace === "undefined") {
+         let $egress_flit_size = '/top/core|ringviz/skid1<>0$egress_flit_size'.goTo(-1)
+         let $uid = '/top/core|egress_out/flit>>1$uid'
+         let $data = '/top/core|ringviz/skid1<>0$egress_flit'
+         let $is_head = '/top/core|ringviz/skid1<>0$egress_is_head'
+         let $is_tail = '/top/core|ringviz/skid1<>0$egress_is_tail'
+         let $vc = '/top/core|ringviz/skid1<>0$vc'
+         while ($egress_flit_size.forwardToValue(1)) {
+            let uid  = $uid .goTo($egress_flit_size.getCycle()).asInt()
+            let data = $data.goTo($egress_flit_size.getCycle()).asInt()
+            let is_head = $is_head.goTo($egress_flit_size.getCycle()).asBool()
+            let is_tail = $is_tail.goTo($egress_flit_size.getCycle()).asBool()
+            let vc = $vc.goTo($egress_flit_size.getCycle()).asBool()
+            let ring_scope = this.getScope("name")
+            let transRect = new fabric.Rect({
+               width: 45,
+               height: 20,
+               fill: vc ? "blue" : "orange",
+               left: 0,
+               top: 0
+            })
+            let transText = new fabric.Text(`${data.toString(16)}`, {
+               left: 1,
+               top: 0,
+               fontSize: 24,
+               fill: "white"
+            })
+            let transCircle = new fabric.Circle({
+               left: 10+20,
+               top: 0,
+               radius: 1,
+               fill: is_head ? "pink" : is_tail ? "blue" : "#208028",
+            })
+            let transObj = new fabric.Group(
+               [transRect,
+                transText,
+                transCircle
+               ],
+               {width: 45,
+                height: 20,
+                visible: false}
+            )
+            context.global.canvas.add(transObj)
+            this.global.transObj[uid] = transObj
+            debugger;
+         }
+         this.getContext().preppedTrace = true
+      }
+      }
+   /skid1
+      \viz_alpha
+         initEach() {
+            debugger;
+            let egress_out = new fabric.Circle({
+               top: M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_EGRESS_OUT_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let fifo_in = new fabric.Circle({
+               top: M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_FIFO_IN_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {egress_out, fifo_in}}
+         },
+         renderEach() {
+         debugger;
+            var arriving_ingress_avail = '/top/core|ingress_in<>0$avail'.asBool();
+            var arriving_ingress_blocked = '/top/core|ingress_in<>0$blocked'.asBool();
+            let arriving_ingress_arrow = new fabric.Line([M4_INGRESS_IN_LEFT, M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_ingress_blocked ? M4_BLOCKED_COLOR : arriving_ingress_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var arriving_deflected_avail = '/top/core|rg_deflected<>0$avail'.asBool();
+            var arriving_deflected_blocked = '/top/core|rg_deflected<>0$blocked'.asBool();
+            let arriving_deflected_arrow = new fabric.Line([M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_deflected_blocked ? M4_BLOCKED_COLOR : arriving_deflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var arriving_rg_avail = '/top/core|rg_not_deflected<>0$avail'.asBool();
+            var arriving_rg_blocked = '/top/core|rg_not_deflected<>0$blocked'.asBool();
+            let arriving_rg_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_rg_blocked ? M4_BLOCKED_COLOR : arriving_rg_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var deflected_fifoin_avail = '/top/core|rg_deflected_st1<>0$avail'.asBool();
+            var deflected_fifoin_blocked = '/top/core|rg_deflected_st1>>1$blocked'.asBool();
+            let deflected_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: deflected_fifoin_blocked ? M4_BLOCKED_COLOR : deflected_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var egressout_fifoin_avail = '/top/core|rg_node_to_fifo<>0$avail'.asBool();
+            var egressout_fifoin_blocked = '/top/core|rg_node_to_fifo<>0$blocked'.asBool();
+            let egressout_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_EGRESS_OUT_LEFT, M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: egressout_fifoin_blocked ? M4_BLOCKED_COLOR : egressout_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var rg_fifoout_avail = '/top/core|rg_fifo_inj<>0$avail'.asBool();
+            var rg_fifoout_blocked = '/top/core|rg_fifo_inj<>0$blocked'.asBool();
+            let rg_fifoout_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_FIFO_OUT_LEFT, M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: rg_fifoout_blocked ? M4_BLOCKED_COLOR : rg_fifoout_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            let uid = '/top/core|egress_out/flit>>1$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               /*trans.set("visible", true)
+               debugger;
+               if ('/top/core|rg_fifo_in<>0$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_EGRESS_OUT_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                              duration: 500})
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }*/ 
+            }
+            return {objects: [arriving_ingress_arrow, arriving_deflected_arrow, arriving_rg_arrow, deflected_fifoin_arrow, egressout_fifoin_arrow, rg_fifoout_arrow]}
+         }
+   /skid2
+      \viz_alpha
+         initEach() {
+            debugger;
+            let deflected = new fabric.Circle({
+               top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_DEFLECTED_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {deflected}}
+         },
+         renderEach() {
+         debugger;
+            let uid = '/top/core|rg_deflected/flit>>1$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               trans.set("visible", true)
+               debugger;
+               if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_DEFLECTED_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                              duration: 500})
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /fork1
+      \viz_alpha
+         initEach() {
+         debugger;
+            let ingress_in = new fabric.Circle({
+               top: M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_INGRESS_IN_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let arriving = new fabric.Circle({
+               top: M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_ARRIVING_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let deflected = new fabric.Circle({
+               top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_DEFLECTED_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {ingress_in, arriving, deflected}}
+         },
+         renderEach() {
+         debugger;
+            let uid = '/top/core|rg_arriving/flit<>0$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               trans.set("visible", true)
+               debugger;
+               if ('/core|ingress_in<>0$trans_valid'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_INGRESS_IN_TOP + (core * M4_COREOFFSET), left: M4_INGRESS_IN_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 1000
+                                 })
+               }
+               else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_DEFLECTED_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500
+                                 })
+               }
+               else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool() && '/top/core|rg<>0$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500
+                                 })
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /arb
+      \viz_alpha
+         initEach() {
+         debugger;
+            let fifo_out = new fabric.Circle({
+               top: M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_FIFO_OUT_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let rg = new fabric.Circle({
+               top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_RG_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {fifo_out, rg}}
+         },
+         renderEach() {
+         debugger;
+               let uid = '/top/core|rg_fifo_out/flit<>0$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               if (trans) {
+                  trans.set("visible", true)
+                  console.log(`uid  ${uid} .`)
+                  if ('/top/core|rg<>0$accepted'.asBool() && '/top/core|rg_fifo_inj<>0$accepted'.asBool()) {
+                     let core = this.getScope("core").index;
+                     //trans.set("top", M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     //trans.set("left", M4_FIFO_OUT_LEFT)
+                     //trans.set("opacity", 0)
+                     trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500,
+                                    onComplete: () => {
+                                       trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                       duration: 500})
+                                    }
+                                    })
+                  } else {
+                  debugger
+                  console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /arbister
+      \viz_alpha
+         initEach() {
+         debugger;
+            let rg_st1 = new fabric.Circle({
+               top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET) + 50,
+               left: M4_RG_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {rg_st1}}
+         },
+         renderEach() {
+               let uid = '/top/core|rg_st1/flit>>1$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               debugger;
+               if (trans) {
+                  trans.set("visible", true)
+                  console.log(`uid  ${uid} .`)
+                  if ('/top/core|rg_st1>>1$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                     if(core != 2) {
+                     trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET) + 50, left: M4_RG_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500})
+                       } else {
+                       trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET) + 50, left: M4_RG_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500,
+                                    onComplete: () => {
+                                       trans.animate({top: M4_ARRIVING_TOP, left: M4_RG_LEFT, opacity: 1}, {
+                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                       duration: 1500})
+                                    }
+                                    })
+                       }
+                  } else {
+                  debugger
+                  console.log(`Transaction new ${uid} not found.`)
+               }
+            }
+         }
+   |rg_fifo_in
+      @0
+         /entry[m4_eval(M4_MAX_PACKET_SIZE):0]
+            \viz_alpha
+               initEach() {
+                  let entry_node = new fabric.Circle({
+                     top: M4_ENTRY_START_TOP + (this.getScope("core").index * M4_COREOFFSET) + (this.getScope("entry").index * M4_ENTRY_START_SPACE_TOP ),
+                     left: M4_ENTRY_START_LEFT,
+                     radius: M4_NODES_RADIUS,
+                     fill: "#208028"
+                  })
+                  return {objects : {entry_node}}
+               },
+               renderEach() {
+                     let uid = '/flit$uid'.asInt()
+                     let push = '$push'.asInt()
+                     let header_point = '>>1$prev_entry_was_tail'.asInt()
+                     debugger;
+                     let trans = this.global.transObj[uid]
+                     if (trans) {
+                        trans.set("visible", true)
+                        console.log(`uid  ${uid} .`)
+                        /*
+                        if (push && header_point) {
+                           let core = this.getScope("core").index;
+                           let entry = this.getScope("entry").index;
+                           trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                           trans.set("left", M4_EGRESS_OUT_LEFT)
+                           trans.set("opacity", 0)
+                           this.global.transObj[counting] = entry;
+                           trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                          duration: 500, 
+                                          onComplete: () => {
+                                             trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((8) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500})
+                                          }
+                                          })
+                        } else if (push) {
+                           let core = this.getScope("core").index;
+                           let entry = this.getScope("entry").index;
+                           let left_att = m4_eval(M4_MAX_PACKET_SIZE) + 2 - this.global.transObj[counting] - entry;
+                           trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                           trans.set("left", M4_EGRESS_OUT_LEFT)
+                           trans.set("opacity", 0)
+                           trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                          duration: 500, 
+                                          onComplete: () => {
+                                             trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((left_att) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500})
+                                          }
+                                          })
+                        } */
+                        if (push) {
+                              let core = this.getScope("core").index;
+                              let entry = this.getScope("entry").index;
+                              trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                              trans.set("left", M4_EGRESS_OUT_LEFT)
+                              trans.set("opacity", 0)
+                              trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500, 
+                                             onComplete: () => {
+                                                trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((8 - entry) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                duration: 500})
+                                             }
+                                             })
+                        } else {
+                        debugger
+                        console.log(`Transaction ${uid} not found.`)
+                     }
+                     }
+               }
 // Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
 // Args:
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
@@ -4803,6 +5293,7 @@ m4+definitions(['
       m4_ifelse_block(M4_ISA, ['RISCV'], ['
       m4_ifelse_block(M4_VIZ, 1, ['
       m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
+      m4+ring_viz(/name)
       '])
       '])
    '], ['
