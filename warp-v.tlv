@@ -3724,13 +3724,13 @@ m4+definitions(['
             $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
             $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
             // This PKTWR write is blocked if the skid buffer blocked last cycle.
-            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$push_blocked;
+            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$\;
          @1
             $valid_pkt_wr = $is_pkt_wr && $commit;
             $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
             $insert_header = |egress_in/skid_buffer$valid_pkt_wr && ! $InPacket;
             // Assert after inserting header up to insertion of tail.
-            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked));
+            $InPacket <=  *reset ? 1'b0 : ($insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked)));
       @1
 
          /skid_buffer
