@@ -3724,7 +3724,7 @@ m4+definitions(['
             $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
             $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
             // This PKTWR write is blocked if the skid buffer blocked last cycle.
-            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$\;
+            $pkt_wr_blocked = $is_pkt_wr && |egress_in/skid_buffer>>1$push_blocked;
          @1
             $valid_pkt_wr = $is_pkt_wr && $commit;
             $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
