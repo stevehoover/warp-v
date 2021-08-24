@@ -3738,7 +3738,7 @@ m4+definitions(['
             // Hold the write if blocked, including the write of the header in separate signals.
             // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
             // Note that signals in this scope are captured versions reflecting the flit and its producing instruction.
-            $push_blocked = $valid_pkt_wr ? (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket) : 1'b0;
+            $push_blocked = *reset ? 1'b0 : $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket);
             // Header
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
