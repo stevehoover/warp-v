@@ -1528,6 +1528,7 @@ m4+definitions(['
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
+   // TODO: This doesn't maintain alignment. Need an m4+foreach macro.
    m4_foreach(csr, csrs, ['
    m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
    '])
