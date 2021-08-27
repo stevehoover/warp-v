@@ -870,7 +870,7 @@ m4+definitions(['
         m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
         m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
-        m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each[' csr_objs["$1_box"] = new fabric.Rect({top: (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
+        m4_define(['m4_csr_viz_init_each'], m4_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
         m4_define(['m4_csr_viz_render_each'], m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").setText($1name + ": " + val_$1 + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
         m4_define(['m4_num_csrs'], m4_eval(m4_num_csrs + 1))
       ']
@@ -3730,7 +3730,7 @@ m4+definitions(['
             $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
             $insert_header = |egress_in/skid_buffer$valid_pkt_wr && ! $InPacket;
             // Assert after inserting header up to insertion of tail.
-            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked));
+            $InPacket <=  *reset ? 1'b0 : ($insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked)));
       @1
 
          /skid_buffer
@@ -3738,7 +3738,7 @@ m4+definitions(['
             // Hold the write if blocked, including the write of the header in separate signals.
             // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
             // Note that signals in this scope are captured versions reflecting the flit and its producing instruction.
-            $push_blocked = $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket);
+            $push_blocked = *reset ? 1'b0 : $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket);
             // Header
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
@@ -4130,8 +4130,9 @@ m4+definitions(['
 \TLV instruction_in_memory(|_top)
    \viz_alpha
       initAll() {
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
          let imem_box = new fabric.Rect({
-            top: -50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
             left: -25 + -580 + M4_ALL_LEFT,
             fill: "#208028",
             width: 670,
@@ -4139,7 +4140,7 @@ m4+definitions(['
             stroke: "black"
          })
          let imem_header = new fabric.Text("🗃️ Instr. Memory", {
-            top: -40 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            top: -40 + (M4_COREOFFSET * core) + M4_ALL_TOP,
             left: 250 + -580 + M4_ALL_LEFT,
             fontSize: 20,
             fontWeight: 800,
@@ -4150,21 +4151,22 @@ m4+definitions(['
       },
       initEach() {
          // Instruction and binary value text.
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
          let instr_str = new fabric.Text("" , {
-            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,  // TODO: Add support for '#instr_mem'.
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,  // TODO: Add support for '#instr_mem'.
             left: -577 + M4_ALL_LEFT,
             fontSize: 14,
             fontFamily: "monospace"
          })
          let instr_asm_box = new fabric.Rect({
-            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
             left: -260 + M4_ALL_LEFT,
             fill: "white",
             width: 300,
             height: 14
          })
          let instr_binary_box = new fabric.Rect({
-            top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
             left: -580 + M4_ALL_LEFT,
             fill: "white",
             width: 280,
@@ -4225,8 +4227,9 @@ m4+definitions(['
    /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
       \viz_alpha
          initAll() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             let rf_box = new fabric.Rect({
-               top: -60 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 350 + _left_adjust + M4_ALL_LEFT,
                fill: "#2028b0",
                width: 145,
@@ -4234,7 +4237,7 @@ m4+definitions(['
                stroke: "black"
             })
             let rf_header = new fabric.Text("📂 _heading", {
-               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 360 + _left_adjust + M4_ALL_LEFT,
                fontSize: 18,
                fontWeight: 800,
@@ -4242,7 +4245,7 @@ m4+definitions(['
                fill: "white"
             })
             let rf_header2 = new fabric.Text("Integer (hex)", {
-               top: -17 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -17 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 367 + _left_adjust + M4_ALL_LEFT,
                fontSize: 14,
                fontFamily: "monospace",
@@ -4251,14 +4254,15 @@ m4+definitions(['
             return {objects: {rf_box, rf_header, rf_header2}}
          },
          initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             let reg = new fabric.Text("", {
-               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 367 + _left_adjust + M4_ALL_LEFT,
                fontSize: 14,
                fontFamily: "monospace"
             })
             let reg_box = new fabric.Rect({
-               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 360 + _left_adjust + M4_ALL_LEFT,
                fill: "white",
                width: 125,
@@ -4294,6 +4298,7 @@ m4+definitions(['
             let csr_objs = {}
             let csr_boxes = {}
             //debugger
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             m4_csr_viz_init_each
             return {objects: {...csr_objs, ...csr_boxes}}
          },
@@ -4315,7 +4320,7 @@ m4+definitions(['
          let color = !commit                ? "gray" :
                      '$abort'.asBool(false) ? "red" :
                                               "blue"
-         let core = this.getScope("core").index
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
          objects.pc_pointer = new fabric.Text("👉", {
             top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
             left: -281 + M4_ALL_LEFT,
@@ -4608,8 +4613,9 @@ m4+definitions(['
    /_mem_size
       \viz_alpha
          initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             let index_val_box = new fabric.Rect({
-               top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 540 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fill: "white",
                width: 40,
@@ -4618,7 +4624,7 @@ m4+definitions(['
             //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
             let index =
                new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                   left: 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                   fontSize: 14,
                   fontFamily: "monospace"
@@ -4628,8 +4634,9 @@ m4+definitions(['
    /_bank_size
       \viz_alpha
          initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             let banknum = new fabric.Text(String(this.getScope("bank").index), {
-               top: -20 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fontSize: 14,
                fontWeight: 800,
@@ -4675,15 +4682,16 @@ m4+definitions(['
       /_mem_size
          \viz_alpha
             initEach() {
+               let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                let bank_val_box = new fabric.Rect({
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                   left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                   fill: "white",
                   width: 25,
                   height: 14
                })
                let data = new fabric.Text("", {
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
                   left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // bank: 3 2 1 0 format
                   fontSize: 14,
                   fontFamily: "monospace"
@@ -4701,9 +4709,10 @@ m4+definitions(['
 \TLV layout_viz(/_screen, |_top) 
    /_screen 
       \viz_alpha 
-         initEach() { 
+         initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             let decode_header = new fabric.Text("⚙️ Instr. Decode", {
-               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 100 + M4_ALL_LEFT,
                fill: "maroon",
                fontSize: 18,
@@ -4711,7 +4720,7 @@ m4+definitions(['
                fontFamily: "monospace"
             })
             let decode_box = new fabric.Rect({
-               top: -50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 80 + M4_ALL_LEFT,
                fill: "#f8f0e8",
                width: 230,
@@ -4719,7 +4728,7 @@ m4+definitions(['
                stroke: "#ff8060"
             })
             let csr_header = new fabric.Text("📂 CSRs", {
-               top: 125 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: 125 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 100 + M4_ALL_LEFT,
                fill: "white",
                fontSize: 18,
@@ -4727,7 +4736,7 @@ m4+definitions(['
                fontFamily: "monospace"
             })
             let csr_box = new fabric.Rect({
-               top: 120 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: 120 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 80 + M4_ALL_LEFT,
                fill: "#2028b0",
                width: 220,
@@ -4735,7 +4744,7 @@ m4+definitions(['
                stroke: "black"
             })
             let dmem_box = new fabric.Rect({
-               top: -60 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 530 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fill: "#208028",
                width: 190,
@@ -4743,7 +4752,7 @@ m4+definitions(['
                stroke: "black"
             })
             let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
-               top: -45 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // Center aligned
                fontSize: 20,
                fontWeight: 800,
@@ -4751,7 +4760,7 @@ m4+definitions(['
                fill: "white"
             })
             let bankname = new fabric.Text("bank", {
-               top: -20 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
                left: 545 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
                fontSize: 14,
                fontWeight: 800,
@@ -4998,7 +5007,7 @@ m4+definitions(['
                trans.set("visible", true)
                debugger;
                if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
-                  let core = this.getScope("core").index;
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET))
                   trans.set("left", M4_DEFLECTED_LEFT)
                   trans.set("opacity", 0)
@@ -5043,7 +5052,7 @@ m4+definitions(['
                trans.set("visible", true)
                debugger;
                if ('/core|ingress_in<>0$trans_valid'.asBool()) {
-                  let core = this.getScope("core").index;
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
                   trans.set("left", M4_ARRIVING_LEFT)
                   trans.set("opacity", 0)
@@ -5053,7 +5062,7 @@ m4+definitions(['
                                  })
                }
                else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
-                  let core = this.getScope("core").index;
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
                   trans.set("left", M4_ARRIVING_LEFT)
                   trans.set("opacity", 0)
@@ -5063,7 +5072,7 @@ m4+definitions(['
                                  })
                }
                else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool() && '/top/core|rg<>0$accepted'.asBool()) {
-                  let core = this.getScope("core").index;
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
                   trans.set("left", M4_ARRIVING_LEFT)
                   trans.set("opacity", 0)
@@ -5103,7 +5112,7 @@ m4+definitions(['
                   trans.set("visible", true)
                   console.log(`uid  ${uid} .`)
                   if ('/top/core|rg<>0$accepted'.asBool() && '/top/core|rg_fifo_inj<>0$accepted'.asBool()) {
-                     let core = this.getScope("core").index;
+                     let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                      //trans.set("top", M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
                      //trans.set("left", M4_FIFO_OUT_LEFT)
                      //trans.set("opacity", 0)
@@ -5142,7 +5151,7 @@ m4+definitions(['
                   trans.set("visible", true)
                   console.log(`uid  ${uid} .`)
                   if ('/top/core|rg_st1>>1$accepted'.asBool()) {
-                  let core = this.getScope("core").index;
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                      if(core != 2) {
                      trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET) + 50, left: M4_RG_LEFT, opacity: 1}, {
                                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
@@ -5221,7 +5230,7 @@ m4+definitions(['
                                           })
                         } */
                         if (push) {
-                              let core = this.getScope("core").index;
+                              let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                               let entry = this.getScope("entry").index;
                               trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
                               trans.set("left", M4_EGRESS_OUT_LEFT)
