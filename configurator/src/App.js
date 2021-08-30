@@ -5,9 +5,7 @@ import HomePage from './components/pages/HomePage';
 import {ConfigurationParameters} from "./components/translation/ConfigurationParameters";
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
-import {getWarpVFileForCommit, warpVLatestSupportedCommit} from "./utils/WarpVUtils";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
-
 
 function App() {
     const [configuratorGlobalSettings, setConfiguratorGlobalSettings] = useState({
@@ -138,3 +136,10 @@ m4_asm(BGE, r1, r2, 1111111010100) // TERMINATE by branching to -1
 `
 
 export default App;
+
+export function getWarpVFileForCommit(version) {
+    return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
+}
+
+export const warpVLatestSupportedCommit = "3be2315252a4565f0091b1607307a3cc026928ea"
+export const warpVLatestVersionCommit = "master"
