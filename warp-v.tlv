@@ -1457,12 +1457,12 @@ m4+definitions(['
             // The program in an instruction memory.
             logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
             logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
-
+            
             m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instrs[m4_instr_ind] = m4_echo(['m4_instr']m4_instr_ind); '])
-
+            
             // String representations of the instructions for debug.
             assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-
+            
          |fetch
             /instr
                @M4_FETCH_STAGE
