@@ -179,8 +179,6 @@ export function WarpVPageBase({
             },
             false,
         )
-        //console.log(tlv)
-        console.log(data)
         if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
         else toast({
             title: "Failed compilation",
