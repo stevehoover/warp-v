@@ -19,7 +19,10 @@ export function CoreDetailsComponent({
                                          ...rest
                                      }) {
     const [makerchipOpening, setMakerchipOpening] = useState(false)
-
+    console.log("here: ")
+    console.log(coreJson)
+    console.log(macrosForJson)
+        console.log(sVForJson)
     if (!coreJson || !macrosForJson || !sVForJson) return null;
 
 

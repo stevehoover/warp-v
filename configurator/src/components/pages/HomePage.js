@@ -21,7 +21,7 @@ export default function HomePage({
         <Box textAlign='center' mb={25}>
             <Image src='warpv-logo.png' maxW={250} mx='auto'/>
             <Text mb={2}>The open-source RISC-V core IP you can shape to your needs!</Text>
-            <video controls autoPlay muted loop style={{"margin-left": "auto", "margin-right": "auto", "width": "45%"}}>
+            <video controls autoPlay muted loop style={{"marginLeft": "auto", "marginRight": "auto", "width": "45%"}}>
                 <source src="WARP-V_VIZ.mp4" type="video/mp4"/>
                 Your browser does not support the video tag.
             </video>

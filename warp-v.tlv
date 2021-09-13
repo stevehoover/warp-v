@@ -30,7 +30,8 @@
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
 m4+definitions(['
-
+   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
+   
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -273,53 +274,58 @@ m4+definitions(['
    // =============
    
    // This is where you configure the CPU.
+   // Note that WARP-V has a configurator at warp-v.org.
+   
    // m4_default(..) allows external definition to take precedence.
 
    // Machine:
-   // ISA:
-   m4_default(['M4_ISA'], ['RISCV']) // MINI, RISCV, MIPSI, POWER, DUMMY, etc.
-   // Select a standard configuration:
-   m4_default(['M4_STANDARD_CONFIG'], ['4-stage'])  // 1-stage, 4-stage, 6-stage, none (and define individual parameters).
+   m4_ifndef(
+     ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
+     ISA, RISCV,
+     ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
+     STANDARD_CONFIG, 4-stage,
+     ['# Number of words in the data memory.'],
+     DMEM_SIZE, 32)
    
-   // A multi-core implementation (currently RISC-V only) should:
-   //   m4_define_hier(['M4_CORE'], #)
-   //   m4_define_hier(['M4_VC'], #)
-   //   m4_define_hier(['M4_PRIO'], #)
-   // prior to inclusion of this file.
-   m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], ['
-      // If not externally defined:
-      m4_define_hier(['M4_CORE'], 1)  // Number of cores.
-      m4_define_hier(['M4_VC'], 2)    // VCs (meaningful if > 1 core).
-      m4_define_hier(['M4_PRIO'], 2)  // Number of priority levels in the NoC.
-      m4_define(['M4_MAX_PACKET_SIZE'], 3)   // Max number of payload flits in a packet.
-   '])
-   // Inclusions for multi-core only:
-   m4_ifexpr(M4_CORE_CNT > 1, ['
-      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['Multi-core supported for RISC-V only.']m4_new_line)'])
-      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
-      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_lib/481188115b4338567df916460d462ca82401e211/fundamentals_lib.tlv'])
-      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/tlv_flow_lib/7a2b37cc0ccd06bc66984c37e17ceb970fd6f339/pipeflow_lib.tlv'])
-   '])
+   // --------------
+   // For multi-core
+   // --------------
+   m4_ifndef(
+     ['# Number of cores. Previously this was defined externally as M4_CORE_CNT (via m4_define_hier), so accept that too.'],
+     NUM_CORES, m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], 1, M4_CORE_CNT))
+
+   // Only relevant, and only defined, if M4_NUM_CORES > 1:
    
-   // Include visualization
-   m4_default(['M4_VIZ'], 1)
-   // Include testbench (for Makerchip simulation) (defaulted to 1).
-   m4_default(['M4_IMPL'], 0)  // For implementation (vs. simulation).
-   // Build for formal verification (defaulted to 0).
-   m4_default(['M4_FORMAL'], 0)  // 1 to enable code for formal verification
-	m4_default(['M4_RISCV_FORMAL_ALTOPS'], 0)  // riscv-formal uses alternate operations (add/sub and xor with a constant value)
-                                              // instead of actual mul/div, this is enabled automatically when formal is used, 
-                                              // can be enabled manually for testing in Makerchip environment.
+   m4_ifexpr(M4_NUM_CORES > 1, ['m4_ifndef(
+     ['# VCs (meaningful if > 1 core).'],
+     NUM_VCS, 2,
+     ['# Number of priority levels in the NoC (meaningful if > 1 core).'],
+     NUM_PRIOS, 2,
+     ['# Max number of payload flits in a packet.'],
+     MAX_PACKET_SIZE, 3)'])
+   
+   m4_ifndef(
+     ['# Include visualization'],
+     VIZ, 1,
+     ['# For implementation (vs. simulation). (0/1)'],
+     IMPL, 0,
+     ['# Build for formal verification (0/1).'],
+     FORMAL, 0,
+     ['# riscv-formal uses alternate operations (add/sub and xor with a constant value)
+         instead of actual mul/div, this is enabled automatically when formal is used. 
+         This can be enabled for testing in Makerchip environment.'],
+     RISCV_FORMAL_ALTOPS, 0)
 
-   // A hook for a software-controlled reset. None by default.
-   m4_define(['m4_soft_reset'], 1'b0)
-
-   // A hook for CPU back-pressure in M4_REG_RD_STAGE.
-   // Various sources of back-pressure can add to this expression.
-   // Currently, this is envisioned for CSR writes that cannot be processed, such as
-   // NoC packet writes.
-   m4_define(['m4_cpu_blocked'], 1'b0)
-
+   m4_ifndef(
+     
+     ['# A hook for a software-controlled reset. None by default.'],
+     soft_reset, 1'b0,
+     
+     ['# A hook for CPU back-pressure in M4_REG_RD_STAGE.
+         Various sources of back-pressure can add to this expression.
+         Currently, this is envisioned for CSR writes that cannot be processed, such as
+         NoC packet writes.'],
+     cpu_blocked, 1'b0)
 
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
@@ -352,77 +358,82 @@ m4+definitions(['
    //       M4_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
    //       M4_EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
    //   M4_BRANCH_PRED: {fallthrough, two_bit, ...}
-   //   M4_DATA_MEM_WORDS: Number of data memory locations.
    m4_case(M4_STANDARD_CONFIG,
       ['1-stage'], ['
          // No pipeline
-         m4_defines(
-            (M4_NEXT_PC_STAGE, 0),
-            (M4_FETCH_STAGE, 0),
-            (M4_DECODE_STAGE, 0),
-            (M4_BRANCH_PRED_STAGE, 0),
-            (M4_REG_RD_STAGE, 0),
-            (M4_EXECUTE_STAGE, 0),
-            (M4_RESULT_STAGE, 0),
-            (M4_REG_WR_STAGE, 0),
-            (M4_MEM_WR_STAGE, 0),
-            (M4_LD_RETURN_ALIGN, 1))
-         m4_default(['M4_BRANCH_PRED'], ['fallthrough'])
-         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+         m4_ifndef(
+            NEXT_PC_STAGE, 0,
+            FETCH_STAGE, 0,
+            DECODE_STAGE, 0,
+            BRANCH_PRED_STAGE, 0,
+            REG_RD_STAGE, 0,
+            EXECUTE_STAGE, 0,
+            RESULT_STAGE, 0,
+            REG_WR_STAGE, 0,
+            MEM_WR_STAGE, 0,
+            LD_RETURN_ALIGN, 1)
+         m4_ifndef(BRANCH_PRED, fallthrough)
       '],
       ['2-stage'], ['
          // 2-stage pipeline.
-         m4_defines(
-            (M4_NEXT_PC_STAGE, 0),
-            (M4_FETCH_STAGE, 0),
-            (M4_DECODE_STAGE, 0),
-            (M4_BRANCH_PRED_STAGE, 0),
-            (M4_REG_RD_STAGE, 0),
-            (M4_EXECUTE_STAGE, 1),
-            (M4_RESULT_STAGE, 1),
-            (M4_REG_WR_STAGE, 1),
-            (M4_MEM_WR_STAGE, 1),
-            (M4_LD_RETURN_ALIGN, 2))
-         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
-         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+         m4_ifndef(
+            NEXT_PC_STAGE, 0,
+            FETCH_STAGE, 0,
+            DECODE_STAGE, 0,
+            BRANCH_PRED_STAGE, 0,
+            REG_RD_STAGE, 0,
+            EXECUTE_STAGE, 1,
+            RESULT_STAGE, 1,
+            REG_WR_STAGE, 1,
+            MEM_WR_STAGE, 1,
+            LD_RETURN_ALIGN, 2)
+         m4_ifndef(BRANCH_PRED, two_bit)
       '],
       ['4-stage'], ['
          // A reasonable 4-stage pipeline.
-         m4_defines(
-            (M4_NEXT_PC_STAGE, 0),
-            (M4_FETCH_STAGE, 0),
-            (M4_DECODE_STAGE, 1),
-            (M4_BRANCH_PRED_STAGE, 1),
-            (M4_REG_RD_STAGE, 1),
-            (M4_EXECUTE_STAGE, 2),
-            (M4_RESULT_STAGE, 2),
-            (M4_REG_WR_STAGE, 3),
-            (M4_MEM_WR_STAGE, 3),
-            (M4_EXTRA_REPLAY_BUBBLE, 1),
-            (M4_LD_RETURN_ALIGN, 4))
-         m4_define(['M4_BRANCH_PRED'], ['two_bit'])
-         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+         m4_ifndef(
+            NEXT_PC_STAGE, 0,
+            FETCH_STAGE, 0,
+            DECODE_STAGE, 1,
+            BRANCH_PRED_STAGE, 1,
+            REG_RD_STAGE, 1,
+            EXECUTE_STAGE, 2,
+            RESULT_STAGE, 2,
+            REG_WR_STAGE, 3,
+            MEM_WR_STAGE, 3,
+            EXTRA_REPLAY_BUBBLE, 1,
+            LD_RETURN_ALIGN, 4)
+         m4_ifndef(BRANCH_PRED, two_bit)
       '],
       ['6-stage'], ['
          // Deep pipeline
-         m4_defines(
-            (M4_NEXT_PC_STAGE, 1),
-            (M4_FETCH_STAGE, 1),
-            (M4_DECODE_STAGE, 3),
-            (M4_BRANCH_PRED_STAGE, 4),
-            (M4_REG_RD_STAGE, 4),
-            (M4_EXECUTE_STAGE, 5),
-            (M4_RESULT_STAGE, 5),
-            (M4_REG_WR_STAGE, 6),
-            (M4_MEM_WR_STAGE, 7),
-            (M4_EXTRA_REPLAY_BUBBLE, 1),
-            (M4_LD_RETURN_ALIGN, 7))
-         m4_default(['M4_BRANCH_PRED'], ['two_bit'])
-         m4_define_hier(['M4_DATA_MEM_WORDS'], 32)
+         m4_ifndef(
+            NEXT_PC_STAGE, 1,
+            FETCH_STAGE, 1,
+            DECODE_STAGE, 3,
+            BRANCH_PRED_STAGE, 4,
+            REG_RD_STAGE, 4,
+            EXECUTE_STAGE, 5,
+            RESULT_STAGE, 5,
+            REG_WR_STAGE, 6,
+            MEM_WR_STAGE, 7,
+            EXTRA_REPLAY_BUBBLE, 1,
+            LD_RETURN_ALIGN, 7)
+         m4_ifndef(BRANCH_PRED, two_bit)
       ']
    )
    
-   
+   // Supply defaults for extra cycles.
+   m4_ifndef(
+      DELAY_BRANCH_TARGET_CALC, 0,
+      EXTRA_PRED_TAKEN_BUBBLE, 0,
+      EXTRA_REPLAY_BUBBLE, 0,
+      EXTRA_JUMP_BUBBLE, 0,
+      EXTRA_BRANCH_BUBBLE, 0,
+      EXTRA_INDIRECT_JUMP_BUBBLE, 0,
+      EXTRA_NON_PIPELINED_BUBBLE, 1,
+      EXTRA_TRAP_BUBBLE, 1)
+
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
@@ -430,7 +441,7 @@ m4+definitions(['
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Configuration:
          // Force predictor to fallthrough, since we can't predict early enough to help.
-         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
+         m4_def(BRANCH_PRED, fallthrough)
       '], ['RISCV'], ['
          // RISC-V Configuration:
 
@@ -440,48 +451,72 @@ m4+definitions(['
          //   RV32IM 2.0, w/ FA ISA extensions WIP.
 
          // Machine width
-         m4_define_vector(['M4_WORD'], 32)  // 32 or RV32X or 64 for RV64X.
+         m4_ifndef(
+           ['# Include visualization. (0/1)'],
+           VIZ, 1,
+           ['# Width of a "word". (32 for RV32X or 64 for RV64X)'],
+           WORD_WIDTH, 32)
+         m4_define_vector(['M4_WORD'], M4_WORD_WIDTH)
          // ISA extensions,  1, or 0 (following M4 boolean convention).
          // TODO. Currently formal checks are broken when M4_EXT_F is set to 1.
          // TODO. Currently formal checks takes long time(~48 mins) when M4_EXT_B is set to 1.
          //       Hence, its disabled at present.
-         m4_defines(
-            (['M4_EXT_E'], 1),
-            (['M4_EXT_I'], 1),
-            (['M4_EXT_M'], 1),
-            (['M4_EXT_A'], 0),
-            (['M4_EXT_F'], 0),
-            (['M4_EXT_D'], 0),
-            (['M4_EXT_Q'], 0),
-            (['M4_EXT_L'], 0),
-            (['M4_EXT_C'], 0),
-            (['M4_EXT_B'], 0),
-            (['M4_EXT_J'], 0),
-            (['M4_EXT_T'], 0),
-            (['M4_EXT_P'], 0),
-            (['M4_EXT_V'], 0),
-            (['M4_EXT_N'], 0))
+         m4_ifndef(
+            EXT_I, 1,
+            EXT_E, 0,
+            EXT_M, 0,
+            EXT_A, 0,
+            EXT_F, 0,
+            EXT_D, 0,
+            EXT_Q, 0,
+            EXT_L, 0,
+            EXT_C, 0,
+            EXT_B, 0,
+            EXT_J, 0,
+            EXT_T, 0,
+            EXT_P, 0,
+            EXT_V, 0,
+            EXT_N, 0)
          
-         // For the time[h] CSR register, after this many cycles, time increments.
-         m4_define_vector(M4_CYCLES_PER_TIME_UNIT, 1000000000)
+         m4_ifndef(['# For the time[h] CSR register, after this many cycles, time increments.'],
+                   CYCLES_PER_TIME_UNIT, 1000000000)
       '], ['MIPSI'], ['
       '], ['POWER'], ['
       '], ['
          // Dummy "ISA".
-         m4_define_hier(M4_DATA_MEM_WORDS, 4) // Override for narrow address.
+         m4_def(DMEM_SIZE, 4)  // Override for narrow address.
          // Force predictor to fallthrough, since we can't predict early enough to help.
-         m4_define(['M4_BRANCH_PRED'], ['fallthrough'])
+         m4_def(BRANCH_PRED, ['fallthrough'])
       ']
    )
-
-   // Which program to assemble.
-   // this depends on the ISA extension(s) choice
-   m4_ifelse(M4_EXT_M, 1, ['m4_define(['M4_PROG_NAME'], ['divmul_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
-   //m4_ifelse(M4_EXT_F, 1, ['m4_define(['M4_PROG_NAME'], ['fpu_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
-   //m4_ifelse(M4_EXT_B, 1, ['m4_define(['M4_PROG_NAME'], ['bmi_test'])'], ['m4_define(['M4_PROG_NAME'], ['cnt10'])'])
+   
+   m4_ifndef(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
+   m4_ifndef(
+     ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
+     PROG_NAME, m4_ifelse(M4_EXT_M, 1, divmul_test, cnt10))
+   //m4_ifelse(M4_EXT_F, 1, fpu_test, cnt10)
+   //m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10)
 
    // =====Done Defining Configuration=====
    
+   
+   m4_define_hier(['M4_DATA_MEM_WORDS'], M4_DMEM_SIZE)
+   
+   // For multi-core only:
+   m4_ifexpr(M4_NUM_CORES > 1, ['
+   
+      // Define hierarchies based on parameters.
+      m4_define_hier(['M4_CORE'], M4_NUM_CORES)
+      m4_define_hier(['M4_VC'], M4_NUM_VCS)
+      m4_define_hier(['M4_PRIO'], M4_NUM_PRIOS)
+      
+      // RISC-V Only
+      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['Multi-core supported for RISC-V only.']m4_new_line)'])
+      
+      // Headere flit fields. 
+      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
+   '])
+
    // Characterize ISA and apply configuration.
    
    // Characterize the ISA, including:
@@ -489,7 +524,7 @@ m4+definitions(['
    //                                  can be available.
    // M4_HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
    // Defaults:
-   m4_define(['M4_HAS_INDIRECT_JUMP'], 0)
+   m4_def(HAS_INDIRECT_JUMP, 0)
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Characterization:
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
@@ -507,36 +542,25 @@ m4+definitions(['
          m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
       ']
    )
-
-   // Supply defaults for extra cycles.
-   m4_defines(
-      (M4_DELAY_BRANCH_TARGET_CALC, 0),
-      (M4_EXTRA_PRED_TAKEN_BUBBLE, 0),
-      (M4_EXTRA_REPLAY_BUBBLE, 0),
-      (M4_EXTRA_JUMP_BUBBLE, 0),
-      (M4_EXTRA_BRANCH_BUBBLE, 0),
-      (M4_EXTRA_INDIRECT_JUMP_BUBBLE, 0),
-      (M4_EXTRA_NON_PIPELINED_BUBBLE, 1),
-      (M4_EXTRA_TRAP_BUBBLE, 1)
-   )
    
    // Calculated stages:
-   m4_define(M4_BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
+   m4_def(BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
    // Calculated alignments:
-   m4_define(M4_REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
+   m4_def(REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
 
    // Latencies/bubbles calculated from stage parameters and extra bubbles:
    // (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
-   m4_define(['M4_PRED_TAKEN_BUBBLES'], m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE))
-   m4_define(['M4_REPLAY_BUBBLES'],     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE))
-   m4_define(['M4_JUMP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE))
-   m4_define(['M4_BRANCH_BUBBLES'],     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE))
-   m4_define(['M4_INDIRECT_JUMP_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE))
-   m4_define(['M4_NON_PIPELINED_BUBBLES'], m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_NON_PIPELINED_BUBBLE))
-   m4_define(['M4_TRAP_BUBBLES'],       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE))
-   m4_define(['M4_SECOND_ISSUE_BUBBLES'], 0)  // Bubbles between second issue of a long-latency instruction and
-                                              // the replay of the instruction it squashed (so always zero).
-   m4_define(['M4_NO_FETCH_BUBBLES'], 0)  // Bubbles between a no-fetch cycle and the next cycles (so always zero).
+   m4_def(PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE),
+          REPLAY_BUBBLES,     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE),
+          JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE),
+          BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE),
+          INDIRECT_JUMP_BUBBLES, m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE),
+          NON_PIPELINED_BUBBLES, m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_NON_PIPELINED_BUBBLE),
+          TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE),
+          ['# Bubbles between second issue of a long-latency instruction and
+              the replay of the instruction it squashed (so always zero).'],
+          SECOND_ISSUE_BUBBLES, 0)
+   m4_def(['# Bubbles between a no-fetch cycle and the next cycles (so always zero).'], NO_FETCH_BUBBLES, 0)
    
    
    
@@ -557,16 +581,16 @@ m4+definitions(['
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
    
    m4_ifelse(M4_RETIMING_EXPERIMENT, ['M4_RETIMING_EXPERIMENT'], [''], ['
-      m4_define(['M4_NEXT_PC_STAGE'], 0)
-      m4_define(['M4_FETCH_STAGE'], 0)
-      m4_define(['M4_DECODE_STAGE'], 0)
-      m4_define(['M4_BRANCH_PRED_STAGE'], 0)
-      m4_define(['M4_BRANCH_TARGET_CALC_STAGE'], 0)
-      m4_define(['M4_REG_RD_STAGE'], 0)
-      m4_define(['M4_EXECUTE_STAGE'], 0)
-      m4_define(['M4_RESULT_STAGE'], 0)
-      m4_define(['M4_REG_WR_STAGE'], 0)
-      m4_define(['M4_MEM_WR_STAGE'], 0)
+      m4_def(NEXT_PC_STAGE, 0,
+             FETCH_STAGE, 0,
+             DECODE_STAGE, 0,
+             BRANCH_PRED_STAGE, 0,
+             BRANCH_TARGET_CALC_STAGE, 0,
+             REG_RD_STAGE, 0,
+             EXECUTE_STAGE, 0,
+             RESULT_STAGE, 0,
+             REG_WR_STAGE, 0,
+             MEM_WR_STAGE, 0)
    '])
    
    
@@ -599,7 +623,7 @@ m4+definitions(['
    // ==================
    // These may be overridden by specific ISA.
 
-   m4_define(M4_BIG_ENDIAN, ['0'])
+   m4_def(BIG_ENDIAN, 0)
 
 
    // =======================
@@ -615,7 +639,7 @@ m4+definitions(['
    //   |fetch@M4_FETCH$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]
    // Outputs:
    //   |fetch/instr?$fetch$raw[M4_INSTR_RANGE] (at or after @M4_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
-   m4_default(['M4_IMEM_MACRO_NAME'], M4_isa['_imem'])
+   m4_ifndef(IMEM_MACRO_NAME, M4_isa['_imem'])
    
    // For each ISA, define:
    //   m4_define_vector(['M4_INSTR'], XX)   // (or, m4_define_vector_with_fields(...)) Instruction vector.
@@ -639,8 +663,8 @@ m4+definitions(['
          m4_define_vector(['M4_ADDR'], 32)
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
-         m4_define_hier(['M4_REGS'], 32, 1)
-         m4_define_hier(['M4_FPUREGS'], 32, 0)
+         m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
+         m4_define_hier(['M4_FPU_REGS'], 32, 0)
          
          // Controls SV generation:
          m4_define(['m4_use_localparams'], 0)
@@ -667,16 +691,26 @@ m4+definitions(['
    
    // Computed ISA uarch Parameters (based on ISA-specific parameters).
 
-   m4_define(['M4_ADDRS_PER_WORD'], m4_eval(M4_WORD_CNT / M4_BITS_PER_ADDR))
-   m4_define(['M4_SUB_WORD_BITS'], m4_width(m4_eval(M4_ADDRS_PER_WORD - 1)))
-   m4_define(['M4_ADDRS_PER_INSTR'], m4_eval(M4_INSTR_CNT / M4_BITS_PER_ADDR))
-   m4_define(['M4_SUB_PC_BITS'], m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
+   m4_def(ADDRS_PER_WORD, m4_eval(M4_WORD_CNT / M4_BITS_PER_ADDR))
+   m4_def(SUB_WORD_BITS, m4_width(m4_eval(M4_ADDRS_PER_WORD - 1)))
+   m4_def(ADDRS_PER_INSTR, m4_eval(M4_INSTR_CNT / M4_BITS_PER_ADDR))
+   m4_def(SUB_PC_BITS, m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
    m4_define_vector(['M4_PC'], M4_ADDR_HIGH, M4_SUB_PC_BITS)
-   m4_define(['M4_FULL_PC'], ['{$Pc, M4_SUB_PC_BITS'b0}'])
+   m4_def(FULL_PC, ['{$Pc, M4_SUB_PC_BITS'b0}'])
    m4_define_hier(M4_DATA_MEM_ADDRS, m4_eval(M4_DATA_MEM_WORDS_HIGH * M4_ADDRS_PER_WORD))  // Addressable data memory locations.
-   m4_define(['M4_INJECT_RETURNING_LD'], m4_eval(M4_LD_RETURN_ALIGN > 0))
-   m4_define(['M4_PENDING_ENABLED'], M4_INJECT_RETURNING_LD)
+   m4_def(INJECT_RETURNING_LD, m4_eval(M4_LD_RETURN_ALIGN > 0))
+   m4_def(PENDING_ENABLED, M4_INJECT_RETURNING_LD)
    
+                                                    
+   // ==============
+   // VIZ Parameters                               
+   // ==============
+   
+   
+   m4_def(['# Amount to shift mem left (to make room for FP regs).'],
+          VIZ_MEM_LEFT_ADJUST, m4_ifelse(M4_EXT_F, 1, 170, 0))
+
+
    
    // =========
    // Redirects
@@ -702,28 +736,28 @@ m4+definitions(['
    // Redirects are described in the TLV code. Supporting macro definitions are here.
 
    // m4_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
-   m4_define(['m4_redirect_list'], ['['-100']'])  // list fed to m4_ordered
-   m4_define(['m4_redirect_squash_terms'], [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
-   m4_define(['m4_redirect_shadow_terms'], [''])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
-   m4_define(['m4_redirect_pc_terms'], [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
-   m4_define(['m4_abort_terms'], ['1'b0'])        // || terms for an instruction's abort condition
-   m4_define(['m4_redirect_masking_triggers'], ['1'b0']) // || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
+   m4_def(redirect_list, ['['-100']'])  // list fed to m4_ordered
+   m4_def(redirect_squash_terms, [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
+   m4_def(redirect_shadow_terms, [''])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
+   m4_def(redirect_pc_terms, [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
+   m4_def(abort_terms, ['1'b0'])        // || terms for an instruction's abort condition
+   m4_def(redirect_masking_triggers, ['1'b0']) // || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
                                                          // Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
    //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatenation terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatenation.
    // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
    // See redirection logic for more detail.
    // Create several defines with items per redirect condition.
-   m4_define(['M4_NUM_REDIRECT_CONDITIONS'], 0)  // Incremented for each condition.
-   m4_define(['m4_process_redirect_conditions'],
-             ['m4_ifelse(['$@'], ['['']'],
-                         [''],
-                         ['m4_process_redirect_condition($1, M4_NUM_REDIRECT_CONDITIONS)
-                           m4_process_redirect_conditions(m4_shift($@))
-                         ']
-                        )
-               m4_define(['M4_NUM_REDIRECT_CONDITIONS'], m4_eval(M4_NUM_REDIRECT_CONDITIONS + 1))
-             '])
-   m4_define(['M4_MAX_REDIRECT_BUBBLES'], M4_TRAP_BUBBLES)
+   m4_def(NUM_REDIRECT_CONDITIONS, 0)  // Incremented for each condition.
+   m4_def(process_redirect_conditions,
+          ['m4_ifelse(['$@'], ['['']'],
+                      [''],
+                      ['m4_process_redirect_condition($1, M4_NUM_REDIRECT_CONDITIONS)
+                       m4_process_redirect_conditions(m4_shift($@))
+                       ']
+                     )
+           m4_def(NUM_REDIRECT_CONDITIONS, m4_eval(M4_NUM_REDIRECT_CONDITIONS + 1))
+           '])
+   m4_def(MAX_REDIRECT_BUBBLES, M4_TRAP_BUBBLES)
 
    // Called by m4_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
    // to various definitions, initialized above.
@@ -733,30 +767,30 @@ m4+definitions(['
    //   $3: target PC signal of triggering instruction
    //   $4: 1 for an aborting redirect (0 otherwise)
    //   $5: (opt) 1 to freeze fetch until subsequent redirect
-   m4_define(['m4_process_redirect_condition'],
-             ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
-               // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
-               //   of this instruction.
-               // Params: $@ (m4_redirect_masking_triggers contains param use)
-               m4_pushdef(['m4_redir_cond'],
-                          ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
-               m4_define(['m4_redirect_list'],
-                         m4_dquote(m4_redirect_list, ['$1']))
-               m4_define(['m4_redirect_squash_terms'],
-                         ['']m4_quote(m4_redirect_squash_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
-               m4_define(['m4_redirect_shadow_terms'],
-                         ['']m4_quote(m4_redirect_shadow_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
-               m4_define(['m4_redirect_pc_terms'],
-                         ['m4_echo(']m4_redir_cond($@)[') ? {>>m4_echo($1)$3, m4_ifelse($5, 1, 1'b1, 1'b0)} : ']m4_quote(m4_redirect_pc_terms)[' '])
-               m4_ifelse(['$4'], ['1'],
-                  ['m4_define(['m4_abort_terms'],
-                              m4_dquote(m4_abort_terms)['[' || $2']'])
-                    m4_define(['m4_redirect_masking_triggers'],
-                              m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
-               //m4_define(['m4_redirect_signal_list'],
-               //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
-               m4_popdef(['m4_redir_cond'])
-             '])
+   m4_def(process_redirect_condition,
+          ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
+            // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
+            //   of this instruction.
+            // Params: $@ (m4_redirect_masking_triggers contains param use)
+            m4_pushdef(['m4_redir_cond'],
+                       ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
+            m4_def(redirect_list,
+                   m4_dquote(m4_redirect_list, ['$1']))
+            m4_def(redirect_squash_terms,
+                   m4_quote(m4_redirect_squash_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
+            m4_def(redirect_shadow_terms,
+                   m4_quote(m4_redirect_shadow_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
+            m4_def(redirect_pc_terms,
+                   ['m4_echo(']m4_redir_cond($@)[') ? {>>m4_echo($1)$3, m4_ifelse($5, 1, 1'b1, 1'b0)} : ']m4_quote(m4_redirect_pc_terms)[' '])
+            m4_ifelse(['$4'], 1,
+               ['m4_def(abort_terms,
+                        m4_dquote(m4_abort_terms)['[' || $2']'])
+                 m4_def(redirect_masking_triggers,
+                        m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
+            //m4_define(['m4_redirect_signal_list'],
+            //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
+            m4_popdef(['m4_redir_cond'])
+          '])
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
@@ -780,8 +814,8 @@ m4+definitions(['
    // bother using it, but it's available in any case.)
    // m4_prev_instr_valid_through(redirect_bubbles) is deasserted by redirects up to the given number of cycles on the previous instruction.
    // Since we can be looking back an arbitrary number of cycles, we'll force invalid if $reset.
-   m4_define(['m4_prev_instr_valid_through'],
-             ['(! $reset && >>m4_eval(1 - $1)$next_good_path_mask[$1])'])
+   m4_def(prev_instr_valid_through,
+          ['(! $reset && >>m4_eval(1 - $1)$next_good_path_mask[$1])'])
    //same as <<m4_eval($1)$GoodPathMask[$1]), but accessible 1 cycle earlier and without $reset term.
 
    
@@ -806,40 +840,48 @@ m4+definitions(['
    //      If RO, the CSR is read-only and code can be simpler. The CSR signal must be provided:
    //         o $csr_<csr_name>: The read-only CSR value (used in |fetch@M4_EXECUTE_STAGE).
    // Variables set by this macro:
-   // List of CSRs.
-   m4_define(['m4_csrs'], [''])
+   m4_def(['# List of CSRs.'],
+          csrs, [''])
+   m4_def(num_csrs, 0)
    // Arguments given to this macro for each CSR.
    // Initial value of CSR read result expression, initialized to ternary default case (X).
-   m4_define(['m4_csrrx_rslt_expr'], ['M4_WORD_CNT'bx'])
+   m4_def(csrrx_rslt_expr, ['M4_WORD_CNT'bx'])
    // Initial value of OR expression for whether CSR index is valid.
-   m4_define(['m4_valid_csr_expr'], ['1'b0'])
+   m4_def(valid_csr_expr, ['1'b0'])
+   // VIZ initEach and renderEach JS code to define fabricjs objects for the CSRs.
+   m4_def(csr_viz_init_each, [''])
+   m4_def(csr_viz_render_each, [''])
 
    // m4_define_csr(name, index (12-bit SV-value), fields (as in m4_define_vector), reset_value (SV-value), writable_mask (SV-value), side-effect_writes (bool))
    // Adds a CSR.
    // Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
-   m4_define(
-      ['m4_define_csr'],
+   m4_def(
+      define_csr,
       ['m4_define_vector_with_fields(['M4_CSR_']m4_to_upper(['$1']), $3)
-        m4_define(['m4_csrs'], 
-                  m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
-        m4_define(['m4_csr_']$1['_args'], ['$@'])
+        m4_def(csrs,
+               m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
+        m4_def(csr_$1_args, ['$@'])
         // 32'b0 = ['{{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
-        m4_define(['m4_csrrx_rslt_expr'], m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
-        m4_define(['m4_valid_csr_expr'], m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
+        m4_def(csrrx_rslt_expr, m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
+        m4_def(valid_csr_expr, m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
+        // VIZ
+        m4_def(csr_viz_init_each, m4_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
+        m4_def(csr_viz_render_each, m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").setText($1name + ": " + val_$1 + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
+        m4_def(num_csrs, m4_eval(m4_num_csrs + 1))
       ']
    )
    
    m4_case(M4_ISA, ['RISCV'], ['
-      m4_ifelse(M4_NO_COUNTER_CSRS, ['1'], [''], ['
+      m4_ifelse(M4_NO_COUNTER_CSRS, 1, [''], ['
          // Define Counter CSRs
-         //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
+         //            Name            Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
          m4_define_csr(['cycle'],      12'hC00,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['cycleh'],     12'hC80,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['time'],       12'hC01,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['timeh'],      12'hC81,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['instret'],    12'hC02,    ['32, INSTRET, 0'],             ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(['instreth'],   12'hC82,    ['32, INSTRETH, 0'],            ['32'b0'],                     ['{32{1'b1}}'],                     1)
-         m4_ifelse_block(M4_EXT_F, 1, ['
+         m4_ifelse(M4_EXT_F, 1, ['
          m4_define_csr(['fflags'],     12'h001,    ['5, FFLAGS, 0'],               ['5'b0'],                      ['{5{1'b1}}'],                      1)
          m4_define_csr(['frm'],        12'h002,    ['3, FRM, 0'],                  ['3'b0'],                      ['{3{1'b1}}'],                      1)
          m4_define_csr(['fcsr'],       12'h003,    ['8, FCSR, 0'],                 ['8'b0'],                      ['{8{1'b1}}'],                      1)
@@ -847,7 +889,7 @@ m4+definitions(['
       '])
       
       // For NoC support
-      m4_ifexpr(M4_CORE_CNT > 1, ['
+      m4_ifexpr(M4_NUM_CORES > 1, ['
          // As defined in: https://docs.google.com/document/d/1cDUv8cuYF2kha8r6DSv-8pwszsrSP3vXsTiAugRkI1k/edit?usp=sharing
          // TODO: Find appropriate indices.
          //            Name            Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
@@ -952,33 +994,44 @@ m4+definitions(['
             input logic reset,
             output logic failed,
             output logic passed,
-            output logic  rvfi_valid, 
+            output logic  rvfi_valid,
             output logic [31:0] rvfi_insn,
             output logic [63 : 0] rvfi_order,
             output logic rvfi_halt,
-            output logic rvfi_trap,       
-            output logic rvfi_halt,       
+            output logic rvfi_trap,
             output logic rvfi_intr,
             output logic [1: 0] rvfi_ixl,
             output logic [1: 0] rvfi_mode,
-            output logic [4: 0] rvfi_rs1_addr,   
-            output logic [4: 0] rvfi_rs2_addr,   
-            output logic [31: 0] rvfi_rs1_rdata,  
-            output logic [31: 0] rvfi_rs2_rdata,  
-            output logic [4: 0] rvfi_rd_addr,    
-            output logic [31: 0] rvfi_rd_wdata,   
-            output logic [31:0] rvfi_pc_rdata,   
-            output logic [31:0] rvfi_pc_wdata ,   
-            output logic [31:0] rvfi_mem_addr,   
-            output logic [3: 0] rvfi_mem_rmask,  
-            output logic [3: 0] rvfi_mem_wmask,  
-            output logic [31: 0] rvfi_mem_rdata,  
+            output logic [4: 0] rvfi_rs1_addr,
+            output logic [4: 0] rvfi_rs2_addr,
+            output logic [31: 0] rvfi_rs1_rdata,
+            output logic [31: 0] rvfi_rs2_rdata,
+            output logic [4: 0] rvfi_rd_addr,
+            output logic [31: 0] rvfi_rd_wdata,
+            output logic [31:0] rvfi_pc_rdata,
+            output logic [31:0] rvfi_pc_wdata,
+            output logic [31:0] rvfi_mem_addr,
+            output logic [3: 0] rvfi_mem_rmask,
+            output logic [3: 0] rvfi_mem_wmask,
+            output logic [31: 0] rvfi_mem_rdata,
             output logic [31: 0] rvfi_mem_wdata);'])'])
+
+   // TODO: Remove after released to Makerchip/SaaS.
+   m4_def(ifdef_tlv, ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
 '])
 \SV
-   m4_ifexpr(M4_CORE_CNT > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/4bcf06b71272556ec7e72269152561902474848e/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/8b5cfb9ffd9830aaf44297280682bedfe8bef3e3/risc-v_defs.tlv'])'])
+   m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
+   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/1d1023ccf8e7b0a8cf8e8fc4f0a823ebb61008e3/risc-v_defs.tlv'])'])
 
+
+// A default testbench for all ISAs.
+// Requires m4+makerchip_pass_fail(..).
+\TLV default_makerchip_tb()
+   |fetch
+      /instr
+         @M4_MEM_WR_STAGE
+            $passed = ! $reset && ($Pc == (M4_NUM_INSTRS - 1)) && $good_path;
+            $failed = *cyc_cnt > 200;
 
 
 
@@ -990,7 +1043,7 @@ m4+definitions(['
                          
 \TLV mini_cnt10_prog()
    \SV_plus
-      m4_define(['M4_NUM_INSTRS'], 13)
+      m4_def(NUM_INSTRS, 13)
       
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -1022,7 +1075,7 @@ m4+definitions(['
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
          
-         "0=d;g",  //    store out at store_addr, 
+         "0=d;g",  //    store out at store_addr,
          "e=c-b", //     tmp = nine - cnt
          "p=f?e", //     branch back if tmp >= 0
          "e=0)c", //     load the final value into tmp
@@ -1216,17 +1269,17 @@ m4+definitions(['
    // 5: offset
    // 6: store addr
  
-   m4_asm(ORI, r6, r0, 0)        //     store_addr = 0
-   m4_asm(ORI, r1, r0, 1)        //     cnt = 1
-   m4_asm(ORI, r2, r0, 1010)     //     ten = 10
-   m4_asm(ORI, r3, r0, 0)        //     out = 0
-   m4_asm(ADD, r3, r1, r3)       //  -> out += cnt
-   m4_asm(SW, r6, r3, 0)         //     store out at store_addr
-   m4_asm(ADDI, r1, r1, 1)       //     cnt ++
-   m4_asm(ADDI, r6, r6, 100)     //     store_addr++
-   m4_asm(BLT, r1, r2, 1111111110000) //  ^- branch back if cnt < 10
-   m4_asm(LW, r4, r6,   111111111100) //     load the final value into tmp
-   m4_asm(BGE, r1, r2, 1111111010100) //     TERMINATE by branching to -1
+   m4_asm(ORI, x6, x0, 0)        //     store_addr = 0
+   m4_asm(ORI, x1, x0, 1)        //     cnt = 1
+   m4_asm(ORI, x2, x0, 1010)     //     ten = 10
+   m4_asm(ORI, x3, x0, 0)        //     out = 0
+   m4_asm(ADD, x3, x1, x3)       //  -> out += cnt
+   m4_asm(SW, x6, x3, 0)         //     store out at store_addr
+   m4_asm(ADDI, x1, x1, 1)       //     cnt ++
+   m4_asm(ADDI, x6, x6, 100)     //     store_addr++
+   m4_asm(BLT, x1, x2, 1111111110000) //  ^- branch back if cnt < 10
+   m4_asm(LW, x4, x6,   111111111100) //     load the final value into tmp
+   m4_asm(BGE, x1, x2, 1111111010100) //     TERMINATE by branching to -1
 
 \TLV riscv_divmul_test_prog()
    // /==========================\
@@ -1235,140 +1288,140 @@ m4+definitions(['
    //
    //3 MULs followed by 3 DIVs, check r11-r15 for correct results
 
-   m4_asm(ORI, r8, r0, 1011)
-   m4_asm(ORI, r9, r0, 1010)
-   m4_asm(ORI, r10, r0, 10101010)
-   m4_asm(MUL, r11, r8, r9)
-   m4_asm(ORI, r6, r0, 0)
-   m4_asm(SW, r6, r11, 0)
-   m4_asm(MUL, r12, r9, r10)
-   m4_asm(LW, r4, r6, 0)
-   m4_asm(ADDI, r6, r6, 100)
-   m4_asm(SW, r6, r12, 0)
-   m4_asm(MUL, r13, r8, r10)
-   m4_asm(DIV, r14, r11, r8)
-   m4_asm(DIV, r15, r13, r10)
-   m4_asm(LW, r5, r6, 0)
-   m4_asm(ADDI, r4, r0, 101101)
-   m4_asm(BGE, r8, r9, 111111111110)
+   m4_asm(ORI, x8, x0, 1011)
+   m4_asm(ORI, x9, x0, 1010)
+   m4_asm(ORI, x10, x0, 10101010)
+   m4_asm(MUL, x11, x8, r9)
+   m4_asm(ORI, x6, x0, 0)
+   m4_asm(SW, x6, x11, 0)
+   m4_asm(MUL, x12, x9, r10)
+   m4_asm(LW, x4, x6, 0)
+   m4_asm(ADDI, x6, x6, 100)
+   m4_asm(SW, x6, x12, 0)
+   m4_asm(MUL, x13, x8, x10)
+   m4_asm(DIV, x14, x11, x8)
+   m4_asm(DIV, x15, x13, x10)
+   m4_asm(LW, x5, x6, 0)
+   m4_asm(ADDI, x4, x0, 101101)
+   m4_asm(BGE, x8, x9, 111111111110)
 
 \TLV riscv_fpu_test_prog()
    // /==========================\
    // | F-extension Test Program |
    // \==========================/
    //
-   m4_asm(LUI, r1, 01110001010101100000)
-   m4_asm(ADDI, r1, r1, 010001000001)
-   m4_asm(LUI, r2, 01100101100101001111)
-   m4_asm(ADDI, r2, r2, 010001000000)
-   m4_asm(LUI, r3, 01001101110111110001)
-   m4_asm(ADDI, r3, r3, 010000000000)
-   m4_asm(FMVWX, r1, r1)
-   m4_asm(FMVWX, r2, r2)
-   m4_asm(FMVWX, r3, r3)
-   m4_asm(FSW, r0, r1, 000001000000)
-   m4_asm(FSW, r0, r2, 000001000100)
-   m4_asm(FLW, r16, r0, 000001000000)
-   m4_asm(FLW, r17, r0, 000001000100)
-   m4_asm(FMADDS, r5, r1, r2, r3, 000)
-   m4_asm(FMSUBS, r6, r1, r2, r3, 000)
-   m4_asm(FNMSUBS, r7, r1, r2, r3, 000)
-   m4_asm(FNMADDS, r8, r1, r2, r3, 000)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FADDS, r9, r1, r2, 000)
-   m4_asm(FSUBS, r10, r1, r2, 000)
-   m4_asm(FMULS, r11, r1, r2, 000)
-   m4_asm(FDIVS, r12, r1, r2, 000)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FSQRTS, r13, r1, 000)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FSGNJS, r14, r1, r2)
-   m4_asm(FSGNJNS, r15, r1, r2)
-   m4_asm(FSGNJXS, r16, r1, r2)
-   m4_asm(FMINS, r17, r1, r2)
-   m4_asm(FMAXS, r18, r1, r2)
-   m4_asm(FCVTSW, r23, r2, 000)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FCVTSWU, r24, r3, 000)
-   m4_asm(FMVXW, r5, r11)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FEQS, r19, r1, r2)
-   m4_asm(FLTS, r20, r2, r1)
-   m4_asm(FLES, r21, r1, r2)
-   m4_asm(FCLASSS, r22, r1)
-   m4_asm(FEQS, r19, r1, r2)
-   m4_asm(CSRRS, r20, r0, 10)
-   m4_asm(CSRRS, r20, r0, 11)
-   m4_asm(FCVTWS, r12, r23, 000)
-   m4_asm(FCVTWUS, r13, r24, 000)
-   m4_asm(ORI, r0, r0, 0)
+   m4_asm(LUI, x1, 01110001010101100000)
+   m4_asm(ADDI, x1, x1, 010001000001)
+   m4_asm(LUI, x2, 01100101100101001111)
+   m4_asm(ADDI, x2, x2, 010001000000)
+   m4_asm(LUI, x3, 01001101110111110001)
+   m4_asm(ADDI, x3, x3, 010000000000)
+   m4_asm(FMVWX, x1, x1)
+   m4_asm(FMVWX, x2, x2)
+   m4_asm(FMVWX, x3, x3)
+   m4_asm(FSW, x0, x1, 000001000000)
+   m4_asm(FSW, x0, x2, 000001000100)
+   m4_asm(FLW, x16, x0, 000001000000)
+   m4_asm(FLW, x17, x0, 000001000100)
+   m4_asm(FMADDS, x5, x1, x2, x3, 000)
+   m4_asm(FMSUBS, x6, x1, x2, x3, 000)
+   m4_asm(FNMSUBS, x7, x1, x2, x3, 000)
+   m4_asm(FNMADDS, x8, x1, x2, x3, 000)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FADDS, x9, x1, x2, 000)
+   m4_asm(FSUBS, x10, x1, x2, 000)
+   m4_asm(FMULS, x11, x1, x2, 000)
+   m4_asm(FDIVS, x12, x1, x2, 000)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FSQRTS, x13, x1, 000)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FSGNJS, x14, x1, x2)
+   m4_asm(FSGNJNS, x15, x1, x2)
+   m4_asm(FSGNJXS, x16, x1, x2)
+   m4_asm(FMINS, x17, x1, x2)
+   m4_asm(FMAXS, x18, x1, x2)
+   m4_asm(FCVTSW, x23, x2, 000)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FCVTSWU, x24, x3, 000)
+   m4_asm(FMVXW, x5, x11)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FEQS, x19, x1, x2)
+   m4_asm(FLTS, x20, x2, x1)
+   m4_asm(FLES, x21, x1, x2)
+   m4_asm(FCLASSS, x22, x1)
+   m4_asm(FEQS, x19, x1, x2)
+   m4_asm(CSRRS, x20, x0, 10)
+   m4_asm(CSRRS, x20, x0, 11)
+   m4_asm(FCVTWS, x12, x23, 000)
+   m4_asm(FCVTWUS, x13, x24, 000)
+   m4_asm(ORI, x0, x0, 0)
    
 \TLV riscv_bmi_test_prog()
    // /==========================\
    // | B-extension Test Program |
    // \==========================/
    //
-   m4_asm(LUI, r1, 01110001010101100000)
-   m4_asm(ADDI, r1, r1, 010001000001)
-   m4_asm(ADDI, r2, r2, 010001000010)
-   m4_asm(ADDI, r3, r3, 010000000011)
-   m4_asm(ANDN, r5, r1, r2)
-   m4_asm(ORN, r6, r1, r2)
-   m4_asm(XNOR, r7, r1, r2)
-   m4_asm(SLO, r8, r1, r2)
-   m4_asm(SRO, r20, r1, r2)
-   m4_asm(ROL, r20, r1, r2)
-   m4_asm(ROR, r9, r1, r2)
-   m4_asm(SBCLR, r10, r1, r2)
-   m4_asm(SBSET, r11, r1, r2)
-   m4_asm(SBINV, r12, r1, r2)
-   m4_asm(SBEXT, r20, r1, r2)
-   m4_asm(GORC, r20, r1, r2)
-   m4_asm(GREV, r13, r1, r2)
-   m4_asm(SLOI, r8, r1, 111)
-   m4_asm(SROI, r20, r1, 111)
-   m4_asm(RORI, r9, r1, 111)
-   m4_asm(SBCLRI, r10, r1, 111)
-   m4_asm(SBSETI, r11, r1, 111)
-   m4_asm(SBINVI, r12, r1, 111)
-   m4_asm(SBEXTI, r20, r1, 111)
-   m4_asm(GORCI, r20, r1, 111)
-   m4_asm(GREVI, r13, r1, 111)
-   m4_asm(CLMUL, r14, r1, r2)
-   m4_asm(CLMULR, r15, r1, r2)
-   m4_asm(CLZ, r19, r1)
-   m4_asm(CTZ, r20, r1)
-   m4_asm(PCNT, r21, r1)
-   m4_asm(CRC32B, r22, r1)
-   m4_asm(CRC32H, r23, r1)
-   m4_asm(CRC32W, r24, r1)
-   m4_asm(CRC32CB, r26, r1)
-   m4_asm(CRC32CH, r27, r1)
-   m4_asm(CRC32CW, r28, r1)
-   m4_asm(MIN, r9, r1, r2)
-   m4_asm(MAX, r10, r1, r2)
-   m4_asm(MINU, r11, r1, r2)
-   m4_asm(MAXU, r12, r1, r2)
-   m4_asm(SHFL, r13, r1, r2)
-   m4_asm(UNSHFL, r14, r1, r2)
-   m4_asm(BDEP, r15, r1, r2)
-   m4_asm(BEXT, r16, r1, r2)
-   m4_asm(PACK, r17, r1, r2)
-   m4_asm(PACKU, r18, r1, r2)
-   m4_asm(PACKH, r19, r1, r2)
-   m4_asm(BFP, r20, r1, r2)
-   m4_asm(SHFLI, r21, r1, 11111)
-   m4_asm(UNSHFLI, r22, r1, 11111)
-   m4_asm(ORI, r0, r0, 0)
+   m4_asm(LUI, x1, 01110001010101100000)
+   m4_asm(ADDI, x1, x1, 010001000001)
+   m4_asm(ADDI, x2, x2, 010001000010)
+   m4_asm(ADDI, x3, x3, 010000000011)
+   m4_asm(ANDN, x5, x1, x2)
+   m4_asm(ORN, x6, x1, x2)
+   m4_asm(XNOR, x7, x1, x2)
+   m4_asm(SLO, x8, x1, x2)
+   m4_asm(SRO, x20, x1, x2)
+   m4_asm(ROL, x20, x1, x2)
+   m4_asm(ROR, x9, x1, x2)
+   m4_asm(SBCLR, x10, x1, x2)
+   m4_asm(SBSET, x11, x1, x2)
+   m4_asm(SBINV, x12, x1, x2)
+   m4_asm(SBEXT, x20, x1, x2)
+   m4_asm(GORC, x20, x1, x2)
+   m4_asm(GREV, x13, x1, x2)
+   m4_asm(SLOI, x8, x1, 111)
+   m4_asm(SROI, x20, x1, 111)
+   m4_asm(RORI, x9, x1, 111)
+   m4_asm(SBCLRI, x10, x1, 111)
+   m4_asm(SBSETI, x11, x1, 111)
+   m4_asm(SBINVI, x12, x1, 111)
+   m4_asm(SBEXTI, x20, x1, 111)
+   m4_asm(GORCI, x20, x1, 111)
+   m4_asm(GREVI, x13, x1, 111)
+   m4_asm(CLMUL, x14, x1, x2)
+   m4_asm(CLMULR, x15, x1, x2)
+   m4_asm(CLZ, x19, x1)
+   m4_asm(CTZ, x20, x1)
+   m4_asm(PCNT, x21, x1)
+   m4_asm(CRC32B, x22, x1)
+   m4_asm(CRC32H, x23, x1)
+   m4_asm(CRC32W, x24, x1)
+   m4_asm(CRC32CB, x26, x1)
+   m4_asm(CRC32CH, x27, x1)
+   m4_asm(CRC32CW, x28, x1)
+   m4_asm(MIN, x9, x1, x2)
+   m4_asm(MAX, x10, x1, x2)
+   m4_asm(MINU, x11, x1, x2)
+   m4_asm(MAXU, x12, x1, x2)
+   m4_asm(SHFL, x13, x1, x2)
+   m4_asm(UNSHFL, x14, x1, x2)
+   m4_asm(BDEP, x15, x1, x2)
+   m4_asm(BEXT, x16, x1, x2)
+   m4_asm(PACK, x17, x1, x2)
+   m4_asm(PACKU, x18, x1, x2)
+   m4_asm(PACKH, x19, x1, x2)
+   m4_asm(BFP, x20, x1, x2)
+   m4_asm(SHFLI, x21, x1, 11111)
+   m4_asm(UNSHFLI, x22, x1, 11111)
+   m4_asm(ORI, x0, x0, 0)
    
 \TLV riscv_imem(_prog_name)
    // Instantiate the program. (This approach is required for an m4-defined name.)
-   m4_define(['m4_prog'], ['riscv_']_prog_name['_prog'])
+   m4_def(prog, ['riscv_']_prog_name['_prog'])
    m4+m4_prog()
    m4+instrs_for_viz()
    
@@ -1376,59 +1429,57 @@ m4+definitions(['
    // IMem and Fetch
    // ==============
    
-   m4_ifelse_block(M4_IMPL, 1, ['
-   
-   // For implementation
-   // ------------------
-   
-   // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
-   |fetch
-      /instr_mem[M4_NUM_INSTRS-1:0]
-         @M4_FETCH_STAGE
-            // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
-            $instr[31:0] =
-               m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == m4_instr_ind) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
-      /instr
-         @M4_FETCH_STAGE
-            ?$fetch
-               // Fetch the raw instruction from program memory.
-               $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
-   '], M4_FORMAL, 0, ['
-   
-   // For simulation
-   // --------------
-   
-   // (Vivado doesn't like this)
-   \SV_plus
-      // The program in an instruction memory.
-      logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
-      logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
-      
-      assign instrs = '{
-         m4_instr0['']m4_forloop(['m4_instr_ind'], 1, M4_NUM_INSTRS, [', m4_echo(['m4_instr']m4_instr_ind)'])
-      };
-      
-      // String representations of the instructions for debug.
-      assign instr_strs = '{m4_asm_mem_expr "END                                     "};
+   m4+ifelse(M4_IMPL, 1,
+      \TLV
+         // For implementation
+         // ------------------
 
-   |fetch
-      /instr
-         @M4_FETCH_STAGE
-            ?$fetch
-               $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
-   '], ['
-   
-   // For formal
-   // ----------
-   
-   // No instruction memory.
-   |fetch
-      /instr
-         @M4_FETCH_STAGE
-            ?$fetch
-               `BOGUS_USE($$raw[M4_INSTR_RANGE])
-   '])
-   
+         // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
+         |fetch
+            /instr_mem[M4_NUM_INSTRS-1:0]
+               @M4_FETCH_STAGE
+                  // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
+                  $instr[31:0] =
+                     m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == m4_instr_ind) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
+            /instr
+               @M4_FETCH_STAGE
+                  ?$fetch
+                     // Fetch the raw instruction from program memory.
+                     $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
+      , M4_FORMAL, 0,
+      \TLV
+
+         // For simulation
+         // --------------
+
+         // (Vivado doesn't like this -- TODO: Is this still true?)
+         \SV_plus
+            // The program in an instruction memory.
+            logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
+            logic [40*8-1:0] instr_strs [0:M4_NUM_INSTRS];
+            
+            m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instrs[m4_instr_ind] = m4_echo(['m4_instr']m4_instr_ind); '])
+            
+            // String representations of the instructions for debug.
+            assign instr_strs = '{m4_asm_mem_expr "END                                     "};
+            
+         |fetch
+            /instr
+               @M4_FETCH_STAGE
+                  ?$fetch
+                     $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
+      ,
+      \TLV
+         // For formal
+         // ----------
+
+         // No instruction memory.
+         |fetch
+            /instr
+               @M4_FETCH_STAGE
+                  ?$fetch
+                     `BOGUS_USE($$raw[M4_INSTR_RANGE])
+      )
 
 // Logic for a single CSR.
 \TLV riscv_csr(csr_name, csr_index, fields, reset_value, writable_mask, side_effects)
@@ -1440,120 +1491,131 @@ m4+definitions(['
    @M4_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
       // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
-      m4_define(['M4_THIS_CSR_RANGE'], m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
+      m4_def(THIS_CSR_RANGE, m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
       
-      m4_ifelse_block(side_effects, 1, ['
-      // hw_wr_mask conditioned by hw_wr.
-      $csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
-      // The CSR value, updated by side-effect writes.
-      $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] =
-           ($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name);
-      '], side_effects, 0, ['
-      // The CSR value with no side-effect writes.
-      $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] = $csr_['']csr_name;
-      '], ['
-      '])
-      m4_ifelse_block(side_effects, RO, ['
-      '], ['
-      // Next value of the CSR.
-      $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
-           $csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
-      <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
-           $reset ? reset_value :
-           ! $commit
-                  ? $upd_csr_['']csr_name :
-           $is_csr_write && $is_csr_['']csr_name
-                  ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ~ writable_mask) :
-           $is_csr_set   && $is_csr_['']csr_name
-                  ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
-           $is_csr_clear && $is_csr_['']csr_name
-                  ? $upd_csr_['']csr_name & ~ $csr_['']csr_name['']_masked_wr_value :
-           // No CSR instruction update, only h/w side-effects.
-                    $upd_csr_['']csr_name;
-      '])
+      m4+ifelse(side_effects, 1,
+         \TLV
+            // hw_wr_mask conditioned by hw_wr.
+            $csr_['']csr_name['']_hw_wr_en_mask[M4_THIS_CSR_RANGE] = {m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
+            // The CSR value, updated by side-effect writes.
+            $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] =
+                 ($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name);
+         , side_effects, 0,
+         \TLV
+            // The CSR value with no side-effect writes.
+            $upd_csr_['']csr_name[M4_THIS_CSR_RANGE] = $csr_['']csr_name;
+         )
+      m4+ifelse(side_effects, RO,
+         \TLV
+         ,
+         \TLV
+            // Next value of the CSR.
+            $csr_['']csr_name['']_masked_wr_value[M4_THIS_CSR_RANGE] =
+                 $csr_wr_value[M4_THIS_CSR_RANGE] & writable_mask;
+            <<1$csr_['']csr_name[M4_THIS_CSR_RANGE] =
+                 $reset ? reset_value :
+                 ! $commit
+                        ? $upd_csr_['']csr_name :
+                 $is_csr_write && $is_csr_['']csr_name
+                        ? $csr_['']csr_name['']_masked_wr_value | ($upd_csr_['']csr_name & ~ writable_mask) :
+                 $is_csr_set   && $is_csr_['']csr_name
+                        ? $upd_csr_['']csr_name |   $csr_['']csr_name['']_masked_wr_value :
+                 $is_csr_clear && $is_csr_['']csr_name
+                        ? $upd_csr_['']csr_name & ~ $csr_['']csr_name['']_masked_wr_value :
+                 // No CSR instruction update, only h/w side-effects.
+                          $upd_csr_['']csr_name;
+         )
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
+   // TODO: This doesn't maintain alignment. Need an m4+foreach macro.
    m4_foreach(csr, csrs, ['
    m4+riscv_csr(m4_echo(['m4_csr_']csr['_args']))
    '])
 
 \TLV riscv_csr_logic()
-   m4_ifelse_block(m4_csrs, [''], [''], ['
-   // CSR write value for CSR write instructions.
-   $csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
-   '])
+   m4+ifelse(m4_csrs, [''], [''],
+      \TLV
+         // CSR write value for CSR write instructions.
+         $csr_wr_value[M4_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
+      )
 
    // Counter CSR
    //
-   m4_ifelse_block(M4_NO_COUNTER_CSRS, ['1'], [''], ['
-   // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
-   $RemainingCyclesWithinTimeUnit[m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)-1:0] <=
-        ($reset || $time_unit_expires) ?
-               m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)'d['']m4_eval(M4_CYCLES_PER_TIME_UNIT_CNT - 1) :
-               $RemainingCyclesWithinTimeUnit - m4_width(M4_CYCLES_PER_TIME_UNIT_CNT)'b1;
-   $time_unit_expires = !( | $RemainingCyclesWithinTimeUnit);  // reaches zero
-   
-   $full_csr_cycle_hw_wr_value[63:0]   = {$csr_cycleh,   $csr_cycle  } + 64'b1;
-   $full_csr_time_hw_wr_value[63:0]    = {$csr_timeh,    $csr_time   } + 64'b1;
-   $full_csr_instret_hw_wr_value[63:0] = {$csr_instreth, $csr_instret} + 64'b1;
-   m4_ifelse_block(M4_EXT_F, 1, ['
-   // If the value of $raw_rm (or rm field in instruction encoding) is 3'b111(dynamic RoundingMode) or if $fpu_second_issue_div_sqrt
-   // occurs then, take the previous "rm"(RoundingMode) stored in "frm" CSR or else take that from instruction encoding itself.
-   // NOTE. In first issue of fpu_div_sqrt itself the vaild $raw_rm value get stored/latched in "frm" CSR,
-   //       so to use that at time of second issue of fpu_div_sqrt. 
-   $fpufcsr[7:0] = {(((|fetch/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_fcsr[7:5] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
-   '])
-   
-   // CSR h/w side-effect write signals.
-   $csr_cycle_hw_wr = 1'b1;
-   $csr_cycle_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_cycle_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[31:0];
-   $csr_cycleh_hw_wr = 1'b1;
-   $csr_cycleh_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_cycleh_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[63:32];
-   $csr_time_hw_wr = $time_unit_expires;
-   $csr_time_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_time_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[31:0];
-   $csr_timeh_hw_wr = $time_unit_expires;
-   $csr_timeh_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_timeh_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[63:32];
-   $csr_instret_hw_wr = $commit;
-   $csr_instret_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_instret_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[31:0];
-   $csr_instreth_hw_wr = $commit;
-   $csr_instreth_hw_wr_mask[31:0] = {32{1'b1}};
-   $csr_instreth_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[63:32];
-   m4_ifelse_block(M4_EXT_F, 1, ['
-   $csr_fflags_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
-   $csr_fflags_hw_wr_mask[4:0] = {5{1'b1}};
-   $csr_fflags_hw_wr_value[4:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_fflags[4:0] : $fpufcsr[4:0])};
-   
-   $csr_frm_hw_wr = ($commit && $fpu_csr_fflags_type_instr);
-   $csr_frm_hw_wr_mask[2:0] = {3{1'b1}};
-   $csr_frm_hw_wr_value[2:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_frm[2:0] : $fpufcsr[7:5])};
-   
-   $csr_fcsr_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
-   $csr_fcsr_hw_wr_mask[7:0] = {8{1'b1}};
-   $csr_fcsr_hw_wr_value[7:0] = {($fpu_fflags_type_instr) ? {>>1$csr_fcsr[7:5], $fpufcsr[4:0]} : (($fpufcsr[7:5] == 3'b111) ? >>1$csr_fcsr : $fpufcsr)};
-   '])
-   '])
+   m4+ifelse(M4_NO_COUNTER_CSRS, 1,
+      \TLV
+      ,
+      \TLV
+         // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
+         $RemainingCyclesWithinTimeUnit[m4_width(M4_CYCLES_PER_TIME_UNIT)-1:0] <=
+              ($reset || $time_unit_expires) ?
+                     m4_width(M4_CYCLES_PER_TIME_UNIT)'d['']m4_eval(M4_CYCLES_PER_TIME_UNIT - 1) :
+                     $RemainingCyclesWithinTimeUnit - m4_width(M4_CYCLES_PER_TIME_UNIT)'b1;
+         $time_unit_expires = !( | $RemainingCyclesWithinTimeUnit);  // reaches zero
+
+         $full_csr_cycle_hw_wr_value[63:0]   = {$csr_cycleh,   $csr_cycle  } + 64'b1;
+         $full_csr_time_hw_wr_value[63:0]    = {$csr_timeh,    $csr_time   } + 64'b1;
+         $full_csr_instret_hw_wr_value[63:0] = {$csr_instreth, $csr_instret} + 64'b1;
+         m4+ifelse(M4_EXT_F, 1,
+            \TLV
+               // If the value of $raw_rm (or rm field in instruction encoding) is 3'b111(dynamic RoundingMode) or if $fpu_second_issue_div_sqrt
+               // occurs then, take the previous "rm"(RoundingMode) stored in "frm" CSR or else take that from instruction encoding itself.
+               // NOTE. In first issue of fpu_div_sqrt itself the vaild $raw_rm value get stored/latched in "frm" CSR,
+               //       so to use that at time of second issue of fpu_div_sqrt. 
+               $fpufcsr[7:0] = {(((|fetch/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_fcsr[7:5] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
+            )
+         // CSR h/w side-effect write signals.
+         $csr_cycle_hw_wr = 1'b1;
+         $csr_cycle_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_cycle_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[31:0];
+         $csr_cycleh_hw_wr = 1'b1;
+         $csr_cycleh_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_cycleh_hw_wr_value[31:0] = $full_csr_cycle_hw_wr_value[63:32];
+         $csr_time_hw_wr = $time_unit_expires;
+         $csr_time_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_time_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[31:0];
+         $csr_timeh_hw_wr = $time_unit_expires;
+         $csr_timeh_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_timeh_hw_wr_value[31:0] = $full_csr_time_hw_wr_value[63:32];
+         $csr_instret_hw_wr = $commit;
+         $csr_instret_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_instret_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[31:0];
+         $csr_instreth_hw_wr = $commit;
+         $csr_instreth_hw_wr_mask[31:0] = {32{1'b1}};
+         $csr_instreth_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[63:32];
+         m4+ifelse(M4_EXT_F, 1,
+            \TLV
+               $csr_fflags_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
+               $csr_fflags_hw_wr_mask[4:0] = {5{1'b1}};
+               $csr_fflags_hw_wr_value[4:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_fflags[4:0] : $fpufcsr[4:0])};
+
+               $csr_frm_hw_wr = ($commit && $fpu_csr_fflags_type_instr);
+               $csr_frm_hw_wr_mask[2:0] = {3{1'b1}};
+               $csr_frm_hw_wr_value[2:0] = {(($fpufcsr[7:5] == 3'b111) ? >>1$csr_frm[2:0] : $fpufcsr[7:5])};
+
+               $csr_fcsr_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
+               $csr_fcsr_hw_wr_mask[7:0] = {8{1'b1}};
+               $csr_fcsr_hw_wr_value[7:0] = {($fpu_fflags_type_instr) ? {>>1$csr_fcsr[7:5], $fpufcsr[4:0]} : (($fpufcsr[7:5] == 3'b111) ? >>1$csr_fcsr : $fpufcsr)};
+            )
+      )
    
    // For multicore CSRs:
-   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
-   $csr_pktavail_hw_wr = 1'b0;
-   $csr_pktavail_hw_wr_mask[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
-   $csr_pktavail_hw_wr_value[M4_VC_RANGE] = {M4_VC_HIGH{1'b1}};
-   $csr_pktcomp_hw_wr = 1'b0;
-   $csr_pktcomp_hw_wr_mask[M4_VC_RANGE]   = {M4_VC_HIGH{1'b1}};
-   $csr_pktcomp_hw_wr_value[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
-   //$csr_pktrd_hw_wr = 1'b0;
-   //$csr_pktrd_hw_wr_mask[M4_WORD_RANGE]   = {M4_WORD_HIGH{1'b1}};
-   //$csr_pktrd_hw_wr_value[M4_WORD_RANGE]  = {M4_WORD_HIGH{1'b0}};
-   $csr_pktinfo_hw_wr = 1'b0;
-   $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
-   $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
-   '])
+   m4+ifelse(m4_eval(M4_NUM_CORES > 1), 1,
+      \TLV
+         $csr_pktavail_hw_wr = 1'b0;
+         $csr_pktavail_hw_wr_mask[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
+         $csr_pktavail_hw_wr_value[M4_VC_RANGE] = {M4_VC_HIGH{1'b1}};
+         $csr_pktcomp_hw_wr = 1'b0;
+         $csr_pktcomp_hw_wr_mask[M4_VC_RANGE]   = {M4_VC_HIGH{1'b1}};
+         $csr_pktcomp_hw_wr_value[M4_VC_RANGE]  = {M4_VC_HIGH{1'b1}};
+         //$csr_pktrd_hw_wr = 1'b0;
+         //$csr_pktrd_hw_wr_mask[M4_WORD_RANGE]   = {M4_WORD_HIGH{1'b1}};
+         //$csr_pktrd_hw_wr_value[M4_WORD_RANGE]  = {M4_WORD_HIGH{1'b0}};
+         $csr_pktinfo_hw_wr = 1'b0;
+         $csr_pktinfo_hw_wr_mask[M4_CSR_PKTINFO_RANGE]  = {M4_CSR_PKTINFO_HIGH{1'b1}};
+         $csr_pktinfo_hw_wr_value[M4_CSR_PKTINFO_RANGE] = {M4_CSR_PKTINFO_HIGH{1'b0}};
+         $csr_core[M4_CORE_INDEX_RANGE] = #core;
+      )
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
 // This keeps the implications contained.
@@ -1610,72 +1672,91 @@ m4+definitions(['
       // Instruction decode.
       m4+riscv_decode_expr()
       
-      m4_ifelse_block(M4_EXT_M, 1, ['
-      // Instruction requires integer mul/div unit and is long-latency.
-      $divtype_instr = ($is_div_instr || $is_divu_instr || $is_rem_instr || $is_remu_instr);
-      $multype_instr = ($is_mul_instr || $is_mulh_instr || $is_mulhsu_instr || $is_mulhu_instr);
-      $div_mul       = ($multype_instr || $divtype_instr);
-      '], ['
-      $div_mul = 1'b0;
-      $multype_instr = 1'b0;
-      `BOGUS_USE($multype_instr)
-      '])
+      m4+ifelse(M4_EXT_M, 1,
+         \TLV
+            // Instruction requires integer mul/div unit and is long-latency.
+            $divtype_instr = ($is_div_instr || $is_divu_instr || $is_rem_instr || $is_remu_instr);
+            $multype_instr = ($is_mul_instr || $is_mulh_instr || $is_mulhsu_instr || $is_mulhu_instr);
+            $div_mul       = ($multype_instr || $divtype_instr);
+         ,
+         \TLV
+            $div_mul = 1'b0;
+            $multype_instr = 1'b0;
+            `BOGUS_USE($multype_instr)
+         )
 
-      m4_ifelse_block(M4_EXT_F, 1, ['
-      // Instruction requires floating point unit and is long-latency.
-      // TODO. Current implementation decodes the floating type instructions seperatly.
-      // Hence can have a macro or signal to differentiate the type of instruction related to a particular extension or 
-      // could be better to use just $op5 decode for this.
+      m4+ifelse(M4_EXT_F, 1,
+         \TLV
+            // Instruction requires floating point unit and is long-latency.
+            // TODO. Current implementation decodes the floating type instructions seperatly.
+            // Hence can have a macro or signal to differentiate the type of instruction related to a particular extension or 
+            // could be better to use just $op5 decode for this.
+
+            // Categorize FP instrs that read int regs.
+            $fcvts_w_type_instr = $is_fcvtsw_instr ||
+                                  $is_fcvtswu_instr;
+            $fcvtw_s_type_instr = $is_fcvtws_instr ||
+                                  $is_fcvtwus_instr;
+            $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
+            $fmvxw_type_instr = $is_fmvxw_instr;
+            $fmvwx_type_instr = $is_fmvwx_instr;
+            // These instructions modifies FP CSR's "frm" and generates "fflags".
+            $fpu_csr_fflags_type_instr = $is_fmadds_instr ||
+                                         $is_fmsubs_instr ||
+                                         $is_fnmsubs_instr ||
+                                         $is_fnmadds_instr ||
+                                         $is_fadds_instr ||
+                                         $is_fsubs_instr ||
+                                         $is_fmuls_instr ||
+                                         $is_fdivs_instr ||
+                                         $is_fsqrts_instr ||
+                                         $fcvtw_s_type_instr ||
+                                         $fcvts_w_type_instr;
+            // These instructions do not modify FP CSR's "frm", but they do generate "fflags".
+            $fpu_fflags_type_instr = $is_fmins_instr ||
+                                     $is_fmaxs_instr ||
+                                     $is_feqs_instr ||
+                                     $is_flts_instr ||
+                                     $is_fles_instr;
+            // Generalized FP instrucions.                               
+            $fpu_type_instr = $fpu_csr_fflags_type_instr ||
+                              $fpu_fflags_type_instr ||
+                              $fmvxw_type_instr ||
+                              $fmvwx_type_instr ||
+                              $is_flw_instr ||
+                              $is_fsw_instr ||
+                              $is_fsgnjs_instr ||
+                              $is_fsgnjns_instr ||
+                              $is_fsgnjxs_instr ||
+                              $is_fclasss_instr;
+            // FPU instrs with int dest reg.
+            $fpu_instr_with_int_dest = $is_feqs_instr ||
+                                       $is_flts_instr ||
+                                       $is_fles_instr ||
+                                       $is_fclasss_instr ||
+                                       $fmvxw_type_instr ||
+                                       $fcvtw_s_type_instr;
+            // FPU instrs with all int srcs.
+            $fpu_instr_with_int_src = $fcvts_w_type_instr ||
+                                      $fmvwx_type_instr ||
+                                      $is_flw_instr;
+            $fpu_instr_with_int_src1 = $is_fsw_instr;
+         )
       
-      // These instructions modifies FP CSR's "frm" and generates "fflags".
-      $fpu_csr_fflags_type_instr = $is_fmadds_instr ||
-                                   $is_fmsubs_instr ||
-                                   $is_fnmsubs_instr ||
-                                   $is_fnmadds_instr ||
-                                   $is_fadds_instr ||
-                                   $is_fsubs_instr ||
-                                   $is_fmuls_instr ||
-                                   $is_fdivs_instr ||
-                                   $is_fsqrts_instr ||
-                                   $is_fcvtws_instr ||
-                                   $is_fcvtwus_instr ||
-                                   $is_fcvtsw_instr ||
-                                   $is_fcvtswu_instr;
-      // These instructions do not modify FP CSR's "frm", but they do generate "fflags".
-      $fpu_fflags_type_instr = $is_fmins_instr ||
-                               $is_fmaxs_instr ||
-                               $is_feqs_instr ||
-                               $is_flts_instr ||
-                               $is_fles_instr;
-      // Generalized FP instrucions.                               
-      $fpu_type_instr = $fpu_csr_fflags_type_instr ||
-                        $fpu_fflags_type_instr ||
-                        $is_flw_instr ||
-                        $is_fsw_instr ||
-                        $is_fsgnjs_instr ||
-                        $is_fsgnjns_instr ||
-                        $is_fsgnjxs_instr ||
-                        $is_fmvxw_instr ||
-                        $is_fclasss_instr ||
-                        $is_fmvwx_instr;
-      $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
-      $fmvxw_type_instr = $is_fmvxw_instr;
-      $fcvtw_s_type_instr = $is_fcvtws_instr || $is_fcvtwus_instr;
-      '])
-      
-      m4_ifelse_block(M4_EXT_B, 1, ['
-      // These are long-latency Instruction requires B-extension enabled.
-      $clmul_type_instr = $is_clmul_instr ||
-                          $is_clmulr_instr ||
-                          $is_clmulh_instr ;
-      $crc_type_instr =  $is_crc32b_instr ||
-                          $is_crc32w_instr ||
-                          $is_crc32h_instr ||
-                          $is_crc32cb_instr ||
-                          $is_crc32cw_instr ||
-                          $is_crc32ch_instr;
-      $clmul_crc_type_instr = $clmul_type_instr || $crc_type_instr;
-      '])
+      m4+ifelse(M4_EXT_B, 1,
+         \TLV
+            // These are long-latency Instruction requires B-extension enabled.
+            $clmul_type_instr = $is_clmul_instr ||
+                                $is_clmulr_instr ||
+                                $is_clmulh_instr ;
+            $crc_type_instr =  $is_crc32b_instr ||
+                                $is_crc32w_instr ||
+                                $is_crc32h_instr ||
+                                $is_crc32cb_instr ||
+                                $is_crc32cw_instr ||
+                                $is_crc32ch_instr;
+            $clmul_crc_type_instr = $clmul_type_instr || $crc_type_instr;
+         )
 
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
@@ -1698,8 +1779,10 @@ m4+definitions(['
       // Output signals.
       /src[2:1]
          // Reg valid for this source, based on instruction type.
-         $is_reg = /instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type;
-         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : /instr$raw_rs2;
+         $is_reg =
+             m4_ifelse(M4_EXT_F, 1, (! /instr$fpu_type_instr || /instr$fpu_instr_with_int_src || ((#src == 1) && /instr$fpu_instr_with_int_src1)) &&)
+             (/instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type);
+         $reg[M4_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[M4_REGS_INDEX_RANGE] : /instr$raw_rs2[M4_REGS_INDEX_RANGE];
          
       // For debug.
       $mnemonic[10*8-1:0] = m4_mnemonic_expr "ILLEGAL   ";
@@ -1707,23 +1790,30 @@ m4+definitions(['
    // Condition signals must not themselves be conditioned (currently).
    $dest_reg[M4_REGS_INDEX_RANGE] = m4_ifelse(M4_EXT_M, 1, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
                                     m4_ifelse(M4_EXT_B, 1, ['$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_reg :'])
-                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd;
-   $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) ||  $fmvxw_type_instr || $fcvtw_s_type_instr) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
-                     | $dest_reg;   // r0 not valid.
+                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd[M4_REGS_INDEX_RANGE];
+   $dest_reg_valid = m4_ifelse(M4_EXT_F, 1, ['((! $fpu_type_instr) || $fpu_instr_with_int_dest) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
+                     | $dest_reg;   // r0 not valid.  TODO: Huh? What about FP? No formal failure?
    
-   m4_ifelse_block(M4_EXT_F, 1, ['
-   // Implementing a different encoding for floating point instructions.
-   ?$valid_decode
-      // Output signals. seperate FPU source
-      /fpusrc[3:1]
-         // Reg valid for this fpu source, based on instruction type.
-         $is_fpu_reg = ( (#fpusrc != 3) && /instr$is_r_type) || /instr$is_r4_type || ( (#fpusrc != 3) && /instr$is_r2_type) || (/instr$is_i_type && (#fpusrc == 1) && (#fpusrc != 3)) || ( (#fpusrc != 3) && /instr$is_s_type);
-         $fpu_reg[M4_FPUREGS_INDEX_RANGE] = (#fpusrc == 1) ? /instr$raw_rs1 : (#fpusrc == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
-         
-   $dest_fpu_reg[M4_FPUREGS_INDEX_RANGE] = $fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_fpu_reg :
-                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_fpu_reg : $raw_rd;
-   $dest_fpu_reg_valid = ($fpu_type_instr && (! $fmvxw_type_instr) && (! $fcvtw_s_type_instr) ) && (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue);
-   '])
+   m4+ifelse(M4_EXT_F, 1,
+      \TLV
+         // Implementing a different encoding for floating point instructions.
+         ?$valid_decode
+            // Output signals. seperate FPU source
+            /fpu_src[3:1]
+               // Reg valid for this fpu source, based on instruction type.
+               $is_reg = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_src && ! ((#fpu_src == 1) && /instr$fpu_instr_with_int_src1)) &&
+                         (((#fpu_src != 3) && /instr$is_r_type) ||
+                          /instr$is_r4_type ||
+                          ((#fpu_src != 3) && /instr$is_r2_type) ||
+                          (/instr$is_i_type && (#fpu_src == 1) && (#fpu_src != 3)) ||
+                          ((#fpu_src != 3) && /instr$is_s_type)
+                         );
+               $reg[M4_FPU_REGS_INDEX_RANGE] = (#fpu_src == 1) ? /instr$raw_rs1 : (#fpu_src == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
+
+         $dest_fpu_reg[M4_FPU_REGS_INDEX_RANGE] = $fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_fpu_reg :
+                                          $second_issue_ld ? |fetch/instr/orig_inst$dest_fpu_reg : $raw_rd;
+         $dest_fpu_reg_valid = ($fpu_type_instr && ! $fpu_instr_with_int_dest) && (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue);
+      )
    
    // Actually load.
    $spec_ld = $valid_decode && $ld;
@@ -1740,19 +1830,14 @@ m4+definitions(['
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
    // if M_EXT is enabled, this handles the stalling logic
-   m4_ifelse_block(M4_EXT_M, 1, ['
-   m4+m_extension()
-   '])
+   m4_ifelse(M4_EXT_M, 1, ['m4+m_extension()'])
 
    // if F_EXT is enabled, this handles the stalling logic
-   m4_ifelse_block(M4_EXT_F, 1, ['
-   m4+f_extension()
-   '])
+   m4_ifelse(M4_EXT_F, 1, ['m4+f_extension()'])
 
    // if B_EXT is enabled, this handles the stalling logic
-   m4_ifelse_block(M4_EXT_B, 1, ['
-   m4+b_extension()
-   '])
+   m4_ifelse(M4_EXT_B, 1, ['m4+b_extension()'])
+   
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
@@ -1763,103 +1848,108 @@ m4+definitions(['
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
-      m4_ifelse_block(M4_EXT_M, 1, ['
-      // Verilog instantiation must happen outside when conditions' scope
-      $divblk_valid = $divtype_instr && $commit;
-      $mulblk_valid = $multype_instr && $commit;
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */   
-      m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
-      m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
-      // for the division module, the valid signal must be asserted for the entire computation duration, hence >>1$div_stall is used for this purpose
-      // for multiplication it is just a single cycle pulse to start operating
+      m4+ifelse(M4_EXT_M, 1,
+         \TLV
+            // Verilog instantiation must happen outside when conditions' scope
+            $divblk_valid = $divtype_instr && $commit;
+            $mulblk_valid = $multype_instr && $commit;
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off CASEINCOMPLETE */   
+            m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+            m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
+            // for the division module, the valid signal must be asserted for the entire computation duration, hence >>1$div_stall is used for this purpose
+            // for multiplication it is just a single cycle pulse to start operating
 
-      /* verilator lint_on CASEINCOMPLETE */
-      /* verilator lint_on WIDTH */
-      // use $ANY for passing attributes from long-latency div/mul instructions into the pipeline 
-      // stall_cnt_upper_div indicates that the results for div module are ready. The second issue of the instruction takes place
-      // M4_NON_PIPELINED_BUBBLES after this point (depending on pipeline depth)
-      // retain till next M-type instruction, to be used again at second issue
-      '])
+            /* verilator lint_on CASEINCOMPLETE */
+            /* verilator lint_on WIDTH */
+            // use $ANY for passing attributes from long-latency div/mul instructions into the pipeline 
+            // stall_cnt_upper_div indicates that the results for div module are ready. The second issue of the instruction takes place
+            // M4_NON_PIPELINED_BUBBLES after this point (depending on pipeline depth)
+            // retain till next M-type instruction, to be used again at second issue
+         )
  
-      m4_ifelse_block(M4_EXT_F, 1, ['
-      // "F" Extension.
+      m4+ifelse(M4_EXT_F, 1,
+         \TLV
+            // "F" Extension.
 
-      // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
-      // Need to call fpu_exe macro inside this ifelse_block itself and simplify it to optimize the unit.
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */
-      
-      $fpu_div_sqrt_valid = >>1$fpu_div_sqrt_stall;
-      $input_valid = $fpu_div_sqrt_type_instr && |fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit;
-      `BOGUS_USE($fpu_div_sqrt_valid)
-      // Main FPU execution
-      m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
-      
-      // Sign-injection macros
-      m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
-      m4+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
-      m4+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
-      /* verilator lint_on WIDTH */
-      /* verilator lint_on CASEINCOMPLETE */
-      '])
-      
-      
-      m4_ifelse_block(M4_EXT_B, 1, ['
-      // "B" Extension.
-      // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
+            // TODO. Current implementation of FPU is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
+            // Need to call fpu_exe macro inside this ifelse_block itself and simplify it to optimize the unit.
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off CASEINCOMPLETE */
 
-      // Main BMI Macro's
+            $fpu_div_sqrt_valid = >>1$fpu_div_sqrt_stall;
+            $input_valid = $fpu_div_sqrt_type_instr && |fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit;
+            `BOGUS_USE($fpu_div_sqrt_valid)
+            // Main FPU execution
+            m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
 
-      $din_valid_bext_dep = ($is_gorc_instr || $is_gorci_instr || $is_shfl_instr || $is_unshfl_instr || $is_bdep_instr || $is_bext_instr || $is_shfli_instr || $is_unshfli_instr) && |fetch/instr$commit;
-      $din_valid_clmul = ($is_clmul_instr || $is_clmulr_instr || $is_clmulh_instr) && |fetch/instr$commit;
-      $din_valid_rvb_crc = ($is_crc32b_instr || $is_crc32h_instr || $is_crc32w_instr || $is_crc32cb_instr || $is_crc32ch_instr || $is_crc32cw_instr) && |fetch/instr$commit;
-      $din_valid_rvb_bitcnt = ($is_pcnt_instr || $is_sextb_instr || $is_sexth_instr) && |fetch/instr$commit;
+            // Sign-injection macros
+            m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
+            m4+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
+            m4+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
+            /* verilator lint_on WIDTH */
+            /* verilator lint_on CASEINCOMPLETE */
+         )
       
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */
-      /* verilator lint_off PINMISSING */
-      /* verilator lint_off CASEOVERLAP */
-      m4+clz_final(|fetch/instr, /clz_stage, 32, 0, 1, $input_a, $clz_final_output)
-      m4+ctz_final(|fetch/instr, /ctz_stage, /reverse, 32, 0, 1, $input_a, $ctz_final_output)
-      m4+popcnt(|fetch/instr, /pop_stage, $input_a, $popcnt_output, 32)
-      m4+andn($input_a, $input_b, $andn_output[31:0])
-      m4+orn($input_a, $input_b, $orn_output[31:0])
-      m4+xnor($input_a, $input_b, $xnor_output[31:0])
-      m4+pack($input_a, $input_b, $pack_output, 32)
-      m4+packu($input_a, $input_b, $packu_output, 32)
-      m4+packh($input_a, $input_b, $packh_output, 32)
-      m4+minu($input_a, $input_b, $minu_output, 32)
-      m4+maxu($input_a, $input_b, $maxu_output, 32)
-      m4+min($input_a, $input_b, $min_output, 32)
-      m4+max($input_a, $input_b, $max_output, 32)
-      m4+sbset($input_a, $input_b, $sbset_output, 32)
-      m4+sbclr($input_a, $input_b, $sbclr_output, 32)
-      m4+sbinv($input_a, $input_b, $sbinv_output, 32)
-      m4+sbext($input_a, $input_b, $sbext_output, 32)
-      m4+sbseti($input_a, $input_b, $sbseti_output, 32)
-      m4+sbclri($input_a, $input_b, $sbclri_output, 32)
-      m4+sbinvi($input_a, $input_b, $sbinvi_output, 32)
-      m4+sbexti($input_a, $input_b, $sbexti_output, 32)
-      m4+slo($input_a, $input_b, $slo_output, 32)
-      m4+sro($input_a, $input_b, $sro_output, 32)
-      m4+sloi($input_a, $input_b, $sloi_output, 32)
-      m4+sroi($input_a, $input_b, $sroi_output, 32)
-      m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
-      m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
-      m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
-      m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $raw[3], $raw[13], $raw[14], $raw[29], $raw[30], $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
-      m4+bfp($input_a, $input_b, $bfp_output, 32)
-      m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
-      m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
-      m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
-      /* verilator lint_on WIDTH */
-      /* verilator lint_on CASEINCOMPLETE */
-      /* verilator lint_on PINMISSING */
-      /* verilator lint_on CASEOVERLAP */
+      
+      m4+ifelse(M4_EXT_B, 1,
+         \TLV
+            // "B" Extension.
+            // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
 
-      `BOGUS_USE($din_ready_rvb_bitcnt $din_ready_bext_dep $din_ready_rvb_crc $din_ready_clmul)
-      '])
+            // Main BMI Macro's
+
+            $din_valid_bext_dep = ($is_gorc_instr || $is_gorci_instr || $is_shfl_instr || $is_unshfl_instr || $is_bdep_instr || $is_bext_instr || $is_shfli_instr || $is_unshfli_instr) && |fetch/instr$commit;
+            $din_valid_clmul = ($is_clmul_instr || $is_clmulr_instr || $is_clmulh_instr) && |fetch/instr$commit;
+            $din_valid_rvb_crc = ($is_crc32b_instr || $is_crc32h_instr || $is_crc32w_instr || $is_crc32cb_instr || $is_crc32ch_instr || $is_crc32cw_instr) && |fetch/instr$commit;
+            $din_valid_rvb_bitcnt = ($is_pcnt_instr || $is_sextb_instr || $is_sexth_instr) && |fetch/instr$commit;
+
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off CASEINCOMPLETE */
+            /* verilator lint_off PINMISSING */
+            /* verilator lint_off CASEOVERLAP */
+            m4+clz_final(|fetch/instr, /clz_stage, 32, 0, 1, $input_a, $clz_final_output)
+            m4+ctz_final(|fetch/instr, /ctz_stage, /reverse, 32, 0, 1, $input_a, $ctz_final_output)
+            m4+popcnt(|fetch/instr, /pop_stage, $input_a, $popcnt_output, 32)
+            m4+andn($input_a, $input_b, $andn_output[31:0])
+            m4+orn($input_a, $input_b, $orn_output[31:0])
+            m4+xnor($input_a, $input_b, $xnor_output[31:0])
+            m4+pack($input_a, $input_b, $pack_output, 32)
+            m4+packu($input_a, $input_b, $packu_output, 32)
+            m4+packh($input_a, $input_b, $packh_output, 32)
+            m4+minu($input_a, $input_b, $minu_output, 32)
+            m4+maxu($input_a, $input_b, $maxu_output, 32)
+            m4+min($input_a, $input_b, $min_output, 32)
+            m4+max($input_a, $input_b, $max_output, 32)
+            m4+sbset($input_a, $input_b, $sbset_output, 32)
+            m4+sbclr($input_a, $input_b, $sbclr_output, 32)
+            m4+sbinv($input_a, $input_b, $sbinv_output, 32)
+            m4+sbext($input_a, $input_b, $sbext_output, 32)
+            m4+sbseti($input_a, $input_b, $sbseti_output, 32)
+            m4+sbclri($input_a, $input_b, $sbclri_output, 32)
+            m4+sbinvi($input_a, $input_b, $sbinvi_output, 32)
+            m4+sbexti($input_a, $input_b, $sbexti_output, 32)
+            m4+slo($input_a, $input_b, $slo_output, 32)
+            m4+sro($input_a, $input_b, $sro_output, 32)
+            m4+sloi($input_a, $input_b, $sloi_output, 32)
+            m4+sroi($input_a, $input_b, $sroi_output, 32)
+            m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
+            m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
+            m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
+            m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $raw[3], $raw[13], $raw[14], $raw[29], $raw[30], $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
+            m4+bfp($input_a, $input_b, $bfp_output, 32)
+            m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
+            m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
+            m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
+            // %Warning-MULTIDRIVEN reported by Verilator for $raw because not all bits are pulled to this stage. Rather than lint_on, this will pull all bits.
+            `BOGUS_USE($raw)
+            /* verilator lint_on WIDTH */
+            /* verilator lint_on CASEINCOMPLETE */
+            /* verilator lint_on PINMISSING */
+            /* verilator lint_on CASEOVERLAP */
+
+            `BOGUS_USE($din_ready_rvb_bitcnt $din_ready_bext_dep $din_ready_rvb_crc $din_ready_clmul)
+         )
 
       // hold_inst scope is not needed when long latency instructions are disabled
       m4_ifelse(m4_eval(M4_EXT_M || M4_EXT_F || M4_EXT_B), 1, ['
@@ -1899,25 +1989,27 @@ m4+definitions(['
          $jal_rslt[M4_WORD_RANGE]   = M4_FULL_PC + 4;
          $jalr_rslt[M4_WORD_RANGE]  = M4_FULL_PC + 4;
          // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
-         m4_ifelse_block(M4_INJECT_RETURNING_LD, 1, ['
-         $lb_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
-         $lh_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
-         $lw_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
-         $lbu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
-         $lhu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
-         m4_ifelse_block(M4_EXT_F, 1, ['
-         $flw_rslt[M4_WORD_RANGE] = 32'b0;
-         '])
-         '], ['
-         $lb_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lh_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lw_rslt[M4_WORD_RANGE]    = /orig_inst$ld_rslt;
-         $lbu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
-         $lhu_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
-         m4_ifelse_block(M4_EXT_F, 1, ['
-         $flw_rslt[M4_WORD_RANGE]   = /orig_inst$ld_rslt;
-         '])
-         '])
+         m4+ifelse(M4_INJECT_RETURNING_LD, 1,
+            \TLV
+               $lb_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+               $lh_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+               $lw_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+               $lbu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+               $lhu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+               m4_ifelse_block(M4_EXT_F, 1, ['
+               $flw_rslt[M4_WORD_RANGE] = 32'b0;
+               '])
+            ,
+            \TLV
+               $lb_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+               $lh_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+               $lw_rslt[M4_WORD_RANGE]    = /orig_load_inst$ld_rslt;
+               $lbu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
+               $lhu_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
+               m4_ifelse_block(M4_EXT_F, 1, ['
+               $flw_rslt[M4_WORD_RANGE]   = /orig_load_inst$ld_rslt;
+               '])
+            )
          $addi_rslt[M4_WORD_RANGE]  = /src[1]$reg_value + $raw_i_imm;  // TODO: This has its own adder; could share w/ add/sub.
          $xori_rslt[M4_WORD_RANGE]  = /src[1]$reg_value ^ $raw_i_imm;
          $ori_rslt[M4_WORD_RANGE]   = /src[1]$reg_value | $raw_i_imm;
@@ -1950,227 +2042,230 @@ m4+definitions(['
          
          // "M" Extension.
          
-         m4_ifelse_block(M4_EXT_M, 1, ['
-         // for Verilog modules instantiation
-         $clk = *clk;
-         $resetn = !(*reset);
+         m4+ifelse(M4_EXT_M, 1,
+            \TLV
+               // for Verilog modules instantiation
+               $clk = *clk;
+               $resetn = !(*reset);
 
-         $instr_type_mul[3:0]    = $reset ? '0 : $mulblk_valid ? {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr} : $RETAIN;
-         $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
-         $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
-         
-         $instr_type_div[3:0]    = $reset ? '0 : $divblk_valid ? {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr} : $RETAIN;
-         $div_in1[M4_WORD_RANGE] = $reset ? '0 : $divblk_valid ? /src[1]$reg_value : $RETAIN;
-         $div_in2[M4_WORD_RANGE] = $reset ? '0 : $divblk_valid ? /src[2]$reg_value : $RETAIN;
-         
-         // result signals for div/mul can be pulled down to 0 here, as they are assigned only in the second issue
+               $instr_type_mul[3:0]    = $reset ? '0 : $mulblk_valid ? {$is_mulhu_instr,$is_mulhsu_instr,$is_mulh_instr,$is_mul_instr} : $RETAIN;
+               $mul_in1[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[1]$reg_value : $RETAIN;
+               $mul_in2[M4_WORD_RANGE] = $reset ? '0 : $mulblk_valid ? /src[2]$reg_value : $RETAIN;
 
-         $mul_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
-         $mulh_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
-         $mulhsu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
-         $mulhu_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
-         $div_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
-         $divu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
-         $rem_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
-         $remu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
-         `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
-         '])
+               $instr_type_div[3:0]    = $reset ? '0 : $divblk_valid ? {$is_remu_instr,$is_rem_instr,$is_divu_instr,$is_div_instr} : $RETAIN;
+               $div_in1[M4_WORD_RANGE] = $reset ? '0 : $divblk_valid ? /src[1]$reg_value : $RETAIN;
+               $div_in2[M4_WORD_RANGE] = $reset ? '0 : $divblk_valid ? /src[2]$reg_value : $RETAIN;
+
+               // result signals for div/mul can be pulled down to 0 here, as they are assigned only in the second issue
+
+               $mul_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+               $mulh_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
+               $mulhsu_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+               $mulhu_rslt[M4_WORD_RANGE]    = M4_WORD_CNT'b0;
+               $div_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+               $divu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
+               $rem_rslt[M4_WORD_RANGE]      = M4_WORD_CNT'b0;
+               $remu_rslt[M4_WORD_RANGE]     = M4_WORD_CNT'b0;
+               `BOGUS_USE ($wrm $wrd $readyd $readym $waitm $waitd)
+            )
       
          // "F" Extension.
          
-         m4_ifelse_block(M4_EXT_F, 1, ['
-         // Determining the type of fpu_operation according to the fpu_exe macro
-         $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
-                               ({5{$is_fmsubs_instr }}  & 5'h3 ) |
-                               ({5{$is_fnmsubs_instr}}  & 5'h4 ) |
-                               ({5{$is_fnmadds_instr}}  & 5'h5 ) |
-                               ({5{$is_fadds_instr  }}  & 5'h6 ) |
-                               ({5{$is_fsubs_instr  }}  & 5'h7 ) |
-                               ({5{$is_fmuls_instr  }}  & 5'h8 ) |
-                               ({5{$is_fdivs_instr  }}  & 5'h9 ) |
-                               ({5{$is_fsqrts_instr }}  & 5'ha ) |
-                               ({5{$is_fsgnjs_instr }}  & 5'hb ) |
-                               ({5{$is_fsgnjns_instr}}  & 5'hc ) |
-                               ({5{$is_fsgnjxs_instr}}  & 5'hd ) |
-                               ({5{$is_fmins_instr  }}  & 5'he ) |
-                               ({5{$is_fmaxs_instr  }}  & 5'hf ) |
-                               ({5{$is_fcvtws_instr }}  & 5'h10) |
-                               ({5{$is_fcvtwus_instr}}  & 5'h11) |
-                               ({5{$is_fmvxw_instr  }}  & 5'h12) |
-                               ({5{$is_feqs_instr   }}  & 5'h13) |
-                               ({5{$is_flts_instr   }}  & 5'h14) |
-                               ({5{$is_fles_instr   }}  & 5'h15) |
-                               ({5{$is_fclasss_instr}}  & 5'h16) |
-                               ({5{$is_fcvtsw_instr }}  & 5'h17) |
-                               ({5{$is_fcvtswu_instr}}  & 5'h18) |
-                               ({5{$is_fmvwx_instr  }}  & 5'h19);
-         // Needed for division-sqrt module  
-         $nreset = ! *reset;
-         $clock = *clk;
+         m4+ifelse(M4_EXT_F, 1,
+            \TLV
+               // Determining the type of fpu_operation according to the fpu_exe macro
+               $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
+                                     ({5{$is_fmsubs_instr }}  & 5'h3 ) |
+                                     ({5{$is_fnmsubs_instr}}  & 5'h4 ) |
+                                     ({5{$is_fnmadds_instr}}  & 5'h5 ) |
+                                     ({5{$is_fadds_instr  }}  & 5'h6 ) |
+                                     ({5{$is_fsubs_instr  }}  & 5'h7 ) |
+                                     ({5{$is_fmuls_instr  }}  & 5'h8 ) |
+                                     ({5{$is_fdivs_instr  }}  & 5'h9 ) |
+                                     ({5{$is_fsqrts_instr }}  & 5'ha ) |
+                                     ({5{$is_fsgnjs_instr }}  & 5'hb ) |
+                                     ({5{$is_fsgnjns_instr}}  & 5'hc ) |
+                                     ({5{$is_fsgnjxs_instr}}  & 5'hd ) |
+                                     ({5{$is_fmins_instr  }}  & 5'he ) |
+                                     ({5{$is_fmaxs_instr  }}  & 5'hf ) |
+                                     ({5{$is_fcvtws_instr }}  & 5'h10) |
+                                     ({5{$is_fcvtwus_instr}}  & 5'h11) |
+                                     ({5{$is_fmvxw_instr  }}  & 5'h12) |
+                                     ({5{$is_feqs_instr   }}  & 5'h13) |
+                                     ({5{$is_flts_instr   }}  & 5'h14) |
+                                     ({5{$is_fles_instr   }}  & 5'h15) |
+                                     ({5{$is_fclasss_instr}}  & 5'h16) |
+                                     ({5{$is_fcvtsw_instr }}  & 5'h17) |
+                                     ({5{$is_fcvtswu_instr}}  & 5'h18) |
+                                     ({5{$is_fmvwx_instr  }}  & 5'h19);
+               // Needed for division-sqrt module  
+               $nreset = ! *reset;
+               $clock = *clk;
 
-         // Operands
-         $operand_a[31:0] = /fpusrc[1]$fpu_reg_value;
-         $operand_b[31:0] = /fpusrc[2]$fpu_reg_value;
-         $operand_c[31:0] = /fpusrc[3]$fpu_reg_value;
-         // rounding mode as per the RISC-V specs (synchronizing with HardFloat module)
-         $rounding_mode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
-                               (|fetch/instr$raw_rm == 3'b001) ? 3'b010 :
-                               (|fetch/instr$raw_rm == 3'b010) ? 3'b011 :
-                               (|fetch/instr$raw_rm == 3'b011) ? 3'b100 :
-                               (|fetch/instr$raw_rm == 3'b100) ? 3'b001 :
-                               (|fetch/instr$raw_rm == 3'b111) ? $csr_fcsr[7:5] : 3'bxxx;
-         $int_input[31:0] = /src[1]$reg_value;
+               // Operands
+               $operand_a[31:0] = /fpu_src[1]$reg_value;
+               $operand_b[31:0] = /fpu_src[2]$reg_value;
+               $operand_c[31:0] = /fpu_src[3]$reg_value;
+               // rounding mode as per the RISC-V specs (synchronizing with HardFloat module)
+               $rounding_mode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
+                                     (|fetch/instr$raw_rm == 3'b001) ? 3'b010 :
+                                     (|fetch/instr$raw_rm == 3'b010) ? 3'b011 :
+                                     (|fetch/instr$raw_rm == 3'b011) ? 3'b100 :
+                                     (|fetch/instr$raw_rm == 3'b100) ? 3'b001 :
+                                     (|fetch/instr$raw_rm == 3'b111) ? $csr_fcsr[7:5] : 3'bxxx;
+               $int_input[31:0] = /src[1]$reg_value;
 
-         // Results
-         $fmadds_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
-         $fmsubs_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
-         $fnmadds_rslt[M4_WORD_RANGE] = /fpu1$output_result;
-         $fnmsubs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
-         $fadds_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
-         $fsubs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
-         $fmuls_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
-         $fsgnjs_rslt[M4_WORD_RANGE]  = $fsgnjs_output;
-         $fsgnjns_rslt[M4_WORD_RANGE] = $fsgnjns_output;
-         $fsgnjxs_rslt[M4_WORD_RANGE] = $fsgnjxs_output;
-         $fmins_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
-         $fmaxs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
-         $fcvtws_rslt[M4_WORD_RANGE]  = /fpu1$int_output;
-         $fcvtwus_rslt[M4_WORD_RANGE] = /fpu1$int_output;
-         $fmvxw_rslt[M4_WORD_RANGE]   = /fpusrc[1]$fpu_reg_value;
-         $feqs_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
-         $flts_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
-         $fles_rslt[M4_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
-         $fclasss_rslt[M4_WORD_RANGE] = {28'b0, /fpu1$output_class};
-         $fcvtsw_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
-         $fcvtswu_rslt[M4_WORD_RANGE] = /fpu1$output_result;
-         $fmvwx_rslt[M4_WORD_RANGE]   = /src[1]$reg_value;
-         
-         // Pulling Instructions from /orig_inst scope
-         $fdivs_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
-         $fsqrts_rslt[M4_WORD_RANGE]  = M4_WORD_CNT'b0;
-         `BOGUS_USE(/fpu1$in_ready /fpu1$sqrtresult /fpu1$unordered /fpu1$exception_invaild_output /fpu1$exception_infinite_output /fpu1$exception_overflow_output /fpu1$exception_underflow_output /fpu1$exception_inexact_output)
-         '])
-         
-         m4_ifelse_block(M4_EXT_B, 1, ['
-         // Currently few of the instructions are custom build in TL-Verilog and will work fine on inputs in power of 2.
-         $is_src_type_instr =     $is_andn_instr       ||
-                                  $is_orn_instr        ||
-                                  $is_xnor_instr       ||
-                                  $is_slo_instr        ||
-                                  $is_sro_instr        ||
-                                  $is_rol_instr        ||
-                                  $is_ror_instr        ||
-                                  $is_sbclr_instr      ||
-                                  $is_sbset_instr      ||
-                                  $is_sbinv_instr      ||
-                                  $is_sbext_instr      ||
-                                  $is_gorc_instr       ||
-                                  $is_grev_instr       ||
-                                  $is_clz_instr        ||
-                                  $is_ctz_instr        ||
-                                  $is_pcnt_instr       ||
-                                  $is_sextb_instr      ||
-                                  $is_sexth_instr      ||
-                                  $is_crc32b_instr     ||
-                                  $is_crc32h_instr     ||
-                                  $is_crc32w_instr     ||
-                                  $is_crc32cb_instr    ||
-                                  $is_crc32ch_instr    ||
-                                  $is_crc32cw_instr    ||
-                                  $is_clmul_instr      ||
-                                  $is_clmulr_instr     ||
-                                  $is_clmulh_instr     ||
-                                  $is_min_instr        ||
-                                  $is_max_instr        ||
-                                  $is_minu_instr       ||
-                                  $is_maxu_instr       ||
-                                  $is_shfl_instr       ||
-                                  $is_unshfl_instr     ||
-                                  $is_bdep_instr       ||
-                                  $is_bext_instr       ||
-                                  $is_pack_instr       ||
-                                  $is_packu_instr      ||
-                                  $is_packh_instr      ||
-                                  $is_bfp_instr;
-         
-         $is_imm_type_instr =     $is_sloi_instr       ||
-                                  $is_sroi_instr       ||
-                                  $is_sbclri_instr     ||
-                                  $is_sbseti_instr     ||
-                                  $is_sbinvi_instr     ||
-                                  $is_sbexti_instr     ||
-                                  $is_gorci_instr      ||
-                                  $is_grevi_instr      ||
-                                  $is_shfli_instr      ||
-                                  $is_unshfli_instr;
-         
-         $bmi_reset = *reset;
-         $bmi_clk = *clk;
-         
-         // Operands
-         $input_a[31:0] = /src[1]$reg_value;
-         $input_b[31:0] = $is_src_type_instr ? /src[2]$reg_value : $raw_i_imm;
-         $sftamt[4:0] = $input_b[4:0];
-         `BOGUS_USE($is_imm_type_instr $sftamt)
+               // Results
+               $fmadds_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
+               $fmsubs_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
+               $fnmadds_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+               $fnmsubs_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+               $fadds_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
+               $fsubs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
+               $fmuls_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
+               $fsgnjs_rslt[M4_WORD_RANGE]  = $fsgnjs_output;
+               $fsgnjns_rslt[M4_WORD_RANGE] = $fsgnjns_output;
+               $fsgnjxs_rslt[M4_WORD_RANGE] = $fsgnjxs_output;
+               $fmins_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
+               $fmaxs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
+               $fcvtws_rslt[M4_WORD_RANGE]  = /fpu1$int_output;
+               $fcvtwus_rslt[M4_WORD_RANGE] = /fpu1$int_output;
+               $fmvxw_rslt[M4_WORD_RANGE]   = /fpu_src[1]$reg_value;
+               $feqs_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
+               $flts_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
+               $fles_rslt[M4_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
+               $fclasss_rslt[M4_WORD_RANGE] = {28'b0, /fpu1$output_class};
+               $fcvtsw_rslt[M4_WORD_RANGE]  = /fpu1$output_result;
+               $fcvtswu_rslt[M4_WORD_RANGE] = /fpu1$output_result;
+               $fmvwx_rslt[M4_WORD_RANGE]   = /src[1]$reg_value;
 
-         // Results
-         $andn_rslt[M4_WORD_RANGE]   = $andn_output;
-         $orn_rslt[M4_WORD_RANGE]    = $orn_output;
-         $xnor_rslt[M4_WORD_RANGE]   = $xnor_output;
-         $slo_rslt[M4_WORD_RANGE]    = $slo_output;
-         $sro_rslt[M4_WORD_RANGE]    = $sro_output;
-         $rol_rslt[M4_WORD_RANGE]    = $rorl_final_output;
-         $ror_rslt[M4_WORD_RANGE]    = $rorr_final_output;
-         $sbclr_rslt[M4_WORD_RANGE]  = $sbclr_output;
-         $sbset_rslt[M4_WORD_RANGE]  = $sbset_output;
-         $sbinv_rslt[M4_WORD_RANGE]  = $sbinv_output;
-         $sbext_rslt[M4_WORD_RANGE]  = $sbext_output;
-         $gorc_rslt[M4_WORD_RANGE]   = $bext_dep_output;
-         $grev_rslt[M4_WORD_RANGE]   = $grev_final_output;
-         $sloi_rslt[M4_WORD_RANGE]   = $sloi_output;
-         $sroi_rslt[M4_WORD_RANGE]   = $sroi_output;
-         $rori_rslt[M4_WORD_RANGE]   = $rorr_final_output;
-         $sbclri_rslt[M4_WORD_RANGE] = $sbclri_output;
-         $sbseti_rslt[M4_WORD_RANGE] = $sbseti_output;
-         $sbinvi_rslt[M4_WORD_RANGE] = $sbinvi_output;
-         $sbexti_rslt[M4_WORD_RANGE] = $sbexti_output;
-         $gorci_rslt[M4_WORD_RANGE]  = $bext_dep_output;
-         $grevi_rslt[M4_WORD_RANGE]  = $grev_final_output;
-         $clz_rslt[M4_WORD_RANGE]    = {26'b0, $clz_final_output};
-         $ctz_rslt[M4_WORD_RANGE]    = {26'b0, $ctz_final_output};
-         $pcnt_rslt[M4_WORD_RANGE]   = {26'b0, $popcnt_output};
-         $sextb_rslt[M4_WORD_RANGE]   = $rvb_bitcnt_output;
-         $sexth_rslt[M4_WORD_RANGE]   = $rvb_bitcnt_output;
-         $min_rslt[M4_WORD_RANGE] = $min_output;
-         $max_rslt[M4_WORD_RANGE] = $max_output;
-         $minu_rslt[M4_WORD_RANGE] = $minu_output;
-         $maxu_rslt[M4_WORD_RANGE] = $maxu_output;
-         $shfl_rslt[M4_WORD_RANGE] = $bext_dep_output;
-         $unshfl_rslt[M4_WORD_RANGE] = $bext_dep_output;
-         $bdep_rslt[M4_WORD_RANGE] = $bext_dep_output;
-         $bext_rslt[M4_WORD_RANGE] = $bext_dep_output;
-         $pack_rslt[M4_WORD_RANGE] = $pack_output;
-         $packu_rslt[M4_WORD_RANGE] = $packu_output;
-         $packh_rslt[M4_WORD_RANGE] = $packh_output;
-         $bfp_rslt[M4_WORD_RANGE] = $bfp_output;
-         $shfli_rslt[M4_WORD_RANGE] = $bext_dep_output;
-         $unshfli_rslt[M4_WORD_RANGE] = $bext_dep_output;
-
-         $clmul_rslt[M4_WORD_RANGE]  = M4_WORD_CNT'b0;
-         $clmulr_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $clmulh_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32b_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32h_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32w_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32cb_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32ch_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
-         $crc32cw_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               // Pulling Instructions from /orig_inst scope
+               $fdivs_rslt[M4_WORD_RANGE]   = M4_WORD_CNT'b0;
+               $fsqrts_rslt[M4_WORD_RANGE]  = M4_WORD_CNT'b0;
+               `BOGUS_USE(/fpu1$in_ready /fpu1$sqrtresult /fpu1$unordered /fpu1$exception_invaild_output /fpu1$exception_infinite_output /fpu1$exception_overflow_output /fpu1$exception_underflow_output /fpu1$exception_inexact_output)
+            )
          
-         $dout_ready_bext_dep = $dout_valid_bext_dep && |fetch/instr$commit;
-         $dout_ready_clmul = $dout_valid_clmul && |fetch/instr$commit;
-         $dout_ready_rvb_crc = $dout_valid_rvb_crc && |fetch/instr$commit;
-         $dout_ready_rvb_bitcnt = $dout_valid_rvb_bitcnt && |fetch/instr$commit;
-         '])
+         m4+ifelse(M4_EXT_B, 1,
+            \TLV
+               // Currently few of the instructions are custom build in TL-Verilog and will work fine on inputs in power of 2.
+               $is_src_type_instr =     $is_andn_instr       ||
+                                        $is_orn_instr        ||
+                                        $is_xnor_instr       ||
+                                        $is_slo_instr        ||
+                                        $is_sro_instr        ||
+                                        $is_rol_instr        ||
+                                        $is_ror_instr        ||
+                                        $is_sbclr_instr      ||
+                                        $is_sbset_instr      ||
+                                        $is_sbinv_instr      ||
+                                        $is_sbext_instr      ||
+                                        $is_gorc_instr       ||
+                                        $is_grev_instr       ||
+                                        $is_clz_instr        ||
+                                        $is_ctz_instr        ||
+                                        $is_pcnt_instr       ||
+                                        $is_sextb_instr      ||
+                                        $is_sexth_instr      ||
+                                        $is_crc32b_instr     ||
+                                        $is_crc32h_instr     ||
+                                        $is_crc32w_instr     ||
+                                        $is_crc32cb_instr    ||
+                                        $is_crc32ch_instr    ||
+                                        $is_crc32cw_instr    ||
+                                        $is_clmul_instr      ||
+                                        $is_clmulr_instr     ||
+                                        $is_clmulh_instr     ||
+                                        $is_min_instr        ||
+                                        $is_max_instr        ||
+                                        $is_minu_instr       ||
+                                        $is_maxu_instr       ||
+                                        $is_shfl_instr       ||
+                                        $is_unshfl_instr     ||
+                                        $is_bdep_instr       ||
+                                        $is_bext_instr       ||
+                                        $is_pack_instr       ||
+                                        $is_packu_instr      ||
+                                        $is_packh_instr      ||
+                                        $is_bfp_instr;
+
+               $is_imm_type_instr =     $is_sloi_instr       ||
+                                        $is_sroi_instr       ||
+                                        $is_sbclri_instr     ||
+                                        $is_sbseti_instr     ||
+                                        $is_sbinvi_instr     ||
+                                        $is_sbexti_instr     ||
+                                        $is_gorci_instr      ||
+                                        $is_grevi_instr      ||
+                                        $is_shfli_instr      ||
+                                        $is_unshfli_instr;
+
+               $bmi_reset = *reset;
+               $bmi_clk = *clk;
+
+               // Operands
+               $input_a[31:0] = /src[1]$reg_value;
+               $input_b[31:0] = $is_src_type_instr ? /src[2]$reg_value : $raw_i_imm;
+               $sftamt[4:0] = $input_b[4:0];
+               `BOGUS_USE($is_imm_type_instr $sftamt)
+
+               // Results
+               $andn_rslt[M4_WORD_RANGE]   = $andn_output;
+               $orn_rslt[M4_WORD_RANGE]    = $orn_output;
+               $xnor_rslt[M4_WORD_RANGE]   = $xnor_output;
+               $slo_rslt[M4_WORD_RANGE]    = $slo_output;
+               $sro_rslt[M4_WORD_RANGE]    = $sro_output;
+               $rol_rslt[M4_WORD_RANGE]    = $rorl_final_output;
+               $ror_rslt[M4_WORD_RANGE]    = $rorr_final_output;
+               $sbclr_rslt[M4_WORD_RANGE]  = $sbclr_output;
+               $sbset_rslt[M4_WORD_RANGE]  = $sbset_output;
+               $sbinv_rslt[M4_WORD_RANGE]  = $sbinv_output;
+               $sbext_rslt[M4_WORD_RANGE]  = $sbext_output;
+               $gorc_rslt[M4_WORD_RANGE]   = $bext_dep_output;
+               $grev_rslt[M4_WORD_RANGE]   = $grev_final_output;
+               $sloi_rslt[M4_WORD_RANGE]   = $sloi_output;
+               $sroi_rslt[M4_WORD_RANGE]   = $sroi_output;
+               $rori_rslt[M4_WORD_RANGE]   = $rorr_final_output;
+               $sbclri_rslt[M4_WORD_RANGE] = $sbclri_output;
+               $sbseti_rslt[M4_WORD_RANGE] = $sbseti_output;
+               $sbinvi_rslt[M4_WORD_RANGE] = $sbinvi_output;
+               $sbexti_rslt[M4_WORD_RANGE] = $sbexti_output;
+               $gorci_rslt[M4_WORD_RANGE]  = $bext_dep_output;
+               $grevi_rslt[M4_WORD_RANGE]  = $grev_final_output;
+               $clz_rslt[M4_WORD_RANGE]    = {26'b0, $clz_final_output};
+               $ctz_rslt[M4_WORD_RANGE]    = {26'b0, $ctz_final_output};
+               $pcnt_rslt[M4_WORD_RANGE]   = {26'b0, $popcnt_output};
+               $sextb_rslt[M4_WORD_RANGE]   = $rvb_bitcnt_output;
+               $sexth_rslt[M4_WORD_RANGE]   = $rvb_bitcnt_output;
+               $min_rslt[M4_WORD_RANGE] = $min_output;
+               $max_rslt[M4_WORD_RANGE] = $max_output;
+               $minu_rslt[M4_WORD_RANGE] = $minu_output;
+               $maxu_rslt[M4_WORD_RANGE] = $maxu_output;
+               $shfl_rslt[M4_WORD_RANGE] = $bext_dep_output;
+               $unshfl_rslt[M4_WORD_RANGE] = $bext_dep_output;
+               $bdep_rslt[M4_WORD_RANGE] = $bext_dep_output;
+               $bext_rslt[M4_WORD_RANGE] = $bext_dep_output;
+               $pack_rslt[M4_WORD_RANGE] = $pack_output;
+               $packu_rslt[M4_WORD_RANGE] = $packu_output;
+               $packh_rslt[M4_WORD_RANGE] = $packh_output;
+               $bfp_rslt[M4_WORD_RANGE] = $bfp_output;
+               $shfli_rslt[M4_WORD_RANGE] = $bext_dep_output;
+               $unshfli_rslt[M4_WORD_RANGE] = $bext_dep_output;
+
+               $clmul_rslt[M4_WORD_RANGE]  = M4_WORD_CNT'b0;
+               $clmulr_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $clmulh_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32b_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32h_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32w_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32cb_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32ch_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+               $crc32cw_rslt[M4_WORD_RANGE] = M4_WORD_CNT'b0;
+
+               $dout_ready_bext_dep = $dout_valid_bext_dep && |fetch/instr$commit;
+               $dout_ready_clmul = $dout_valid_clmul && |fetch/instr$commit;
+               $dout_ready_rvb_crc = $dout_valid_rvb_crc && |fetch/instr$commit;
+               $dout_ready_rvb_bitcnt = $dout_valid_rvb_bitcnt && |fetch/instr$commit;
+            )
 
    // CSR logic
    // ---------
@@ -2189,8 +2284,8 @@ m4+definitions(['
       $st_cond = $st && $valid_exe;
       ?$st_cond
          // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
-         $st_reg_value[M4_WORD_RANGE] = m4_ifelse_block(M4_EXT_F, 1, ['$is_fsw_instr ? /fpusrc[2]$fpu_reg_value :'])
-                                                        /src[2]$reg_value;
+         $st_reg_value[M4_WORD_RANGE] = m4_ifelse(M4_EXT_F, 1, ['$is_fsw_instr ? /fpu_src[2]$reg_value :'])
+                                                  /src[2]$reg_value;
          $st_value[M4_WORD_RANGE] =
               $ld_st_word ? $st_reg_value :            // word
               $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
@@ -2236,7 +2331,6 @@ m4+definitions(['
    @_rslt_stage
       // Mux the correct result.
       m4+riscv_rslt_mux_expr()
-   
 
 
 //============================//
@@ -2248,7 +2342,7 @@ m4+definitions(['
 
 \TLV mipsi_cnt10_prog()
    \SV_plus
-      m4_define(['M4_NUM_INSTRS'], 11)
+      m4_def(NUM_INSTRS, 11)
       
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -2284,7 +2378,7 @@ m4+definitions(['
 
 \TLV mipsi_imem(_prog_name)
    // Instantiate the program. (This approach is required for an m4-defined name.)
-   m4_define(['m4_prog'], ['mipsi_']_prog_name['_prog'])
+   m4_def(prog, ['mipsi_']_prog_name['_prog'])
    m4+m4_prog()
    |fetch
       /instr
@@ -2419,7 +2513,7 @@ m4+definitions(['
          // Reg valid for this source, based on instruction type.
          $is_reg =
              (#src == 1) ? ! /instr$jtype :
-                           /instr$rtype || /instr$st || /instr$is_beq || /instr$is_bne;
+                            /instr$rtype || /instr$st || /instr$is_beq || /instr$is_bne;
          $reg[M4_REGS_INDEX_RANGE] =
              (#src == 1) ? /instr$raw_rs :
                            /instr$raw_rt;
@@ -2573,7 +2667,7 @@ m4+definitions(['
 
 \TLV power_cnt10_prog()
    \SV_plus
-      m4_define(['M4_NUM_INSTRS'], 2)
+      m4_def(NUM_INSTRS, 2)
       
       // The program in an instruction memory.
       logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -2600,7 +2694,7 @@ m4+definitions(['
 
 \TLV power_imem(_prog_name)
    // Instantiate the program. (This approach is required for an m4-defined name.)
-   m4_define(['m4_prog'], ['power_']_prog_name['_prog'])
+   m4_def(prog, ['power_']_prog_name['_prog'])
    m4+m4_prog()
    m4+instrs_for_viz()
    |fetch
@@ -2757,7 +2851,7 @@ m4+definitions(['
          // Load
          // ====
          @M4_MEM_WR_STAGE
-            /bank[M4_ADDRS_PER_WORD-1:0]
+            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
                $ANY = /instr$ANY; // Find signal from outside of /bank.
                /mem[M4_DATA_MEM_WORDS_RANGE]
                ?$spec_ld
@@ -2775,7 +2869,7 @@ m4+definitions(['
                \SV_plus
                   always @ (posedge clk) begin
                      if ($valid_st && $st_mask[#bank])
-                        /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
+                        /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$^Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
                   end
             // Combine $ld_value per bank, assuming little-endian.
             //$ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
@@ -2838,12 +2932,12 @@ m4+definitions(['
 \SV
    m4_ifelse_block(M4_EXT_M, 1, ['
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
-      m4_ifelse_block(M4_FORMAL, ['1'], ['
-         m4_define(M4_RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
+      m4_ifelse_block(M4_FORMAL, 1, ['
+         m4_def(RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
       '])
       m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
-			`define RISCV_FORMAL_ALTOPS
-		'])
+      `define RISCV_FORMAL_ALTOPS
+    '])
       /* verilator lint_off WIDTH */
       /* verilator lint_off CASEINCOMPLETE */
       // TODO : Update links after merge to master!
@@ -2867,13 +2961,13 @@ m4+definitions(['
 
    // latency for division is different for ALTOPS case
    m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
-        m4_define(['M4_DIV_LATENCY'], 12)
+        m4_def(DIV_LATENCY, 12)
    '],['
-        m4_define(['M4_DIV_LATENCY'], 37)
+        m4_def(DIV_LATENCY, 37)
    '])
-   m4_define(['M4_MUL_LATENCY'], 5)       // latency for multiplication is 2 cycles in case of ALTOPS,
-                                          // but we flop it for 5 cycles (in rslt_mux) to augment the normal
-                                          // second issue behavior
+   m4_def(MUL_LATENCY, 5)       // latency for multiplication is 2 cycles in case of ALTOPS,
+                                // but we flop it for 5 cycles (in rslt_mux) to augment the normal
+                                // second issue behavior
 
    // Relative to typical 1-cycle latency instructions.
 
@@ -3077,7 +3171,7 @@ m4+definitions(['
    // instructions is detected, and results are put in /orig_inst scope to be used in second issue.
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
    
-   m4_define(['M4_FPU_DIV_LATENCY'], 26)  // Relative to typical 1-cycle latency instructions.
+   m4_def(FPU_DIV_LATENCY, 26)  // Relative to typical 1-cycle latency instructions.
    @M4_NEXT_PC_STAGE
       $fpu_second_issue_div_sqrt = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_fpu_div_sqrt_second_issue;
    @M4_EXECUTE_STAGE
@@ -3114,8 +3208,8 @@ m4+definitions(['
    // Although the latency of different variant of CRC instr's are different, we are using a common FIXED LATENCY
    // for those instr's.
 
-   m4_define(['M4_CLMUL_LATENCY'], 5)
-   m4_define(['M4_CRC_LATENCY'], 5)
+   m4_def(CLMUL_LATENCY, 5)
+   m4_def(CRC_LATENCY, 5)
    @M4_NEXT_PC_STAGE
       $second_issue_clmul_crc = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_clmul_crc_second_issue;
    @M4_EXECUTE_STAGE
@@ -3141,7 +3235,7 @@ m4+definitions(['
 \TLV cpu(/_cpu)
    // Generated logic
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
-   m4_define(['m4_gen'], M4_isa['_gen'])
+   m4_def(gen, M4_isa['_gen'])
    m4+m4_gen()
    // Instruction memory and fetch of $raw.
    m4+M4_IMEM_MACRO_NAME(M4_PROG_NAME)
@@ -3209,7 +3303,7 @@ m4+definitions(['
             // instructions are on the current path with a $GoodPathMask. $GoodPathMask[n] of an instruction indicates
             // whether the instruction n instructions prior to this instruction is on its path.
             //
-            //                 $GoodPathMask for Redir'edX => {o,X,o,o,y,y,o,o} == {1,1,1,1,0,0,1,1}
+            //                 $GoodPathMask for Redir'edX => {o,X,o,y,y,y,o,o} == {1,1,1,1,0,0,1,1}
             // Waterfall View: |
             //                 V
             // 0)       oooooooo                  Good-path
@@ -3282,17 +3376,18 @@ m4+definitions(['
                <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
                $next_good_path_mask;
             
-            m4_ifelse_block(M4_FORMAL, ['1'], ['
-            // Formal verfication must consider trapping instructions. For this, we need to maintain $RvfiGoodPathMask, which is similar to
-            // $GoodPathMask, except that it does not mask out aborted instructions.
-            $next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES+1:0] =
-               {$RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
-                m4_redirect_shadow_terms,
-                1'b1};
-            $RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
-               <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :
-               $next_rvfi_good_path_mask;
-            '])
+            m4+ifelse(M4_FORMAL, 1,
+               \TLV
+                  // Formal verfication must consider trapping instructions. For this, we need to maintain $RvfiGoodPathMask, which is similar to
+                  // $GoodPathMask, except that it does not mask out aborted instructions.
+                  $next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES+1:0] =
+                     {$RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
+                      m4_redirect_shadow_terms,
+                      1'b1};
+                  $RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
+                     <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :
+                     $next_rvfi_good_path_mask;
+               )
             
             
             // A returning load clobbers the instruction.
@@ -3339,10 +3434,10 @@ m4+definitions(['
             // A load that will return later.
             //$split_ld = $spec_ld && 1'b['']M4_INJECT_RETURNING_LD;
             // Instantiate the program. (This approach is required for an m4-defined name.)
-            m4_define(['m4_decode_macro_name'], M4_isa['_decode'])
+            m4_def(decode_macro_name, M4_isa['_decode'])
             m4+m4_decode_macro_name()
          // Instantiate the program. (This approach is required for an m4-defined name.)
-         m4_define(['m4_branch_pred_macro_name'], ['branch_pred_']M4_BRANCH_PRED)
+         m4_def(branch_pred_macro_name, ['branch_pred_']M4_BRANCH_PRED)
          m4+m4_branch_pred_macro_name()
          
          @M4_REG_RD_STAGE
@@ -3365,14 +3460,16 @@ m4+definitions(['
             /src[2:1]
                $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
                ?$is_reg_condition
+                  /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
                   {$reg_value[M4_WORD_RANGE], $pending} =
                      m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
                      // Bypass stages. Both register and pending are bypassed.
                      // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+                  /* verilator lint_on WIDTH */
                // Replay if this source register is pending.
                $replay = $is_reg_condition && $pending;
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
@@ -3382,47 +3479,48 @@ m4+definitions(['
                $dest_pending =
                   m4_ifelse(M4_ISA, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
                   // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
-                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
+                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$valid_dest_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
+                  m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
             // Combine replay conditions for pending source or dest registers.
             $replay_int = | /src[*]$replay || ($is_dest_condition && $dest_pending);
 
-            m4_ifelse_block(M4_EXT_F, 1, ['
-            //
-            // ======
-            // Reg Rd for Floating Point Unit
-            // ======
-            // 
-            /M4_FPUREGS_HIER
-            /fpusrc[3:1]
-               $is_fpu_reg_condition = $is_fpu_reg && /instr$valid_decode;  // Note: $is_fpu_reg can be set for RISC-V sr0.
-               ?$is_fpu_reg_condition
-                  {$fpu_reg_value[M4_WORD_RANGE], $pending_fpu} =
-                     m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as r0 does'])
-                     // Bypass stages. Both register and pending are bypassed.
-                     // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_fpu_reg == $fpu_reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_fpu_reg == $fpu_reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_fpu_reg == $fpu_reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                     {/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$fpuvalue, m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/instr/fpuregs[$fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu'])};
-               // Replay if FPU source register is pending.
-               $replay_fpu = $is_fpu_reg_condition && $pending_fpu;
+            m4+ifelse(M4_EXT_F, 1,
+               \TLV
+                  //
+                  // ======
+                  // Reg Rd for Floating Point Unit
+                  // ======
+                  // 
+                  /M4_FPU_REGS_HIER
+                  /fpu_src[3:1]
+                     $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
+                     ?$is_reg_condition
+                        {$reg_value[M4_WORD_RANGE], $pending} =
+                           m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
+                           // Bypass stages. Both register and pending are bypassed.
+                           // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
+                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr>>1$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue) && (/instr>>1$dest_fpu_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr>>2$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue) && (/instr>>2$dest_fpu_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr>>3$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue) && (/instr>>3$dest_fpu_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+                           {/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+                     // Replay if FPU source register is pending.
+                     $replay_fpu = $is_reg_condition && $pending;
 
-            // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
-            $is_dest_fpu_condition = $dest_fpu_reg_valid && /instr$valid_decode;
-            ?$is_dest_fpu_condition
-               $dest_fpu_pending =
-                  m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as r0 does'])
-                  // Bypass stages. Both register and pending are bypassed.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$dest_fpu_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$dest_fpu_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$dest_fpu_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
-                  m4_ifelse(M4_PENDING_ENABLED, ['0'], ['1'b0'], ['/fpuregs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending_fpu']);
-            // Combine replay conditions for pending source or dest registers.
-            $replay_fpu = | /fpusrc[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
-            '])
+                  // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
+                  $is_dest_fpu_condition = $dest_fpu_reg_valid && /instr$valid_decode;
+                  ?$is_dest_fpu_condition
+                     $dest_fpu_pending =
+                        m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
+                        // Bypass stages. Both register and pending are bypassed.
+                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(>>1$valid_dest_fpu_reg_valid && ($GoodPathMask[1] || /instr>>1$second_issue) && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
+                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(>>2$valid_dest_fpu_reg_valid && ($GoodPathMask[2] || /instr>>2$second_issue) && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
+                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(>>3$valid_dest_fpu_reg_valid && ($GoodPathMask[3] || /instr>>3$second_issue) && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
+                        m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/fpu_regs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending']);
+                  // Combine replay conditions for pending source or dest registers.
+                  $replay_fpu = | /fpu_src[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
+               )
             $replay = $replay_int m4_ifelse(M4_EXT_F, 1, ['|| $replay_fpu']);
          
          // =======
@@ -3430,7 +3528,7 @@ m4+definitions(['
          // =======
          
          // Instantiate the program. (This approach is required for an m4-defined name.)
-         m4_define(['m4_exe_macro_name'], M4_isa['_exe'])
+         m4_def(exe_macro_name, M4_isa['_exe'])
          m4+m4_exe_macro_name(@M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
          
          @M4_BRANCH_PRED_STAGE
@@ -3441,10 +3539,15 @@ m4+definitions(['
             // Control
             // =======
             
+            // A version of PC we can pull through $ANYs.
+            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];
+            `BOGUS_USE($pc)
+            
+            
             // Execute stage redirect conditions.
             $non_pipelined = $div_mul m4_ifelse(M4_EXT_F, 1, ['|| $fpu_div_sqrt_type_instr']) m4_ifelse(M4_EXT_B, 1, ['|| $clmul_crc_type_instr']);
             $replay_trap = m4_cpu_blocked;
-            $aborting_trap = $replay_trap || $illegal || $aborting_isa_trap;
+            $aborting_trap = $replay_trap || ($valid_decode && $illegal) || $aborting_isa_trap;
             $non_aborting_trap = $non_aborting_isa_trap;
             $mispred_branch = $branch && ! ($conditional_branch && ($taken == $pred_taken));
             ?$valid_decode_branch
@@ -3474,7 +3577,8 @@ m4+definitions(['
             // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
             m4_ifelse_block(M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['M4_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
             // Normal case:
-            $commit = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES) && ! $abort;
+            $good_path = m4_prev_instr_valid_through(M4_MAX_REDIRECT_BUBBLES);
+            $commit = $good_path && ! $abort;
             '], ['
             // For the retiming experiments, $commit is determined too late, and it is inconvenient to make the $GoodPathMask
             // logic retimable. Let's drive it to 1'b1 for now, and give synthesis the benefit of the doubt.
@@ -3482,7 +3586,7 @@ m4+definitions(['
             '])
             
             // Conditions that commit results.
-            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m4_ifelse_block(M4_EXT_F, 1, ['&&  (!>>M4_LD_RETURN_ALIGN$is_flw_instr) && (!$fpu_second_issue_div_sqrt)']) );
+            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m4_ifelse(M4_EXT_F, 1, ['&&  (! >>M4_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
             m4_ifelse_block(M4_EXT_F, 1, ['
             $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || ($fpu_second_issue_div_sqrt || ($second_issue && >>M4_LD_RETURN_ALIGN$is_flw_instr));
@@ -3499,51 +3603,42 @@ m4+definitions(['
             // =========
 
             $reg_write = $reset ? 1'b0 : $valid_dest_reg_valid;
+            /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
             \SV_plus
                always @ (posedge clk) begin
                   if ($reg_write)
-                     /regs[$dest_reg]<<0$$value[M4_WORD_RANGE] <= $rslt;
+                     /regs[$dest_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
                end
-            m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
-            // Write $pending along with $value, but coded differently because it must be reset.
-            /regs[*]
-               <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
-             '])
-            m4_ifelse_block(M4_EXT_F, 1, ['
-            // Reg Write (Floating Point Register)
-            // TODO. Seperate the $rslt comit to both "int" and "fpu" regs.
-            $fpu_reg_write = $reset ? 1'b0 : $valid_dest_fpu_reg_valid;
-            \SV_plus
-               always @ (posedge clk) begin
-                  if ($fpu_reg_write)
-                     /fpuregs[$dest_fpu_reg]<<0$$fpuvalue[M4_WORD_RANGE] <= $rslt;
-               end
-            m4_ifelse_block(M4_PENDING_ENABLED, 1, ['
-            // Write $pending along with $value, but coded differently because it must be reset.
-            /fpuregs[*]
-               <<1$pending_fpu = ! /instr$reset && (((#fpuregs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending_fpu);
-              '])
-            '])
+            /* verilator lint_on WIDTH */
+            m4+ifelse(M4_PENDING_ENABLED, 1,
+               \TLV
+                  // Write $pending along with $value, but coded differently because it must be reset.
+                  /regs[*]
+                     <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
+               )
+            m4+ifelse(M4_EXT_F, 1,
+               \TLV
+                  // Reg Write (Floating Point Register)
+                  // TODO. Seperate the $rslt comit to both "int" and "fpu" regs.
+                  $fpu_reg_write = $reset ? 1'b0 : $valid_dest_fpu_reg_valid;
+                  \SV_plus
+                     always @ (posedge clk) begin
+                        if ($fpu_reg_write)
+                           /fpu_regs[$dest_fpu_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
+                     end
+                  m4+ifelse(M4_PENDING_ENABLED, 1,
+                     \TLV
+                        // Write $pending along with $value, but coded differently because it must be reset.
+                        /fpu_regs[*]
+                           <<1$pending = ! /instr$reset && (((#fpu_regs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending);
+                     )
+               )
             
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
-   m4_ifelse_block(M4_ISA, ['RISCV'], ['
-   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
-   // Multi-core
-   /M4_CORE_HIER
-      m4_ifelse_block(M4_VIZ, 1, ['
-      m4+cpu_viz(/top)
-      '])
-   '], ['
-   m4_ifelse_block(M4_VIZ, 1, ['
-   m4+cpu_viz(/top)
-   '])
-   '])
-   '])
 
-
-\TLV warpv_makerchip_cnt10_tb()
+\TLV cnt10_makerchip_tb()
    |fetch
       /instr
          @M4_REG_WR_STAGE
@@ -3551,9 +3646,14 @@ m4+definitions(['
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
             $passed = ! $reset && $ReachedEnd && $Reg4Became45;
-            $failed = ! $reset && (*cyc_cnt > 200 || (*cyc_cnt > 5 && $commit && $illegal));
+            $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
+   
+   // /=====================\
+   // | Formal Verification |
+   // \=====================/
+   
    // Instructions are presented to RVFI in reg wr stage. Loads cannot be presented until their load
    // data returns, so it is the returning ld that is presented. The instruction to present to RVFI
    // is provided in /instr/original. RVFI inputs are generally connected from this context,
@@ -3564,7 +3664,6 @@ m4+definitions(['
          @M4_EXECUTE_STAGE
             // characterise non-speculatively in execute stage
 
-            $pc[M4_PC_RANGE] = $Pc[M4_PC_RANGE];  // A version of PC we can pull through $ANYs.
             // RVFI interface for formal verification.
             $trap = $aborting_trap ||
                     $non_aborting_trap;
@@ -3582,7 +3681,7 @@ m4+definitions(['
 
             /original
                $ANY = /instr$second_issue ? /instr/orig_inst$ANY : /instr$ANY;
-               /src[2:1]instr
+               /src[2:1]
                   $ANY = /instr$second_issue ? /instr/orig_inst/src$ANY : /instr/src$ANY;
 
             $would_reissue = ($ld || $div_mul);
@@ -3650,7 +3749,7 @@ m4+definitions(['
             $valid_pkt_tail = $valid_pkt_wr && $is_csr_pkttail;
             $insert_header = |egress_in/skid_buffer$valid_pkt_wr && ! $InPacket;
             // Assert after inserting header up to insertion of tail.
-            $InPacket <= $insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked));
+            $InPacket <=  *reset ? 1'b0 : ($insert_header || ($InPacket && ! (|egress_in/skid_buffer$valid_pkt_tail && ! |egress_in/skid_buffer$push_blocked)));
       @1
 
          /skid_buffer
@@ -3658,13 +3757,13 @@ m4+definitions(['
             // Hold the write if blocked, including the write of the header in separate signals.
             // This give 1 cycle of slop so we have time to check validity and generate a replay if blocked.
             // Note that signals in this scope are captured versions reflecting the flit and its producing instruction.
-            $push_blocked = $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket);
+            $push_blocked = *reset ? 1'b0 : $valid_pkt_wr && (/_cpu/vc[$vc]|egress_in$blocked || ! |egress_in/instr$InPacket);
             // Header
             // Construct header flit.
             $src[M4_CORE_INDEX_RANGE] = #m4_strip_prefix(/_cpu);
             $header_flit[31:0] = {{M4_FLIT_UNUSED_CNT{1'b0}},
-                                  $src,
                                   $vc,
+                                  $src,
                                   $csr_pktdest[m4_echo(M4_CORE_INDEX_RANGE)]
                                  };
          /flit
@@ -3703,6 +3802,11 @@ m4+definitions(['
             $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
             ?$csr_pktrd_valid
                $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
+            $non_spec_abort = $aborting_trap && $good_path;
+         @M4_NEXT_PC_STAGE
+            // Mark instructions that are replayed. These are non-speculative. We use this indication for CSR pkt reads,
+            // which can only pull flits from ingress FIFOs non-speculatively (currently).
+            $replayed = >>m4_eval(M4_TRAP_BUBBLES + 1)$non_spec_abort;
    |ingress_out
       @-1
          // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
@@ -3711,10 +3815,12 @@ m4+definitions(['
          $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
-         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed;
+         $do_pktrd = $is_pktrd && ! $pktrdvcs_changed && /instr$replayed; // non-speculative do_pktrd
+
       @0
-         // Replay for PKTRD with no data read.
+         // Replay for PKTRD with no data transaction.
          $pktrd_blocked = $is_pktrd && ! $trans_valid;
+
    /vc[*]
       |ingress_out
          @-1
@@ -3722,6 +3828,8 @@ m4+definitions(['
                           /_cpu|ingress_out$do_pktrd;
             $Prio[M4_PRIO_INDEX_RANGE] <= '0;
    m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, M4_VC_RANGE, M4_PRIO_RANGE)
+
+
 
 \TLV noc_insertion_ring(/_cpu, #_depth)
    /vc[*]
@@ -3839,9 +3947,11 @@ m4+definitions(['
       @0
          $blocked = /_hop[(#m4_hop_name + 1) % m4_echo(M4_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
    // Fork off ring
-   m4+fork(/_hop, |_name['']_arriving, @0, $head_out, |_name['']_off_ramp, @0, $true, |_name['']_continuing, @0, /_flit)
-   // Fork from off-ramp out or into FIFO
-   m4+fork(/_hop, |_name['']_off_ramp, @0, $head_out, |_out, @_out, $true, |_name['']_deflected, @0, /_flit)
+   m4+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
+   
+   // Fork from continuing to non_deflected or into FIFO
+   m4+fork(/_hop, |_name['']_continuing, @0, $head_out, |_name['']_not_deflected, @0, $true, |_name['']_deflected, @0, /_flit)
+   
    // Flop prior to FIFO.
    m4+stage(ff, /_hop, |_name['']_deflected, @0, |_name['']_deflected_st1, @1, /_flit)
    // Mux into FIFO. (Priority to deflected blocks node.)
@@ -3851,7 +3961,7 @@ m4+definitions(['
    // Block FIFO output until a full packet is ready (tail from node in FIFO)
    m4+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
    // Ring
-   m4+arb2(/_hop, |_name['']_fifo_inj, @0, |_name['']_continuing, @0, |_name, @0, /_flit)
+   m4+arb3(/_hop, |_name['']_not_deflected, @0, |_name['']_fifo_inj, @0, |_name, @0, /_flit)
 
 
    // Decode arriving header flit.
@@ -3871,10 +3981,12 @@ m4+definitions(['
          // Asserts with the first absorbed flit, deasserts for the first flit that can stay on the ring.
          $valid_dest = $dest == #m4_hop_name;
          $head_out = ! /_hop|_out<>0$blocked && $valid_dest;
-         $true = 1'b1; // (ok signal for fork along continuing path)
-   |_name['']_off_ramp
+         $head_out_inv = ! $head_out;
+         $true = 1'b1; // (ok signal for fork along out path)
+   |_name['']_continuing
       @0
-         $head_out = /_hop|_name['']_arriving<>0$head_out;
+
+         $head_out = ! /_hop|_name['']_not_deflected<>0$blocked;
          $true = 1'b1;  // (ok signal for fork to FIFO)
    |_name['']_in_present
       @0
@@ -3890,7 +4002,7 @@ m4+definitions(['
          // XXX It will deassert for a minimum of 1 cycle (since $would_bypass enables a flit from node).
          $node_tail_flit_in_fifo =
               $reset ? 1'b0 :
-              /_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail ? 1'b1 :
+              ((/_hop|_name['']_deflected_st1>>1$avail && /_hop|_name['']_deflected_st1>>1$accepted) || (/_hop|_name['']_node_to_fifo<>0$accepted && /_hop|_name['']_node_to_fifo/flit<>0$tail)) ? 1'b1 :
               $would_bypass ? 1'b0 :
                    $RETAIN;
 
@@ -3900,22 +4012,34 @@ m4+definitions(['
    m4_popdef(['M4_HOP'])
    m4_popdef(['m4_prev_hop_index'])
 
-
-m4+module_def
-
-\TLV warpv()
-   // =================
-   //
-   //    THE MODEL
-   //
-   // =================
-
-
-   m4+cpu(/top)
-   m4_ifelse_block(M4_FORMAL, 1, ['
-   m4+formal()
-   '], [''])
-
+\TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
+   m4+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
+   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
+   // In1 is blocked if output is blocked.
+   // In1 is blocked if output is blocked or in2 is available.
+   |_in1
+      @_in1
+         $blocked = /_top|_out>>m4_align(@_out, @_in1)$blocked ||
+                    (/_top|_in2>>m4_align(@_in2, @_out)$avail && /_top|_in2>>m4_align(@_in2 + 1, @_out)$accepted);
+   // In2 is blocked if output is blocked or in1 is available.
+   |_in2
+      @_in2
+         $blocked = /_top|_out>>m4_align(@_out, @_in2)$blocked ||
+                    /_top|_in1>>m4_align(@_in1, @_in2)$avail;
+   // Output comes from in1 if available, otherwise, in2.
+   |_out
+      @_out
+         $reset = /_top|_in1>>m4_align(@_in1, @_out)$reset_in;
+         // Output is available if either input is available.
+         $avail = /_top|_in1>>m4_align(@_in1, @_out)$avail ||
+                  /_top|_in2>>m4_align(@_in2, @_out)$avail;
+         ?$avail
+            /_trans
+         m4_trans_ind   $ANY = /_top|_in1>>m4_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m4_align(@_in1, @_out)$ANY :
+                                                                          /_top|_in2/_trans>>m4_align(@_in2, @_out)$ANY;
+   m4_popdef(['m4_trans_ind'])
+   
+   
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
@@ -3983,416 +4107,1245 @@ m4+module_def
                  ({M4_WORD_CNT{$is_b_type}} & $raw_b_imm) |
                  ({M4_WORD_CNT{$is_u_type}} & $raw_u_imm) |
                  ({M4_WORD_CNT{$is_j_type}} & $raw_j_imm);
+            $imm_valid = $is_i_type || $is_r_type || $is_s_type || $is_b_type || $is_u_type || $is_j_type;
 
 \TLV dummy_viz_logic()
    // dummy
 
 // *instrs must be consumed local to its definition (because it is local to the generate block).
 \TLV instrs_for_viz()
-   m4_ifelse_block(M4_VIZ, 1, ['
-   |fetch
-      @M4_REG_WR_STAGE
-         m4_ifelse_block(M4_ISA, ['MINI'], [''], ['
-         // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
-         // has different fields on different clocks, Verilator throws warnings.
-         // These are unconditioned versions of the problematic signals.
-         /instr
-            /src[*]
-               $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
-               $unconditioned_is_reg = $is_reg;
-               $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
-         /instr_mem
-            $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
-         '])
-         /instr_mem
-            m4_case(M4_ISA, ['MINI'], ['
-            '], ['RISCV'], ['
-            $instr_str[40*8-1:0] = *instr_strs[instr_mem];
-            '], ['MIPSI'], ['
-            '], ['DUMMY'], ['
-            '])
-   '])
-
-\TLV cpu_viz()
-   // Instantiate the program. (This approach is required for an m4-defined name.)
-   m4_define(['m4_viz_logic_macro_name'], M4_isa['_viz_logic'])
-   m4+m4_viz_logic_macro_name()
-   |fetch
-      @M4_REG_WR_STAGE  // Visualize everything happening at the same time.
-         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]  // TODO: Cleanly report non-integer ranges.
-            \viz_alpha
-               renderEach: function() {
-                  // Instruction memory is constant, so just create it once.
-                  if (!global.instr_mem_drawn) {
-                     global.instr_mem_drawn = [];
-                  }
-                  if (!global.instr_mem_drawn[this.getIndex()]) {
-                     global.instr_mem_drawn[this.getIndex()] = true;
-                     m4_ifelse_block(M4_ISA, ['MINI'], ['
-                        let instr_str = '$instr'.goTo(0).asString();
-                     '], M4_ISA, ['RISCV'], ['
-                        let instr_str = '$instr_str'.asString() + ": " + '$instr'.asBinaryStr(NaN);
-                     '], M4_ISA, ['MIPSI'], ['
-                        let instr_str = '$instr'.asBinaryStr(NaN);
-                     '], ['
-                        let instr_str = '$instr'.goTo(0).asString();
-                     '])
-                     this.getCanvas().add(new fabric.Text(instr_str, {
-                        top: 18 * this.getIndex(),  // TODO: Add support for '#instr_mem'.
-                        left: m4_case(M4_ISA, ['MINI'], 20, ['RISCV'], -580, ['MIPSI'], -580, ['DUMMY'], 20),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     }));
-                  }
-               }
-         /instr
-            \viz_alpha
-               //
-               renderEach: function() {
-                  debugger;
-                  //
-                  // PC instr_mem pointer
-                  //
-                  let $Pc = '$Pc';
-                  let color = !('$commit'.asBool()) ? "gray" :
-                              '$abort'.asBool()        ? "red" :
-                                                         "blue";
-                  let pcPointer = new fabric.Text("->", {
-                     top: 18 * $Pc.asInt(),
-                     left: m4_case(M4_ISA, ['MINI'], 0, ['RISCV'], -600, ['MIPSI'], -600, ['DUMMY'], 0),
-                     fill: color,
-                     fontSize: 14,
-                     fontFamily: "monospace"
-                  });
-                  //
-                  //
-                  // Fetch Instruction
-                  //
-                  // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
-                  //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
-                  //   top: 50,
-                  //   left: 90,
-                  //   fill: color,
-                  //   fontSize: 14,
-                  //   fontFamily: "monospace"
-                  //});
-                  //
-                  // Instruction with values.
-                  //
-                  m4_ifelse_block(M4_ISA, ['MINI'], ['
-                     let str = '$dest_char'.asString();
-                     str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n =";
-                     str += '/src[1]$char'.asString();
-                     str += "(" + ('/src[1]$valid'.asBool(false) ? '/src[1]$value'.asInt(NaN) : "--") + ")\n   ";
-                     str += '/op$char'.asString("-");
-                     str += '/src[2]$char'.asString();
-                     str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")";
-                  '], M4_ISA, ['RISCV'], ['
-                     let regStr = (valid, regNum, regValue) => {
-                        return valid ? `r${regNum} (${regValue})` : `rX`;
-                     };
-                     let srcStr = (src) => {
-                        return '/src[src]$unconditioned_is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
-                                   : "";
-                     };
-                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
-                               `  = ${'$mnemonic'.asString()}${srcStr(1)}${srcStr(2)}\n` +
-                               `      i[${'$imm_value'.asInt(NaN)}]`;
-                  '], M4_ISA, ['MIPSI'], ['
-                     // TODO: Almost same as RISC-V. Avoid cut-n-paste.
-                     let regStr = (valid, regNum, regValue) => {
-                        return valid ? `r${regNum} (${regValue})` : `rX`;
-                     };
-                     let srcStr = (src) => {
-                        return '/src[src]$unconditioned_is_reg'.asBool(false)
-                                   ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
-                                   : "";
-                     };
-                     let str = `${regStr('$dest_reg_valid'.asBool(false), '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
-                               `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
-                               `      i[${'$imm_value'.asInt(NaN)}]`;
-                  '], ['
+   m4+ifelse(M4_VIZ, 1,
+      \TLV
+         |fetch
+            @M4_MEM_WR_STAGE
+               m4+ifelse(M4_ISA, ['MINI'],
+                  \TLV
+                  ,
+                  \TLV
+                     // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
+                     // has different fields on different clocks, Verilator throws warnings.
+                     // These are unconditioned versions of the problematic signals.
+                     /instr
+                        /src[*]
+                           $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+                           $unconditioned_is_reg = $is_reg;
+                           $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
+                        m4+ifelse(M4_EXT_F, 1,
+                           \TLV
+                              /fpu_src[*]
+                                 $unconditioned_reg[M4_FPU_REGS_INDEX_RANGE] = $reg;
+                                 $unconditioned_is_reg = $is_reg;
+                                 $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
+                           )
+                     /instr_mem[*]
+                        $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
+                  )
+               /instr_mem[*]
+                  m4_case(M4_ISA, ['MINI'], ['
+                  '], ['RISCV'], ['
+                  $instr_str[40*8-1:0] = *instr_strs[instr_mem];
+                  '], ['MIPSI'], ['
+                  '], ['DUMMY'], ['
                   '])
-                  let instrWithValues = new fabric.Text(str, {
-                     top: 70,
-                     left: 90,
-                     fill: color,
-                     fontSize: 14,
-                     fontFamily: "monospace"
-                  });
-                  return {objects: [pcPointer, instrWithValues]};
+      )
+   
+   
+
+\TLV instruction_in_memory(|_top)
+   \viz_alpha
+      initAll() {
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+         let imem_box = new fabric.Rect({
+            top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: -25 + -580 + M4_ALL_LEFT,
+            fill: "#208028",
+            width: 670,
+            height: 76 + 18 * M4_NUM_INSTRS,
+            stroke: "black"
+         })
+         let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+            top: -40 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: 250 + -580 + M4_ALL_LEFT,
+            fontSize: 20,
+            fontWeight: 800,
+            fontFamily: "monospace",
+            fill: "white"
+         })
+         return {objects: {imem_box, imem_header}}
+      },
+      initEach() {
+         // Instruction and binary value text.
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+         let instr_str = new fabric.Text("" , {
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,  // TODO: Add support for '#instr_mem'.
+            left: -577 + M4_ALL_LEFT,
+            fontSize: 14,
+            fontFamily: "monospace"
+         })
+         let instr_asm_box = new fabric.Rect({
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: -260 + M4_ALL_LEFT,
+            fill: "white",
+            width: 300,
+            height: 14
+         })
+         let instr_binary_box = new fabric.Rect({
+            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: -580 + M4_ALL_LEFT,
+            fill: "white",
+            width: 280,
+            height: 14
+         })
+         return {objects: {instr_binary_box, instr_asm_box, instr_str}}
+      },
+      renderAll() {
+         // Update fetch instruction highlighting and 2nd issue instruction.
+         // (We record and clear the old highlighting so we don't have to render each instruction individually.)
+         // Unhighlight fetch instruction.
+         let instance = this.context.instances[this.fromInit().highlighted_addr]
+         if (typeof instance != "undefined") {
+            instance.initObjects.instr_binary_box.setFill("white")
+            instance.initObjects.instr_asm_box.setFill("white")
+         }
+         // Unhighlight 2nd issue instruction.
+         let instance2 = this.context.instances[this.fromInit().highlighted_addr2]
+         if (typeof instance2 != "undefined") {
+            instance2.initObjects.instr_binary_box.setFill("white")
+            instance2.initObjects.instr_asm_box.setFill("white")
+         }
+         // Highlight fetch instruction.
+         let pc = '['']|_top/instr$pc'.asInt(-1)
+         this.fromInit().highlighted_addr = pc
+         instance = this.context.instances[pc]
+         if (typeof instance !== "undefined") {
+            let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
+            instance.initObjects.instr_binary_box.setFill(color)
+            instance.initObjects.instr_asm_box.setFill(color)
+         }
+         // Highlight 2nd issue instruction.
+         let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
+         this.fromInit().highlighted_addr2 = pc2
+         instance2 = this.context.instances[pc2]
+         if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
+            let color = "#ffd0b0"
+            instance2.initObjects.instr_binary_box.setFill(color)
+            instance2.initObjects.instr_asm_box.setFill(color)
+         }
+      },
+      renderEach() {
+         // Instruction memory is constant, so just create it once.
+         m4_ifelse_block(M4_ISA, ['MINI'], ['
+            let instr_str = '$instr'.goTo(0).asString("?")
+         '], M4_ISA, ['RISCV'], ['
+            let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
+         '], M4_ISA, ['MIPSI'], ['
+            let instr_str = '$instr'.asBinaryStr("?")
+         '], ['
+            let instr_str = '$instr'.goTo(0).asString("?")
+         '])
+         this.getInitObject("instr_str").setText(`${instr_str}`)
+      }
+         
+\TLV registers(_name, _heading, _sig_prefix, _num_srcs, _left_adjust)
+   // /regs or /fpu_regs
+   /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
+      \viz_alpha
+         initAll() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            let rf_box = new fabric.Rect({
+               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 350 + _left_adjust + M4_ALL_LEFT,
+               fill: "#2028b0",
+               width: 145,
+               height: 650,
+               stroke: "black"
+            })
+            let rf_header = new fabric.Text("📂 _heading", {
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 360 + _left_adjust + M4_ALL_LEFT,
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            let rf_header2 = new fabric.Text("Integer (hex)", {
+               top: -17 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 367 + _left_adjust + M4_ALL_LEFT,
+               fontSize: 14,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            return {objects: {rf_box, rf_header, rf_header2}}
+         },
+         initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            let reg = new fabric.Text("", {
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 367 + _left_adjust + M4_ALL_LEFT,
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let reg_box = new fabric.Rect({
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 360 + _left_adjust + M4_ALL_LEFT,
+               fill: "white",
+               width: 125,
+               height: 14
+            })
+            return {objects: {reg_box, reg}}
+         },
+         renderEach() {
+            //debugger
+            // TODO: This is inefficient as is the same for every entry.
+            let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getScope("['']_sig_prefix['']regs").index)
+            let rs_valid = []
+            let read_valid = false
+            for (let i = 1; i <= _num_srcs; i++) {
+               rs_valid[i] = '/instr/['']_sig_prefix['']src[i]$unconditioned_is_reg'.asBool(false) && this.getIndex() === '/instr/['']_sig_prefix['']src[i]$unconditioned_reg'.asInt(-1)
+               read_valid |= rs_valid[i]
+            }
+            let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
+            let reg = parseInt(this.getIndex())
+            let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
+            let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
+            this.getInitObject("reg").setText(
+               regIdent + ": " +
+               '$value'.step(1).asInt(NaN).toString(16) + oldValStr)
+            this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black")
+            this.getInitObject("reg_box").setFill(mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white")
+         }
+
+\TLV register_csr(/_csr) 
+   /_csr
+      \viz_alpha
+         initEach() {
+            let csr_objs = {}
+            let csr_boxes = {}
+            //debugger
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            m4_csr_viz_init_each
+            return {objects: {...csr_objs, ...csr_boxes}}
+         },
+         renderEach() {
+            //debugger
+            m4_csr_viz_render_each
+         }
+
+
+\TLV instruction(/_top)
+   \viz_alpha
+      renderEach() {
+         objects = {}
+         //
+         // PC instr_mem pointer
+         //
+         let pc = '$Pc'.asInt(-1)
+         let commit = '$commit'.asBool(false)
+         let color = !commit                ? "gray" :
+                     '$abort'.asBool(false) ? "red" :
+                                              "blue"
+         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+         objects.pc_pointer = new fabric.Text("👉", {
+            top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: -281 + M4_ALL_LEFT,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            opacity: commit ? 1 : 0.5
+         })
+         if ('$second_issue'.asBool(false)) {
+            let second_issue_pc = '/orig_inst$pc'.asInt(-1)
+            objects.second_issue_pointer = new fabric.Text("👉🏿", {
+               top: 18 * second_issue_pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: -281 + M4_ALL_LEFT,
+               fill: color,
+               fontSize: 14,
+               fontFamily: "monospace",
+               opacity: 0.75
+            })
+         }
+         //
+         //
+         // Fetch Instruction
+         //
+         // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
+         //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
+         //   top: 50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
+         //   left: 90 + M4_ALL_LEFT,
+         //   fill: color,
+         //   fontSize: 14,
+         //   fontFamily: "monospace"
+         //})
+         //
+         // Instruction with values.
+         //
+         m4_ifelse_block(M4_ISA, ['MINI'], ['
+            let str = '$dest_char'.asString("?")
+            str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n ="
+            str += '/src[1]$char'.asString("?")
+            str += "(" + ('/src[1]$valid'.asBool(false) ? '/src[1]$value'.asInt(NaN) : "--") + ")\n   "
+            str += '/op$char'.asString("-")
+            str += '/src[2]$char'.asString("?")
+            str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")"
+         '], M4_ISA, ['RISCV'], ['
+            let regStr = (type_char, valid, regNum, regValue) => {
+               return type_char + (valid ? `${regNum} (${regValue})` : `X`)
+            }
+            let srcStr = (src) => {
+               let ret = ""
+               if ((src < 3) &&
+                   '/src[src]$unconditioned_is_reg'.asBool(false)) {
+                  ret += `\n      ${regStr("x", true, '/src[src]$unconditioned_reg'.asInt(NaN),     '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                }
-            //
-            // Register file
-            //
-            
-            /regs[M4_REGS_RANGE]  // TODO: Fix [*]
-               \viz_alpha
-                   
-                  initEach: function() {
-                     let regname = new fabric.Text("Integer", {
-                           top: -20,
-                           left: m4_case(M4_ISA, ['MINI'], 192, ['RISCV'], 367, ['MIPSI'], 392, ['DUMMY'], 192),
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                     let reg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {regname: regname, reg: reg}};
-                  },
-                  renderEach: function() {
-                     let mod = '/instr$reg_write'.asBool(false) && ('/instr$dest_reg'.asInt(-1) == this.getScope("regs").index);
-                     let pending = '$pending'.asBool(false);
-                     let reg = parseInt(this.getIndex());
-                     let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$value'.asInt(NaN).toString()})` : "";
-                     this.getInitObject("reg").setText(
-                        regIdent + ": " +
-                        '$value'.step(1).asInt(NaN).toString() + oldValStr);
-                     this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black");
-                  }
-            /regcsr
-               \viz_alpha
-                  initEach: function() {
-                     let cycle = new fabric.Text("", {
-                        top: 18 * 33,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let cycleh = new fabric.Text("", {
-                        top: 18 * 34,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let time = new fabric.Text("", {
-                        top: 18 * 35,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let timeh = new fabric.Text("", {
-                        top: 18 * 36,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let instret = new fabric.Text("", {
-                        top: 18 * 37,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let instreth = new fabric.Text("", {
-                        top: 18 * 38,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 375, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {cycle: cycle, cycleh: cycleh, time: time, timeh: timeh, instret: instret, instreth: instreth}};
-                     },
-                     renderEach: function() {
-                        var cyclemod = '/instr$csr_cycle_hw_wr'.asBool(false);
-                        var cyclehmod = '/instr$csr_cycleh_hw_wr'.asBool(false);
-                        var timemod = '/instr$csr_time_hw_wr'.asBool(false);
-                        var timehmod = '/instr$csr_timeh_hw_wr'.asBool(false);
-                        var instretmod = '/instr$csr_instret_hw_wr'.asBool(false);
-                        var instrethmod = '/instr$csr_instreth_hw_wr'.asBool(false);
-                        var cyclename    = String("cycle");
-                        var cyclehname   = String("cycleh");
-                        var timename     = String("time");
-                        var timehname    = String("timeh");
-                        var instretname  = String("instret");
-                        var instrethname = String("instreth");
-                        var oldValcycle    = cyclemod    ? `(${'/instr$csr_cycle'.asInt(NaN).toString()})` : "";
-                        var oldValcycleh   = cyclehmod   ? `(${'/instr$csr_cycleh'.asInt(NaN).toString()})` : "";
-                        var oldValtime     = timemod     ? `(${'/instr$csr_time'.asInt(NaN).toString()})` : "";
-                        var oldValtimeh    = timehmod    ? `(${'/instr$csr_timeh'.asInt(NaN).toString()})` : "";
-                        var oldValinstret  = instretmod  ? `(${'/instr$csr_instret'.asInt(NaN).toString()})` : "";
-                        var oldValinstreth = instrethmod ? `(${'/instr$csr_instreth'.asInt(NaN).toString()})` : "";
-                        this.getInitObject("cycle").setText(
-                           cyclename + ": " +
-                           '/instr$csr_cycle'.step(1).asInt(NaN).toString() + oldValcycle);
-                        this.getInitObject("cycleh").setText(
-                           cyclehname + ": " +
-                           '/instr$csr_cycleh'.step(1).asInt(NaN).toString() + oldValcycleh);
-                        this.getInitObject("time").setText(
-                           timename + ": " +
-                           '/instr$csr_time'.step(1).asInt(NaN).toString() + oldValtime);
-                        this.getInitObject("timeh").setText(
-                           timehname + ": " +
-                           '/instr$csr_timeh'.step(1).asInt(NaN).toString() + oldValtimeh);
-                        this.getInitObject("instret").setText(
-                           instretname + ": " +
-                           '/instr$csr_instret'.step(1).asInt(NaN).toString() + oldValinstret);
-                        this.getInitObject("instreth").setText(
-                           instrethname + ": " +
-                           '/instr$csr_instreth'.step(1).asInt(NaN).toString() + oldValinstreth);
-                        this.getInitObject("cycle").setFill( cyclemod ? "blue" : "black");
-                        this.getInitObject("cycleh").setFill( cyclehmod ? "blue" : "black");
-                        this.getInitObject("time").setFill( timemod ? "blue" : "black");
-                        this.getInitObject("timeh").setFill( timehmod ? "blue" : "black");
-                        this.getInitObject("instret").setFill( instretmod ? "blue" : "black");
-                        this.getInitObject("instreth").setFill( instrethmod ? "blue" : "black");
-                     }
-            m4_ifelse_block(M4_EXT_F, 1, ['
-            /fpuregs[M4_FPUREGS_RANGE]  // TODO: Fix [*]
-               \viz_alpha
-                  initEach: function() {
-                     let regname = new fabric.Text("Floating Point", {
-                              top: -20,
-                              left: m4_case(M4_ISA, ['MINI'], 175, ['RISCV'], 225, ['MIPSI'], 375, ['DUMMY'], 175),
-                              fontSize: 14,
-                              fontFamily: "monospace"
-                           });
-                     let fpureg = new fabric.Text("", {
-                        top: 18 * this.getIndex(),
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {regname :regname, fpureg: fpureg}};
-                  },
-                  renderEach: function() {
-                     let mod = '/instr$fpu_reg_write'.asBool(false) && ('/instr$dest_fpu_reg'.asInt(-1) == this.getScope("fpuregs").index);
-                     let pending = '$pending_fpu'.asBool(false);
-                     let reg = parseInt(this.getIndex());
-                     let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString();
-                     let oldValStr = mod ? `(${'$fpuvalue'.asInt(NaN).toString(16)})` : "";
-                     this.getInitObject("fpureg").setText(
-                        regIdent + ": " +
-                        '$fpuvalue'.step(1).asInt(NaN).toString(16) + oldValStr);
-                     this.getInitObject("fpureg").setFill(pending ? "red" : mod ? "blue" : "black");
-                  }
-            /fpucsr
-               \viz_alpha
-                  initEach: function() {
-                     let fcsr = new fabric.Text("", {
-                        top: 18 * 33,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let frm = new fabric.Text("", {
-                        top: 18 * 34,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     let fflags = new fabric.Text("", {
-                        top: 18 * 35,
-                        left: m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 250, ['MIPSI'], 400, ['DUMMY'], 200),
-                        fontSize: 14,
-                        fontFamily: "monospace"
-                     });
-                     return {objects: {fcsr: fcsr, frm: frm, fflags: fflags}};
-                  },
-                  renderEach: function() {
-                     var fcsrmod = '/instr$csr_fcsr_hw_wr'.asBool(false);
-                     var frmmod = '/instr$csr_frm_hw_wr'.asBool(false);
-                     var fflagsmod = '/instr$csr_fflags_hw_wr'.asBool(false);
-                     var fcsrname = String("fcsr");
-                     var frmname = String("frm");
-                     var fflagsname = String("fflags");
-                     var oldValfcsr = fcsrmod ? `(${'/instr$csr_fcsr'.asInt(NaN).toString(16)})` : "";
-                     var oldValfrm =  frmmod ? `(${'/instr$csr_frm'.asInt(NaN).toString(16)})` : "";
-                     var oldValfflags = fflagsmod ? `(${'/instr$csr_fflags'.asInt(NaN).toString(16)})` : "";
-                     this.getInitObject("fcsr").setText(
-                        fcsrname + ": " +
-                        '/instr$csr_fcsr'.step(1).asInt(NaN).toString(16) + oldValfcsr);
-                     this.getInitObject("frm").setText(
-                        frmname + ": " +
-                        '/instr$csr_frm'.step(1).asInt(NaN).toString(16) + oldValfrm);
-                     this.getInitObject("fflags").setText(
-                        fflagsname + ": " +
-                        '/instr$csr_fflags'.step(1).asInt(NaN).toString(16) + oldValfflags);
-                     this.getInitObject("fcsr").setFill( fcsrmod ? "blue" : "black");
-                     this.getInitObject("frm").setFill( frmmod ? "blue" : "black");
-                     this.getInitObject("fflags").setFill( fflagsmod ? "blue" : "black");
-                  }
+               m4_ifelse_block(M4_EXT_F, 1, ['
+               if ('/fpu_src[src]$unconditioned_is_reg'.asBool(false)) {
+                  ret += `\n      ${regStr("f", true, '/fpu_src[src]$unconditioned_reg'.asInt(NaN), '/fpu_src[src]$unconditioned_reg_value'.asInt(NaN))}`
+               }
                '])
+               return ret
+            }
+            let dest_reg_valid = '$dest_reg_valid'.asBool(false)
+            let str = `${regStr("x", dest_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+            m4_ifelse_block(M4_EXT_F, 1, ['
+            let dest_fpu_reg_valid = '$dest_fpu_reg_valid'.asBool(false)
+            if (dest_fpu_reg_valid) {
+               str = `${regStr("f", dest_fpu_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+            }
+            '])
+            str += `  = ${'$mnemonic'.asString("?")}${srcStr(1)}${srcStr(2)}${srcStr(3)}`
+            if ('$imm_valid'.asBool()) {
+               str += `\n      i[${'$imm_value'.asInt(NaN)}]`
+            }
+         '], M4_ISA, ['MIPSI'], ['
+            // TODO: Almost same as RISC-V. Avoid cut-n-paste.
+            let regStr = (valid, regNum, regValue) => {
+               return valid ? `x${regNum} (${regValue})` : `xX`
+            }
+            let srcStr = (src) => {
+               return '/src[src]$unconditioned_is_reg'.asBool(false)
+                          ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                          : ""
+            }
+            let str = `${regStr(dest_reg_valid, '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+                      `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
+                      ('$imm_valid` ? `i[${'$imm_value'.asInt(NaN)}]` : ""
+         '], ['
+         '])
+         //
+         newSrcArrow = function(name, fp, addr, valid, pos) {
+            if (valid) {
+               objects[name + "_arrow"] = new fabric.Line([360 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0) + M4_ALL_LEFT, 18 * addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 210 + M4_ALL_LEFT, 40 + 18 * pos + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+                  stroke: "#b0c8df",
+                  strokeWidth: 2
+               })
+            }
+         }
+         objects.pc_arrow = new fabric.Line([10 + M4_ALL_LEFT, 18 * pc + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 86 + M4_ALL_LEFT, -8 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+            stroke: "#b0c8df",
+            strokeWidth: 2
+         })
+         // Create rsX arrows for int and FP regs.
+         let reg_addr1 = '$raw_rs1'.asInt()
+         let reg_addr2 = '$raw_rs2'.asInt()
+         let reg_addr3 = '$raw_rs3'.asInt()
+         let rs1_valid = '/src[1]$unconditioned_is_reg'.asBool()
+         let rs2_valid = '/src[2]$unconditioned_is_reg'.asBool()
+         let rs3_valid = false
+         let fpu_rs1_valid = false
+         let fpu_rs2_valid = false
+         let fpu_rs3_valid = false
+         newSrcArrow("rs1", false, reg_addr1, rs1_valid, 1)
+         newSrcArrow("rs2", false, reg_addr2, rs2_valid, 2)
+         let src1_value = '/src[1]$unconditioned_reg_value'.asInt()
+         let src2_value = '/src[2]$unconditioned_reg_value'.asInt()
+         let src3_value = 0
+         let dest_reg = '$dest_reg'.asInt(0)
+         let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
+         let valid_dest_fpu_reg_valid = false
+         m4_ifelse_block(M4_EXT_F, 1, ['
+         fpu_rs1_valid = '/fpu_src[1]$unconditioned_is_reg'.asBool()
+         fpu_rs2_valid = '/fpu_src[2]$unconditioned_is_reg'.asBool()
+         fpu_rs3_valid = '/fpu_src[3]$unconditioned_is_reg'.asBool()
+         let dest_fpu_reg = '$dest_fpu_reg'.asInt(0)
+         newSrcArrow("fp_rs1", true, reg_addr1, fpu_rs1_valid, 1)
+         newSrcArrow("fp_rs2", true, reg_addr2, fpu_rs2_valid, 2)
+         newSrcArrow("fp_rs3", true, reg_addr3, fpu_rs3_valid, 3)
+         if (fpu_rs1_valid) {src1_value = '/fpu_src[1]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs2_valid) {src2_value = '/fpu_src[2]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs3_valid) {src3_value = '/fpu_src[3]$unconditioned_reg_value'.asInt()}
+         valid_dest_fpu_reg_valid = '$valid_dest_fpu_reg_valid'.asBool(false)
+         debugger
+         '])
+         let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
+         //
+         let second_issue = '$second_issue'.asBool()
+         objects.rd_arrow = new fabric.Line([157 + M4_ALL_LEFT, 20 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 360 + M4_VIZ_MEM_LEFT_ADJUST : 360), (18 * the_dest_reg) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+            stroke: '$second_issue'.asBool() ? "#c03050" : commit ? "#a0dfff" : "#d0d0d0",
+            strokeWidth: 3,
+            visible: valid_dest_reg_valid || valid_dest_fpu_reg_valid
+         })
+         //
+         let ld_st_addr = ('$addr'.asInt() / 4)
+         let ld_valid = '$valid_ld'.asBool(false)
+         objects.ld_arrow = new fabric.Line([550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, (18 * ld_st_addr) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + 475 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 5 + 18 * the_dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+            stroke: "#c03050",
+            strokeWidth: 3,
+            visible: ld_valid
+         })
+         //
+         let st_valid = '$valid_st'.asBool()
+         objects.st_arrow = new fabric.Line(
+            [210 + M4_ALL_LEFT, 76 + (M4_COREOFFSET * core) + M4_ALL_TOP, 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, 18 * ld_st_addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+            stroke: "#a0dfff",
+            strokeWidth: 3,
+            visible: st_valid
+         })
+         //
+         let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
+         let instr_string = $instr_str ? $instr_str.asString("?") : "?"
+         objects.fetch_instr_viz = new fabric.Text(instr_string, {
+                  top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                  left: -250 + M4_ALL_LEFT,
+                  fill: color,
+                  fontSize: 14,
+                  fontFamily: "monospace"
+         })
+         //
+         objects.fetch_instr_viz.animate({top: -12 + (M4_COREOFFSET * core) + M4_ALL_TOP, left: 85 + M4_ALL_LEFT}, {
+              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+              duration: 500
+         })
+         //
+         objects.instr_with_values = new fabric.Text(str, {
+            top: 15 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: 110 + M4_ALL_LEFT,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace"
+         })
+         //
+         objects.src1_value_viz = new fabric.Text(src1_value.toString(), {
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (rs1_valid || fpu_rs1_valid) {
+            setTimeout(() => {
+               objects.src1_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr1 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                                           visible: true})
+               objects.src1_value_viz.animate({left: 195 + M4_ALL_LEFT, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  objects.src1_value_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 500)
+         }
+         debugger
+         objects.src2_value_viz = new fabric.Text(src2_value.toString(), {
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         let src2_being_stored = '$valid_decode'.asBool(false) && '$st'.asBool(false) && commit; // Animate src2 value being stored.
+         if (rs2_valid || fpu_rs2_valid) {
+               setTimeout(() => {
+               objects.src2_value_viz.set({left: (8 * 4) + M4_ALL_LEFT + 316 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: (18 * reg_addr2) + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                                           visible: true})
+               objects.src2_value_viz.setVisible(true)
+               objects.src2_value_viz.animate({left: 195 + M4_ALL_LEFT, top: (18 * 3) + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  if (src2_being_stored) {
+                     // Animate src2 value being stored.
+                     objects.src2_value_viz.animate({left: M4_ALL_LEFT + 550 + M4_VIZ_MEM_LEFT_ADJUST, top: 18 * ld_st_addr + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                        onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                        duration: 500
+                     })
+                     setTimeout(() => {
+                        objects.src2_value_viz.setVisible(false)
+                        this.global.canvas.renderAll.bind(this.global.canvas)()
+                     }, 500)
+                  } else {
+                     // Hide src2 value.
+                     objects.src2_value_viz.setVisible(false)
+                     this.global.canvas.renderAll.bind(this.global.canvas)()
+                  }
+               }, 500)
+            }, 500)
+         }
+         objects.src3_value_viz = new fabric.Text(src3_value.toString(), {
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if (fpu_rs3_valid) {
+            setTimeout(() => {
+               objects.src3_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 18 * reg_addr + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                                           visible: true})
+               objects.src3_value_viz.animate({left: M4_ALL_LEFT + 195, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                    duration: 500
+               })
+               setTimeout(() => {
+                  objects.src3_value_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 500)
+         }
+         let res_value = '$rslt'.asInt().toString(16)
+         objects.result_viz = new fabric.Text(res_value, {
+            top: 16 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+            left: 150 + M4_ALL_LEFT,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            fontWeight: 800,
+            visible: false
+         })
+         if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
+            setTimeout(() => {
+               objects.result_viz.setVisible(true)
+               objects.result_viz.animate({left: M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 393 + M4_VIZ_MEM_LEFT_ADJUST : 393), top: 18 * dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                 duration: 500
+               })
+               setTimeout(() => {
+                  objects.result_viz.setVisible(false)
+                  this.global.canvas.renderAll.bind(this.global.canvas)()
+               }, 500)
+            }, 1000)
+         }
+         return {objects: Object.values(objects)}
+      }
 
-            /bank[M4_ADDRS_PER_WORD-1:0]
-               /mem[M4_DATA_MEM_WORDS_RANGE]
-                  \viz_alpha
-                     initEach: function() {
-                        let regname = new fabric.Text("Data Memory", {
-                                 top: -20,
-                                 left: m4_case(M4_ISA, ['MINI'], 255, ['RISCV'], 455, ['MIPSI'], 455, ['DUMMY'], 255) + this.getScope("bank").index * 30 + 30,
-                                 fontSize: 14,
-                                 fontFamily: "monospace"
-                              });
-                        let data = new fabric.Text("", {
-                           top: 18 * this.getIndex(),
-                           left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30 + 30,
-                           fontSize: 14,
-                           fontFamily: "monospace"
-                        });
-                        let index = (this.getScope("bank").index != 0) ? null :
-                           new fabric.Text("", {
-                              top: 18 * this.getIndex(),
-                              left: m4_case(M4_ISA, ['MINI'], 300, ['RISCV'], 500, ['MIPSI'], 500, ['DUMMY'], 300) + this.getScope("bank").index * 30,
-                              fontSize: 14,
-                              fontFamily: "monospace"
-                           });
-                        return {objects: {regname: regname, data: data, index: index}};
-                     },
-                     renderEach: function() {
-                        // BUG: It seems this is not getting called for every /bank[*].
-                        console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`);
-                        let mod = '/instr$st'.asBool(false) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex());
-                        let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString()})` : "";
-                        if (this.getInitObject("index")) {
-                           let addrStr = parseInt(this.getIndex()).toString();
-                           this.getInitObject("index").setText(addrStr + ":");
-                        }
-                        this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString() + oldValStr);
-                        this.getInitObject("data").setFill(mod ? "blue" : "black");
+
+\TLV memory(/_bank_size, /_mem_size)
+   /_mem_size
+      \viz_alpha
+         initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            let index_val_box = new fabric.Rect({
+               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 540 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+               fill: "white",
+               width: 40,
+               height: 14
+            })
+            //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+            let index =
+               new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                  left: 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+                  fontSize: 14,
+                  fontFamily: "monospace"
+               })
+            return {objects: {index_val_box, index}}
+         }
+   /_bank_size
+      \viz_alpha
+         initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            let banknum = new fabric.Text(String(this.getScope("bank").index), {
+               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+               fontSize: 14,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            return {objects: {banknum}}
+         },
+         initAll() {
+            return {}
+         },
+         renderAll() {
+            // Update write address highlighting.
+            // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
+            // Unhighlight
+            let unhighlight_addr = this.fromInit().highlighted_addr
+            let unhighlight = typeof unhighlight_addr != "undefined"
+            let valid_ld = '/instr$valid_ld'.asBool(false)
+            let valid_st = '/instr$valid_st'.asBool(false)
+            let st_mask = '/instr$st_mask'.asInt(0)
+            let addr = '/instr$addr'.asInt(-1) >> 2 // (word-address)
+            let color = valid_st ? "#b0ffff" : "#b0ffff"
+            debugger
+            let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
+            // Re-highlight index.
+            //debugger
+            if (unhighlight) {
+               this.getScope("instr").children.mem.instances[unhighlight_addr].initObjects.index_val_box.setFill("white")
+            }
+            if (highlight) {
+               this.getScope("instr").children.mem.instances[addr].initObjects.index_val_box.setFill(color)
+            }
+            for (let i = 0; i < 4; i++) {
+               if (unhighlight) {
+                  this.getScope("instr").children.bank.instances[i].children.mem.instances[unhighlight_addr].initObjects.bank_val_box.setFill("white")
+               }
+               if (highlight && ((st_mask >> i) & 1 != 0)) {
+                  this.getScope("instr").children.bank.instances[i].children.mem.instances[addr].initObjects.bank_val_box.setFill(color)
+               }
+            }
+            this.fromInit().highlighted_addr = highlight ? addr : undefined
+         },
+      /_mem_size
+         \viz_alpha
+            initEach() {
+               let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+               let bank_val_box = new fabric.Rect({
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                  left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+                  fill: "white",
+                  width: 25,
+                  height: 14
+               })
+               let data = new fabric.Text("", {
+                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
+                  left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // bank: 3 2 1 0 format
+                  fontSize: 14,
+                  fontFamily: "monospace"
+               })
+               return {objects: {bank_val_box, data}}
+            },
+            renderEach() {
+               //console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`)
+               let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+               //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
+               this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"))
+               this.getInitObject("data").setFill(mod ? "blue" : "black")
+            }
+
+\TLV layout_viz(/_screen, |_top) 
+   /_screen 
+      \viz_alpha 
+         initEach() {
+            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            let decode_header = new fabric.Text("⚙️ Instr. Decode", {
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 100 + M4_ALL_LEFT,
+               fill: "maroon",
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace"
+            })
+            let decode_box = new fabric.Rect({
+               top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 80 + M4_ALL_LEFT,
+               fill: "#f8f0e8",
+               width: 230,
+               height: 160,
+               stroke: "#ff8060"
+            })
+            let csr_header = new fabric.Text("📂 CSRs", {
+               top: 125 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 100 + M4_ALL_LEFT,
+               fill: "white",
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace"
+            })
+            let csr_box = new fabric.Rect({
+               top: 120 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 80 + M4_ALL_LEFT,
+               fill: "#2028b0",
+               width: 220,
+               height: 18 * m4_num_csrs + 52,
+               stroke: "black"
+            })
+            let dmem_box = new fabric.Rect({
+               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 530 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+               fill: "#208028",
+               width: 190,
+               height: 650,
+               stroke: "black"
+            })
+            let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
+               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // Center aligned
+               fontSize: 20,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            let bankname = new fabric.Text("bank", {
+               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               left: 545 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+               fontSize: 14,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "white"
+            })
+            return {objects: {csr_box, decode_box, csr_header, decode_header, dmem_box, dmem_header, bankname}}
+         }
+         
+   //////// VIZUALIZING THE MAIN CPU //////////////
+\TLV cpu_viz(/_des_pipe, @_M4_stage)
+   // Instantiate the program. (This approach is required for an m4-defined name.)
+   m4_def(viz_logic_macro_name, M4_isa['_viz_logic'])
+   m4_def(COREOFFSET, 750)
+   m4_def(ALL_TOP, -1000)
+   m4_def(ALL_LEFT, -500)
+   m4+m4_viz_logic_macro_name()
+   /_des_pipe
+      @_M4_stage  // Visualize everything happening at the same time.
+         m4+layout_viz(/layout, /_des_pipe)
+         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
+            m4+instruction_in_memory(/_des_pipe)
+         //
+         // Register file
+         //
+         /instr
+            m4+instruction()
+            m4+registers(int, Int RF, , 2, 0)
+            m4+register_csr(/regcsr)
+            m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, M4_VIZ_MEM_LEFT_ADJUST)'])
+            m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE]) 
+      
+      //////// VIZUALIZING THE INSERTION RING //////////////
+\TLV ring_viz(/_name)
+   m4_define(['M4_RINGVIZ_REF_TOP'],-100)
+   m4_define(['M4_RINGVIZ_REF_LEFT'],700)
+   m4_define(['M4_RINGVIZ_GLOBAL_TOP'], M4_ALL_TOP + M4_RINGVIZ_REF_TOP)
+   m4_define(['M4_RINGVIZ_GLOBAL_LEFT'], M4_ALL_LEFT + M4_RINGVIZ_REF_LEFT)
+   |egress_out
+      @1
+         /flit
+            $src[1:0] = #core;
+            $uid[31:0] = {$src, *cyc_cnt[29:0]};  // Attach Unique Identifier along with transaction which enters into the ring
+   |ringviz
+      @0
+         // Bunch of define statements parameterizing the VIZ
+         m4_define(['M4_NODES_RADIUS'],3)
+         m4_define(['M4_NODES_COLOR'],"#208028")
+         m4_define(['M4_AVAIL_COLOR'],"blue")
+         m4_define(['M4_BLOCKED_COLOR'],"red")
+         m4_define(['M4_INVAILD_COLOR'],"grey")
+         m4_define(['M4_EGRESS_OUT_TOP'], 200 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_EGRESS_OUT_LEFT'],515 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_FIFO_IN_TOP'],100 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_FIFO_IN_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_FIFO_OUT_TOP'], 600 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_FIFO_OUT_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_RG_TOP'],650 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_RG_LEFT'],765 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_INGRESS_IN_TOP'],25 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_INGRESS_IN_LEFT'],515 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ARRIVING_TOP'],0 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_ARRIVING_LEFT'],765 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_DEFLECTED_TOP'],75 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_DEFLECTED_LEFT'],665 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ENTRY_START_TOP'],150 + M4_RINGVIZ_GLOBAL_TOP)
+         m4_define(['M4_ENTRY_START_LEFT'],615 + M4_RINGVIZ_GLOBAL_LEFT)
+         m4_define(['M4_ENTRY_START_SPACE_TOP'],50)
+
+         /skid1
+            $egress_is_head = ! *reset && (/top/core|egress_out>>1$valid_head);
+            $egress_is_tail = ! *reset && (/top/core|egress_out>>1$valid_tail);
+            $egress_flit_size = $egress_is_head ? 1'b1 : >>1$egress_is_tail ? 1'b0 : $RETAIN;
+            $egress_flit[31:0] = (! *reset) ? (/top/core|egress_out/flit>>1$flit) : '0;
+            $vc[M4_VC_INDEX_RANGE] = $egress_is_head ? $egress_flit[M4_FLIT_VC_RANGE] : $RETAIN;
+            $valid = 1;
+   \viz_alpha
+      initEach() {
+         debugger;
+         this.global.transObj = {counting: 0}
+         return {
+            objects : {
+            },
+            transObj: {}
+         }
+      },
+      renderEach() {
+      debugger;
+      for (const uid in this.fromInit().transObj) {
+            const trans = this.fromInit().transObj[uid]
+            //trans.wasVisible = trans.visible
+            trans.visible = false
+      }
+      if (typeof this.getContext().preppedTrace === "undefined") {
+         let $egress_flit_size = '/top/core|ringviz/skid1<>0$egress_flit_size'.goTo(-1)
+         let $uid = '/top/core|egress_out/flit>>1$uid'
+         let $data = '/top/core|ringviz/skid1<>0$egress_flit'
+         let $is_head = '/top/core|ringviz/skid1<>0$egress_is_head'
+         let $is_tail = '/top/core|ringviz/skid1<>0$egress_is_tail'
+         let $vc = '/top/core|ringviz/skid1<>0$vc'
+         while ($egress_flit_size.forwardToValue(1)) {
+            let uid  = $uid .goTo($egress_flit_size.getCycle()).asInt()
+            let data = $data.goTo($egress_flit_size.getCycle()).asInt()
+            let is_head = $is_head.goTo($egress_flit_size.getCycle()).asBool()
+            let is_tail = $is_tail.goTo($egress_flit_size.getCycle()).asBool()
+            let vc = $vc.goTo($egress_flit_size.getCycle()).asBool()
+            let ring_scope = this.getScope("name")
+            let transRect = new fabric.Rect({
+               width: 45,
+               height: 20,
+               fill: vc ? "blue" : "orange",
+               left: 0,
+               top: 0
+            })
+            let transText = new fabric.Text(`${data.toString(16)}`, {
+               left: 1,
+               top: 0,
+               fontSize: 24,
+               fill: "white"
+            })
+            let transCircle = new fabric.Circle({
+               left: 10+20,
+               top: 0,
+               radius: 1,
+               fill: is_head ? "pink" : is_tail ? "blue" : "#208028",
+            })
+            let transObj = new fabric.Group(
+               [transRect,
+                transText,
+                transCircle
+               ],
+               {width: 45,
+                height: 20,
+                visible: false}
+            )
+            context.global.canvas.add(transObj)
+            this.global.transObj[uid] = transObj
+            debugger;
+         }
+         this.getContext().preppedTrace = true
+      }
+      }
+   /skid1
+      \viz_alpha
+         initEach() {
+            debugger;
+            let egress_out = new fabric.Circle({
+               top: M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_EGRESS_OUT_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let fifo_in = new fabric.Circle({
+               top: M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_FIFO_IN_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {egress_out, fifo_in}}
+         },
+         renderEach() {
+         debugger;
+            var arriving_ingress_avail = '/top/core|ingress_in<>0$avail'.asBool();
+            var arriving_ingress_blocked = '/top/core|ingress_in<>0$blocked'.asBool();
+            let arriving_ingress_arrow = new fabric.Line([M4_INGRESS_IN_LEFT, M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_ingress_blocked ? M4_BLOCKED_COLOR : arriving_ingress_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var arriving_deflected_avail = '/top/core|rg_deflected<>0$avail'.asBool();
+            var arriving_deflected_blocked = '/top/core|rg_deflected<>0$blocked'.asBool();
+            let arriving_deflected_arrow = new fabric.Line([M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_deflected_blocked ? M4_BLOCKED_COLOR : arriving_deflected_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var arriving_rg_avail = '/top/core|rg_not_deflected<>0$avail'.asBool();
+            var arriving_rg_blocked = '/top/core|rg_not_deflected<>0$blocked'.asBool();
+            let arriving_rg_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: arriving_rg_blocked ? M4_BLOCKED_COLOR : arriving_rg_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var deflected_fifoin_avail = '/top/core|rg_deflected_st1<>0$avail'.asBool();
+            var deflected_fifoin_blocked = '/top/core|rg_deflected_st1>>1$blocked'.asBool();
+            let deflected_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_DEFLECTED_LEFT, M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: deflected_fifoin_blocked ? M4_BLOCKED_COLOR : deflected_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var egressout_fifoin_avail = '/top/core|rg_node_to_fifo<>0$avail'.asBool();
+            var egressout_fifoin_blocked = '/top/core|rg_node_to_fifo<>0$blocked'.asBool();
+            let egressout_fifoin_arrow = new fabric.Line([M4_FIFO_IN_LEFT, M4_FIFO_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_EGRESS_OUT_LEFT, M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: egressout_fifoin_blocked ? M4_BLOCKED_COLOR : egressout_fifoin_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            var rg_fifoout_avail = '/top/core|rg_fifo_inj<>0$avail'.asBool();
+            var rg_fifoout_blocked = '/top/core|rg_fifo_inj<>0$blocked'.asBool();
+            let rg_fifoout_arrow = new fabric.Line([M4_RG_LEFT, M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_FIFO_OUT_LEFT, M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
+               stroke: rg_fifoout_blocked ? M4_BLOCKED_COLOR : rg_fifoout_avail ? M4_AVAIL_COLOR : M4_INVAILD_COLOR,
+               strokeWidth: 2,
+               visible: 1
+            })
+            let uid = '/top/core|egress_out/flit>>1$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               /*trans.set("visible", true)
+               debugger;
+               if ('/top/core|rg_fifo_in<>0$accepted'.asBool()) {
+                  let core = this.getScope("core").index;
+                  trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_EGRESS_OUT_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                              duration: 500})
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }*/ 
+            }
+            return {objects: [arriving_ingress_arrow, arriving_deflected_arrow, arriving_rg_arrow, deflected_fifoin_arrow, egressout_fifoin_arrow, rg_fifoout_arrow]}
+         }
+   /skid2
+      \viz_alpha
+         initEach() {
+            debugger;
+            let deflected = new fabric.Circle({
+               top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_DEFLECTED_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {deflected}}
+         },
+         renderEach() {
+         debugger;
+            let uid = '/top/core|rg_deflected/flit>>1$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               trans.set("visible", true)
+               debugger;
+               if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                  trans.set("top", M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_DEFLECTED_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                              duration: 500})
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /fork1
+      \viz_alpha
+         initEach() {
+         debugger;
+            let ingress_in = new fabric.Circle({
+               top: M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_INGRESS_IN_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let arriving = new fabric.Circle({
+               top: M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_ARRIVING_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let deflected = new fabric.Circle({
+               top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_DEFLECTED_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {ingress_in, arriving, deflected}}
+         },
+         renderEach() {
+         debugger;
+            let uid = '/top/core|rg_arriving/flit<>0$uid'.asInt()
+            let trans = this.global.transObj[uid]
+            if (trans) {
+               trans.set("visible", true)
+               debugger;
+               if ('/core|ingress_in<>0$trans_valid'.asBool()) {
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_INGRESS_IN_TOP + (core * M4_COREOFFSET), left: M4_INGRESS_IN_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 1000
+                                 })
+               }
+               else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_DEFLECTED_TOP + (core * M4_COREOFFSET), left: M4_DEFLECTED_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500
+                                 })
+               }
+               else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool() && '/top/core|rg<>0$accepted'.asBool()) {
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                  trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                  trans.set("left", M4_ARRIVING_LEFT)
+                  trans.set("opacity", 0)
+                  trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                 duration: 500
+                                 })
+               } else {
+               debugger
+               console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /arb
+      \viz_alpha
+         initEach() {
+         debugger;
+            let fifo_out = new fabric.Circle({
+               top: M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_FIFO_OUT_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            let rg = new fabric.Circle({
+               top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET),
+               left: M4_RG_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {fifo_out, rg}}
+         },
+         renderEach() {
+         debugger;
+               let uid = '/top/core|rg_fifo_out/flit<>0$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               if (trans) {
+                  trans.set("visible", true)
+                  console.log(`uid  ${uid} .`)
+                  if ('/top/core|rg<>0$accepted'.asBool() && '/top/core|rg_fifo_inj<>0$accepted'.asBool()) {
+                     let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                     //trans.set("top", M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                     //trans.set("left", M4_FIFO_OUT_LEFT)
+                     //trans.set("opacity", 0)
+                     trans.animate({top: M4_FIFO_OUT_TOP + (core * M4_COREOFFSET), left: M4_FIFO_OUT_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500,
+                                    onComplete: () => {
+                                       trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET), left: M4_RG_LEFT, opacity: 1}, {
+                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                       duration: 500})
+                                    }
+                                    })
+                  } else {
+                  debugger
+                  console.log(`Transaction ${uid} not found.`)
+               }
+            }
+         }
+   /arbister
+      \viz_alpha
+         initEach() {
+         debugger;
+            let rg_st1 = new fabric.Circle({
+               top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET) + 50,
+               left: M4_RG_LEFT,
+               radius: M4_NODES_RADIUS,
+               fill: M4_NODES_COLOR
+            })
+            return {objects : {rg_st1}}
+         },
+         renderEach() {
+               let uid = '/top/core|rg_st1/flit>>1$uid'.asInt()
+               let trans = this.global.transObj[uid]
+               debugger;
+               if (trans) {
+                  trans.set("visible", true)
+                  console.log(`uid  ${uid} .`)
+                  if ('/top/core|rg_st1>>1$accepted'.asBool()) {
+                  let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                     if(core != 2) {
+                     trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET) + 50, left: M4_RG_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500})
+                       } else {
+                       trans.animate({top: M4_RG_TOP + (core * M4_COREOFFSET) + 50, left: M4_RG_LEFT, opacity: 1}, {
+                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                    duration: 500,
+                                    onComplete: () => {
+                                       trans.animate({top: M4_ARRIVING_TOP, left: M4_RG_LEFT, opacity: 1}, {
+                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                       duration: 1500})
+                                    }
+                                    })
+                       }
+                  } else {
+                  debugger
+                  console.log(`Transaction new ${uid} not found.`)
+               }
+            }
+         }
+   |rg_fifo_in
+      @0
+         /entry[m4_eval(M4_MAX_PACKET_SIZE):0]
+            \viz_alpha
+               initEach() {
+                  let entry_node = new fabric.Circle({
+                     top: M4_ENTRY_START_TOP + (this.getScope("core").index * M4_COREOFFSET) + (this.getScope("entry").index * M4_ENTRY_START_SPACE_TOP ),
+                     left: M4_ENTRY_START_LEFT,
+                     radius: M4_NODES_RADIUS,
+                     fill: "#208028"
+                  })
+                  return {objects : {entry_node}}
+               },
+               renderEach() {
+                     let uid = '/flit$uid'.asInt()
+                     let push = '$push'.asInt()
+                     let header_point = '>>1$prev_entry_was_tail'.asInt()
+                     debugger;
+                     let trans = this.global.transObj[uid]
+                     if (trans) {
+                        trans.set("visible", true)
+                        console.log(`uid  ${uid} .`)
+                        /*
+                        if (push && header_point) {
+                           let core = this.getScope("core").index;
+                           let entry = this.getScope("entry").index;
+                           trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                           trans.set("left", M4_EGRESS_OUT_LEFT)
+                           trans.set("opacity", 0)
+                           this.global.transObj[counting] = entry;
+                           trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                          duration: 500, 
+                                          onComplete: () => {
+                                             trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((8) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500})
+                                          }
+                                          })
+                        } else if (push) {
+                           let core = this.getScope("core").index;
+                           let entry = this.getScope("entry").index;
+                           let left_att = m4_eval(M4_MAX_PACKET_SIZE) + 2 - this.global.transObj[counting] - entry;
+                           trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                           trans.set("left", M4_EGRESS_OUT_LEFT)
+                           trans.set("opacity", 0)
+                           trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                          duration: 500, 
+                                          onComplete: () => {
+                                             trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((left_att) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500})
+                                          }
+                                          })
+                        } */
+                        if (push) {
+                              let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+                              let entry = this.getScope("entry").index;
+                              trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
+                              trans.set("left", M4_EGRESS_OUT_LEFT)
+                              trans.set("opacity", 0)
+                              trans.animate({top: M4_FIFO_IN_TOP + (core * M4_COREOFFSET), left: M4_FIFO_IN_LEFT, opacity: 1}, {
+                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                             duration: 500, 
+                                             onComplete: () => {
+                                                trans.animate({top: M4_ENTRY_START_TOP + (core * M4_COREOFFSET) + ((8 - entry) * M4_ENTRY_START_SPACE_TOP ), left: M4_ENTRY_START_LEFT, opacity: 1}, {
+                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
+                                                duration: 500})
+                                             }
+                                             })
+                        } else {
+                        debugger
+                        console.log(`Transaction ${uid} not found.`)
                      }
-
-
-
-
+                     }
+               }
 // Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
 // Args:
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
 \TLV makerchip_pass_fail(/_hier)
    |done
-      @0
+      @M4_MEM_WR_STAGE
          // Assert these to end simulation (before Makerchip cycle limit).
          *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
          *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
 
 
-\TLV //disabled_main()
+// Instantiate the chosen testbench, based on M4_isa, M4_PROG_NAME, and/or M4_TESTBENCH_NAME.
+//   - m4+<M4_isa>_<M4_TESTBENCH_NAME>_makerchip_tb
+//   - m4+<M4_TESTBENCH_NAME>_makerchip_tb
+//   - m4+<M4_isa>_<M4_PROG_NAME>_makerchip_tb
+//   - m4+<M4_PROG_NAME>_makerchip_tb
+//   - m4+<M4_isa>_default_makerchip_tb
+//   - m4+default_makerchip_tb
+\TLV warpv_makerchip_tb()
+   m4_ifndef(TESTBENCH_NAME, m4_ifdef_tlv(M4_isa['_']M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, m4_ifdef_tlv(M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, ['default'])))
+   m4_def(tb_macro_name, m4_ifdef_tlv(M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_TESTBENCH_NAME['_makerchip_tb']))
+   m4+m4_tb_macro_name()
+
+// A top-level macro supporting one core and no test-bench.
+\TLV warpv()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
-   m4_ifelse_block(m4_eval(M4_CORE_CNT > 1), ['1'], ['
-   // Multi-core
-   /M4_CORE_HIER
-      // TODO: Find a better place for this:
-      // Block CPU |fetch pipeline if blocked.
-      m4_define(['m4_cpu_blocked'], m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
-      m4+cpu(/core)
-      //m4+dummy_noc(/core)
-      m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
-      m4+warpv_makerchip_cnt10_tb()
-   //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
-   m4+makerchip_pass_fail(/core[*])
-   '], ['
-   // Single Core.
-   m4+warpv()
-   m4+warpv_makerchip_cnt10_tb()
-   m4+makerchip_pass_fail()
-   m4_ifelse_block(M4_VIZ, 1, ['
-   '])
-   '])
+   m4+cpu(/top)
+   m4_ifelse(M4_FORMAL, 1, ['m4+formal()'])
+
+// A top-level macro for WARP-V.
+\TLV warpv_top()
+   /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
+   m4+ifelse(m4_eval(M4_NUM_CORES > 1), 1,
+      \TLV
+         // Multi-core
+         /M4_CORE_HIER
+            // TODO: Find a better place for this:
+            // Block CPU |fetch pipeline if blocked.
+            m4_def(cpu_blocked, m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
+            m4+cpu(/core)
+            //m4+dummy_noc(/core)
+            m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+            m4+noc_insertion_ring(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
+            m4+warpv_makerchip_tb()
+         //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
+         m4+makerchip_pass_fail(/core[*])
+         /M4_CORE_HIER
+            // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
+            m4_ifelse_block(M4_ISA, ['RISCV'], ['
+            m4_ifelse_block(M4_VIZ, 1, ['
+            m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
+            m4+ring_viz(/name)
+            '])
+            '])
+      ,
+      \TLV
+         // Single Core.
+         
+         
+         // m4+warpv() (but inlined to reduce macro depth)
+         m4+cpu(/top)
+         m4+warpv_makerchip_tb()
+         m4_ifelse(M4_FORMAL, 1, ['m4+formal()'])
+   
+         m4+makerchip_pass_fail()
+
+         m4_ifelse_block(M4_ISA, ['RISCV'], ['
+         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)'])
+         '])
+      )
+
+m4+module_def
+\TLV //disabled_main()
+   m4+warpv_top()
 
 \SV
    endmodule

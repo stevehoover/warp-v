@@ -10,7 +10,5 @@ m4+definitions(['
 m4+module_def
 \TLV
    m4+warpv()
-   m4+warpv_makerchip_cnt10_tb()
-   m4+makerchip_pass_fail()
 \SV
    endmodule

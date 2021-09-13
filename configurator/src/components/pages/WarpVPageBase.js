@@ -180,7 +180,7 @@ export function WarpVPageBase({
             false,
         )
         //console.log(tlv)
-        //console.log(data)
+        console.log(data)
         if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
         else toast({
             title: "Failed compilation",
@@ -277,18 +277,16 @@ export function WarpVPageBase({
 
         </Box>
 
-        <div ref={detailsComponentRef}>
-            <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
-                                  settings={configuratorGlobalSettings.settings}
-                                  coreJson={coreJson}
-                                  tlvForJson={tlvForJson}
-                                  macrosForJson={macrosForJson}
-                                  sVForJson={sVForJson}
-                                  selectedFile={selectedFile}
-                                  setSelectedFile={setSelectedFile}
-                                  setDiscloureAndUrl={setDisclosureAndUrl}
-            />
-        </div>
+        <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
+                              settings={configuratorGlobalSettings.settings}
+                              coreJson={coreJson}
+                              tlvForJson={tlvForJson}
+                              macrosForJson={macrosForJson}
+                              sVForJson={sVForJson}
+                              selectedFile={selectedFile}
+                              setSelectedFile={setSelectedFile}
+                              setDiscloureAndUrl={setDisclosureAndUrl}
+        />
 
         <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure}/>
     </>

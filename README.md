@@ -7,27 +7,23 @@
 
 WARP-V is an open-source CPU core generator written in TL-Verilog with support for RISC-V and MIPS I. It is a demonstration and exploration vehicle for the flexibility that is possible using the emerging "transaction-level design" methodology. It can implement a single-stage, low-power microcontroller or a mid-range 7-stage CPU. Even the instruction-set architectures (ISAs) is configurable. WARP-V is an evolving library of CPU components as well as various compositions of them. It is driven by a community interested in transforming the silicon industry through open-source hardware and revolutionary design methodology.
 
-WARP-V includes CPU core logic only with no current support for virtual memory, caches, or IOs. RISC-V implementations are formally verified using open-source tools in continuous integration testing.
+WARP-V includes CPU core logic only with no current support for virtual memory, caches, or IOs. RISC-V implementations are formally verified using open-source tools in continuous integration testing. They have been [formally verified also by Axiomise](https://semiwiki.com/eda/302631-accelerating-exhaustive-and-complete-verification-of-risc-v-processors/).
 
 
+# Links
 
-# Quick Links
+## Explore WARP-V
 
-### Explore WARP-V
+We built a <a href="https://warp-v.org">configurator</a>, so you can quickly build a CPU to suit your needs!
 
-WARP-V is easiest to explore in Makerchip. You can:
-  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">open the entire WARP-V model as a single file</a>
-  - <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v_config.tlv" target="_blank" atom_fix="_">open a small configuration file to explore a given configuration</a>.
-
-
-### Publications
+## Publications
 
   - Steve Hoover, "Pipelining RISC-V", Udemy 2018, <a href="http://www.makerchip.com/module/Pane/CourseSlides.pdf" target="_blank" target="_blank" atom_fix="_">webinar</a>
   - Steve Hoover, "Overcoming RTL", DAC 2018: <a href="http://www.makerchip.com/module/pane/DAC2018_WARP-V_Presentation.pdf" target="_blank" target="_blank" atom_fix="_">slides</a>
   - Akos Hadnagy, "Formal Verification of WARP-V", ORConf 2018 and VSDOpen 2018: <a href="https://docs.google.com/presentation/d/e/2PACX-1vQobRU9_QxRI8dguy0U9WYulMJUm4IWjHHKzz9o8nwId-KGiz8pOrTXsAgwjWEI8GLEipMQj2s8ChMy/pub?start=false&loop=false&delayms=30000" target="_blank" target="_blank" atom_fix="_">slides</a>, <a href="https://www.youtube.com/watch?v=fqr4Z9wLNvQ&list=PLUg3wIOWD8yoZLznLfhXjlICGlx2tuwvT&index=14&t=21s" target="_blank">video</a>, and <a href="https://arxiv.org/pdf/1811.12474.pdf" target="_blank" atom_fix="_">paper</a>
   - Steve Hoover: "Verifying a RISC-V in 1 Page of Code!", <a href="https://www.linkedin.com/pulse/verifying-risc-v-1-page-code-steve-hoover/" target="_blank" atom_fix="_">Linkedin</a> and <a href="https://www.semiwiki.com/forum/content/7850-verifying-risc-v-1-page-code-e.html" target="_blank" target="_blank" atom_fix="_">SemiWiki</a>
 
-### Collaboration
+## Collaboration
 
   - A Google Drive for this and other <a href="https://drive.google.com/drive/folders/1l9YTvpNZ0km3IlzlPaMvoLdriLw9B8Yk?usp=sharing" target="_blank" target="_blank" atom_fix="_">open-source TL-Verilog projects</a> including some <a href="https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit#slide=id.g480b08c3a2_0_11" target="_blank" target="_blank" atom_fix="_">WARP-V block diagrams</a>
   - A <a href="https://gitter.im/librecores/warp-v" target="_blank" atom_fix="_">LibreCores WARP-V Gitter Room</a> for public discussion
@@ -39,15 +35,9 @@ WARP-V is easiest to explore in Makerchip. You can:
 In a clean directory:
 
 ```sh
-git clone --recurse-submodules https://github.com/stevehoover/warp-v.git
-```
-
-Note the use of `--recurse-submodules`. If you already cloned without it, you can:
-
-```sh
+git clone https://github.com/stevehoover/warp-v.git
 cd warp-v
-git submodule init
-git submodule update
+./init
 ```
 
 
@@ -164,6 +154,7 @@ WARP-V RISC-V implementations are verified using the <a href="https://github.com
 
 (For other ISAs, <a href="https://upscale.stanford.edu/" target="_blank" target="_blank" atom_fix="_">Upscale</a> might be a good direction for future work.)
 
+RISC-V WARP-V cores have also been [formally verified by Axiomise](https://semiwiki.com/eda/302631-accelerating-exhaustive-and-complete-verification-of-risc-v-processors/) with some [issues outstanding](https://github.com/darbaria/axiomise-warpv-formal-6-stage/issues).
 
 
 <a name="ci"></a>
