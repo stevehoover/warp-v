@@ -4583,7 +4583,7 @@ m4+definitions(['
                     duration: 500
                })
                setTimeout(() => {
-                  objects.src1_value_viz.setVisible(false)
+                  objects.src1_value_viz.set({visible: false})
                   this.global.canvas.renderAll.bind(this.global.canvas)()
                }, 500)
             }, 500)
@@ -4602,7 +4602,7 @@ m4+definitions(['
                objects.src2_value_viz.set({left: 965 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
                                            top: 17 * reg_addr2 + 96,
                                            visible: true})
-               objects.src2_value_viz.setVisible(true)
+               objects.src2_value_viz.set({visible: true})
                objects.src2_value_viz.animate({left: 830, top: 18 * 2 + 96}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
@@ -4615,12 +4615,12 @@ m4+definitions(['
                         duration: 500
                      })
                      setTimeout(() => {
-                        objects.src2_value_viz.setVisible(false)
+                        objects.src2_value_viz.set({visible: false})
                         this.global.canvas.renderAll.bind(this.global.canvas)()
                      }, 500)
                   } else {
                      // Hide src2 value.
-                     objects.src2_value_viz.setVisible(false)
+                     objects.src2_value_viz.set({visible: false})
                      this.global.canvas.renderAll.bind(this.global.canvas)()
                   }
                }, 500)
@@ -4643,7 +4643,7 @@ m4+definitions(['
                     duration: 500
                })
                setTimeout(() => {
-                  objects.src3_value_viz.setVisible(false)
+                  objects.src3_value_viz.set({visible: false})
                   this.global.canvas.renderAll.bind(this.global.canvas)()
                }, 500)
             }, 500)
@@ -4660,13 +4660,13 @@ m4+definitions(['
          })
          if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
             setTimeout(() => {
-               objects.result_viz.setVisible(true)
+               objects.result_viz.set({visible: true})
                objects.result_viz.animate({left: (valid_dest_fpu_reg_valid ? 965 + M4_VIZ_MEM_LEFT_ADJUST : 965), top: 17 * dest_reg + 96}, {
                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                  duration: 500
                })
                setTimeout(() => {
-                  objects.result_viz.setVisible(false)
+                  objects.result_viz.set({visible: false})
                   this.global.canvas.renderAll.bind(this.global.canvas)()
                }, 500)
             }, 1000)
