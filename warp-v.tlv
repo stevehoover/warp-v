@@ -865,8 +865,8 @@ m4+definitions(['
         m4_def(csrrx_rslt_expr, m4_dquote(['$is_csr_']$1[' ? {{']m4_eval(32 - m4_echo(['M4_CSR_']m4_to_upper(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m4_csrrx_rslt_expr))
         m4_def(valid_csr_expr, m4_dquote(m4_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
-        m4_def(csr_viz_init_each, m4_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 193, ['RISCV'], 103, ['MIPSI'], 393, ['DUMMY'], 193), fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: (M4_COREOFFSET * core) + M4_ALL_TOP + 162 + 18 * ']m4_num_csrs[', left: M4_ALL_LEFT + m4_case(M4_ISA, ['MINI'], 200, ['RISCV'], 110, ['MIPSI'], 400, ['DUMMY'], 200), fontSize: 14, fontFamily: "monospace"}); '])
-        m4_def(csr_viz_render_each, m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").setText($1name + ": " + val_$1 + oldVal$1); this.getInitObject("$1").setFill($1mod ? "blue" : "black"); '])
+        m4_def(csr_viz_init_each, m4_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: 40 + 18 * ']m4_num_csrs[', left: 20, fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 40 + 18 * ']m4_num_csrs[', left: 30, fontSize: 14, fontFamily: "monospace"}); '])
+        m4_def(csr_viz_render_each, m4_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m4_ifelse($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").set({text: $1name + ": " + val_$1 + oldVal$1}); this.getInitObject("$1").set({fill: $1mod ? "blue" : "black"}); '])
         m4_def(num_csrs, m4_eval(m4_num_csrs + 1))
       ']
    )
@@ -4149,91 +4149,91 @@ m4+definitions(['
                   '])
       )
    
-   
-
-\TLV instruction_in_memory(|_top)
-   \viz_alpha
-      initAll() {
-         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-         let imem_box = new fabric.Rect({
-            top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: -25 + -580 + M4_ALL_LEFT,
-            fill: "#208028",
+\TLV instruction_in_memory(|_top, _where_)
+   \viz_js
+       all: {
+         box: {
             width: 670,
             height: 76 + 18 * M4_NUM_INSTRS,
-            stroke: "black"
-         })
-         let imem_header = new fabric.Text("🗃️ Instr. Memory", {
-            top: -40 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: 250 + -580 + M4_ALL_LEFT,
-            fontSize: 20,
-            fontWeight: 800,
-            fontFamily: "monospace",
-            fill: "white"
-         })
-         return {objects: {imem_box, imem_header}}
-      },
-      initEach() {
-         // Instruction and binary value text.
-         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+            fill: "#208028",
+            stroke: "white",
+            strokeWidth: 0
+         },
+         init() {
+            //debugger
+            let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+               top: 10,
+               left: 250,
+               fontSize: 20,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "black"
+            })
+            return {imem_header}
+         },
+         render() {
+            //debugger
+            // Highlight instruction.
+            let pc = '['']|_top/instr$pc'.asInt(-1)
+             this.highlighted_addr = pc
+             instance = this.getContext().children[pc]
+             if (typeof instance !== "undefined") {
+                let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
+                instance.initObjects.instr_binary_box.set({fill: color})
+                instance.initObjects.instr_asm_box.set({fill: color})
+             }
+             // Highlight 2nd issue instruction.
+             let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
+             this.highlighted_addr2 = pc2
+             instance2 = this.getContext().children[pc2]
+             if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
+                let color = "#ffd0b0"
+                instance2.initObjects.instr_binary_box.set({fill: color})
+                instance2.initObjects.instr_asm_box.set({fill: color})
+             }
+         },
+         unrender() {
+            //debbuger
+            // Unhighlight instruction.
+            let instance = this.getContext().children[this.highlighted_addr]
+             if (typeof instance != "undefined") {
+                instance.initObjects.instr_binary_box.set({fill: "white"})
+                instance.initObjects.instr_asm_box.set({fill: "white"})
+             }
+             // Unhighlight 2nd issue instruction.
+             let instance2 = this.getContext().children[this.highlighted_addr2]
+             if (typeof instance2 != "undefined") {
+                instance2.initObjects.instr_binary_box.set({fill: "white"})
+                instance2.initObjects.instr_asm_box.set({fill: "white"})
+             }
+         },
+       },
+       where: {_where_},
+       where0: {left: 30, top: 50},
+       layout: {top: 18}, //scope's instance stacked vertically
+       init() {
          let instr_str = new fabric.Text("" , {
-            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,  // TODO: Add support for '#instr_mem'.
-            left: -577 + M4_ALL_LEFT,
+            left: 10,
             fontSize: 14,
             fontFamily: "monospace"
          })
          let instr_asm_box = new fabric.Rect({
-            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: -260 + M4_ALL_LEFT,
-            fill: "white",
-            width: 300,
-            height: 14
-         })
-         let instr_binary_box = new fabric.Rect({
-            top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: -580 + M4_ALL_LEFT,
+            left: 0,
             fill: "white",
             width: 280,
             height: 14
          })
-         return {objects: {instr_binary_box, instr_asm_box, instr_str}}
-      },
-      renderAll() {
-         // Update fetch instruction highlighting and 2nd issue instruction.
-         // (We record and clear the old highlighting so we don't have to render each instruction individually.)
-         // Unhighlight fetch instruction.
-         let instance = this.context.instances[this.fromInit().highlighted_addr]
-         if (typeof instance != "undefined") {
-            instance.initObjects.instr_binary_box.setFill("white")
-            instance.initObjects.instr_asm_box.setFill("white")
-         }
-         // Unhighlight 2nd issue instruction.
-         let instance2 = this.context.instances[this.fromInit().highlighted_addr2]
-         if (typeof instance2 != "undefined") {
-            instance2.initObjects.instr_binary_box.setFill("white")
-            instance2.initObjects.instr_asm_box.setFill("white")
-         }
-         // Highlight fetch instruction.
-         let pc = '['']|_top/instr$pc'.asInt(-1)
-         this.fromInit().highlighted_addr = pc
-         instance = this.context.instances[pc]
-         if (typeof instance !== "undefined") {
-            let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
-            instance.initObjects.instr_binary_box.setFill(color)
-            instance.initObjects.instr_asm_box.setFill(color)
-         }
-         // Highlight 2nd issue instruction.
-         let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
-         this.fromInit().highlighted_addr2 = pc2
-         instance2 = this.context.instances[pc2]
-         if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
-            let color = "#ffd0b0"
-            instance2.initObjects.instr_binary_box.setFill(color)
-            instance2.initObjects.instr_asm_box.setFill(color)
-         }
-      },
-      renderEach() {
-         // Instruction memory is constant, so just create it once.
+         let instr_binary_box = new fabric.Rect({
+            left: 330,
+            fill: "white",
+            width: 280,
+            height: 14
+         })
+         return {instr_asm_box, instr_binary_box, instr_str}
+       },
+       render() {
+          //debugger
+          // Instruction memory is constant, so just create it once.
          m4_ifelse_block(M4_ISA, ['MINI'], ['
             let instr_str = '$instr'.goTo(0).asString("?")
          '], M4_ISA, ['RISCV'], ['
@@ -4243,61 +4243,61 @@ m4+definitions(['
          '], ['
             let instr_str = '$instr'.goTo(0).asString("?")
          '])
-         this.getInitObject("instr_str").setText(`${instr_str}`)
-      }
-         
-\TLV registers(_name, _heading, _sig_prefix, _num_srcs, _left_adjust)
+         this.getObjects().instr_str.set({text: `${instr_str}`})
+       },
+   
+\TLV registers(_name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
    /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
-      \viz_alpha
-         initAll() {
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-            let rf_box = new fabric.Rect({
-               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 350 + _left_adjust + M4_ALL_LEFT,
+      \viz_js
+         all: {
+            box: {
                fill: "#2028b0",
                width: 145,
                height: 650,
-               stroke: "black"
-            })
-            let rf_header = new fabric.Text("📂 _heading", {
-               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 360 + _left_adjust + M4_ALL_LEFT,
-               fontSize: 18,
-               fontWeight: 800,
-               fontFamily: "monospace",
-               fill: "white"
-            })
-            let rf_header2 = new fabric.Text("Integer (hex)", {
-               top: -17 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 367 + _left_adjust + M4_ALL_LEFT,
-               fontSize: 14,
-               fontFamily: "monospace",
-               fill: "white"
-            })
-            return {objects: {rf_box, rf_header, rf_header2}}
+               stroke: "black",
+               strokeWidth: 0
+            },
+            init() {
+               let rf_header = new fabric.Text("📂 _heading", {
+                  top: 10,
+                  left: 10,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fill: "white"
+               })
+               let rf_header2 = new fabric.Text("Integer (hex)", {
+                  top: 40,
+                  left: 20,
+                  fontSize: 14,
+                  fontFamily: "monospace",
+                  fill: "white"
+               })
+               return {rf_header, rf_header2}
+            },
          },
-         initEach() {
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
+         where: {_where_},
+         where0: {left: 10, top: 80},
+         box: {
+               fill: "white",
+               width: 125,
+               height: 14,
+               strokeWidth: 0
+            },
+         layout: {top: 17}, //vertically
+         init() {
             let reg = new fabric.Text("", {
-               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 367 + _left_adjust + M4_ALL_LEFT,
+               left: 10,
                fontSize: 14,
                fontFamily: "monospace"
             })
-            let reg_box = new fabric.Rect({
-               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 360 + _left_adjust + M4_ALL_LEFT,
-               fill: "white",
-               width: 125,
-               height: 14
-            })
-            return {objects: {reg_box, reg}}
+            return {reg}
          },
-         renderEach() {
+         render() {
             //debugger
             // TODO: This is inefficient as is the same for every entry.
-            let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getScope("['']_sig_prefix['']regs").index)
+            let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getIndex())
             let rs_valid = []
             let read_valid = false
             for (let i = 1; i <= _num_srcs; i++) {
@@ -4308,33 +4308,76 @@ m4+definitions(['
             let reg = parseInt(this.getIndex())
             let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
             let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
-            this.getInitObject("reg").setText(
+            this.getObjects().reg.set({text:
                regIdent + ": " +
-               '$value'.step(1).asInt(NaN).toString(16) + oldValStr)
-            this.getInitObject("reg").setFill(pending ? "red" : mod ? "blue" : "black")
-            this.getInitObject("reg_box").setFill(mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white")
+               '$value'.step(1).asInt(NaN).toString(16) + oldValStr})
+            this.getObjects().reg.set({fill: pending ? "red" : mod ? "blue" : "black"})
+            this.getBox().set({fill: mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white"})
          }
 
-\TLV register_csr(/_csr) 
+\TLV register_csr(/_csr, _where_) 
    /_csr
-      \viz_alpha
-         initEach() {
+      \viz_js
+            box: {
+               fill: "#2028b0",
+               width: 220,
+               height: 18 * m4_num_csrs + 52,
+               stroke: "black",
+               strokeWidth: 0
+            },
+         where: {_where_},
+         init() {
+            //debugger
+            let csr_header = new fabric.Text("📂 CSRs", {
+                  top: 10,
+                  left: 10,
+                  fill: "white",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  fontFamily: "monospace"
+               })
             let csr_objs = {}
             let csr_boxes = {}
             //debugger
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
             m4_csr_viz_init_each
-            return {objects: {...csr_objs, ...csr_boxes}}
+            return {...csr_objs, ...csr_boxes, csr_header}
          },
-         renderEach() {
+         render() {
             //debugger
             m4_csr_viz_render_each
          }
 
-
-\TLV instruction(/_top)
-   \viz_alpha
-      renderEach() {
+\TLV instruction(_where_)
+   \viz_js
+      box: {
+         fill: "pink",
+         width: 10 + (550 + 605) + 190 -10,
+         height: 700,
+         stroke: "black",
+         visible: false,
+         strokeWidth: 0
+      },
+      init() {
+         let decode_header = new fabric.Text("⚙️ Instr. Decode", {
+            top: 15,
+            left: 103 + 605 + 20 -6,
+            fill: "maroon",
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: "monospace"
+         })
+         let decode_box = new fabric.Rect({
+            top: 10,
+            left: 103 + 605 -6,
+            fill: "#f8f0e8",
+            width: 230,
+            height: 160,
+            stroke: "#ff8060"
+         })
+         return {decode_box, decode_header}
+      },
+      where: {_where_},
+      render() {
          objects = {}
          //
          // PC instr_mem pointer
@@ -4344,10 +4387,9 @@ m4+definitions(['
          let color = !commit                ? "gray" :
                      '$abort'.asBool(false) ? "red" :
                                               "blue"
-         let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
          objects.pc_pointer = new fabric.Text("👉", {
-            top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: -281 + M4_ALL_LEFT,
+            top: 60 + 18 * pc,
+            left: 335,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -4356,8 +4398,8 @@ m4+definitions(['
          if ('$second_issue'.asBool(false)) {
             let second_issue_pc = '/orig_inst$pc'.asInt(-1)
             objects.second_issue_pointer = new fabric.Text("👉🏿", {
-               top: 18 * second_issue_pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: -281 + M4_ALL_LEFT,
+               top: 60 + 18 * pc,
+               left: 335,
                fill: color,
                fontSize: 14,
                fontFamily: "monospace",
@@ -4370,8 +4412,8 @@ m4+definitions(['
          //
          // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
          //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
-         //   top: 50 + (M4_COREOFFSET * this.getScope("core").index) + M4_ALL_TOP,
-         //   left: 90 + M4_ALL_LEFT,
+         //   top: 50,
+         //   left: 90,
          //   fill: color,
          //   fontSize: 14,
          //   fontFamily: "monospace"
@@ -4431,16 +4473,16 @@ m4+definitions(['
                       ('$imm_valid` ? `i[${'$imm_value'.asInt(NaN)}]` : ""
          '], ['
          '])
-         //
+         // srcX Arrow function
          newSrcArrow = function(name, fp, addr, valid, pos) {
             if (valid) {
-               objects[name + "_arrow"] = new fabric.Line([360 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0) + M4_ALL_LEFT, 18 * addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 210 + M4_ALL_LEFT, 40 + 18 * pos + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+               objects[name + "_arrow"] = new fabric.Line([965 + (fp ? M4_VIZ_MEM_LEFT_ADJUST : 0), 17 * addr + 96, 830, 96 + 18 * pos], {
                   stroke: "#b0c8df",
                   strokeWidth: 2
                })
             }
          }
-         objects.pc_arrow = new fabric.Line([10 + M4_ALL_LEFT, 18 * pc + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, 86 + M4_ALL_LEFT, -8 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+         objects.pc_arrow = new fabric.Line([10+620, 18 * pc + 66, 86+620, -8+66], {
             stroke: "#b0c8df",
             strokeWidth: 2
          })
@@ -4463,6 +4505,7 @@ m4+definitions(['
          let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
          let valid_dest_fpu_reg_valid = false
          m4_ifelse_block(M4_EXT_F, 1, ['
+         //debugger
          fpu_rs1_valid = '/fpu_src[1]$unconditioned_is_reg'.asBool()
          fpu_rs2_valid = '/fpu_src[2]$unconditioned_is_reg'.asBool()
          fpu_rs3_valid = '/fpu_src[3]$unconditioned_is_reg'.asBool()
@@ -4474,28 +4517,27 @@ m4+definitions(['
          if (fpu_rs2_valid) {src2_value = '/fpu_src[2]$unconditioned_reg_value'.asInt()}
          if (fpu_rs3_valid) {src3_value = '/fpu_src[3]$unconditioned_reg_value'.asInt()}
          valid_dest_fpu_reg_valid = '$valid_dest_fpu_reg_valid'.asBool(false)
-         debugger
          '])
          let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
-         //
+         // rd Arrow
          let second_issue = '$second_issue'.asBool()
-         objects.rd_arrow = new fabric.Line([157 + M4_ALL_LEFT, 20 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 360 + M4_VIZ_MEM_LEFT_ADJUST : 360), (18 * the_dest_reg) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+         objects.rd_arrow = new fabric.Line([780, 76, (valid_dest_fpu_reg_valid ? 965 + M4_VIZ_MEM_LEFT_ADJUST : 965), 17 * the_dest_reg + 96], {
             stroke: '$second_issue'.asBool() ? "#c03050" : commit ? "#a0dfff" : "#d0d0d0",
             strokeWidth: 3,
             visible: valid_dest_reg_valid || valid_dest_fpu_reg_valid
          })
-         //
+         // load arrow
          let ld_st_addr = ('$addr'.asInt() / 4)
          let ld_valid = '$valid_ld'.asBool(false)
-         objects.ld_arrow = new fabric.Line([550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, (18 * ld_st_addr) + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP, M4_ALL_LEFT + 475 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 5 + 18 * the_dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+         objects.ld_arrow = new fabric.Line([1165 + M4_VIZ_MEM_LEFT_ADJUST, (17 * ld_st_addr) + 96, 1080 + (valid_dest_fpu_reg_valid ? M4_VIZ_MEM_LEFT_ADJUST : 0), 96 + 17 * the_dest_reg], {
             stroke: "#c03050",
             strokeWidth: 3,
             visible: ld_valid
          })
-         //
+         // store arrow
          let st_valid = '$valid_st'.asBool()
          objects.st_arrow = new fabric.Line(
-            [210 + M4_ALL_LEFT, 76 + (M4_COREOFFSET * core) + M4_ALL_TOP, 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, 18 * ld_st_addr + 6 + (M4_COREOFFSET * core) + M4_ALL_TOP], {
+            [830, 132, 1165 + M4_VIZ_MEM_LEFT_ADJUST, 17 * ld_st_addr + 96], {
             stroke: "#a0dfff",
             strokeWidth: 3,
             visible: st_valid
@@ -4504,21 +4546,21 @@ m4+definitions(['
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
-                  top: 18 * pc + (M4_COREOFFSET * core) + M4_ALL_TOP,
-                  left: -250 + M4_ALL_LEFT,
+                  top: 18 * pc + 50,
+                  left: 630,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
          })
          //
-         objects.fetch_instr_viz.animate({top: -12 + (M4_COREOFFSET * core) + M4_ALL_TOP, left: 85 + M4_ALL_LEFT}, {
+         objects.fetch_instr_viz.animate({top: 50, left: 710}, {
               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
               duration: 500
          })
          //
          objects.instr_with_values = new fabric.Text(str, {
-            top: 15 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: 110 + M4_ALL_LEFT,
+            top: 70,
+            left: 730,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace"
@@ -4533,10 +4575,10 @@ m4+definitions(['
          })
          if (rs1_valid || fpu_rs1_valid) {
             setTimeout(() => {
-               objects.src1_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: 18 * reg_addr1 + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               objects.src1_value_viz.set({left: 965 + (rs1_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 17 * reg_addr1 + 96,
                                            visible: true})
-               objects.src1_value_viz.animate({left: 195 + M4_ALL_LEFT, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+               objects.src1_value_viz.animate({left: 830, top: 18 * 1 + 96}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
@@ -4546,7 +4588,7 @@ m4+definitions(['
                }, 500)
             }, 500)
          }
-         debugger
+         //debugger
          objects.src2_value_viz = new fabric.Text(src2_value.toString(), {
             fill: color,
             fontSize: 14,
@@ -4557,18 +4599,18 @@ m4+definitions(['
          let src2_being_stored = '$valid_decode'.asBool(false) && '$st'.asBool(false) && commit; // Animate src2 value being stored.
          if (rs2_valid || fpu_rs2_valid) {
                setTimeout(() => {
-               objects.src2_value_viz.set({left: (8 * 4) + M4_ALL_LEFT + 316 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: (18 * reg_addr2) + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               objects.src2_value_viz.set({left: 965 + (rs2_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 17 * reg_addr2 + 96,
                                            visible: true})
                objects.src2_value_viz.setVisible(true)
-               objects.src2_value_viz.animate({left: 195 + M4_ALL_LEFT, top: (18 * 3) + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+               objects.src2_value_viz.animate({left: 830, top: 18 * 2 + 96}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
                setTimeout(() => {
                   if (src2_being_stored) {
                      // Animate src2 value being stored.
-                     objects.src2_value_viz.animate({left: M4_ALL_LEFT + 550 + M4_VIZ_MEM_LEFT_ADJUST, top: 18 * ld_st_addr + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+                     objects.src2_value_viz.animate({left: 1165 + M4_VIZ_MEM_LEFT_ADJUST, top: 17 * ld_st_addr + 96}, {
                         onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                         duration: 500
                      })
@@ -4593,10 +4635,10 @@ m4+definitions(['
          })
          if (fpu_rs3_valid) {
             setTimeout(() => {
-               objects.src3_value_viz.set({left: M4_ALL_LEFT + 316 + 8 * 4 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
-                                           top: 18 * reg_addr + (M4_COREOFFSET * core) + M4_ALL_TOP,
+               objects.src3_value_viz.set({left: 965 + (rs3_valid ? 0 : M4_VIZ_MEM_LEFT_ADJUST),
+                                           top: 17 * reg_addr + 96,
                                            visible: true})
-               objects.src3_value_viz.animate({left: M4_ALL_LEFT + 195, top: 18 * 2 + 15 + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+               objects.src3_value_viz.animate({left: 830, top: 18 * 3 + 96}, {
                     onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                     duration: 500
                })
@@ -4608,8 +4650,8 @@ m4+definitions(['
          }
          let res_value = '$rslt'.asInt().toString(16)
          objects.result_viz = new fabric.Text(res_value, {
-            top: 16 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-            left: 150 + M4_ALL_LEFT,
+            top: 76,
+            left: 780,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -4619,7 +4661,7 @@ m4+definitions(['
          if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
             setTimeout(() => {
                objects.result_viz.setVisible(true)
-               objects.result_viz.animate({left: M4_ALL_LEFT + (valid_dest_fpu_reg_valid ? 393 + M4_VIZ_MEM_LEFT_ADJUST : 393), top: 18 * dest_reg + (M4_COREOFFSET * core) + M4_ALL_TOP}, {
+               objects.result_viz.animate({left: (valid_dest_fpu_reg_valid ? 965 + M4_VIZ_MEM_LEFT_ADJUST : 965), top: 17 * dest_reg + 96}, {
                  onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                  duration: 500
                })
@@ -4629,170 +4671,160 @@ m4+definitions(['
                }, 500)
             }, 1000)
          }
-         return {objects: Object.values(objects)}
+         return Object.values(objects)
       }
+   
 
-
-\TLV memory(/_bank_size, /_mem_size)
+\TLV memory(/_bank_size, /_mem_size, _where_)
    /_mem_size
-      \viz_alpha
-         initEach() {
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-            let index_val_box = new fabric.Rect({
-               top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 540 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+      \viz_js
+         all: {
+            box: {
+               fill: "#208028",
+               width: 190,
+               height: 650,
+               stroke: "black",
+               strokeWidth: 0
+            },
+            init() {
+               //debugger
+               let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
+                  top: 10,
+                  left: 10, // Center aligned
+                  fontSize: 20,
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fill: "white"
+               })
+               return {dmem_header}
+            },
+         },
+         where: {_where_},
+         where0: {left: 10, top: 80},
+         box: {
                fill: "white",
                width: 40,
-               height: 14
-            })
-            //let index = (this.getScope("bank").index != 0) ? null : // resulting in "Cannot read property 'setupState' of null" error
+               height: 14,
+               strokeWidth: 0
+            },
+         layout: {top: 17}, //vertically
+         init() {
+            //debugger
             let index =
                new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-                  left: 550 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+                  left: 10,
                   fontSize: 14,
                   fontFamily: "monospace"
                })
-            return {objects: {index_val_box, index}}
+            return {index}
          }
    /_bank_size
-      \viz_alpha
-         initEach() {
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-            let banknum = new fabric.Text(String(this.getScope("bank").index), {
-               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 510 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 60 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+      \viz_js
+         all: {
+            box: {
+                  width: 190,
+                  height: 650,
+                  stroke: "black",
+                  strokeWidth: 0
+                 },
+            init() {
+               let bankname = new fabric.Text("bank", {
+                  top: 40,
+                  left: 100,
+                  fontSize: 14,
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fill: "black"
+               })
+               return {bankname}
+            }
+         },
+         where: {_where_},
+         where0: {left: 60, top: 60},
+         init() {
+         //debugger
+            let banknum = new fabric.Text(String(this.scopes.bank.index), {
+               top: -19,
+               left: 10,
                fontSize: 14,
                fontWeight: 800,
                fontFamily: "monospace",
-               fill: "white"
+               fill: "black"
             })
-            return {objects: {banknum}}
+            return {banknum}
          },
-         initAll() {
-            return {}
-         },
-         renderAll() {
+         render() {
+         //debugger
             // Update write address highlighting.
             // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
             // Unhighlight
-            let unhighlight_addr = this.fromInit().highlighted_addr
+            let unhighlight_addr = this.highlighted_addr
             let unhighlight = typeof unhighlight_addr != "undefined"
             let valid_ld = '/instr$valid_ld'.asBool(false)
             let valid_st = '/instr$valid_st'.asBool(false)
             let st_mask = '/instr$st_mask'.asInt(0)
             let addr = '/instr$addr'.asInt(-1) >> 2 // (word-address)
             let color = valid_st ? "#b0ffff" : "#b0ffff"
-            debugger
             let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
             // Re-highlight index.
             //debugger
             if (unhighlight) {
-               this.getScope("instr").children.mem.instances[unhighlight_addr].initObjects.index_val_box.setFill("white")
+               this.scopes.instr.children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
             }
             if (highlight) {
-               this.getScope("instr").children.mem.instances[addr].initObjects.index_val_box.setFill(color)
+               this.scopes.instr.children.mem.children[addr].initObjects.box.set({fill: color})
             }
             for (let i = 0; i < 4; i++) {
                if (unhighlight) {
-                  this.getScope("instr").children.bank.instances[i].children.mem.instances[unhighlight_addr].initObjects.bank_val_box.setFill("white")
+                  this.scopes.instr.children.bank.children[i].children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
                }
                if (highlight && ((st_mask >> i) & 1 != 0)) {
-                  this.getScope("instr").children.bank.instances[i].children.mem.instances[addr].initObjects.bank_val_box.setFill(color)
+                  this.scopes.instr.children.bank.children[i].children.mem.children[addr].initObjects.box.set({fill: color})
                }
             }
-            this.fromInit().highlighted_addr = highlight ? addr : undefined
+            this.highlighted_addr = highlight ? addr : undefined
          },
+         layout: {left: 30},
       /_mem_size
-         \viz_alpha
-            initEach() {
-               let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-               let bank_val_box = new fabric.Rect({
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-                  left: 550 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
+         \viz_js
+            box: {
                   fill: "white",
-                  width: 25,
-                  height: 14
-               })
+                  width: 30,
+                  height: 16,
+                  stroke: "#208028",
+                  strokeWidth: 0.75
+                 },
+            layout: {top: 17},
+            init() {
+               //debugger
                let data = new fabric.Text("", {
-                  top: 18 * this.getIndex() + (M4_COREOFFSET * core) + M4_ALL_TOP,
-                  left: 555 + (M4_ADDRS_PER_WORD - this.getScope("bank").index) * 30 + 10 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // bank: 3 2 1 0 format
+                  top: 2,
+                  left: 6,
                   fontSize: 14,
                   fontFamily: "monospace"
                })
-               return {objects: {bank_val_box, data}}
+               return {data}
             },
-            renderEach() {
-               //console.log(`Render ${this.getScope("bank").index},${this.getScope("mem").index}`)
-               let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.getScope("bank").index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+            render() {
+            debugger
+               //console.log(`Render ${this.scopes.bank.index},${this.scopes.mem.index}`)
+               let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.scopes.bank.index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
                //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
-               this.getInitObject("data").setText('$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0"))
-               this.getInitObject("data").setFill(mod ? "blue" : "black")
+               this.getInitObject("data").set({text: '$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0")})
+               this.getInitObject("data").set({fill: mod ? "blue" : "black"})
             }
+         
 
-\TLV layout_viz(/_screen, |_top) 
-   /_screen 
-      \viz_alpha 
-         initEach() {
-            let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
-            let decode_header = new fabric.Text("⚙️ Instr. Decode", {
-               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 100 + M4_ALL_LEFT,
-               fill: "maroon",
-               fontSize: 18,
-               fontWeight: 800,
-               fontFamily: "monospace"
-            })
-            let decode_box = new fabric.Rect({
-               top: -50 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 80 + M4_ALL_LEFT,
-               fill: "#f8f0e8",
-               width: 230,
-               height: 160,
-               stroke: "#ff8060"
-            })
-            let csr_header = new fabric.Text("📂 CSRs", {
-               top: 125 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 100 + M4_ALL_LEFT,
-               fill: "white",
-               fontSize: 18,
-               fontWeight: 800,
-               fontFamily: "monospace"
-            })
-            let csr_box = new fabric.Rect({
-               top: 120 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 80 + M4_ALL_LEFT,
-               fill: "#2028b0",
-               width: 220,
-               height: 18 * m4_num_csrs + 52,
-               stroke: "black"
-            })
-            let dmem_box = new fabric.Rect({
-               top: -60 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 530 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
-               fill: "#208028",
-               width: 190,
-               height: 650,
-               stroke: "black"
-            })
-            let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
-               top: -45 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 485 + m4_eval(M4_ADDRS_PER_WORD * 15) + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT, // Center aligned
-               fontSize: 20,
-               fontWeight: 800,
-               fontFamily: "monospace",
-               fill: "white"
-            })
-            let bankname = new fabric.Text("bank", {
-               top: -20 + (M4_COREOFFSET * core) + M4_ALL_TOP,
-               left: 545 + M4_VIZ_MEM_LEFT_ADJUST + M4_ALL_LEFT,
-               fontSize: 14,
-               fontWeight: 800,
-               fontFamily: "monospace",
-               fill: "white"
-            })
-            return {objects: {csr_box, decode_box, csr_header, decode_header, dmem_box, dmem_header, bankname}}
-         }
+\TLV layout_viz(_where_) 
+   \viz_js
+      //Main layout
+      box: {
+            fill: "#7AD7F0",
+            width: 10 + (550 + 605) + 190 + 10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0),
+            height: (76 + 18 * M4_NUM_INSTRS >= 670) ? (20 + 76 + 18 * M4_NUM_INSTRS) : 670,
+            strokeWidth: 0
+           },
+      where: {_where_},
          
    //////// VIZUALIZING THE MAIN CPU //////////////
 \TLV cpu_viz(/_des_pipe, @_M4_stage)
@@ -4804,19 +4836,19 @@ m4+definitions(['
    m4+m4_viz_logic_macro_name()
    /_des_pipe
       @_M4_stage  // Visualize everything happening at the same time.
-         m4+layout_viz(/layout, /_des_pipe)
+         m4+layout_viz(['left: 0, top: 0'])
+         
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
-            m4+instruction_in_memory(/_des_pipe)
-         //
-         // Register file
-         //
+            m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])
+            
          /instr
-            m4+instruction()
-            m4+registers(int, Int RF, , 2, 0)
-            m4+register_csr(/regcsr)
-            m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, M4_VIZ_MEM_LEFT_ADJUST)'])
-            m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE]) 
-      
+            m4+instruction(['left: 10, top: 0'])
+            m4+registers(int, Int RF, , 2, ['left: 10 + (350 + 605) -10, top: 10'])
+            m4+register_csr(/regcsr, ['left: 10 + (103 + 605) -10, top: 10 + 172'])
+            m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, ['left: 955 + M4_VIZ_MEM_LEFT_ADJUST, top: 10'])'])
+            m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0), top: 10']) 
+         
+         
       //////// VIZUALIZING THE INSERTION RING //////////////
 \TLV ring_viz(/_name)
    m4_define(['M4_RINGVIZ_REF_TOP'],-100)
