@@ -4740,7 +4740,7 @@ m4+definitions(['
             }
          },
          where: {_where_},
-         where0: {left: 60, top: 60},
+         where0: {left: 150, top: 60},
          init() {
          //debugger
             let banknum = new fabric.Text(String(this.scopes.bank.index), {
@@ -4784,7 +4784,7 @@ m4+definitions(['
             }
             this.highlighted_addr = highlight ? addr : undefined
          },
-         layout: {left: 30},
+         layout: {left: -30},
       /_mem_size
          \viz_js
             box: {
