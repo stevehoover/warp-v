@@ -4208,6 +4208,7 @@ m4+definitions(['
              }
          },
        },
+       box: {strokeWidth: 0},
        where: {_where_},
        where0: {left: 30, top: 50},
        layout: {top: 18}, //scope's instance stacked vertically
@@ -4815,11 +4816,11 @@ m4+definitions(['
             }
          
 
-\TLV layout_viz(_where_) 
+\TLV layout_viz(_where_, _fill_color) 
    \viz_js
       //Main layout
       box: {
-            fill: "#7AD7F0",
+            fill: _fill_color,
             width: 10 + (550 + 605) + 190 + 10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0),
             height: (76 + 18 * M4_NUM_INSTRS >= 670) ? (20 + 76 + 18 * M4_NUM_INSTRS) : 670,
             strokeWidth: 0
@@ -4827,7 +4828,7 @@ m4+definitions(['
       where: {_where_},
          
    //////// VIZUALIZING THE MAIN CPU //////////////
-\TLV cpu_viz(/_des_pipe, @_M4_stage)
+\TLV cpu_viz(/_des_pipe, @_M4_stage, _fill_color)
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_def(viz_logic_macro_name, M4_isa['_viz_logic'])
    m4_def(COREOFFSET, 750)
@@ -4836,7 +4837,7 @@ m4+definitions(['
    m4+m4_viz_logic_macro_name()
    /_des_pipe
       @_M4_stage  // Visualize everything happening at the same time.
-         m4+layout_viz(['left: 0, top: 0'])
+         m4+layout_viz(['left: 0, top: 0'], _fill_color)
          
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
             m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])
@@ -5354,7 +5355,7 @@ m4+definitions(['
             // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
             m4_ifelse_block(M4_ISA, ['RISCV'], ['
             m4_ifelse_block(M4_VIZ, 1, ['
-            m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)
+            m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE, "#7AD7F0")
             m4+ring_viz(/name)
             '])
             '])
@@ -5371,7 +5372,7 @@ m4+definitions(['
          m4+makerchip_pass_fail()
 
          m4_ifelse_block(M4_ISA, ['RISCV'], ['
-         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE)'])
+         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE, "#7AD7F0")'])
          '])
       )
 
