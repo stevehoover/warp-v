@@ -4160,7 +4160,6 @@ m4+definitions(['
             strokeWidth: 0
          },
          init() {
-            //debugger
             let imem_header = new fabric.Text("🗃️ Instr. Memory", {
                top: 10,
                left: 250,
@@ -4172,7 +4171,6 @@ m4+definitions(['
             return {imem_header}
          },
          render() {
-            //debugger
             // Highlight instruction.
             let pc = '['']|_top/instr$pc'.asInt(-1)
              this.highlighted_addr = pc
@@ -4233,7 +4231,6 @@ m4+definitions(['
          return {instr_asm_box, instr_binary_box, instr_str}
        },
        render() {
-          //debugger
           // Instruction memory is constant, so just create it once.
          m4_ifelse_block(M4_ISA, ['MINI'], ['
             let instr_str = '$instr'.goTo(0).asString("?")
@@ -4296,7 +4293,6 @@ m4+definitions(['
             return {reg}
          },
          render() {
-            //debugger
             // TODO: This is inefficient as is the same for every entry.
             let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getIndex())
             let rs_valid = []
@@ -4328,7 +4324,6 @@ m4+definitions(['
             },
          where: {_where_},
          init() {
-            //debugger
             let csr_header = new fabric.Text("📂 CSRs", {
                   top: 10,
                   left: 10,
@@ -4339,12 +4334,10 @@ m4+definitions(['
                })
             let csr_objs = {}
             let csr_boxes = {}
-            //debugger
             m4_csr_viz_init_each
             return {...csr_objs, ...csr_boxes, csr_header}
          },
          render() {
-            //debugger
             m4_csr_viz_render_each
          }
 
@@ -4506,7 +4499,6 @@ m4+definitions(['
          let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
          let valid_dest_fpu_reg_valid = false
          m4_ifelse_block(M4_EXT_F, 1, ['
-         //debugger
          fpu_rs1_valid = '/fpu_src[1]$unconditioned_is_reg'.asBool()
          fpu_rs2_valid = '/fpu_src[2]$unconditioned_is_reg'.asBool()
          fpu_rs3_valid = '/fpu_src[3]$unconditioned_is_reg'.asBool()
@@ -4589,7 +4581,6 @@ m4+definitions(['
                }, 500)
             }, 500)
          }
-         //debugger
          objects.src2_value_viz = new fabric.Text(src2_value.toString(), {
             fill: color,
             fontSize: 14,
@@ -4688,7 +4679,6 @@ m4+definitions(['
                strokeWidth: 0
             },
             init() {
-               //debugger
                let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
                   top: 10,
                   left: 10, // Center aligned
@@ -4710,7 +4700,6 @@ m4+definitions(['
             },
          layout: {top: 17}, //vertically
          init() {
-            //debugger
             let index =
                new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
                   left: 10,
@@ -4743,7 +4732,6 @@ m4+definitions(['
          where: {_where_},
          where0: {left: 150, top: 60},
          init() {
-         //debugger
             let banknum = new fabric.Text(String(this.scopes.bank.index), {
                top: -19,
                left: 10,
@@ -4755,7 +4743,6 @@ m4+definitions(['
             return {banknum}
          },
          render() {
-         //debugger
             // Update write address highlighting.
             // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
             // Unhighlight
@@ -4768,7 +4755,6 @@ m4+definitions(['
             let color = valid_st ? "#b0ffff" : "#b0ffff"
             let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
             // Re-highlight index.
-            //debugger
             if (unhighlight) {
                this.scopes.instr.children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
             }
@@ -4797,7 +4783,6 @@ m4+definitions(['
                  },
             layout: {top: 17},
             init() {
-               //debugger
                let data = new fabric.Text("", {
                   top: 2,
                   left: 6,
@@ -4807,8 +4792,6 @@ m4+definitions(['
                return {data}
             },
             render() {
-            debugger
-               //console.log(`Render ${this.scopes.bank.index},${this.scopes.mem.index}`)
                let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.scopes.bank.index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
                //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
                this.getInitObject("data").set({text: '$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0")})
@@ -4896,7 +4879,6 @@ m4+definitions(['
             $valid = 1;
    \viz_alpha
       initEach() {
-         debugger;
          this.global.transObj = {counting: 0}
          return {
             objects : {
@@ -4905,8 +4887,7 @@ m4+definitions(['
          }
       },
       renderEach() {
-      debugger;
-      for (const uid in this.fromInit().transObj) {
+         for (const uid in this.fromInit().transObj) {
             const trans = this.fromInit().transObj[uid]
             //trans.wasVisible = trans.visible
             trans.visible = false
@@ -4955,7 +4936,6 @@ m4+definitions(['
             )
             context.global.canvas.add(transObj)
             this.global.transObj[uid] = transObj
-            debugger;
          }
          this.getContext().preppedTrace = true
       }
@@ -4963,7 +4943,6 @@ m4+definitions(['
    /skid1
       \viz_alpha
          initEach() {
-            debugger;
             let egress_out = new fabric.Circle({
                top: M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
                left: M4_EGRESS_OUT_LEFT,
@@ -4979,7 +4958,6 @@ m4+definitions(['
             return {objects : {egress_out, fifo_in}}
          },
          renderEach() {
-         debugger;
             var arriving_ingress_avail = '/top/core|ingress_in<>0$avail'.asBool();
             var arriving_ingress_blocked = '/top/core|ingress_in<>0$blocked'.asBool();
             let arriving_ingress_arrow = new fabric.Line([M4_INGRESS_IN_LEFT, M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET), M4_ARRIVING_LEFT, M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET)], {
@@ -5026,7 +5004,6 @@ m4+definitions(['
             let trans = this.global.transObj[uid]
             if (trans) {
                /*trans.set("visible", true)
-               debugger;
                if ('/top/core|rg_fifo_in<>0$accepted'.asBool()) {
                   let core = this.getScope("core").index;
                   trans.set("top", M4_EGRESS_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET))
@@ -5036,8 +5013,7 @@ m4+definitions(['
                               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                               duration: 500})
                } else {
-               debugger
-               console.log(`Transaction ${uid} not found.`)
+                  console.log(`Transaction ${uid} not found.`)
                }*/ 
             }
             return {objects: [arriving_ingress_arrow, arriving_deflected_arrow, arriving_rg_arrow, deflected_fifoin_arrow, egressout_fifoin_arrow, rg_fifoout_arrow]}
@@ -5045,7 +5021,6 @@ m4+definitions(['
    /skid2
       \viz_alpha
          initEach() {
-            debugger;
             let deflected = new fabric.Circle({
                top: M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET),
                left: M4_DEFLECTED_LEFT,
@@ -5055,12 +5030,10 @@ m4+definitions(['
             return {objects : {deflected}}
          },
          renderEach() {
-         debugger;
             let uid = '/top/core|rg_deflected/flit>>1$uid'.asInt()
             let trans = this.global.transObj[uid]
             if (trans) {
                trans.set("visible", true)
-               debugger;
                if ('/top/core|rg_fifo_in<>0$accepted'.asBool() && '/top/core|rg_deflected_st1>>1$accepted'.asBool()) {
                   let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_DEFLECTED_TOP + (this.getScope("core").index * M4_COREOFFSET))
@@ -5070,15 +5043,13 @@ m4+definitions(['
                               onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                               duration: 500})
                } else {
-               debugger
-               console.log(`Transaction ${uid} not found.`)
+                  console.log(`Transaction ${uid} not found.`)
                }
             }
          }
    /fork1
       \viz_alpha
          initEach() {
-         debugger;
             let ingress_in = new fabric.Circle({
                top: M4_INGRESS_IN_TOP + (this.getScope("core").index * M4_COREOFFSET),
                left: M4_INGRESS_IN_LEFT,
@@ -5100,12 +5071,10 @@ m4+definitions(['
             return {objects : {ingress_in, arriving, deflected}}
          },
          renderEach() {
-         debugger;
             let uid = '/top/core|rg_arriving/flit<>0$uid'.asInt()
             let trans = this.global.transObj[uid]
             if (trans) {
                trans.set("visible", true)
-               debugger;
                if ('/core|ingress_in<>0$trans_valid'.asBool()) {
                   let core = (M4_NUM_CORES > 1) ? this.getScope("core").index : 0;
                   trans.set("top", M4_ARRIVING_TOP + (this.getScope("core").index * M4_COREOFFSET))
@@ -5136,15 +5105,13 @@ m4+definitions(['
                                  duration: 500
                                  })
                } else {
-               debugger
-               console.log(`Transaction ${uid} not found.`)
+                  console.log(`Transaction ${uid} not found.`)
                }
             }
          }
    /arb
       \viz_alpha
          initEach() {
-         debugger;
             let fifo_out = new fabric.Circle({
                top: M4_FIFO_OUT_TOP + (this.getScope("core").index * M4_COREOFFSET),
                left: M4_FIFO_OUT_LEFT,
@@ -5160,7 +5127,6 @@ m4+definitions(['
             return {objects : {fifo_out, rg}}
          },
          renderEach() {
-         debugger;
                let uid = '/top/core|rg_fifo_out/flit<>0$uid'.asInt()
                let trans = this.global.transObj[uid]
                if (trans) {
@@ -5189,7 +5155,6 @@ m4+definitions(['
    /arbister
       \viz_alpha
          initEach() {
-         debugger;
             let rg_st1 = new fabric.Circle({
                top: M4_RG_TOP + (this.getScope("core").index * M4_COREOFFSET) + 50,
                left: M4_RG_LEFT,
@@ -5201,7 +5166,6 @@ m4+definitions(['
          renderEach() {
                let uid = '/top/core|rg_st1/flit>>1$uid'.asInt()
                let trans = this.global.transObj[uid]
-               debugger;
                if (trans) {
                   trans.set("visible", true)
                   console.log(`uid  ${uid} .`)
@@ -5245,7 +5209,6 @@ m4+definitions(['
                      let uid = '/flit$uid'.asInt()
                      let push = '$push'.asInt()
                      let header_point = '>>1$prev_entry_was_tail'.asInt()
-                     debugger;
                      let trans = this.global.transObj[uid]
                      if (trans) {
                         trans.set("visible", true)
@@ -5300,9 +5263,9 @@ m4+definitions(['
                                              }
                                              })
                         } else {
-                        debugger
-                        console.log(`Transaction ${uid} not found.`)
-                     }
+                           debugger
+                           console.log(`Transaction ${uid} not found.`)
+                        }
                      }
                }
 // Hookup Makerchip *passed/*failed signals to CPU $passed/$failed.
