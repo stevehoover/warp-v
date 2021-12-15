@@ -32,11 +32,11 @@ jobs :
       script: 
       -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'1-stage\'])" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  sed -i "/insn   /c\insn            20" /home/travis/build/$BUILD_PATH/formal/checks.cfg
-      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make tos_agree verif';
     - script: 
       -  sed -i "/-stage/c\   m4_define([\'M4_STANDARD_CONFIG\'], [\'4-stage\'])" /home/travis/build/$BUILD_PATH/formal/warp-v_formal.tlv
       -  sed -i "/insn   /c\insn            29" /home/travis/build/$BUILD_PATH/formal/checks.cfg
-      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make verif';
+      -  PATH=/home/travis/build/$BUILD_PATH/formal/env/bin:$PATH bash -c 'make tos_agree verif';
       name : "4 Stage - riscv-formal"
       # the structure for the YAML format is non-standard in some way, but Travis interprets it correctly
       # with both the scripts being run parallel under same stage (in Travis terminology)

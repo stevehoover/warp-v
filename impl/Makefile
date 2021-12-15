@@ -11,7 +11,7 @@ all: $(WARPV_OUT)
 
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
 out/%/status: warp-v_%.tlv ../warp-v.tlv
-	yes | sandpiper-saas -i $< -f ../warp-v.tlv -o warp-v_$(patsubst warp-v_%.tlv,%,$<).sv --outdir out --sv_url_inc --iArgs
+	sandpiper-saas -i $< -f ../warp-v.tlv -o warp-v_$(patsubst warp-v_%.tlv,%,$<).sv --outdir out --sv_url_inc --iArgs
 
 impl:
 	vivado -mode tcl -source Vivado/impl.tcl 

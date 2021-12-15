@@ -7,11 +7,15 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 .PHONY: all clean compile verif env riscv-formal
 
 
+# Agree to SandPiper ToS.
+tos_agree:
+	yes | sandpiper-saas
+
 # Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
 out/warp-v_formal.sv: warp-v_formal.tlv ../warp-v.tlv
 	rm -rf out
 	mkdir out
-	yes | sandpiper-saas -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs
+	sandpiper-saas -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs
 	
 env: env/PASSED
 
