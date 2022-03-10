@@ -86,7 +86,7 @@ export function CoreDetailsComponent({
                     <Image src="tlv-tlvpreview.png" maxW={200} mx="auto"/>
                 </Link>
                 <Tooltip
-                    label="Redwood EDA's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
+                    label="Redwood EDA, LLC's SandPiper(TM) SaaS Edition expands your Transaction-Level Verilog code into Verilog.">
                     <Container centerContent mx={0} px={0} width={30}>
                         <Icon as={FaLongArrowAltRight} fontSize="30px"/>
                         <QuestionOutlineIcon mx="auto" marginLeft="auto"/>

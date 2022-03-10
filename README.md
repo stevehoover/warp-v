@@ -127,9 +127,10 @@ You can find help in the <a href="https://gitter.im/librecores/warp-v" target="_
 A few pointers for exploring WARP-V in Makerchip:
 
   - Learn TL-Verilog and Makerchip first, following tutorials and other resources, at <a href="http://www.makerchip.com/" target="_blank" atom_fix="_">makerchip.com</a>.
+  there are several courses available for building your own RISC-V CPU similar to WARP-V, but less parameterized, available via the menus.
   - This link will <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">Open the latest WARP-V in Makerchip</a>.
-  - Reverse-engineer the WARP-V design at the TL-Verilog level, not by reading WARP-V source code. Configure WARP-V as you choose, compile, and explore the model in the "Nav-TLV" pane.
-  - You can then correlate this back to the source code by clicking Nav-TLV line numbers. This highlights the corresponding source code line... er... well, this doesn't always work in its current form because of the `m4_indirect` macro. You can work around this by replacing them, e.g `m4+indirect(M4_isa['_decode'])` becomes `m4+riscv_decode()`.
+  - Reverse-engineer the WARP-V design at the TL-Verilog level, not by reading WARP-V source code. Configure WARP-V at [warp-v.org](https://warp-v.org) as you choose, compile, and explore the model in the "Nav-TLV" pane.
+  - You can then correlate this back to the source code by clicking Nav-TLV line numbers. This highlights the corresponding source code line.
 
 
 

@@ -8,7 +8,7 @@ import {ColorModeSwitcher} from '../../ColorModeSwitcher';
 const links = [
     {label: 'Home', href: '/'},
     {label: 'WARP-V Github', href: 'https://github.com/stevehoover/warp-v', target: "_blank"},
-    {label: 'Redwood EDA', href: 'https://redwoodeda.com', target: "_blank"},
+    {label: 'Redwood EDA, LLC', href: 'https://redwoodeda.com', target: "_blank"},
 ];
 
 function MobileNavContent(props) {

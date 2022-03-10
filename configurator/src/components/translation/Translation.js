@@ -63,7 +63,7 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     return `\\m4_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
-   Copyright ${new Date().getFullYear()} Redwood EDA
+   Copyright ${new Date().getFullYear()} Redwood EDA, LLC
    
    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
    

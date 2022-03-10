@@ -20,7 +20,7 @@ export function Header() {
         height='100%'
       >
         <Box as='a' href='/' rel='home'>
-          <VisuallyHidden>Redwood EDA</VisuallyHidden>
+          <VisuallyHidden>Redwood EDA, LLC</VisuallyHidden>
           <Logo h='6' iconColor={useColorModeValue('blue.600', 'blue.200')} />
         </Box>
         <NavContent.Desktop ml={10} display={{ base: 'none', md: 'flex' }} />

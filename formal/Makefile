@@ -43,4 +43,4 @@ verif: checks.cfg out/warp-v_formal.sv env riscv-formal
 all: verif
 
 clean:
-	rm -rf out
+	rm -rf out checks

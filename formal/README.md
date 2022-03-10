@@ -32,6 +32,5 @@ The results will appear in `checks/`.
 
 ## Upgrading riscv-formal
 
-The file `riscv-formal/checks/genchecks.py` required modifications that were not accepted in riscv-formal.
-There is a local copy of this file that must be maintained if riscv-formal is updated.
-To apply the patch, run apply_genchecks.py.patch.
+Until riscv-formal pulls https://github.com/SymbioticEDA/riscv-formal/pull/11 (or `#46`, or similar), we are using
+a side-version of RISC-V formal. Beware.
