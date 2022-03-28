@@ -1,6 +1,5 @@
 \m4_TLV_version 1d: tl-x.org
 \SV
-
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
    // 
@@ -29,6 +28,10 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
+   //m4_def(STANDARD_CONFIG, 6-stage)
+   //m4_def(VIZ, 1)
+   //m4_def(NUM_CORES, 1)
+   //m4_def(NUM_VCS, 2)
 m4+definitions(['
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
    
@@ -276,8 +279,20 @@ m4+definitions(['
    // This is where you configure the CPU.
    // Note that WARP-V has a configurator at warp-v.org.
    
-   // m4_default(..) allows external definition to take precedence.
+   // m4_ifndef(..) allows external definition to take precedence.
 
+   // Default parameters for formal verification continuous integration testing.
+   // M4_FORMAL is only used within Makerchip in debug mode (for VIZ).
+   //m4_ifndef(FORMAL, 1)  // Uncomment to test formal verification in Makerchip.
+   m4_ifelse(M4_FORMAL, 1, ['
+      m4_ifndef(
+         ISA, RISCV,
+         EXT_M, 1,
+         RISCV_FORMAL_ALTOPS, 1,
+         VIZ, 0,
+         STANDARD_CONFIG, 1-stage)
+   '])
+   
    // Machine:
    m4_ifndef(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
@@ -562,6 +577,10 @@ m4+definitions(['
           SECOND_ISSUE_BUBBLES, 0)
    m4_def(['# Bubbles between a no-fetch cycle and the next cycles (so always zero).'], NO_FETCH_BUBBLES, 0)
    
+   m4_def(stages_js, [''])
+   m4_def(stages, ['m4_ifelse(['$1'],,,['m4_append(stages_js, ['defineStage("$1", ']M4_$1_STAGE - M4_NEXT_PC_STAGE['); '])m4_stages(m4_shift($@))'])'])
+   m4_stages(NEXT_PC, FETCH, DECODE, BRANCH_PRED, REG_RD, EXECUTE, RESULT, REG_WR, MEM_WR)
+
    
    
    // Retiming experiment.
@@ -612,7 +631,7 @@ m4+definitions(['
    // TODO:; It should be M4_NEXT_PC_STAGE-1, below.
    m4_ordered(['M4_NEXT_PC_STAGE'], ['M4_FETCH_STAGE'], ['M4_DECODE_STAGE'], ['M4_BRANCH_PRED_STAGE'], ['M4_REG_RD_STAGE'],
               ['M4_EXECUTE_STAGE'], ['M4_RESULT_STAGE'], ['M4_REG_WR_STAGE'], ['M4_MEM_WR_STAGE'])
-   
+                                 
    // Check reg bypass limit
    m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
    
@@ -736,13 +755,15 @@ m4+definitions(['
    // Redirects are described in the TLV code. Supporting macro definitions are here.
 
    // m4_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
-   m4_def(redirect_list, ['['-100']'])  // list fed to m4_ordered
-   m4_def(redirect_squash_terms, [''])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
-   m4_def(redirect_shadow_terms, [''])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
+   m4_def(redirect_list, ['-100'])  // list fed to m4_ordered
+   m4_def(redirect_squash_terms, ['['']'])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
+   m4_def(redirect_shadow_terms, ['['']'])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
    m4_def(redirect_pc_terms, [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
    m4_def(abort_terms, ['1'b0'])        // || terms for an instruction's abort condition
    m4_def(redirect_masking_triggers, ['1'b0']) // || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
                                                          // Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
+   m4_def(redirect_viz, [''])                 // JS code to provide parameters for visualization of the waterfall diagram.
+   m4_def(redirect_cell_viz, [''])            // JS code to provide parameters for visualization of a cell of waterfall diagram.
    //m4_define(['m4_redirect_signal_list'], ['{0{1'b0}}'])  // concatenation terms for each trigger condition (naturally-aligned). Start w/ a 0-bit term for concatenation.
    // Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
    // See redirection logic for more detail.
@@ -766,44 +787,50 @@ m4+definitions(['
    //   $2: condition signal of triggering instr
    //   $3: target PC signal of triggering instruction
    //   $4: 1 for an aborting redirect (0 otherwise)
-   //   $5: (opt) 1 to freeze fetch until subsequent redirect
+   //   $5: VIZ text  for redirect bullet
+   //   $6: VIZ color for redirect bullet
+   //   $7: (opt) 1 to freeze fetch until subsequent redirect
    m4_def(process_redirect_condition,
           ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
             // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
             //   of this instruction.
             // Params: $@ (m4_redirect_masking_triggers contains param use)
             m4_pushdef(['m4_redir_cond'],
-                       ['(>>m4_echo($1)$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask[m4_echo($1)])'])
-            m4_def(redirect_list,
-                   m4_dquote(m4_redirect_list, ['$1']))
-            m4_def(redirect_squash_terms,
-                   m4_quote(m4_redirect_squash_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1) - $4){1'b1}}, {m4_eval(m4_echo($1) + $4){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
-            m4_def(redirect_shadow_terms,
-                   m4_quote(m4_redirect_shadow_terms)[' & (m4_echo(']m4_redir_cond($@)[') ? {{m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - m4_echo($1)     ){1'b1}}, {m4_eval(m4_echo($1)     ){1'b0}}} : {m4_eval(M4_MAX_REDIRECT_BUBBLES + 1){1'b1}})'])
-            m4_def(redirect_pc_terms,
-                   ['m4_echo(']m4_redir_cond($@)[') ? {>>m4_echo($1)$3, m4_ifelse($5, 1, 1'b1, 1'b0)} : ']m4_quote(m4_redirect_pc_terms)[' '])
+                       ['(>>']M4_$1_BUBBLES['$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask'][M4_$1_BUBBLES][')'])
+            m4_append(redirect_list, M4_$1_BUBBLES))
+            m4_append(redirect_squash_terms,
+                      [' & (']m4_redir_cond($@)[' ? {{']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - M4_$1_BUBBLES - $4)['{1'b1}}, {']m4_eval(M4_$1_BUBBLES + $4)['{1'b0}}} : {']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+            //m4_errprint(['|']m4_echo(m4_redirect_squash_terms)['| '])
+            m4_append(redirect_shadow_terms,
+                      [' & (']m4_redir_cond($@)[' ? {{']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - M4_$1_BUBBLES)['{1'b1}}, {']m4_eval(M4_$1_BUBBLES)['{1'b0}}} : {']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+            m4_prepend(redirect_pc_terms,
+                       ['']m4_redir_cond($@)[' ? {>>']M4_$1_BUBBLES['$3, ']m4_ifelse($7, 1, 1'b1, 1'b0)['} : '])
             m4_ifelse(['$4'], 1,
-               ['m4_def(abort_terms,
-                        m4_dquote(m4_abort_terms)['[' || $2']'])
-                 m4_def(redirect_masking_triggers,
-                        m4_dquote(m4_redirect_masking_triggers)['[' || >>$['']1$2']'])'])
+               ['m4_append(abort_terms,
+                           [' || $2'])
+                 m4_append(redirect_masking_triggers,
+                           [' || >>']M4_$1_BUBBLES['$2']']))
             //m4_define(['m4_redirect_signal_list'],
             //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
+            m4_append(redirect_viz,
+                      ['ret.$2 = redirect_cond("$2", $5, $6); '])
+            m4_append(redirect_cell_viz,
+                      ['if (stage == ']M4_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6))}; '])
             m4_popdef(['m4_redir_cond'])
           '])
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['['M4_SECOND_ISSUE_BUBBLES'], $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1'],
-      ['['M4_NO_FETCH_BUBBLES'], $NoFetch, $Pc, 1, 1'],
-      m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['['M4_PRED_TAKEN_BUBBLES'], $pred_taken_branch, $branch_target, 0'],'])
-      ['['M4_REPLAY_BUBBLES'], $replay, $Pc, 1'],
-      ['['M4_JUMP_BUBBLES'], $jump, $jump_target, 0'],
-      ['['M4_BRANCH_BUBBLES'], $mispred_branch, $branch_redir_pc, 0'],
-      m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['['M4_INDIRECT_JUMP_BUBBLES'], $indirect_jump, $indirect_jump_target, 0'],'], [''])
-      ['['M4_NON_PIPELINED_BUBBLES'], $non_pipelined, $Pc, 0, 1'],
-      ['['M4_TRAP_BUBBLES'], $aborting_trap, $trap_target, 1'],
-      ['['M4_TRAP_BUBBLES'], $non_aborting_trap, $trap_target, 0'])
+      ['SECOND_ISSUE, $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1, "2", "orange"'],
+      ['NO_FETCH, $NoFetch, $Pc, 1, "X", "red", 1'],
+      m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "T", "#0080ff"'],'])
+      ['REPLAY, $replay, $Pc, 1, "R", "#ff8000"'],
+      ['JUMP, $jump, $jump_target, 0, "J", "purple"'],
+      ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "B", "blue"'],
+      m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "I", "purple"'],'], [''])
+      ['NON_PIPELINED, $non_pipelined, $Pc, 0, "W", "red", 1'],
+      ['TRAP, $aborting_trap, $trap_target, 1, "A", "#ff0080"'],
+      ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080"'])
 
    // Ensure proper order.
    // TODO: It would be great to auto-sort.
@@ -2023,7 +2050,7 @@ m4+definitions(['
          $sltiu_rslt[M4_WORD_RANGE] = (/src[1]$reg_value < $raw_i_imm) ? 1 : 0;
          $srai_rslt[M4_WORD_RANGE]  = $srai_intermediate_rslt;
          $srli_rslt[M4_WORD_RANGE]  = $srli_intermediate_rslt;
-         $add_sub_rslt[M4_WORD_RANGE] = ($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : /src[1]$reg_value + /src[2]$reg_value;
+         $add_sub_rslt[M4_WORD_RANGE] = /*($raw_funct7[5] == 1) ?  /src[1]$reg_value - /src[2]$reg_value : */ /src[1]$reg_value + /src[2]$reg_value;
          $add_rslt[M4_WORD_RANGE]   = $add_sub_rslt;
          $sub_rslt[M4_WORD_RANGE]   = $add_sub_rslt;
          $sll_rslt[M4_WORD_RANGE]   = /src[1]$reg_value << /src[2]$reg_value[4:0];
@@ -3369,7 +3396,7 @@ m4+definitions(['
                // Shift up and mask w/ redirect conditions.
                {$GoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
                 // & terms for each condition (order doesn't matter since masks are the same within a cycle)
-                m4_redirect_squash_terms,
+                m4_echo(m4_redirect_squash_terms),
                 1'b1}; // Shift in 1'b1 (fetch-valid).
             
             $GoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
@@ -3382,7 +3409,7 @@ m4+definitions(['
                   // $GoodPathMask, except that it does not mask out aborted instructions.
                   $next_rvfi_good_path_mask[M4_MAX_REDIRECT_BUBBLES+1:0] =
                      {$RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES:0]
-                      m4_redirect_shadow_terms,
+                      m4_echo(m4_redirect_shadow_terms),
                       1'b1};
                   $RvfiGoodPathMask[M4_MAX_REDIRECT_BUBBLES+1:0] <=
                      <<1$reset ? m4_eval(M4_MAX_REDIRECT_BUBBLES + 2)'b0 :
@@ -4305,6 +4332,7 @@ m4+definitions(['
             let reg = parseInt(this.getIndex())
             let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
             let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
+            //debugger
             this.getObjects().reg.set({text:
                regIdent + ": " +
                '$value'.step(1).asInt(NaN).toString(16) + oldValStr})
@@ -4312,17 +4340,201 @@ m4+definitions(['
             this.getBox().set({fill: mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white"})
          }
 
-\TLV register_csr(/_csr, _where_) 
+\TLV pipeline_control_viz(/_scope, _where)
+   /pipe_ctrl
+      \viz_js
+         box: {width: 110, height: 100},
+         where: {_where},
+      /pipeline[M4_MAX_REDIRECT_BUBBLES:0]   // Normalized to NEXT_PC_STAGE=0
+         \viz_js
+            all: {
+            },
+            where: {left: 6, top: 6, width: 68, height: 40},
+            box: {width: 100, height: 100},
+            layout: "horizontal",
+            init() {
+               this.color = function (stage) {
+                  let i = stage + 1
+                  return `rgb(${i % 8 >= 4 ? 100 : 10}, ${i % 4 >= 2 ? 100 : 10}, ${i % 2 >= 1 ? 100 : 10})`
+               }
+               let stages = {}
+               let defineStage = function (name, stage) {
+                  if (!stages[stage]) {
+                     stages[stage] = []
+                  }
+                  stages[stage].push(name)
+               }
+               m4_stages_js
+               let text = ""
+               let i = this.getIndex()
+               if (stages[i]) {
+                  for (nameIndex in stages[i]) {
+                     //debugger
+                     if (text != "") {text += "\n"}
+                     text += stages[i][nameIndex]
+                  }
+               }
+               return {
+                    text: new fabric.Text(text,
+                         {left: 5, top: 5, fill: "white",
+                          fontSize: 10, fontWeight: 800, fontFamily: "monospace"}
+                    ),
+               }
+            },
+            renderFill() {
+               return this.color(this.getIndex())
+            },
+            where0: {left: 0, top: 20},
+      /legend
+         \viz_js
+            init() {
+               ret = {}
+               bulletTop = 5
+               this.makeBullet = (signalName, bulletText, bulletColor) => {
+                  return new fabric.Group([
+                       new fabric.Circle({
+                            fill: bulletColor, strokeWidth: 0,
+                            originX: "center", originY: "center",
+                            left: 0, top: 0,
+                            radius: 2}),
+                       new fabric.Text(bulletText, {
+                            fill: "black",
+                            originX: "center", originY: "center",
+                            left: 0, top: 0,
+                            fontSize: 2, fontWeight: 800, fontFamily: "monospace"})
+                  ], {originX: "center", originY: "center"})
+               }
+               redirect_cond = (signalName, bulletText, bulletColor) => {
+                  let ret = new fabric.Group([
+                       this.makeBullet(signalName, bulletText, bulletColor)
+                            .set({left: 52, top: bulletTop, width: 4, height: 4}),
+                       new fabric.Text(signalName, {
+                            fill: "black",
+                            originY: "center",
+                            left: 55, top: bulletTop,
+                            fontSize: 2, fontWeight: 800, fontFamily: "monospace"})
+                  ])
+                  bulletTop += 5
+                  return ret
+               }
+               m4_redirect_viz
+               return ret
+            },
+            where: {left: 75, top: 4, width: 52, height: 40},
+      /waterfall
+         /pipe_ctrl_instr[m4_eval(M4_MAX_REDIRECT_BUBBLES * 2):0]  // Zero on the bottom. See this.getInstrIndex().
+            \viz_js
+               layout: {
+                  left: function(i) {return -i * 10},
+                  top: function(i) {return -i * 10},
+               },
+               box: {
+               },
+               init() {
+                  // /pipe_ctrl_instr indices are chosen such that they render bottom to top
+                  // for proper overlapping of dependence arcs.
+                  // This function provides indices where
+                  // the current instruction has index 0, and negative are above.
+                  this.getInstrIndex = () => {
+                     return M4_MAX_REDIRECT_BUBBLES - this.getIndex()
+                  }
+                  return {instr: new fabric.Text("?", {
+                             left: -100, top: 1,
+                             fill: "darkgray",
+                             fontSize: 8, fontWeight: 800, fontFamily: "monospace",
+                         })}
+               },
+               renderFill() {
+                  return (this.getInstrIndex() == 0) ? "#b0ffff" : "transparent"
+               },
+               render() {
+                  let instr_text = this.getObjects().instr
+                  let step = this.getInstrIndex()
+                  try {
+                     let commit = '/instr$commit'.step(step).asBool(false)
+                     let color = !commit                        ? "gray" :
+                        '/instr$abort'.step(step).asBool(false) ? "red" :
+                                                                  "blue"
+                     let pc = '/instr$pc'.step(step).asInt()
+                     let instr_str = '|fetch/instr_mem[pc]$instr_str'.step(step).asString("?")
+                     if (instr_str === "") {
+                        //debugger
+                     }
+                     this.getObjects().instr.set({
+                        text: instr_str,
+                        fill: color,
+                     })
+                  } catch(e) {
+                     instr_text.set({text: "?", fill: "darkgray"})
+                  }
+                  return []
+               },
+               where: {left: 4, top: 45, width: 102, height: 51},
+            /pipe_ctrl_stage[M4_MAX_REDIRECT_BUBBLES:0]
+               \viz_js
+                  box: {width: 10, height: 10, fill: "gray"},
+                  layout: "horizontal",
+                  init() {
+                  },
+                  renderFill() {
+                     // A step of 0 gives the $GoodPathMask in the middle, running up from bit 0.
+                     // Positive steps are to the right (and shifting downward).
+                     let stage = this.getIndex()
+                     let instr = this.getScope("pipe_ctrl_instr").context.getInstrIndex()
+                     let step = stage + instr  // step amount for $GoodPathMask
+                     this.goodPath = true
+                     try {
+                        this.goodPath = (('/instr$GoodPathMask'.step(step).asInt(0) >> stage) & 1) != 0
+                        return this.goodPath ? this.getScope("pipe_ctrl").children.pipeline.children[M4_NEXT_PC_STAGE].context.color(this.getIndex()) : "gray"
+                     } catch(e) {
+                        return "darkgray"
+                     }
+                  },
+                  render() {
+                     let ret = []
+                     //debugger
+                     if (this.goodPath) {
+                        let redir_cnt = -1   // Increment for every redirect condition.
+                        let render_redir = (sigName, $sig, bulletText, bulletColor) => {
+                           let step = this.getScope("pipe_ctrl_instr").context.getInstrIndex()
+                           $sig.step(step)
+                           if ($sig.asBool()) {
+                              redir_cnt++
+                              let top = 4 + 2 * redir_cnt
+                              //debugger
+                              let bullet = this.getScope("pipe_ctrl").children.legend.context.makeBullet(sigName, bulletText, bulletColor)
+                                   .set({left: 8, top})
+                              //debugger
+                              return [
+                                 new fabric.Line([8, top, 9.5, 10 * stage + 15],
+                                                 {strokeWidth: 0.5, stroke: bulletColor}),
+                                 bullet,
+                              ]
+                           } else {
+                              return []
+                           }
+                        }
+                        let stage = this.getIndex()
+                        try {
+                           m4_redirect_cell_viz
+                        } catch(e) {
+                           debugger
+                        }
+                     }
+                     return ret
+                  },
+
+\TLV register_csr(/_csr, _where)
    /_csr
       \viz_js
-            box: {
-               fill: "#2028b0",
-               width: 220,
-               height: 18 * m4_num_csrs + 52,
-               stroke: "black",
-               strokeWidth: 0
-            },
-         where: {_where_},
+         box: {
+            fill: "#2028b0",
+            width: 220,
+            height: 18 * m4_num_csrs + 52,
+            stroke: "black",
+            strokeWidth: 0
+         },
+         where: {_where},
          init() {
             let csr_header = new fabric.Text("📂 CSRs", {
                   top: 10,
@@ -4341,17 +4553,13 @@ m4+definitions(['
             m4_csr_viz_render_each
          }
 
-\TLV instruction(_where_)
+\TLV instruction(_where)
    \viz_js
-      box: {
-         fill: "pink",
-         width: 10 + (550 + 605) + 190 -10,
-         height: 700,
-         stroke: "black",
-         visible: false,
+      box: {left: 0, top: 0,
          strokeWidth: 0
       },
       init() {
+         //debugger
          let decode_header = new fabric.Text("⚙️ Instr. Decode", {
             top: 15,
             left: 103 + 605 + 20 -6,
@@ -4370,7 +4578,7 @@ m4+definitions(['
          })
          return {decode_box, decode_header}
       },
-      where: {_where_},
+      where: {_where},
       render() {
          objects = {}
          //
@@ -4710,6 +4918,7 @@ m4+definitions(['
          }
    /_bank_size
       \viz_js
+         box: {strokeWidth: 0},
          all: {
             box: {
                   width: 190,
@@ -4804,10 +5013,11 @@ m4+definitions(['
       //Main layout
       box: {
             fill: _fill_color,
-            width: 10 + (550 + 605) + 190 + 10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0),
-            height: (76 + 18 * M4_NUM_INSTRS >= 670) ? (20 + 76 + 18 * M4_NUM_INSTRS) : 670,
+            //width: 10 + (550 + 605) + 190 + 10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0),
+            //height: (76 + 18 * M4_NUM_INSTRS >= 670) ? (20 + 76 + 18 * M4_NUM_INSTRS) : 670,
             strokeWidth: 0
            },
+      layout_tag: "boogers",
       where: {_where_},
          
    //////// VIZUALIZING THE MAIN CPU //////////////
@@ -4819,21 +5029,75 @@ m4+definitions(['
    m4_def(ALL_LEFT, -500)
    m4+m4_viz_logic_macro_name()
    /_des_pipe
-      @_M4_stage  // Visualize everything happening at the same time.
-         m4+layout_viz(['left: 0, top: 0'], _fill_color)
+      @_M4_stage
+         m4+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
          /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
             m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])
             
          /instr
             m4+instruction(['left: 10, top: 0'])
-            m4+registers(int, Int RF, , 2, ['left: 10 + (350 + 605) -10, top: 10'])
-            m4+register_csr(/regcsr, ['left: 10 + (103 + 605) -10, top: 10 + 172'])
+            m4+registers(int, Int RF, , 2, ['left: 350 + 605, top: 10'])
+            m4+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
+            m4+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 274 + 18 * m4_num_csrs, width: 200, height: 180, visible: true, stroke: "green", strokeWidth: 1, fill: "#a0f0a0"'])
             m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, ['left: 955 + M4_VIZ_MEM_LEFT_ADJUST, top: 10'])'])
             m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0), top: 10']) 
-         
-         
-      //////// VIZUALIZING THE INSERTION RING //////////////
+   m4_ifelse_block(M4_FORMAL, 1, ['
+   m4+riscv_formal_viz(['rvfi_testbench'], ['left: 100, top: -300, width: 450, height: 300'])
+   '])
+   
+// Visualization for RISCV Formal.
+// Params:
+//   _root: The root path containing "checker_inst" and "wrapper".
+\TLV riscv_formal_viz(_root, _where)
+   /rvfi_viz
+      \viz_js
+         box: {width: 150, height: 100},
+         init() {
+            let ret = {}
+            this.sigs = {
+               mem_addr: {},
+               mem_rmask: {},
+               mem_wdata: {},
+               pc_wdata: {},
+               rd_addr: {},
+               rd_wdata: {},
+               rs1_addr: {},
+               rs2_addr: {},
+               trap: {},
+            }
+            let pos = 0
+            for (sigName in this.sigs) {
+               let obj = new fabric.Group([
+                  new fabric.Text("",
+                       {left: 5, top: 5 + 10 * pos, fontSize: 7, fontWeight: 800, fontFamily: "monospace", fill: "lightgray"})
+               ])
+               ret[sigName] = obj
+               this.sigs[sigName].obj = obj
+               pos++
+            }
+            return ret
+         },
+         render() {
+            // Update RVFI table strings.
+            let valid = this.sigVal(`_root.checker_inst.rvfi_valid`, 0).asBool()
+            for (sigName in this.sigs) {
+               let rvfi = this.sigVal(`_root.checker_inst.rvfi_${sigName}`, 0)
+               let spec = this.sigVal(`_root.checker_inst.spec_${sigName}`, 0)
+               rvfi = rvfi ? rvfi.asInt().toString(16) : "?"
+               spec = spec ? spec.asInt().toString(16) : "?"
+               let mismatch = spec != rvfi
+               this.getObjects()[sigName].getObjects()[0].set({
+                    text: `${sigName}: ${rvfi} ${mismatch ? "!=" : "=="} ${spec}`,
+                    fill: valid ? mismatch ? "red" : "blue" : "lightgray",
+               })
+            }
+         },
+         where: {_where}
+   
+   
+   
+         //////// VIZUALIZING THE INSERTION RING //////////////
 \TLV ring_viz(/_name)
    m4_define(['M4_RINGVIZ_REF_TOP'],-100)
    m4_define(['M4_RINGVIZ_REF_LEFT'],700)
@@ -4876,7 +5140,7 @@ m4+definitions(['
             $egress_flit_size = $egress_is_head ? 1'b1 : >>1$egress_is_tail ? 1'b0 : $RETAIN;
             $egress_flit[31:0] = (! *reset) ? (/top/core|egress_out/flit>>1$flit) : '0;
             $vc[M4_VC_INDEX_RANGE] = $egress_is_head ? $egress_flit[M4_FLIT_VC_RANGE] : $RETAIN;
-            $valid = 1;
+            //$valid = 1;
    \viz_alpha
       initEach() {
          this.global.transObj = {counting: 0}
@@ -5147,7 +5411,7 @@ m4+definitions(['
                                     }
                                     })
                   } else {
-                  debugger
+                  //debugger
                   console.log(`Transaction ${uid} not found.`)
                }
             }
@@ -5187,7 +5451,7 @@ m4+definitions(['
                                     })
                        }
                   } else {
-                  debugger
+                  //debugger
                   console.log(`Transaction new ${uid} not found.`)
                }
             }
@@ -5263,7 +5527,7 @@ m4+definitions(['
                                              }
                                              })
                         } else {
-                           debugger
+                           //debugger
                            console.log(`Transaction ${uid} not found.`)
                         }
                      }
@@ -5326,14 +5590,15 @@ m4+definitions(['
       \TLV
          // Single Core.
          
-         
          // m4+warpv() (but inlined to reduce macro depth)
          m4+cpu(/top)
+         m4_ifelse_block(M4_FORMAL, 1, ['
+         m4+formal()
+         '])
+         m4_ifelse_block(M4_MAKERCHIP, 1, ['
          m4+warpv_makerchip_tb()
-         m4_ifelse(M4_FORMAL, 1, ['m4+formal()'])
-   
          m4+makerchip_pass_fail()
-
+         '])
          m4_ifelse_block(M4_ISA, ['RISCV'], ['
          m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE, "#7AD7F0")'])
          '])
@@ -5342,6 +5607,5 @@ m4+definitions(['
 m4+module_def
 \TLV //disabled_main()
    m4+warpv_top()
-
 \SV
    endmodule
