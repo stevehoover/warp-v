@@ -2,10 +2,10 @@
 \SV
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
-   // 
+   //
    // Redistribution and use in source and binary forms, with or without
    // modification, are permitted provided that the following conditions are met:
-   // 
+   //
    //     * Redistributions of source code must retain the above copyright notice,
    //       this list of conditions and the following disclaimer.
    //     * Redistributions in binary form must reproduce the above copyright
@@ -14,7 +14,7 @@
    //     * The name Steven F. Hoover
    //       may not be used to endorse or promote products derived from this software
    //       without specific prior written permission.
-   // 
+   //
    // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
    // AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
    // IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -29,8 +29,7 @@
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
    //m4_def(STANDARD_CONFIG, 6-stage)
-   //m4_def(VIZ, 1)
-   //m4_def(NUM_CORES, 1)
+   //m4_def(NUM_CORES, 2)
    //m4_def(NUM_VCS, 2)
 m4+definitions(['
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
@@ -135,7 +134,7 @@ m4+definitions(['
    //     mem pipeline to the CPU pipeline in first pipestage (of CPU) to reserve slot for the load 
    //     flowing from mem to CPU in the second issue.
    //   o For non-pipelined instructions such as mul-div, the /hold_inst scope retains the values
-   //     till the second issue. 
+   //     till the second issue.
    //   o Both the scopes are merged into /orig_inst scope depending on which instruction the second
    //     issue belongs to.
    //
@@ -151,6 +150,8 @@ m4+definitions(['
    //    Data memory is separate.
    //
    
+   // Futures:
+   //
    // TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
    //       /fetch_instr reflects the instruction fetched from i-memory (1st issue), and /commit_instr reflects the
    //       instruction that will be committed (2nd issue). The difference is long-latency instructions which commit
@@ -161,7 +162,15 @@ m4+definitions(['
    // TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
    //       already have the raw instruction bits to inject. The replay mechanism can be separated from
    //       redirects.
-   
+   //
+   // TODO: Once Makerchip supports multifile editing, split this up.
+   //       WARP should be a library, and each CPU uses this library to create a CPU.
+   //       Stages should be defined using a generic mechanism (just defining M4_*_STAGE constants).
+   //       Redirects should be defined using a generic mechanism to define each redirect, then
+   //       instantiate the logic (including PC logic).
+   //       IMem, RF should be m4+ macros.
+   //       Should create generic instruction definition macros (like the RISC-V ones, but generic).
+
 
    // ============
    // Mini-CPU ISA
@@ -535,8 +544,8 @@ m4+definitions(['
    // Characterize ISA and apply configuration.
    
    // Characterize the ISA, including:
-   // M4_NOMINAL_BR_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
-   //                                  can be available.
+   // M4_NOMINAL_BRANCH_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
+   //                                      can be available.
    // M4_HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
    // Defaults:
    m4_def(HAS_INDIRECT_JUMP, 0)
@@ -554,7 +563,7 @@ m4+definitions(['
       '], ['POWER'], ['
       '], ['DUMMY'], ['
          // DUMMY Characterization:
-         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_EXECUTE_STAGE'])
+         m4_define(['M4_NOMINAL_BRANCH_TARGET_CALC_STAGE'], ['M4_DECODE_STAGE'])
       ']
    )
    
@@ -578,8 +587,22 @@ m4+definitions(['
    m4_def(['# Bubbles between a no-fetch cycle and the next cycles (so always zero).'], NO_FETCH_BUBBLES, 0)
    
    m4_def(stages_js, [''])
-   m4_def(stages, ['m4_ifelse(['$1'],,,['m4_append(stages_js, ['defineStage("$1", ']M4_$1_STAGE - M4_NEXT_PC_STAGE['); '])m4_stages(m4_shift($@))'])'])
-   m4_stages(NEXT_PC, FETCH, DECODE, BRANCH_PRED, REG_RD, EXECUTE, RESULT, REG_WR, MEM_WR)
+   // Define stages
+   //   $1: VIZ left of stage in diagram
+   //   $2: Stage name
+   //   $3: Next $1
+   m4_def(stages, ['m4_ifelse(['$2'],,,['m4_append(stages_js, ['defineStage("$2", ']M4_$2_STAGE - M4_NEXT_PC_STAGE[', $1, $3); '])m4_stages(m4_shift(m4_shift($@)))'])'])
+   m4_stages(
+      8.5, NEXT_PC,
+      13, FETCH,
+      21, DECODE,
+      33, BRANCH_PRED,
+      41, REG_RD,
+      58, EXECUTE,
+      73.3, RESULT,
+      79, REG_WR,
+      93, MEM_WR,
+      100)
 
    
    
@@ -789,7 +812,9 @@ m4+definitions(['
    //   $4: 1 for an aborting redirect (0 otherwise)
    //   $5: VIZ text  for redirect bullet
    //   $6: VIZ color for redirect bullet
-   //   $7: (opt) 1 to freeze fetch until subsequent redirect
+   //   $7: VIZ bullet left
+   //   $8: VIZ bullet top
+   //   $9: (opt) ['wait'] to freeze fetch until subsequent redirect
    m4_def(process_redirect_condition,
           ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
             // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
@@ -804,7 +829,7 @@ m4+definitions(['
             m4_append(redirect_shadow_terms,
                       [' & (']m4_redir_cond($@)[' ? {{']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - M4_$1_BUBBLES)['{1'b1}}, {']m4_eval(M4_$1_BUBBLES)['{1'b0}}} : {']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
             m4_prepend(redirect_pc_terms,
-                       ['']m4_redir_cond($@)[' ? {>>']M4_$1_BUBBLES['$3, ']m4_ifelse($7, 1, 1'b1, 1'b0)['} : '])
+                       ['']m4_redir_cond($@)[' ? {>>']M4_$1_BUBBLES['$3, ']m4_ifelse($9, wait, 1'b1, 1'b0)['} : '])
             m4_ifelse(['$4'], 1,
                ['m4_append(abort_terms,
                            [' || $2'])
@@ -813,27 +838,29 @@ m4+definitions(['
             //m4_define(['m4_redirect_signal_list'],
             //          ['']m4_dquote(m4_redirect_signal_list)['[', $2']'])
             m4_append(redirect_viz,
-                      ['ret.$2 = redirect_cond("$2", $5, $6); '])
+                      ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
             m4_append(redirect_cell_viz,
-                      ['if (stage == ']M4_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6))}; '])
+                      ['if (stage == ']M4_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m4_ifelse(M4_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
             m4_popdef(['m4_redir_cond'])
           '])
 
    // Specify and process redirect conditions.
    m4_process_redirect_conditions(
-      ['SECOND_ISSUE, $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1, "2", "orange"'],
-      ['NO_FETCH, $NoFetch, $Pc, 1, "X", "red", 1'],
-      m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "T", "#0080ff"'],'])
-      ['REPLAY, $replay, $Pc, 1, "R", "#ff8000"'],
-      ['JUMP, $jump, $jump_target, 0, "J", "purple"'],
-      ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "B", "blue"'],
-      m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "I", "purple"'],'], [''])
-      ['NON_PIPELINED, $non_pipelined, $Pc, 0, "W", "red", 1'],
-      ['TRAP, $aborting_trap, $trap_target, 1, "A", "#ff0080"'],
-      ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080"'])
+      ['SECOND_ISSUE, $second_issue, $second_issue_ld ? $Pc : $pc_inc, 1, "2", "orange", 11.8, 26.2'],
+      ['NO_FETCH, $NoFetch, $Pc, 1, "X", "red", 11.8, 30, wait'],
+      m4_ifelse(M4_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "T", "#0080ff", 37.4, 26.2'],'])
+      ['REPLAY, $replay, $Pc, 1, "R", "#ff8000", 50, 29.1'],
+      ['JUMP, $jump, $jump_target, 0, "J", "purple", 61, 11'],
+      ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "B", "blue", 70, 20'],
+      m4_ifelse(M4_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "I", "purple", 68, 16'],'], [''])
+      ['NON_PIPELINED, $non_pipelined, $Pc, 0, "W", "red", 75.6, 25, wait'],
+      ['TRAP, $aborting_trap, $trap_target, 1, "A", "#ff0080", 75.6, 7'],
+      ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080", 75.6, 12'])
 
    // Ensure proper order.
    // TODO: It would be great to auto-sort.
+   // TODO: JUMP timing is nominally DECODE for most uarch's (immediate jumps), but this ordering forces
+   //       redirect to be no earlier than REPLAY (REG_RD).
    m4_ordered(m4_redirect_list)
 
    
@@ -2783,6 +2810,7 @@ m4+definitions(['
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
       ?$jump
          $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
+   // TODO: Depends on $rslt. Check timing.
    @M4_BRANCH_TARGET_CALC_STAGE
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
@@ -2845,7 +2873,7 @@ m4+definitions(['
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
       $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
    @M4_BRANCH_TARGET_CALC_STAGE
-      $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
+      $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + /instr$raw[M4_PC_CNT-1:0]; // $raw represents immediate field
          
 
 
@@ -4332,7 +4360,6 @@ m4+definitions(['
             let reg = parseInt(this.getIndex())
             let regIdent = ("M4_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
             let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
-            //debugger
             this.getObjects().reg.set({text:
                regIdent + ": " +
                '$value'.step(1).asInt(NaN).toString(16) + oldValStr})
@@ -4343,53 +4370,25 @@ m4+definitions(['
 \TLV pipeline_control_viz(/_scope, _where)
    /pipe_ctrl
       \viz_js
-         box: {width: 110, height: 100},
-         where: {_where},
-      /pipeline[M4_MAX_REDIRECT_BUBBLES:0]   // Normalized to NEXT_PC_STAGE=0
+         box: {width: 110, height: 180, stroke: "green", strokeWidth: 1, fill: "#b0e0b0"},
+         init() {
+            return {title: new fabric.Text("Cycle-Level Behavior", {
+               top: 10,
+               left: 55,
+               originX: "center", originY: "center",
+               fill: "darkgreen",
+               fontSize: 10,
+               fontWeight: 800,
+               fontFamily: "roboto"
+            })}
+         },
+         where: {_where}
+      /logic_diagram
          \viz_js
-            all: {
-            },
-            where: {left: 6, top: 6, width: 68, height: 40},
-            box: {width: 100, height: 100},
-            layout: "horizontal",
-            init() {
-               this.color = function (stage) {
-                  let i = stage + 1
-                  return `rgb(${i % 8 >= 4 ? 100 : 10}, ${i % 4 >= 2 ? 100 : 10}, ${i % 2 >= 1 ? 100 : 10})`
-               }
-               let stages = {}
-               let defineStage = function (name, stage) {
-                  if (!stages[stage]) {
-                     stages[stage] = []
-                  }
-                  stages[stage].push(name)
-               }
-               m4_stages_js
-               let text = ""
-               let i = this.getIndex()
-               if (stages[i]) {
-                  for (nameIndex in stages[i]) {
-                     //debugger
-                     if (text != "") {text += "\n"}
-                     text += stages[i][nameIndex]
-                  }
-               }
-               return {
-                    text: new fabric.Text(text,
-                         {left: 5, top: 5, fill: "white",
-                          fontSize: 10, fontWeight: 800, fontFamily: "monospace"}
-                    ),
-               }
-            },
-            renderFill() {
-               return this.color(this.getIndex())
-            },
-            where0: {left: 0, top: 20},
-      /legend
-         \viz_js
+            box: {left: -5, top: -15, width: 110, height: 80, strokeWidth: 0},
             init() {
                ret = {}
-               bulletTop = 5
+               labels = {}  // virtual pipeline stage name labels, added to ret after stage backgrounds
                this.makeBullet = (signalName, bulletText, bulletColor) => {
                   return new fabric.Group([
                        new fabric.Circle({
@@ -4404,32 +4403,108 @@ m4+definitions(['
                             fontSize: 2, fontWeight: 800, fontFamily: "monospace"})
                   ], {originX: "center", originY: "center"})
                }
-               redirect_cond = (signalName, bulletText, bulletColor) => {
+               
+               this.color = function (stage) {
+                  let i = (stage % 6) + 1
+                  let ret = `rgb(${i % 8 >= 4 ? 60 :10}, ${i % 4 >= 2 ? 100 : 30}, ${i % 2 >= 1 ? 150 : 90})`
+                  return ret
+               }
+               
+               ret.title = new fabric.Text("Pipeline Reference", {
+                  top: -5,
+                  left: 50,
+                  fill: "black",
+                  originX: "center", originY: "center",
+                  fontSize: 7,
+                  fontWeight: 800,
+                  fontFamily: "monospace"
+               })
+               
+               let stages = []  // Eg: [0: {virtualStages: ["NEXT_PC", "FETCH"], left: 10, right: 25}, 2: ...}
+               let stageCnt = 0
+               let defineStage = function (name, stage, left, right) {
+                  if (!stages[stage]) {
+                     stages[stage] = {}
+                  }
+                  s = stages[stage]
+                  s.virtualStages = []
+                  if (!s.left || left < s.left) {s.left = left}
+                  if (!s.right || right > s.right) {s.right = right}
+                  s.virtualStages.push(name)
+                  // Create label
+                  labels[`${name}_label`] = new fabric.Text(name, {
+                            fill: "white",
+                            originX: "center", originY: "center",
+                            left: (left + right) / 2, top: 57 + ((stageCnt % 2) ? 0 : 3),
+                            fontSize: 2, fontWeight: 800, fontFamily: "roboto"
+                  })
+                  stageCnt++
+               }
+               m4_stages_js
+               for (stage in stages) {
+                  stage = parseInt(stage)
+                  s = stages[stage]
+                  ret[`stage${stage}`] = new fabric.Rect({
+                       left: s.left, top: 0, width: s.right - s.left, height: 62,
+                       fill: this.color(stage)
+                  })
+                  ret[`@${stage}`] = new fabric.Text(`@${stage}`, {
+                       fill: "green",
+                       originX: "center", originY: "center",
+                       left: (s.left + s.right) / 2, top: 64,
+                       fontSize: 2, fontWeight: 800, fontFamily: "mono"
+                  })
+               }
+               // Layer in stage labels.
+               Object.assign(ret, labels)
+               
+               redirect_cond = (signalName, bulletText, bulletColor, left, top) => {
                   let ret = new fabric.Group([
                        this.makeBullet(signalName, bulletText, bulletColor)
-                            .set({left: 52, top: bulletTop, width: 4, height: 4}),
+                            .set({left: left, top: top, width: 4, height: 4}),
                        new fabric.Text(signalName, {
                             fill: "black",
                             originY: "center",
-                            left: 55, top: bulletTop,
+                            left: left + 2, top: top,
                             fontSize: 2, fontWeight: 800, fontFamily: "monospace"})
                   ])
-                  bulletTop += 5
                   return ret
                }
                m4_redirect_viz
+               
+               ret.diagram =
+                  // To update diagram, save from https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit?usp=sharing
+                  // Open in Inkscape. Delete background rect. Edit > Resize Page to Selection. Drag into GitHub file editor. Copy URL. Cancel edit. Paste here.
+                  this.newImageFromURL(
+                      "https://user-images.githubusercontent.com/11302288/160441894-a3b3cc46-b5d0-497f-a415-84bf2a26c16d.svg",
+                      {left: 0, top: 0, width: 100, height: 57},
+                  )
+               
                return ret
             },
-            where: {left: 75, top: 4, width: 52, height: 40},
+            where: {left: 5, top: 17, width: 100, height: 73},
       /waterfall
+         \viz_js
+            box: {left: 0, top: 0, width: 100, strokeWidth: 0},
+            init() {
+               return {title: new fabric.Text("Waterfall Diagram", {
+                  top: 9,
+                  left: 50,
+                  fill: "black",
+                  originX: "center", originY: "center",
+                  fontSize: 7,
+                  fontWeight: 800,
+                  fontFamily: "monospace"
+               })}
+            },
+            where: {left: 5, top: 95, width: 100, height: 70}
          /pipe_ctrl_instr[m4_eval(M4_MAX_REDIRECT_BUBBLES * 2):0]  // Zero on the bottom. See this.getInstrIndex().
             \viz_js
                layout: {
                   left: function(i) {return -i * 10},
                   top: function(i) {return -i * 10},
                },
-               box: {
-               },
+               box: {strokeWidth: 0},
                init() {
                   // /pipe_ctrl_instr indices are chosen such that they render bottom to top
                   // for proper overlapping of dependence arcs.
@@ -4441,7 +4516,7 @@ m4+definitions(['
                   return {instr: new fabric.Text("?", {
                              left: -100, top: 1,
                              fill: "darkgray",
-                             fontSize: 8, fontWeight: 800, fontFamily: "monospace",
+                             fontSize: 7, fontWeight: 800, fontFamily: "monospace",
                          })}
                },
                renderFill() {
@@ -4457,9 +4532,6 @@ m4+definitions(['
                                                                   "blue"
                      let pc = '/instr$pc'.step(step).asInt()
                      let instr_str = '|fetch/instr_mem[pc]$instr_str'.step(step).asString("?")
-                     if (instr_str === "") {
-                        //debugger
-                     }
                      this.getObjects().instr.set({
                         text: instr_str,
                         fill: color,
@@ -4469,10 +4541,10 @@ m4+definitions(['
                   }
                   return []
                },
-               where: {left: 4, top: 45, width: 102, height: 51},
+               where: {left: 4, top: 15, width: 92, height: 51}
             /pipe_ctrl_stage[M4_MAX_REDIRECT_BUBBLES:0]
                \viz_js
-                  box: {width: 10, height: 10, fill: "gray"},
+                  box: {width: 10, height: 10, fill: "gray", strokeWidth: 0},
                   layout: "horizontal",
                   init() {
                   },
@@ -4485,28 +4557,26 @@ m4+definitions(['
                      this.goodPath = true
                      try {
                         this.goodPath = (('/instr$GoodPathMask'.step(step).asInt(0) >> stage) & 1) != 0
-                        return this.goodPath ? this.getScope("pipe_ctrl").children.pipeline.children[M4_NEXT_PC_STAGE].context.color(this.getIndex()) : "gray"
+                        return this.goodPath ? this.getScope("pipe_ctrl").children.logic_diagram.context.color(this.getIndex()) : "gray"
                      } catch(e) {
                         return "darkgray"
                      }
                   },
                   render() {
                      let ret = []
-                     //debugger
                      if (this.goodPath) {
                         let redir_cnt = -1   // Increment for every redirect condition.
-                        let render_redir = (sigName, $sig, bulletText, bulletColor) => {
+                        let render_redir = (sigName, $sig, bulletText, bulletColor, extraBubbleCycle) => {
                            let step = this.getScope("pipe_ctrl_instr").context.getInstrIndex()
                            $sig.step(step)
                            if ($sig.asBool()) {
                               redir_cnt++
                               let top = 4 + 2 * redir_cnt
-                              //debugger
-                              let bullet = this.getScope("pipe_ctrl").children.legend.context.makeBullet(sigName, bulletText, bulletColor)
-                                   .set({left: 8, top})
-                              //debugger
+                              let left = 8 - 8 * extraBubbleCycle
+                              let bullet = this.getScope("pipe_ctrl").children.logic_diagram.context.makeBullet(sigName, bulletText, bulletColor)
+                                   .set({left, top})
                               return [
-                                 new fabric.Line([8, top, 9.5, 10 * stage + 15],
+                                 new fabric.Line([left, top, 9.5, 10 * stage + 15],
                                                  {strokeWidth: 0.5, stroke: bulletColor}),
                                  bullet,
                               ]
@@ -5039,7 +5109,7 @@ m4+definitions(['
             m4+instruction(['left: 10, top: 0'])
             m4+registers(int, Int RF, , 2, ['left: 350 + 605, top: 10'])
             m4+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
-            m4+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 274 + 18 * m4_num_csrs, width: 200, height: 180, visible: true, stroke: "green", strokeWidth: 1, fill: "#a0f0a0"'])
+            m4+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 274 + 18 * m4_num_csrs, width: 200, height: 220'])
             m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, ['left: 955 + M4_VIZ_MEM_LEFT_ADJUST, top: 10'])'])
             m4+memory(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0), top: 10']) 
    m4_ifelse_block(M4_FORMAL, 1, ['
