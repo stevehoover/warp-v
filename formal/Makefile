@@ -11,11 +11,12 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 tos_agree:
 	yes | sandpiper-saas
 
-# Run SandPiper Cloud Edition(TM) (SandPiper(TM) in the cloud for open-source code).
-out/warp-v_formal.sv: warp-v_formal.tlv ../warp-v.tlv
+# Run SandPiper-SaaS(TM).
+out/warp-v_formal.sv: ../warp-v.tlv
 	rm -rf out
 	mkdir out
-	sandpiper-saas -i warp-v_formal.tlv -f ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs
+	# Note: Currently "--m4def M4_FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
+	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys --m4def M4_FORMAL=1
 	
 env: env/PASSED
 

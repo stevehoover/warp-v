@@ -19,7 +19,7 @@ make verif
 WARP-V uses riscv-formal for formal verification. The script `make_env.sh` (run by the `Makefile`) is provided to
 download and build the necessary tools in the manner described in this <a href="https://github.com/cliffordwolf/riscv-formal/blob/master/docs/quickstart.md" target="_blank" atom_fix="_">QuickStart Guide</a>.
 
-`warp-v_formal.tlv` can be compiled with SandPiper(TM) SaaS Edition (running in the cloud) using:
+`warp-v.tlv` can be compiled with SandPiper(TM) SaaS Edition (running in the cloud) for formal verification using:
 
 ```sh
 make compile

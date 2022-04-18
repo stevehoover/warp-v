@@ -24,6 +24,9 @@ before_script:
   - cd formal
   - if ("$TRAVIS_PULL_REQUEST"); then export BUILD_PATH=$TRAVIS_PULL_REQUEST_SLUG; else export BUILD_PATH=$TRAVIS_REPO_SLUG; fi
 
+# TODO : Travis stopped providing free computes.
+# TODO : Changes have been made that would break this, but we need to rework this for a different CI system anyway.
+#        Below refers to .../formal/warp-v_formal.tlv which used to be a top-level file, but now .../warp-v.tlv is used directly.
 # TODO : riscv-formal for 6 stage implementation
 jobs :
   include :
