@@ -28,10 +28,6 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
-   m4_ifndef(FORMAL, 1)
-   m4_ifndef(STANDARD_CONFIG, 4-stage)
-   //m4_ifndef(NUM_VCS, 2)
-   m4_ifndef(EXT_M, 1)
 m4+definitions(['
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
    
@@ -300,7 +296,7 @@ m4+definitions(['
          EXT_M, 1,
          RISCV_FORMAL_ALTOPS, 1,
          VIZ, 1,
-         STANDARD_CONFIG, 1-stage)
+         STANDARD_CONFIG, 4-stage)
    '])
    
    // Machine:
