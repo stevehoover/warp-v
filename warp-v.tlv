@@ -336,6 +336,11 @@ m4+definitions(['
          instead of actual mul/div, this is enabled automatically when formal is used. 
          This can be enabled for testing in Makerchip environment.'],
      RISCV_FORMAL_ALTOPS, 0)
+   m4_ifndef(
+      ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED'],
+      IMEM_STYLE, m4_ifelse(M4_IMPL, 0, HARDCODED_ARRAY, SRAM),
+      ['# DMem style: SRAM, ARRAY, STUBBED'],
+      DMEM_STYLE, m4ifelse(M4_IMPL, 0, ARRAY, SRAM))
 
    m4_ifndef(
      
@@ -1153,7 +1158,6 @@ m4+definitions(['
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_define(['m4_prog'], ['mini_']_prog_name['_prog'])
    m4+m4_prog()
-   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -1486,40 +1490,75 @@ m4+definitions(['
    m4_asm(UNSHFLI, x22, x1, 11111)
    m4_asm(ORI, x0, x0, 0)
    
+// Provides the instruction memory and fetch logic, producing.
+//   $raw
+//   *instrs[]
+//   *instr_strs[]
 \TLV riscv_imem(_prog_name)
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_def(prog, ['riscv_']_prog_name['_prog'])
    m4+m4_prog()
-   m4+instrs_for_viz()
    
    // ==============
    // IMem and Fetch
    // ==============
    
-   m4+ifelse(M4_IMPL, 1,
+   m4+ifelse(M4_FORMAL, 1,
       \TLV
-         // For implementation
-         // ------------------
-
-         // A Vivado-friendly, hard-coded instruction memory (without a separate mem file). Verilator does not like this.
+         // For formal
+         // ----------
+   
+         // No instruction memory.
          |fetch
-            /instr_mem[M4_NUM_INSTRS-1:0]
-               @M4_FETCH_STAGE
-                  // This instruction is selected from all instructions, based on #instr_mem. Not sure if this will synthesize well.
-                  $instr[31:0] =
-                     m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, [' (#instr_mem == m4_instr_ind) ? m4_echo(['m4_instr']m4_instr_ind) :']) 32'b0;
             /instr
                @M4_FETCH_STAGE
                   ?$fetch
-                     // Fetch the raw instruction from program memory.
-                     $raw[M4_INSTR_RANGE] = |fetch/instr_mem[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]]$instr;
-      , M4_FORMAL, 0,
+                     `BOGUS_USE($$raw[M4_INSTR_RANGE])
+      , M4_IMEM_STYLE, SRAM,
       \TLV
-
+         |fetch
+            /instr
+               @M4_FETCH_STAGE
+                  // For SRAM
+                  // --------
+                  m4_ifndef(IMEM_SIZE, 1024)
+                  m4_define_hier(['M4_IMEM_SRAM'], M4_IMEM_SIZE)
+                  \SV_plus
+                    sram #(
+                      .NB_COL(4),                           // Specify number of columns (number of bytes)
+                      .COL_WIDTH(8),                        // Specify column width (byte width, typically 8 or 9)
+                      .RAM_DEPTH(M4_IMEM_SRAM_CNT),         // Specify RAM depth (number of entries)
+                      .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
+                      .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
+                    ) imem (
+                      .addra($Pc[M4_IMEM_SRAM_INDEX_MAX+2:M4_IMEM_SRAM_INDEX_MIN+2]),  // Port A address bus, width determined from RAM_DEPTH
+                      .addrb(M4_IMEM_SRAM_INDEX_CNT'b0),         // Port B address bus, width determined from RAM_DEPTH
+                      .dina(32'b0),                         // Port A RAM input data, width determined from NB_COL*COL_WIDTH
+                      .dinb(32'b0),                         // Port B RAM input data, width determined from NB_COL*COL_WIDTH
+                      .clka(clk),                           // Clock
+                      .wea(4'b0),                           // Port A write enable, width determined from NB_COL
+                      .web(4'b0),                           // Port B write enable, width determined from NB_COL
+                      .ena(1'b1),                           // Port A RAM Enable, for additional power savings, disable port when not in use
+                      .enb(1'b0),                           // Port B RAM Enable, for additional power savings, disable port when not in use
+                      .rsta(1'b0),                          // Port A output reset (does not affect memory contents)
+                      .rstb(1'b0),                          // Port B output reset (does not affect memory contents)
+                      .regcea(1'b1),                        // Port A output register enable
+                      .regceb(1'b0),                        // Port B output register enable
+                      .douta(>>1$$raw[M4_INSTR_RANGE]),        // Port A RAM output data, width determined from NB_COL*COL_WIDTH
+                      .doutb()                              // Port B RAM output data, width determined from NB_COL*COL_WIDTH
+                    );
+      , M4_IMEM_STYLE, STUBBED,
+      \TLV
+         |fetch
+            /instr
+               @M4_DECODE_STAGE
+                  $raw[M4_INSTR_RANGE] = {$Pc, 2'b0};
+      ,
+      \TLV
+         // Default to HARDCODED_ARRAY
          // For simulation
          // --------------
 
-         // (Vivado doesn't like this -- TODO: Is this still true?)
          \SV_plus
             // The program in an instruction memory.
             logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -1535,17 +1574,6 @@ m4+definitions(['
                @M4_FETCH_STAGE
                   ?$fetch
                      $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
-      ,
-      \TLV
-         // For formal
-         // ----------
-
-         // No instruction memory.
-         |fetch
-            /instr
-               @M4_FETCH_STAGE
-                  ?$fetch
-                     `BOGUS_USE($$raw[M4_INSTR_RANGE])
       )
 
 // Logic for a single CSR.
@@ -2760,7 +2788,6 @@ m4+definitions(['
    // Instantiate the program. (This approach is required for an m4-defined name.)
    m4_def(prog, ['power_']_prog_name['_prog'])
    m4+m4_prog()
-   m4+instrs_for_viz()
    |fetch
       /instr
          @M4_FETCH_STAGE
@@ -2916,32 +2943,67 @@ m4+definitions(['
          // Load
          // ====
          @M4_MEM_WR_STAGE
-            /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
-               $ANY = /instr$ANY; // Find signal from outside of /bank.
-               /mem[M4_DATA_MEM_WORDS_RANGE]
-               ?$spec_ld
-                  $ld_value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Value;
-         
-               // Array writes are not currently permitted to use assignment
-               // syntax, so \always_comb is used, and this must be outside of
-               // when conditions, so we need to use if. <<1 because no <= support
-               // in this context. (This limitation will be lifted.)
+            m4+ifelse(M4_DMEM_STYLE, STUBBED,
+               \TLV
+                  $ld_value[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value : 32'b0;
+                  `BOGUS_USE($st_mask)
+               , M4_DMEM_STYLE, SRAM,
+               \TLV
+                  // For SRAM
+                  // --------
+                  \SV_plus
+                    sram #(
+                      .NB_COL(4),                           // Specify number of columns (number of bytes)
+                      .COL_WIDTH(8),                        // Specify column width (byte width, typically 8 or 9)
+                      .RAM_DEPTH(M4_DATA_MEM_WORDS_HIGH),   // Specify RAM depth (number of entries)
+                      .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
+                      .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
+                    ) imem (
+                      .addra($addr),                        // Port A address bus, width determined from RAM_DEPTH
+                      .addrb($addr),                        // Port B address bus, width determined from RAM_DEPTH
+                      .dina($st_data),                      // Port A RAM input data, width determined from NB_COL*COL_WIDTH
+                      .dinb(32'b0),                         // Port B RAM input data, width determined from NB_COL*COL_WIDTH
+                      .clka(clk),                           // Clock
+                      .wea({4{$valid_st}} & $st_mask),      // Port A write enable, width determined from NB_COL
+                      .web(4'b0),                           // Port B write enable, width determined from NB_COL
+                      .ena($valid_st),                      // Port A RAM Enable, for additional power savings, disable port when not in use
+                      .enb($ld_valid),                      // Port B RAM Enable, for additional power savings, disable port when not in use
+                      .rsta(1'b0),                          // Port A output reset (does not affect memory contents)
+                      .rstb(1'b0),                          // Port B output reset (does not affect memory contents)
+                      .regcea(1'b0),                        // Port A output register enable
+                      .regceb($ld_valid),                   // Port B output register enable
+                      .douta(),                             // Port A RAM output data, width determined from NB_COL*COL_WIDTH
+                      .doutb(>>1$$ld_valid[M4_WORD_RANGE])  // Port B RAM output data, width determined from NB_COL*COL_WIDTH
+                    );
+               ,
+               \TLV
+                  // Array. Required for VIZ.
+                  /bank[m4_eval(M4_ADDRS_PER_WORD-1):0]
+                     $ANY = /instr$ANY; // Find signal from outside of /bank.
+                     /mem[M4_DATA_MEM_WORDS_RANGE]
+                     ?$spec_ld
+                        $ld_value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Value;
 
-               // =====
-               // Store
-               // =====
+                     // Array writes are not currently permitted to use assignment
+                     // syntax, so \always_comb is used, and this must be outside of
+                     // when conditions, so we need to use if. <<1 because no <= support
+                     // in this context. (This limitation will be lifted.)
 
-               \SV_plus
-                  always @ (posedge clk) begin
-                     if ($valid_st && $st_mask[#bank])
-                        /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$^Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
-                  end
-            // Combine $ld_value per bank, assuming little-endian.
-            //$ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
-            // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
-            // build the concatination.
-            $ld_value[M4_WORD_RANGE] = {m4_forloop(['m4_ind'], 0, M4_ADDRS_PER_WORD, ['m4_ifelse(m4_ind, 0, [''], [', '])/bank[m4_eval(M4_ADDRS_PER_WORD - m4_ind - 1)]$ld_value'])};
+                     // =====
+                     // Store
+                     // =====
 
+                     \SV_plus
+                        always @ (posedge clk) begin
+                           if ($valid_st && $st_mask[#bank])
+                              /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$^Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
+                        end
+                  // Combine $ld_value per bank, assuming little-endian.
+                  //$ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
+                  // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
+                  // build the concatination.
+                  $ld_value[M4_WORD_RANGE] = {m4_forloop(['m4_ind'], 0, M4_ADDRS_PER_WORD, ['m4_ifelse(m4_ind, 0, [''], [', '])/bank[m4_eval(M4_ADDRS_PER_WORD - m4_ind - 1)]$ld_value'])};
+               )
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
    |mem
@@ -4182,34 +4244,6 @@ m4+definitions(['
 
 \TLV dummy_viz_logic()
    // dummy
-
-// *instrs must be consumed local to its definition (because it is local to the generate block).
-\TLV instrs_for_viz()
-   m4+ifelse(M4_VIZ, 1,
-      \TLV
-         |fetch
-            @M4_MEM_WR_STAGE
-               m4+ifelse(M4_ISA, ['MINI'],
-                  \TLV
-                  ,
-                  \TLV
-                     // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
-                     // has different fields on different clocks, Verilator throws warnings.
-                     // These are unconditioned versions of the problematic signals.
-                     /instr
-                        /src[*]
-                           $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
-                           $unconditioned_is_reg = $is_reg;
-                           $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
-                        m4+ifelse(M4_EXT_F, 1,
-                           \TLV
-                              /fpu_src[*]
-                                 $unconditioned_reg[M4_FPU_REGS_INDEX_RANGE] = $reg;
-                                 $unconditioned_is_reg = $is_reg;
-                                 $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
-                           )
-                  )
-      )
    
 \TLV instruction_in_memory(|_top, _where_)
    $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
@@ -4310,6 +4344,13 @@ m4+definitions(['
    
 \TLV registers(_name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
+   /['']_sig_prefix['']src[*]
+      // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
+      // has different fields on different clocks, Verilator throws warnings.
+      // These are unconditioned versions of the problematic signals.
+      $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+      $unconditioned_is_reg = $is_reg;
+      $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
    /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
       \viz_js
          all: {
