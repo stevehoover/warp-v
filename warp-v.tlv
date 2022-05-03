@@ -340,7 +340,9 @@ m4+definitions(['
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED'],
       IMEM_STYLE, m4_ifelse(M4_IMPL, 0, HARDCODED_ARRAY, SRAM),
       ['# DMem style: SRAM, ARRAY, STUBBED'],
-      DMEM_STYLE, m4ifelse(M4_IMPL, 0, ARRAY, SRAM))
+      DMEM_STYLE, m4ifelse(M4_IMPL, 0, ARRAY, SRAM),
+      ['# RF style: ARRAY, STUBBED'],
+      RF_STYLE, ARRAY)
 
    m4_ifndef(
      
@@ -519,7 +521,7 @@ m4+definitions(['
    m4_ifndef(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
    m4_ifndef(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
-     PROG_NAME, m4_ifelse(M4_EXT_M, 1, divmul_test, cnt10))
+     PROG_NAME, m4_ifelse(M4_ISA, RISCV, m4_ifelse(M4_EXT_F, 1, fpu_test, m4_ifelse(M4_EXT_M, 1, divmul_test, m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10)))), cnt10)
    //m4_ifelse(M4_EXT_F, 1, fpu_test, cnt10)
    //m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10)
 
@@ -605,6 +607,8 @@ m4+definitions(['
       77.2, REG_WR,
       93, MEM_WR,
       100)
+   
+   m4_def(VIZ_STAGE, M4_MEM_WR_STAGE)
 
    
    
@@ -1095,6 +1099,15 @@ m4+definitions(['
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/cc27801ff64687d54094da698ed28c40351ed288/risc-v_defs.tlv'])'])
+   
+   // Heavy-handed lint_off's based on config.
+   // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
+   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_M['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
+   m4_ifelse(m4_eval(M4_EXT_M), 0, , /* verilator lint_off CASEINCOMPLETE */)
+   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off PINMISSING */)
+   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off SELRANGE */)
+
+
 
 // A default testbench for all ISAs.
 // Requires m4+makerchip_pass_fail(..).
@@ -1558,7 +1571,7 @@ m4+definitions(['
          // Default to HARDCODED_ARRAY
          // For simulation
          // --------------
-
+         
          \SV_plus
             // The program in an instruction memory.
             logic [M4_INSTR_RANGE] instrs [0:M4_NUM_INSTRS-1];
@@ -1568,8 +1581,15 @@ m4+definitions(['
             
             // String representations of the instructions for debug.
             assign instr_strs = '{m4_asm_mem_expr "END                                     "};
-            
+         
          |fetch
+            m4+ifelse(M4_VIZ, 1,
+               \TLV
+                  /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
+                     @M4_VIZ_STAGE
+                        $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
+                        $instr_str[40*8-1:0] = *instr_strs[instr_mem];
+               )
             /instr
                @M4_FETCH_STAGE
                   ?$fetch
@@ -3576,85 +3596,21 @@ m4+definitions(['
             // Reg Rd
             // ======
             
-            // Obtain source register values and pending bit for source registers. Bypass up to 3
-            // stages.
-            // It is not necessary to bypass pending, as we could delay the replay, but we implement
-            // bypass for performance.
-            // Pending has an additional read for the dest register as we need to replay for write-after-write
-            // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
-            // bypass the dest reg's pending bit.
-            /M4_REGS_HIER
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$valid_dest_reg_valid && ($GoodPathMask[1] || >>1$second_issue);'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$valid_dest_reg_valid && ($GoodPathMask[2] || >>2$second_issue);'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$valid_dest_reg_valid && ($GoodPathMask[3] || >>3$second_issue);'])
-            /src[2:1]
-               $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
-               ?$is_reg_condition
-                  /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
-                  {$reg_value[M4_WORD_RANGE], $pending} =
-                     m4_ifelse(M4_ISA, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
-                     // Bypass stages. Both register and pending are bypassed.
-                     // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$bypass_avail1 && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$bypass_avail2 && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                     m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$bypass_avail3 && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                     {/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
-                  /* verilator lint_on WIDTH */
-               // Replay if this source register is pending.
-               $replay = $is_reg_condition && $pending;
+            // Obtain source register values and pending bit for source registers.
+            m4+operands(, /src, 2:1)
+            /src[*]
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
-            // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
-            $is_dest_condition = $dest_reg_valid && /instr$valid_decode;  // Note, $dest_reg_valid is 0 for RISC-V sr0.
-            ?$is_dest_condition
-               $dest_pending =
-                  m4_ifelse(M4_ISA, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
-                  // Bypass stages.
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($bypass_avail1 && (>>1$dest_reg == $dest_reg)) ? >>1$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($bypass_avail2 && (>>2$dest_reg == $dest_reg)) ? >>2$reg_wr_pending :'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($bypass_avail3 && (>>3$dest_reg == $dest_reg)) ? >>3$reg_wr_pending :'])
-                  m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
-            // Combine replay conditions for pending source or dest registers.
-            $replay_int = | /src[*]$replay || ($is_dest_condition && $dest_pending);
-
+            
             m4+ifelse(M4_EXT_F, 1,
                \TLV
                   //
                   // ======
                   // Reg Rd for Floating Point Unit
                   // ======
-                  // 
-                  /M4_FPU_REGS_HIER
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$fp_bypass_avail1 = /instr>>1$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue);'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$fp_bypass_avail2 = /instr>>2$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue);'])
-                  m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$fp_bypass_avail3 = /instr>>3$valid_dest_fpu_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue);'])
-                  /fpu_src[3:1]
-                     $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
-                     ?$is_reg_condition
-                        {$reg_value[M4_WORD_RANGE], $pending} =
-                           m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
-                           // Bypass stages. Both register and pending are bypassed.
-                           // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$fp_bypass_avail1 && (/instr>>1$dest_fpu_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$fp_bypass_avail2 && (/instr>>2$dest_fpu_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-                           m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$fp_bypass_avail3 && (/instr>>3$dest_fpu_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-                           {/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/fpu_regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
-                     // Replay if FPU source register is pending.
-                     $replay_fpu = $is_reg_condition && $pending;
-            
-                  // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
-                  $is_dest_fpu_condition = $dest_fpu_reg_valid && /instr$valid_decode;
-                  ?$is_dest_fpu_condition
-                     $dest_fpu_pending =
-                        m4_ifelse(M4_ISA, ['RISCV'], ['// Note: f0 is not hardwired to ground as x0 does'])
-                        // Bypass stages. Both register and pending are bypassed.
-                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($fp_bypass_avail1 && (>>1$dest_fpu_reg == $dest_fpu_reg)) ? >>1$reg_wr_pending :'])
-                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($fp_bypass_avail2 && (>>2$dest_fpu_reg == $dest_fpu_reg)) ? >>2$reg_wr_pending :'])
-                        m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($fp_bypass_avail3 && (>>3$dest_fpu_reg == $dest_fpu_reg)) ? >>3$reg_wr_pending :'])
-                        m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/fpu_regs[$dest_fpu_reg]>>M4_REG_BYPASS_STAGES$pending']);
-                  // Combine replay conditions for pending source or dest registers.
-                  $replay_fpu = | /fpu_src[*]$replay_fpu || ($is_dest_fpu_condition && $dest_fpu_pending);
+                  //
+                  m4+operands(fpu_, /fpu_src, 3:1)
                )
-            $replay = ($replay_int m4_ifelse(M4_EXT_F, 1, ['|| $replay_fpu']));
+            $replay = ($pending_replay m4_ifelse(M4_EXT_F, 1, ['|| $fpu_pending_replay']));
          
          // =======
          // Execute
@@ -3730,46 +3686,99 @@ m4+definitions(['
    m4+fixed_latency_fake_memory(/_cpu, 0)
    |fetch
       /instr
-         @M4_REG_WR_STAGE
-            // =========
-            // Reg Write
-            // =========
+         // =========
+         // Reg Write
+         // =========
+         m4+rf_wr(/regs, $valid_dest_reg_valid, $dest_reg, $rslt, $reg_wr_pending)
 
-            $reg_write = $reset ? 1'b0 : $valid_dest_reg_valid;
-            /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
-            \SV_plus
-               always @ (posedge clk) begin
-                  if ($reg_write)
-                     /regs[$dest_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
-               end
-            /* verilator lint_on WIDTH */
-            m4+ifelse(M4_PENDING_ENABLED, 1,
-               \TLV
-                  // Write $pending along with $value, but coded differently because it must be reset.
-                  /regs[*]
-                     <<1$pending = ! /instr$reset && (((#regs == /instr$dest_reg) && /instr$valid_dest_reg_valid) ? /instr$reg_wr_pending : $pending);
-               )
-            m4+ifelse(M4_EXT_F, 1,
-               \TLV
-                  // Reg Write (Floating Point Register)
-                  // TODO. Seperate the $rslt comit to both "int" and "fpu" regs.
-                  $fpu_reg_write = $reset ? 1'b0 : $valid_dest_fpu_reg_valid;
-                  \SV_plus
-                     always @ (posedge clk) begin
-                        if ($fpu_reg_write)
-                           /fpu_regs[$dest_fpu_reg]<<0$$^value[M4_WORD_RANGE] <= $rslt;
-                     end
-                  m4+ifelse(M4_PENDING_ENABLED, 1,
-                     \TLV
-                        // Write $pending along with $value, but coded differently because it must be reset.
-                        /fpu_regs[*]
-                           <<1$pending = ! /instr$reset && (((#fpu_regs == /instr$dest_fpu_reg) && /instr$valid_dest_fpu_reg_valid) ? /instr$reg_wr_pending : $pending);
-                     )
-               )
-            
+         // ======
+         // FPU RF
+         // ======
+         m4+ifelse(M4_EXT_F, 1,
+            \TLV
+               m4+rf_wr(/fpu_regs, $valid_dest_fpu_reg_valid, $dest_fpu_reg, $rslt, $reg_wr_pending)
+            )
+
          @M4_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
+         // TODO. Seperate the $rslt and $reg_wr_pending committed to both "int" and "fpu" regs.
+
+
+\TLV operands(_rf, /_src, _src_range)
+   // Obtain source register values and pending bit for int or fp source registers. Bypass up to 3
+   // stages.
+   // It is not necessary to bypass pending, as we could delay the replay, but we implement
+   // bypass for performance.
+   // Pending has an additional read for the dest register as we need to replay for write-after-write
+   // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
+   // bypass the dest reg's pending bit.
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$['']_rf['']bypass_avail1 = >>1$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[1] || >>1$second_issue);'])
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$['']_rf['']bypass_avail2 = >>2$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[2] || >>2$second_issue);'])
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$['']_rf['']bypass_avail3 = >>3$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[3] || >>3$second_issue);'])
+   /_src[''][_src_range]
+      $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
+      ?$is_reg_condition
+         $rf_value[M4_WORD_RANGE] =
+              m4_ifelse(M4_RF_STYLE, STUBBED, $pc, /instr/['']_rf['']regs[$reg]>>M4_REG_BYPASS_STAGES$value);
+         /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
+         {$reg_value[M4_WORD_RANGE], $pending} =
+            m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
+            // Bypass stages. Both register and pending are bypassed.
+            // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$['']_rf['']bypass_avail1 && (/instr>>1$dest_['']_rf['']reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$['']_rf['']bypass_avail2 && (/instr>>2$dest_['']_rf['']reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$['']_rf['']bypass_avail3 && (/instr>>3$dest_['']_rf['']reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+            {$rf_value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/['']_rf['']regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+         /* verilator lint_on WIDTH */
+      // Replay if source register is pending.
+      $replay = $is_reg_condition && $pending;
+   
+   // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
+   $is_dest_['']_rf['']condition = $dest_['']_rf['']reg_valid && /instr$valid_decode;
+   ?$is_dest_['']_rf['']condition
+      $dest_['']_rf['']pending =
+         m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
+         // Bypass stages.
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($['']_rf['']bypass_avail1 && (>>1$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>1$reg_wr_pending :'])
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($['']_rf['']bypass_avail2 && (>>2$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>2$reg_wr_pending :'])
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($['']_rf['']bypass_avail3 && (>>3$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>3$reg_wr_pending :'])
+         m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/['']_rf['']regs[$dest_['']_rf['']reg]>>M4_REG_BYPASS_STAGES$pending']);
+   // Combine replay conditions for pending source or dest registers.
+   $['']_rf['']pending_replay = | /_src[*]$replay || ($is_dest_['']_rf['']condition && $dest_['']_rf['']pending);
+
+
+
+
+// Reg write logic for int or fp RF.
+// Register file has no reset, so initial values are undefined, and can be written at random prior to and during reset.
+// Controlling definitions:
+//    M4_PENDING_ENABLED
+//    M4_RF_STYLE
+\TLV rf_wr(/_hier, $_we, $_waddr, $_wdata, $_wpending)
+   /* verilator lint_save */
+   /* verilator lint_on WIDTH */
+   @M4_REG_WR_STAGE
+      m4+ifelse(M4_RF_STYLE, STUBBED,
+         \TLV
+            // Exclude the register file.
+            `BOGUS_USE($_we $_waddr $_wdata)
+         ,
+         \TLV
+            // Reg Write (Floating Point Register)
+            \SV_plus
+               always @ (posedge clk) begin
+                  if ($_we)
+                     /_hier[$_waddr]<<0$$^value[M4_WORD_RANGE] <= $_wdata;
+               end
+         )
+      m4+ifelse(M4_PENDING_ENABLED, 1,
+         \TLV
+            // Write $pending along with $value, but coded differently because it must be reset.
+            /_hier[*]
+               <<1$pending = ! /instr$reset && (((#m4_strip_prefix(/_hier) == /instr$_waddr) && /instr$_we) ? /instr$_wpending : $pending);
+         )
+   /* verilator lint_restore */
 
 \TLV cnt10_makerchip_tb()
    |fetch
@@ -4230,7 +4239,7 @@ m4+definitions(['
 \TLV riscv_viz_logic()
    // Code that supports 
    |fetch
-      @M4_MEM_WR_STAGE
+      @M4_VIZ_STAGE
          /instr
             // A type-independent immediate value, for debug. (For R-type, funct7 is used as immediate).
             $imm_value[M4_WORD_RANGE] =
@@ -4246,106 +4255,105 @@ m4+definitions(['
    // dummy
    
 \TLV instruction_in_memory(|_top, _where_)
-   $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
-   $instr_str[40*8-1:0] = *instr_strs[instr_mem];
-   \viz_js
-       all: {
-         box: {
-            width: 670,
-            height: 76 + 18 * M4_NUM_INSTRS,
-            fill: "#208028",
-            stroke: "white",
-            strokeWidth: 0
-         },
-         init() {
-            let imem_header = new fabric.Text("🗃️ Instr. Memory", {
-               top: 10,
-               left: 250,
-               fontSize: 20,
-               fontWeight: 800,
-               fontFamily: "monospace",
-               fill: "black"
+   /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
+      \viz_js
+          all: {
+            box: {
+               width: 670,
+               height: 76 + 18 * M4_NUM_INSTRS,
+               fill: "#208028",
+               stroke: "white",
+               strokeWidth: 0
+            },
+            init() {
+               let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+                  top: 10,
+                  left: 250,
+                  fontSize: 20,
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fill: "black"
+               })
+               return {imem_header}
+            },
+            render() {
+               // Highlight instruction.
+               let pc = '['']|_top/instr$pc'.asInt(-1)
+                this.highlighted_addr = pc
+                instance = this.getContext().children[pc]
+                if (typeof instance !== "undefined") {
+                   let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
+                   instance.initObjects.instr_binary_box.set({fill: color})
+                   instance.initObjects.instr_asm_box.set({fill: color})
+                }
+                // Highlight 2nd issue instruction.
+                let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
+                this.highlighted_addr2 = pc2
+                instance2 = this.getContext().children[pc2]
+                if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
+                   let color = "#ffd0b0"
+                   instance2.initObjects.instr_binary_box.set({fill: color})
+                   instance2.initObjects.instr_asm_box.set({fill: color})
+                }
+            },
+            unrender() {
+               //debbuger
+               // Unhighlight instruction.
+               let instance = this.getContext().children[this.highlighted_addr]
+                if (typeof instance != "undefined") {
+                   instance.initObjects.instr_binary_box.set({fill: "white"})
+                   instance.initObjects.instr_asm_box.set({fill: "white"})
+                }
+                // Unhighlight 2nd issue instruction.
+                let instance2 = this.getContext().children[this.highlighted_addr2]
+                if (typeof instance2 != "undefined") {
+                   instance2.initObjects.instr_binary_box.set({fill: "white"})
+                   instance2.initObjects.instr_asm_box.set({fill: "white"})
+                }
+            },
+          },
+          box: {strokeWidth: 0},
+          where: {_where_},
+          where0: {left: 30, top: 50},
+          layout: {top: 18}, //scope's instance stacked vertically
+          init() {
+            let instr_str = new fabric.Text("" , {
+               left: 10,
+               fontSize: 14,
+               fontFamily: "monospace"
             })
-            return {imem_header}
-         },
-         render() {
-            // Highlight instruction.
-            let pc = '['']|_top/instr$pc'.asInt(-1)
-             this.highlighted_addr = pc
-             instance = this.getContext().children[pc]
-             if (typeof instance !== "undefined") {
-                let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
-                instance.initObjects.instr_binary_box.set({fill: color})
-                instance.initObjects.instr_asm_box.set({fill: color})
-             }
-             // Highlight 2nd issue instruction.
-             let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
-             this.highlighted_addr2 = pc2
-             instance2 = this.getContext().children[pc2]
-             if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
-                let color = "#ffd0b0"
-                instance2.initObjects.instr_binary_box.set({fill: color})
-                instance2.initObjects.instr_asm_box.set({fill: color})
-             }
-         },
-         unrender() {
-            //debbuger
-            // Unhighlight instruction.
-            let instance = this.getContext().children[this.highlighted_addr]
-             if (typeof instance != "undefined") {
-                instance.initObjects.instr_binary_box.set({fill: "white"})
-                instance.initObjects.instr_asm_box.set({fill: "white"})
-             }
-             // Unhighlight 2nd issue instruction.
-             let instance2 = this.getContext().children[this.highlighted_addr2]
-             if (typeof instance2 != "undefined") {
-                instance2.initObjects.instr_binary_box.set({fill: "white"})
-                instance2.initObjects.instr_asm_box.set({fill: "white"})
-             }
-         },
-       },
-       box: {strokeWidth: 0},
-       where: {_where_},
-       where0: {left: 30, top: 50},
-       layout: {top: 18}, //scope's instance stacked vertically
-       init() {
-         let instr_str = new fabric.Text("" , {
-            left: 10,
-            fontSize: 14,
-            fontFamily: "monospace"
-         })
-         let instr_asm_box = new fabric.Rect({
-            left: 0,
-            fill: "white",
-            width: 280,
-            height: 14
-         })
-         let instr_binary_box = new fabric.Rect({
-            left: 330,
-            fill: "white",
-            width: 280,
-            height: 14
-         })
-         return {instr_asm_box, instr_binary_box, instr_str}
-       },
-       render() {
-          // Instruction memory is constant, so just create it once.
-         m4_ifelse_block(M4_ISA, ['MINI'], ['
-            let instr_str = '$instr'.goTo(0).asString("?")
-         '], M4_ISA, ['RISCV'], ['
-            let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
-         '], M4_ISA, ['MIPSI'], ['
-            let instr_str = '$instr'.asBinaryStr("?")
-         '], ['
-            let instr_str = '$instr'.goTo(0).asString("?")
-         '])
-         this.getObjects().instr_str.set({text: `${instr_str}`})
-       },
+            let instr_asm_box = new fabric.Rect({
+               left: 0,
+               fill: "white",
+               width: 280,
+               height: 14
+            })
+            let instr_binary_box = new fabric.Rect({
+               left: 330,
+               fill: "white",
+               width: 280,
+               height: 14
+            })
+            return {instr_asm_box, instr_binary_box, instr_str}
+          },
+          render() {
+             // Instruction memory is constant, so just create it once.
+            m4_ifelse_block(M4_ISA, ['MINI'], ['
+               let instr_str = '$instr'.goTo(0).asString("?")
+            '], M4_ISA, ['RISCV'], ['
+               let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
+            '], M4_ISA, ['MIPSI'], ['
+               let instr_str = '$instr'.asBinaryStr("?")
+            '], ['
+               let instr_str = '$instr'.goTo(0).asString("?")
+            '])
+            this.getObjects().instr_str.set({text: `${instr_str}`})
+          },
    
 \TLV registers(_name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
    /['']_sig_prefix['']src[*]
-      // There is an issue with \viz code indexing causing signals to be packed, and if a packed value
+      // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
       $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
@@ -4399,7 +4407,7 @@ m4+definitions(['
          },
          render() {
             // TODO: This is inefficient as is the same for every entry.
-            let mod = '/instr$['']_sig_prefix['']reg_write'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getIndex())
+            let mod = '/instr$valid_dest_['']_sig_prefix['']reg_valid'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getIndex())
             let rs_valid = []
             let read_valid = false
             for (let i = 1; i <= _num_srcs; i++) {
@@ -4639,7 +4647,7 @@ m4+definitions(['
                                                                                                                  null
                                     let rd = '/instr$dest_reg'.step(this.instr).asInt(0)
                                     let bypass = bypassSig.step(bypassAmount + this.instr).asBool(false) &&
-                                                 (rd === '/instr/src[rs]$reg'.step(bypassAmount + this.instr).asInt(0))
+                                                 (rd === '/instr/src[rs]$unconditioned_reg'.step(bypassAmount + this.instr).asInt(0))
                                     if (bypass) {
                                        // To coords
                                        let rsLeft = -12 + bypassAmount * 10
@@ -5225,7 +5233,7 @@ m4+definitions(['
       where: {_where_},
          
    //////// VIZUALIZING THE MAIN CPU //////////////
-\TLV cpu_viz(/_des_pipe, @_M4_stage, _fill_color)
+\TLV cpu_viz(/_des_pipe, _fill_color)
    /* CPU_VIZ HERE */
    m4_def(viz_logic_macro_name, M4_isa['_viz_logic'])
    m4_def(COREOFFSET, 750)
@@ -5233,11 +5241,10 @@ m4+definitions(['
    m4_def(ALL_LEFT, -500)
    m4+m4_viz_logic_macro_name()
    /_des_pipe
-      @_M4_stage
+      @M4_VIZ_STAGE
          m4+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
-         /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
-            m4_ifelse(M4_FORMAL, 1, , ['m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
+         m4_ifelse(M4_FORMAL, 1, , ['m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
             
          /instr
             m4+instruction(['left: 10, top: 0'])
@@ -5929,7 +5936,7 @@ m4+definitions(['
             // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
             m4_ifelse_block(M4_ISA, ['RISCV'], ['
             m4_ifelse_block(M4_VIZ, 1, ['
-            m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE, "#7AD7F0")
+            m4+cpu_viz(|fetch, "#7AD7F0")
             m4+ring_viz(/name)
             '])
             '])
@@ -5947,7 +5954,7 @@ m4+definitions(['
          m4+makerchip_pass_fail()
          '])
          m4_ifelse_block(M4_ISA, ['RISCV'], ['
-         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, @M4_MEM_WR_STAGE, "#7AD7F0")'])
+         m4_ifelse(M4_VIZ, 1, ['m4+cpu_viz(|fetch, "#7AD7F0")'])
          '])
       )
 
