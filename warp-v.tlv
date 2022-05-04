@@ -521,7 +521,7 @@ m4+definitions(['
    m4_ifndef(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
    m4_ifndef(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
-     PROG_NAME, m4_ifelse(M4_ISA, RISCV, m4_ifelse(M4_EXT_F, 1, fpu_test, m4_ifelse(M4_EXT_M, 1, divmul_test, m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10)))), cnt10)
+     PROG_NAME, m4_ifelse(M4_ISA, RISCV, m4_ifelse(M4_EXT_F, 1, fpu_test, m4_ifelse(M4_EXT_M, 1, divmul_test, m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10))), cnt10))
    //m4_ifelse(M4_EXT_F, 1, fpu_test, cnt10)
    //m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10)
 
@@ -712,7 +712,7 @@ m4+definitions(['
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
          m4_define_vector(['M4_WORD'], 32)
          m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
-         m4_define_hier(['M4_FPU_REGS'], 32, 0)
+         m4_define_hier(['M4_FPU_REGS'], 32, 0)   // (though, the hierarchy is called /regs, not /fpu_regs)
          
          // Controls SV generation:
          m4_define(['m4_use_localparams'], 0)
@@ -1677,7 +1677,7 @@ m4+definitions(['
                // occurs then, take the previous "rm"(RoundingMode) stored in "frm" CSR or else take that from instruction encoding itself.
                // NOTE. In first issue of fpu_div_sqrt itself the vaild $raw_rm value get stored/latched in "frm" CSR,
                //       so to use that at time of second issue of fpu_div_sqrt. 
-               $fpufcsr[7:0] = {(((|fetch/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_fcsr[7:5] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
+               $fpufcsr[7:0] = {(((/instr>>1$raw_rm[2:0] == 3'b111) || $fpu_second_issue_div_sqrt) ? >>1$csr_fcsr[7:5] : |fetch/instr$raw_rm[2:0] ) ,|fetch/instr/fpu1$exception_invaild_output, |fetch/instr/fpu1$exception_infinite_output, |fetch/instr/fpu1$exception_overflow_output, |fetch/instr/fpu1$exception_underflow_output, |fetch/instr/fpu1$exception_inexact_output};
             )
          // CSR h/w side-effect write signals.
          $csr_cycle_hw_wr = 1'b1;
@@ -1910,21 +1910,22 @@ m4+definitions(['
       \TLV
          // Implementing a different encoding for floating point instructions.
          ?$valid_decode
-            // Output signals. seperate FPU source
-            /fpu_src[3:1]
-               // Reg valid for this fpu source, based on instruction type.
-               $is_reg = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_src && ! ((#fpu_src == 1) && /instr$fpu_instr_with_int_src1)) &&
-                         (((#fpu_src != 3) && /instr$is_r_type) ||
-                          /instr$is_r4_type ||
-                          ((#fpu_src != 3) && /instr$is_r2_type) ||
-                          (/instr$is_i_type && (#fpu_src == 1) && (#fpu_src != 3)) ||
-                          ((#fpu_src != 3) && /instr$is_s_type)
-                         );
-               $reg[M4_FPU_REGS_INDEX_RANGE] = (#fpu_src == 1) ? /instr$raw_rs1 : (#fpu_src == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
-
-         $dest_fpu_reg[M4_FPU_REGS_INDEX_RANGE] = $fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$dest_fpu_reg :
-                                          $second_issue_ld ? |fetch/instr/orig_inst$dest_fpu_reg : $raw_rd;
-         $dest_fpu_reg_valid = ($fpu_type_instr && ! $fpu_instr_with_int_dest) && (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue);
+            /fpu
+               // Output signals. seperate FPU source
+               /src[3:1]
+                  // Reg valid for this fpu source, based on instruction type.
+                  $is_reg = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_src && ! ((#src == 1) && /instr$fpu_instr_with_int_src1)) &&
+                            (((#src != 3) && /instr$is_r_type) ||
+                             /instr$is_r4_type ||
+                             ((#src != 3) && /instr$is_r2_type) ||
+                             (/instr$is_i_type && (#src == 1) && (#src != 3)) ||
+                             ((#src != 3) && /instr$is_s_type)
+                            );
+                  $reg[M4_FPU_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : (#src == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
+   
+               $dest_reg[M4_FPU_REGS_INDEX_RANGE] = /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>M4_NON_PIPELINED_BUBBLES$dest_reg :
+                                                 /instr$second_issue_ld ? /instr/orig_inst/fpu$dest_reg : /instr$raw_rd;
+               $dest_reg_valid = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_dest) && ((/instr$valid_decode && ! /instr$is_s_type && ! /instr$is_b_type) || /instr$second_issue);
       )
    
    // Actually load.
@@ -2065,11 +2066,19 @@ m4+definitions(['
 
       // hold_inst scope is not needed when long latency instructions are disabled
       m4_ifelse(m4_eval(M4_EXT_M || M4_EXT_F || M4_EXT_B), 1, ['
-      // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M 
+      // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
+      // TODO: This becomes a one-liner once $ANY acts on subscope.
       /hold_inst
          $ANY = 1'b0 m4_ifelse(M4_EXT_M, 1, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) m4_ifelse(M4_EXT_B, 1, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr$ANY : >>1$ANY;
          /src[2:1]
             $ANY = 1'b0 m4_ifelse(M4_EXT_M, 1, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m4_ifelse(M4_EXT_F, 1, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) m4_ifelse(M4_EXT_B, 1, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr/src$ANY : >>1$ANY;
+         m4+ifelse(M4_EXT_F, 1,
+            \TLV
+               /fpu
+                  $ANY = 1'b0 m4_ifelse(M4_EXT_M, 1, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit) m4_ifelse(M4_EXT_B, 1, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr/fpu$ANY : >>1$ANY;
+                  ///src[2:1]
+                  //   $ANY = 1'b0 m4_ifelse(M4_EXT_M, 1, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit) m4_ifelse(M4_EXT_B, 1, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr/fpu/src$ANY : >>1$ANY;
+            )
       '])
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
@@ -2183,6 +2192,7 @@ m4+definitions(['
       
          // "F" Extension.
          
+         // TODO: Move this under /fpu.
          m4+ifelse(M4_EXT_F, 1,
             \TLV
                // Determining the type of fpu_operation according to the fpu_exe macro
@@ -2215,9 +2225,9 @@ m4+definitions(['
                $clock = *clk;
 
                // Operands
-               $operand_a[31:0] = /fpu_src[1]$reg_value;
-               $operand_b[31:0] = /fpu_src[2]$reg_value;
-               $operand_c[31:0] = /fpu_src[3]$reg_value;
+               $operand_a[31:0] = /fpu/src[1]$reg_value;
+               $operand_b[31:0] = /fpu/src[2]$reg_value;
+               $operand_c[31:0] = /fpu/src[3]$reg_value;
                // rounding mode as per the RISC-V specs (synchronizing with HardFloat module)
                $rounding_mode[2:0] = (|fetch/instr$raw_rm == 3'b000) ? 3'b000 :
                                      (|fetch/instr$raw_rm == 3'b001) ? 3'b010 :
@@ -2242,7 +2252,7 @@ m4+definitions(['
                $fmaxs_rslt[M4_WORD_RANGE]   = /fpu1$output_result;
                $fcvtws_rslt[M4_WORD_RANGE]  = /fpu1$int_output;
                $fcvtwus_rslt[M4_WORD_RANGE] = /fpu1$int_output;
-               $fmvxw_rslt[M4_WORD_RANGE]   = /fpu_src[1]$reg_value;
+               $fmvxw_rslt[M4_WORD_RANGE]   = /fpu/src[1]$reg_value;
                $feqs_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
                $flts_rslt[M4_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
                $fles_rslt[M4_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
@@ -2396,7 +2406,7 @@ m4+definitions(['
       $st_cond = $st && $valid_exe;
       ?$st_cond
          // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
-         $st_reg_value[M4_WORD_RANGE] = m4_ifelse(M4_EXT_F, 1, ['$is_fsw_instr ? /fpu_src[2]$reg_value :'])
+         $st_reg_value[M4_WORD_RANGE] = m4_ifelse(M4_EXT_F, 1, ['$is_fsw_instr ? /fpu/src[2]$reg_value :'])
                                                   /src[2]$reg_value;
          $st_value[M4_WORD_RANGE] =
               $ld_st_word ? $st_reg_value :            // word
@@ -3028,10 +3038,18 @@ m4+definitions(['
    // right alignment.
    |mem
       /data
+         // This becomes a one-liner once $ANY acts on subscopes.
          @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
             $ANY = /_cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
             /src[2:1]
                $ANY = /_cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
+            m4+ifelse(M4_EXT_F, 1,
+               \TLV
+                  /fpu
+                     $ANY = /_cpu|fetch/instr/fpu>>M4_ALIGNMENT_VALUE$ANY;
+                     ///src[2:1]
+                     //   $ANY = /_cpu|fetch/instr/fpu/src>>M4_ALIGNMENT_VALUE$ANY;
+               )
 
 
 
@@ -3544,19 +3562,33 @@ m4+definitions(['
             $second_issue = ($second_issue_ld m4_ifelse(M4_EXT_M, 1, ['|| $second_issue_div_mul']) m4_ifelse(M4_EXT_F, 1, ['|| $fpu_second_issue_div_sqrt']) m4_ifelse(M4_EXT_B, 1, ['|| $second_issue_clmul_crc']));
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
+            // This reduces significantly once $ANY acts on subscope.
             ?$second_issue_ld
                // This scope holds the original load for a returning load.
                /orig_load_inst
                   $ANY = /_cpu|mem/data>>M4_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>M4_LD_RETURN_ALIGN$ANY;
+                  m4+ifelse(M4_EXT_F, 1,
+                     \TLV
+                        /fpu
+                           $ANY = /_cpu|mem/data/fpu>>M4_LD_RETURN_ALIGN$ANY;
+                           ///src[2:1]
+                           //   $ANY = /_cpu|mem/data/fpu/src>>M4_LD_RETURN_ALIGN$ANY;
+                     )
             ?$second_issue
                /orig_inst
                   // pull values from /orig_load_inst or /hold_inst depending on which second issue
                   $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst$ANY;
                   /src[2:1]
                      $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/src$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_F, 1, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/src$ANY;
-            
+                  m4+ifelse(M4_EXT_F, 1,
+                     \TLV
+                        /fpu
+                           $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/fpu$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/fpu>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/fpu>>M4_NON_PIPELINED_BUBBLES$ANY : m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/fpu>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/fpu$ANY;
+                           ///src[3:1]
+                           //   $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/fpu/src$ANY : m4_ifelse(M4_EXT_M, 1, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/fpu/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/fpu/src>>M4_NON_PIPELINED_BUBBLES$ANY : m4_ifelse(M4_EXT_B, 1, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/fpu/src>>M4_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/fpu/src$ANY;
+                     )
             // Next PC
             $pc_inc[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1;
             // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
@@ -3597,7 +3629,7 @@ m4+definitions(['
             // ======
             
             // Obtain source register values and pending bit for source registers.
-            m4+operands(, /src, 2:1)
+            m4+operands( , /src, 2:1)
             /src[*]
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
             
@@ -3608,9 +3640,10 @@ m4+definitions(['
                   // Reg Rd for Floating Point Unit
                   // ======
                   //
-                  m4+operands(fpu_, /fpu_src, 3:1)
+                  /fpu
+                     m4+operands(fpu_, /fpu_src, 3:1)
                )
-            $replay = ($pending_replay m4_ifelse(M4_EXT_F, 1, ['|| $fpu_pending_replay']));
+            $replay = ($pending_replay m4_ifelse(M4_EXT_F, 1, ['|| /fpu$pending_replay']));
          
          // =======
          // Execute
@@ -3678,7 +3711,8 @@ m4+definitions(['
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m4_ifelse(M4_EXT_F, 1, ['&&  (! >>M4_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
             m4_ifelse_block(M4_EXT_F, 1, ['
-            $valid_dest_fpu_reg_valid = ($dest_fpu_reg_valid && $commit) || ($fpu_second_issue_div_sqrt || ($second_issue && >>M4_LD_RETURN_ALIGN$is_flw_instr));
+            /fpu
+               $valid_dest_reg_valid = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$second_issue && /instr>>M4_LD_RETURN_ALIGN$is_flw_instr));
             '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
@@ -3689,14 +3723,16 @@ m4+definitions(['
          // =========
          // Reg Write
          // =========
-         m4+rf_wr(/regs, $valid_dest_reg_valid, $dest_reg, $rslt, $reg_wr_pending)
+         m4+rf_wr(/regs, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
 
          // ======
          // FPU RF
          // ======
          m4+ifelse(M4_EXT_F, 1,
             \TLV
-               m4+rf_wr(/fpu_regs, $valid_dest_fpu_reg_valid, $dest_fpu_reg, $rslt, $reg_wr_pending)
+               /fpu
+                  // TODO: $reg_wr_pending can go under /fpu?
+                  m4+rf_wr(/regs, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
          @M4_REG_WR_STAGE
@@ -3713,39 +3749,39 @@ m4+definitions(['
    // Pending has an additional read for the dest register as we need to replay for write-after-write
    // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
    // bypass the dest reg's pending bit.
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$['']_rf['']bypass_avail1 = >>1$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[1] || >>1$second_issue);'])
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$['']_rf['']bypass_avail2 = >>2$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[2] || >>2$second_issue);'])
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$['']_rf['']bypass_avail3 = >>3$valid_dest_['']_rf['']reg_valid && ($GoodPathMask[3] || >>3$second_issue);'])
-   /_src[''][_src_range]
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue);'])
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue);'])
+   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue);'])
+   /src[_src_range]
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[M4_WORD_RANGE] =
-              m4_ifelse(M4_RF_STYLE, STUBBED, $pc, /instr/['']_rf['']regs[$reg]>>M4_REG_BYPASS_STAGES$value);
+              m4_ifelse(M4_RF_STYLE, STUBBED, $pc, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[M4_WORD_RANGE], $pending} =
             m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
             // Bypass stages. Both register and pending are bypassed.
             // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$['']_rf['']bypass_avail1 && (/instr>>1$dest_['']_rf['']reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$['']_rf['']bypass_avail2 && (/instr>>2$dest_['']_rf['']reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$['']_rf['']bypass_avail3 && (/instr>>3$dest_['']_rf['']reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-            {$rf_value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/['']_rf['']regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$bypass_avail1 && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$bypass_avail2 && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+            m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$bypass_avail3 && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+            {$rf_value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
          /* verilator lint_on WIDTH */
       // Replay if source register is pending.
       $replay = $is_reg_condition && $pending;
    
    // Also replay for pending dest reg to keep writes in order. Bypass dest reg pending to support this.
-   $is_dest_['']_rf['']condition = $dest_['']_rf['']reg_valid && /instr$valid_decode;
-   ?$is_dest_['']_rf['']condition
-      $dest_['']_rf['']pending =
+   $is_dest_condition = $dest_reg_valid && /instr$valid_decode;
+   ?$is_dest_condition
+      $dest_pending =
          m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
          // Bypass stages.
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($['']_rf['']bypass_avail1 && (>>1$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>1$reg_wr_pending :'])
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($['']_rf['']bypass_avail2 && (>>2$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>2$reg_wr_pending :'])
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($['']_rf['']bypass_avail3 && (>>3$dest_['']_rf['']reg == $dest_['']_rf['']reg)) ? >>3$reg_wr_pending :'])
-         m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/['']_rf['']regs[$dest_['']_rf['']reg]>>M4_REG_BYPASS_STAGES$pending']);
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($bypass_avail1 && (>>1$dest_reg == $dest_reg)) ? /instr>>1$reg_wr_pending :'])
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($bypass_avail2 && (>>2$dest_reg == $dest_reg)) ? /instr>>2$reg_wr_pending :'])
+         m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($bypass_avail3 && (>>3$dest_reg == $dest_reg)) ? /instr>>3$reg_wr_pending :'])
+         m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
    // Combine replay conditions for pending source or dest registers.
-   $['']_rf['']pending_replay = | /_src[*]$replay || ($is_dest_['']_rf['']condition && $dest_['']_rf['']pending);
+   $pending_replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
 
 
 
@@ -3776,7 +3812,7 @@ m4+definitions(['
          \TLV
             // Write $pending along with $value, but coded differently because it must be reset.
             /_hier[*]
-               <<1$pending = ! /instr$reset && (((#m4_strip_prefix(/_hier) == /instr$_waddr) && /instr$_we) ? /instr$_wpending : $pending);
+               <<1$pending = ! /instr$reset && (((#m4_strip_prefix(/_hier) == $_waddr) && $_we) ? $_wpending : $pending);
          )
    /* verilator lint_restore */
 
@@ -4350,16 +4386,16 @@ m4+definitions(['
             this.getObjects().instr_str.set({text: `${instr_str}`})
           },
    
-\TLV registers(_name, _heading, _sig_prefix, _num_srcs, _where_)
+\TLV registers(/_top, _name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
-   /['']_sig_prefix['']src[*]
+   /src[*]
       // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
       $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
-   /m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_HIER)
+   /regs[m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_RANGE)]
       \viz_js
          all: {
             box: {
@@ -4407,11 +4443,11 @@ m4+definitions(['
          },
          render() {
             // TODO: This is inefficient as is the same for every entry.
-            let mod = '/instr$valid_dest_['']_sig_prefix['']reg_valid'.asBool(false) && ('/instr$dest_['']_sig_prefix['']reg'.asInt(-1) == this.getIndex())
+            let mod = '/_top$valid_dest_reg_valid'.asBool(false) && ('/_top$dest_reg'.asInt(-1) == this.getIndex())
             let rs_valid = []
             let read_valid = false
             for (let i = 1; i <= _num_srcs; i++) {
-               rs_valid[i] = '/instr/['']_sig_prefix['']src[i]$unconditioned_is_reg'.asBool(false) && this.getIndex() === '/instr/['']_sig_prefix['']src[i]$unconditioned_reg'.asInt(-1)
+               rs_valid[i] = '/_top/src[i]$unconditioned_is_reg'.asBool(false) && this.getIndex() === '/_top/src[i]$unconditioned_reg'.asInt(-1)
                read_valid |= rs_valid[i]
             }
             let pending = m4_ifelse(M4_PENDING_ENABLED, 1, [''<<1$pending'.asBool(false)'], ['false'])
@@ -4637,6 +4673,7 @@ m4+definitions(['
                         //
                         // Draw all register bypass arcs from this cell into REG_RD.
                         //
+                        // TODO: Not implemented for FPU.
                         if (stage == M4_EXECUTE_STAGE + 1) {
                            for (bypassAmount = 1; bypassAmount <= M4_REG_BYPASS_STAGES; bypassAmount++) {
                               for (let rs = 1; rs <= 2; rs++) {
@@ -4852,8 +4889,8 @@ m4+definitions(['
                   ret += `\n      ${regStr("x", true, '/src[src]$unconditioned_reg'.asInt(NaN),     '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                }
                m4_ifelse_block(M4_EXT_F, 1, ['
-               if ('/fpu_src[src]$unconditioned_is_reg'.asBool(false)) {
-                  ret += `\n      ${regStr("f", true, '/fpu_src[src]$unconditioned_reg'.asInt(NaN), '/fpu_src[src]$unconditioned_reg_value'.asInt(NaN))}`
+               if ('/fpu/src[src]$unconditioned_is_reg'.asBool(false)) {
+                  ret += `\n      ${regStr("f", true, '/fpu/src[src]$unconditioned_reg'.asInt(NaN), '/fpu/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                }
                '])
                return ret
@@ -4861,7 +4898,7 @@ m4+definitions(['
             let dest_reg_valid = '$dest_reg_valid'.asBool(false)
             let str = `${regStr("x", dest_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
             m4_ifelse_block(M4_EXT_F, 1, ['
-            let dest_fpu_reg_valid = '$dest_fpu_reg_valid'.asBool(false)
+            let dest_fpu_reg_valid = '/fpu$dest_reg_valid'.asBool(false)
             if (dest_fpu_reg_valid) {
                str = `${regStr("f", dest_fpu_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
             }
@@ -4917,17 +4954,17 @@ m4+definitions(['
          let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
          let valid_dest_fpu_reg_valid = false
          m4_ifelse_block(M4_EXT_F, 1, ['
-         fpu_rs1_valid = '/fpu_src[1]$unconditioned_is_reg'.asBool()
-         fpu_rs2_valid = '/fpu_src[2]$unconditioned_is_reg'.asBool()
-         fpu_rs3_valid = '/fpu_src[3]$unconditioned_is_reg'.asBool()
-         let dest_fpu_reg = '$dest_fpu_reg'.asInt(0)
+         fpu_rs1_valid = '/fpu/src[1]$unconditioned_is_reg'.asBool()
+         fpu_rs2_valid = '/fpu/src[2]$unconditioned_is_reg'.asBool()
+         fpu_rs3_valid = '/fpu/src[3]$unconditioned_is_reg'.asBool()
+         let dest_fpu_reg = '/fpu$dest_reg'.asInt(0)
          newSrcArrow("fp_rs1", true, reg_addr1, fpu_rs1_valid, 1)
          newSrcArrow("fp_rs2", true, reg_addr2, fpu_rs2_valid, 2)
          newSrcArrow("fp_rs3", true, reg_addr3, fpu_rs3_valid, 3)
-         if (fpu_rs1_valid) {src1_value = '/fpu_src[1]$unconditioned_reg_value'.asInt()}
-         if (fpu_rs2_valid) {src2_value = '/fpu_src[2]$unconditioned_reg_value'.asInt()}
-         if (fpu_rs3_valid) {src3_value = '/fpu_src[3]$unconditioned_reg_value'.asInt()}
-         valid_dest_fpu_reg_valid = '$valid_dest_fpu_reg_valid'.asBool(false)
+         if (fpu_rs1_valid) {src1_value = '/fpu/src[1]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs2_valid) {src2_value = '/fpu/src[2]$unconditioned_reg_value'.asInt()}
+         if (fpu_rs3_valid) {src3_value = '/fpu/src[3]$unconditioned_reg_value'.asInt()}
+         valid_dest_fpu_reg_valid = '/fpu$valid_dest_reg_valid'.asBool(false)
          '])
          let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
          // rd Arrow
@@ -5248,10 +5285,14 @@ m4+definitions(['
             
          /instr
             m4+instruction(['left: 10, top: 0'])
-            m4+registers(int, Int RF, , 2, ['left: 350 + 605, top: 10'])
+            m4+registers(/instr, int, Int RF, , 2, ['left: 350 + 605, top: 10'])
             m4+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
             m4+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 265 + 18 * m4_num_csrs, width: 220, height: 330'])
-            m4_ifelse(M4_EXT_F, 1, ['m4+registers(fp, FP RF, fpu_, 3, ['left: 955 + M4_VIZ_MEM_LEFT_ADJUST, top: 10'])'])
+            m4+ifelse(M4_EXT_F, 1,
+               \TLV
+                  /fpu
+                     m4+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 955 + M4_VIZ_MEM_LEFT_ADJUST, top: 10'])
+               )
             m4+memory_viz(/bank[m4_eval(M4_ADDRS_PER_WORD-1):0] , /mem[M4_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
    m4_ifelse_block(M4_FORMAL, 1, ['
    m4+riscv_formal_viz(['rvfi_testbench'], ['left: 450, top: 50, width: 150, height: 130'])
@@ -5812,7 +5853,7 @@ m4+definitions(['
          }
    |rg_fifo_in
       @0
-         /entry[m4_eval(M4_MAX_PACKET_SIZE):0]
+         /entry[*]
             \viz_alpha
                initEach() {
                   let entry_node = new fabric.Circle({
