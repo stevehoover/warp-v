@@ -1,14 +1,12 @@
 import React, {useEffect} from "react";
-import {Box, Button, Heading, HStack, Image} from "@chakra-ui/react";
+import {Box, Button, Heading, HStack, Image, useToast} from "@chakra-ui/react";
 import {getTLVCodeForDefinitions, translateJsonToM4Macros, translateParametersToJson} from "../translation/Translation";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
-import {OpenInMakerchipModal} from "../../utils/FetchUtils";
+import {downloadFile, openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
+import useFetch from "../../utils/useFetch";
 
 export function WarpVPageBase({
                                   programText,
-                                  setProgramText,
-                                  formErrors,
-                                  setFormErrors,
                                   children,
                                   coreJson,
                                   macrosForJson,
@@ -18,14 +16,11 @@ export function WarpVPageBase({
                                   configuratorCustomProgramName,
                                   configuratorGlobalSettings,
                                   sVForJson,
-                                  getSVForTlv,
                                   setSVForJson,
                                   setConfiguratorGlobalSettings,
-                                  setDownloadingCode,
                                   setCoreJson,
                                   makerchipOpening,
                                   openInMakerchipUrl,
-                                  setDisclosureAndUrl,
                                   openInMakerchipDisclosure,
                                   selectedFile,
                                   setSelectedFile,
@@ -34,14 +29,15 @@ export function WarpVPageBase({
                                   setPipelineDefaultDepth,
                                   setUserChangedStages,
                                   pipelineDefaultDepth,
-                                  setMakerchipOpening,
                                   downloadingCode,
-                                  validateForm,
-                                  scrollToDetailsComponent,
-                                  handleDownloadRTLVerilogButtonClicked,
-                                  handleOpenInMakerchipButtonClicked
+                                  setFormErrors,
+                                  formErrors,
+                                  setMakerchipOpening,
+                                  setDownloadingCode,
+                                  setOpenInMakerchipUrl
                               }) {
-
+    const makerchipFetch = useFetch("https://faas.makerchip.com")
+    const toast = useToast()
 
     useEffect(() => {
         if (!coreJson) return
@@ -165,6 +161,99 @@ export function WarpVPageBase({
         }
     }, [configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings]);
 
+    function scrollToDetailsComponent() {
+        setSelectedFile("m4")
+        detailsComponentRef?.current?.scrollIntoView()
+    }
+
+    async function getSVForTlv(tlv, callback) {
+        const data = await makerchipFetch.post(
+            "/function/sandpiper-faas",
+            {
+                args: `-i test.tlv -o test.sv --iArgs --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
+                responseType: "json",
+                sv_url_inc: true,
+                files: {
+                    "test.tlv": tlv
+                }
+            },
+            false,
+        )
+        if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
+        else toast({
+            title: "Failed compilation",
+            status: "error"
+        })
+        setMacrosForJson(tlv.split("\n"))
+
+        if (data["out/test.sv"]) {
+            const verilog = data["out/test.sv"]
+                .replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
+                .split("\n")
+                .filter(line => !line.startsWith("`include \"sp_default.vh\""))
+                .join("\n")
+            callback(verilog)
+        }
+    }
+
+    function validateForm(err) {
+        if (!err) {
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return true
+        }
+
+        if (!configuratorGlobalSettings.generalSettings.depth && !formErrors.includes("depth")) {
+            setFormErrors([...formErrors, 'depth']);
+        } else {
+            if (formErrors.length !== 0) setFormErrors([]);
+            translateParametersToJson(configuratorGlobalSettings, setConfiguratorGlobalSettings);
+            const json = {
+                general: configuratorGlobalSettings.generalSettings,
+                pipeline: configuratorGlobalSettings.settings
+            };
+            if (JSON.stringify(coreJson) !== JSON.stringify(json)) setCoreJson(json);
+            return true
+        }
+
+        return null;
+    }
+
+    function handleOpenInMakerchipButtonClicked() {
+        if (validateForm(true)) {
+            setMakerchipOpening(true)
+            const macros = translateJsonToM4Macros(coreJson);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            openInMakerchip(tlv, setMakerchipOpening, setDisclosureAndUrl)
+        }
+    }
+
+    function handleDownloadRTLVerilogButtonClicked() {
+        if (validateForm(true)) {
+            const json = validateForm(true)
+            if (json) setConfiguratorGlobalSettings({
+                ...configuratorGlobalSettings,
+                coreJson: json
+            })
+            setDownloadingCode(true)
+            const macros = translateJsonToM4Macros(coreJson);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            getSVForTlv(tlv, sv => {
+                downloadFile('verilog.sv', sv);
+                setDownloadingCode(false)
+            });
+        }
+    }
+
+    function setDisclosureAndUrl(newUrl) {
+        setOpenInMakerchipUrl(newUrl)
+        openInMakerchipDisclosure.onOpen()
+    }
+
     return <>
         {children}
 
@@ -186,18 +275,16 @@ export function WarpVPageBase({
 
         </Box>
 
-        <div ref={detailsComponentRef}>
-            <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
-                                  settings={configuratorGlobalSettings.settings}
-                                  coreJson={coreJson}
-                                  tlvForJson={tlvForJson}
-                                  macrosForJson={macrosForJson}
-                                  sVForJson={sVForJson}
-                                  selectedFile={selectedFile}
-                                  setSelectedFile={setSelectedFile}
-                                  setDiscloureAndUrl={setDisclosureAndUrl}
-            />
-        </div>
+        <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
+                              settings={configuratorGlobalSettings.settings}
+                              coreJson={coreJson}
+                              tlvForJson={tlvForJson}
+                              macrosForJson={macrosForJson}
+                              sVForJson={sVForJson}
+                              selectedFile={selectedFile}
+                              setSelectedFile={setSelectedFile}
+                              setDiscloureAndUrl={setDisclosureAndUrl}
+        />
 
         <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure}/>
     </>

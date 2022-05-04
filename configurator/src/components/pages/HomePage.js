@@ -9,41 +9,22 @@ export const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters
 export const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)
 
 export default function HomePage({
-                                     getSVForTlv,
-                                     sVForJson,
-                                     setSVForJson,
-                                     tlvForJson,
-                                     macrosForJson,
-                                     setMacrosForJson,
-                                     setTlvForJson,
-                                     coreJson,
-                                     setCoreJson,
                                      configuratorGlobalSettings,
                                      setConfiguratorGlobalSettings,
-                                     configuratorCustomProgramName,
-                                     setConfiguratorCustomProgramName,
                                      programText,
                                      setProgramText,
                                      userChangedStages,
                                      setUserChangedStages,
-                                     scrollToDetailsComponent,
-                                     handleDownloadRTLVerilogButtonClicked,
-                                     downloadingCode,
-                                     handleOpenInMakerchipButtonClicked,
-                                     makerchipOpening,
-                                     detailsComponentRef,
-                                     openInMakerchipUrl,
-                                     openInMakerchipDisclosure,
-                                     selectedFile,
-                                     setSelectedFile,
-                                     setDisclosureAndUrl,
-                                     formErrors,
-                                     setFormErrors
+                                     formErrors
                                  }) {
     return <>
         <Box textAlign='center' mb={25}>
             <Image src='warpv-logo.png' maxW={250} mx='auto'/>
-            <Text>The open-source RISC-V core IP you can shape to your needs!</Text>
+            <Text mb={2}>The open-source RISC-V core IP you can shape to your needs!</Text>
+            <video controls autoPlay muted loop style={{"marginLeft": "auto", "marginRight": "auto", "width": "45%"}}>
+                <source src="WARP-V_VIZ.mp4" type="video/mp4"/>
+                Your browser does not support the video tag.
+            </video>
         </Box>
 
         <Heading textAlign='center' size='md' mb={5}>What CPU core can we build for you today?</Heading>
@@ -76,39 +57,6 @@ export default function HomePage({
                 warpVVersion: version
             }
         })} programText={programText} setProgramText={setProgramText}/>
-
-        <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
-            <Heading size='lg' mb={4}>Get your code:</Heading>
-            <HStack mb={3}>
-                <Button type="button" colorScheme="blue" onClick={scrollToDetailsComponent}>View Below</Button>
-                <Box>
-                    <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
-                            isLoading={downloadingCode} isDisabled={downloadingCode}>Download
-                        Verilog</Button>
-                </Box>
-                <Button type='button' colorScheme='blue' onClick={handleOpenInMakerchipButtonClicked}
-                        isLoading={makerchipOpening} isDisabled={makerchipOpening}>Open in Makerchip IDE</Button>
-            </HStack>
-
-            <Image src='makerchip-preview.png' w='350px'/>
-
-
-        </Box>
-
-        <div ref={detailsComponentRef}>
-            <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
-                                  settings={configuratorGlobalSettings.settings}
-                                  coreJson={coreJson}
-                                  tlvForJson={tlvForJson}
-                                  macrosForJson={macrosForJson}
-                                  sVForJson={sVForJson}
-                                  selectedFile={selectedFile}
-                                  setSelectedFile={setSelectedFile}
-                                  setDiscloureAndUrl={setDisclosureAndUrl}
-            />
-        </div>
-
-        <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure}/>
     </>;
 }
 
