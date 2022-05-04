@@ -45,16 +45,17 @@ function tlvM4OutputMapper(input, type) {
 export function getTLVCodeForDefinitions(definitions, programName, programText, isa, settings) {
     //console.log(settings)
     const verilatorConfig = new Set()
-    if (settings.isaExtensions.includes("F")) verilatorConfig.add("/* verilator lint_off WIDTH */")
-    if (settings.isaExtensions.includes("M")) {
-        verilatorConfig.add("/* verilator lint_off WIDTH */")
-        verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
-    }
-    if (settings.isaExtensions.includes("B")) {
-        verilatorConfig.add("/* verilator lint_off WIDTH */")
-        verilatorConfig.add("/* verilator lint_off PINMISSING */")
-        verilatorConfig.add("/* verilator lint_off SELRANGE */")
-    }
+    // These are now handled in warp-v itself:
+    //if (settings.isaExtensions.includes("F")) verilatorConfig.add("/* verilator lint_off WIDTH */")
+    //if (settings.isaExtensions.includes("M")) {
+    //    verilatorConfig.add("/* verilator lint_off WIDTH */")
+    //    verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
+    //}
+    //if (settings.isaExtensions.includes("B")) {
+    //    verilatorConfig.add("/* verilator lint_off WIDTH */")
+    //    verilatorConfig.add("/* verilator lint_off PINMISSING */")
+    //    verilatorConfig.add("/* verilator lint_off SELRANGE */")
+    //}
     if (settings.formattingSettings.includes("--fmtPackAll")) {
         verilatorConfig.add("/* verilator lint_on WIDTH */ // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613")
         verilatorConfig.delete("/* verilator lint_off WIDTH */")

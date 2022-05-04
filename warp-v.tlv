@@ -1104,8 +1104,8 @@ m4+definitions(['
    // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
    m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_M['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
    m4_ifelse(m4_eval(M4_EXT_M), 0, , /* verilator lint_off CASEINCOMPLETE */)
-   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off PINMISSING */)
-   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off SELRANGE */)
+   m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
+   m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
 
 
 
