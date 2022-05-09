@@ -28,14 +28,14 @@ formal:
       - public
 
 react-build:
-  stage: build
+  stage: test
   extends:
     - .react-build
   rules:
     - if: $CI_COMMIT_BRANCH != "main"
 
 pages:
-  stage: build
+  stage: test
   extends:
     - .react-build
   rules:
