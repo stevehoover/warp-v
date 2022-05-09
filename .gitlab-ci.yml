@@ -24,7 +24,7 @@ formal:
     - cd configurator
     - yarn
   script:
-    - yarn build/
+    - yarn build
     - cp -r build/ ../public/
   artifacts:
     paths:
