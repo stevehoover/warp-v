@@ -7,9 +7,11 @@ workflow:
 
 formal:
   stage: test
-  image: python:latest
+  image: ubuntu:jammy
   before_script:
     - export PATH="/root/.local/bin:$PATH"
+    - ./init
+    - apt-get install -y python3-pip
     - pip3 install sandpiper-saas --user
     - cd formal
     - ./make_env.sh
