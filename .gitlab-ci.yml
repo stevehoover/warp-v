@@ -9,6 +9,7 @@ formal:
   stage: test
   image: python:latest
   before_script:
+    - export PATH="/root/.local/bin:$PATH"
     - pip3 install sandpiper-saas --user
     - cd formal
     - ./make_env.sh
