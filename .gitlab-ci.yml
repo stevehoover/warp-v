@@ -1,0 +1,42 @@
+stages:
+  - test
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+formal:
+  stage: test
+  image: python:latest
+  before_script:
+    - pip3 install sandpiper-saas --user
+    - cd formal
+    - ./make_env.sh
+  script:
+    - make tos_agree verif
+
+.react-build:
+  image: node:18
+  before_script:
+    - cd configurator
+    - yarn
+  script:
+    - yarn build/
+    - cp -r build/ ../public/
+  artifacts:
+    paths:
+      - public
+
+react-build:
+  stage: build
+  extends:
+    - .react-build
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+
+pages:
+  stage: build
+  extends:
+    - .react-build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
