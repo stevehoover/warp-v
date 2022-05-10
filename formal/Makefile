@@ -9,7 +9,7 @@ export PATH:=$(shell pwd)/env/bin:$(PATH)
 
 # Agree to SandPiper ToS.
 tos_agree:
-	yes | sandpiper-saas
+	yes | sandpiper-saas -h > /dev/null
 
 # Run SandPiper-SaaS(TM).
 out/warp-v_formal.sv: ../warp-v.tlv
