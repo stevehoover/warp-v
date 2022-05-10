@@ -24,7 +24,7 @@ formal:
     - make tos_agree verif
 
 .react-build:
-  image: node:18
+  image: node:16
   before_script:
     - cd configurator
     - yarn --frozen-lockfile
