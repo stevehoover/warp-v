@@ -10,8 +10,12 @@ formal:
   image: ubuntu:jammy
   before_script:
     - export PATH="/root/.local/bin:$PATH"
+    - apt-get update
+    - apt-get install -y
+        git
+        python3-pip
+        sudo
     - ./init
-    - apt-get install -y python3-pip
     - pip3 install sandpiper-saas --user
     - cd formal
     - ./make_env.sh
@@ -22,7 +26,7 @@ formal:
   image: node:18
   before_script:
     - cd configurator
-    - yarn
+    - yarn --frozen-lockfile
   script:
     - yarn build
     - cp -r build/ ../public/
