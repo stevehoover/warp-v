@@ -29,7 +29,7 @@ formal:
     - cd configurator
     - yarn --frozen-lockfile
   script:
-    - yarn build
+    - CI=false yarn build
     - cp -r build/ ../public/
   artifacts:
     paths:
