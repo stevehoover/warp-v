@@ -45,6 +45,8 @@ BUILD_DIR=`pwd`
 echo "Build dir: $BUILD_DIR"
 
 # Yosys:
+echo -e "\e[0Ksection_start:`date +%s`:make-env-yosys[collapsed=true]\r\e[0KInstalling Yosys"
+
 check_previous_build "yosys"
 if [ $? -eq 1 ]; then
   git clone https://github.com/cliffordwolf/yosys.git && \
@@ -59,6 +61,7 @@ if [ $? -eq 1 ]; then
   touch PASSED
   STATUS[yosys]=$?
 fi
+echo -e "\e[0Ksection_end:`date +%s`:make-env-yosys\r\e[0K"
 
 ## RISCV-Formal:
 #cd "$BUILD_DIR"
@@ -71,6 +74,8 @@ fi
 #STATUS[riscv-formal]=$?
 
 # SymbiYosys:
+echo -e "\e[0Ksection_start:`date +%s`:make-env-symbiyosys[collapsed=true]\r\e[0KInstalling SymbiYosys"
+
 check_previous_build "SymbiYosys"
 if [ $? -eq 1 ]; then
   git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys && \
@@ -90,6 +95,8 @@ if [ $? -eq 1 ]; then
   STATUS[SymbiYosys]=$?
 fi
 
+echo -e "\e[0Ksection_end:`date +%s`:make-env-symbiyosys\r\e[0K"
+
 ## Z3
 #cd "$BUILD_DIR"
 #git clone https://github.com/Z3Prover/z3.git z3 && \
@@ -100,6 +107,8 @@ fi
 ## TODO: install
 
 # Boolector
+echo -e "\e[0Ksection_start:`date +%s`:make-env-boolector[collapsed=true]\r\e[0KInstalling Boolector"
+
 check_previous_build "boolector"
 if [ $? -eq 1 ]; then
   mkdir boolector && \
@@ -112,6 +121,8 @@ if [ $? -eq 1 ]; then
   touch ../PASSED
   STATUS[boolector]=$?
 fi
+
+echo -e "\e[0Ksection_end:`date +%s`:make-env-boolector\r\e[0K"
 
 cd "$BUILD_DIR"
 if (( ${STATUS[yosys]} || ${STATUS[SymbiYosys]} || ${STATUS[boolector]} )); then

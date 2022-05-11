@@ -18,7 +18,6 @@ formal:
         wget
     - export DEBIAN_FRONTEND=noninteractive
     - ./init
-    - pip3 install sandpiper-saas --user
     - cd formal
     - ./make_env.sh
   script:
