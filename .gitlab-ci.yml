@@ -7,19 +7,19 @@ workflow:
 
 formal:
   stage: test
-  image: ubuntu:jammy
+  image: gcr.io/hdl-containers/formal
   before_script:
     - export PATH="/root/.local/bin:$PATH"
-    - apt-get update
-    - apt-get install -y
-        git
-        python3-pip
-        sudo
-        wget
-    - export DEBIAN_FRONTEND=noninteractive
-    - ./init
+    # - apt-get update
+    # - apt-get install -y
+    #     git
+    #     python3-pip
+    #     sudo
+    #     wget
+    # - export DEBIAN_FRONTEND=noninteractive
+    # - ./init
     - cd formal
-    - ./make_env.sh
+    # - ./make_env.sh
   script:
     - make tos_agree verif
 
