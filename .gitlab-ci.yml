@@ -10,13 +10,13 @@ formal:
   image: gcr.io/hdl-containers/formal
   before_script:
     - export PATH="/root/.local/bin:$PATH"
-    # - apt-get update
-    # - apt-get install -y
-    #     git
-    #     python3-pip
-    #     sudo
-    #     wget
-    # - export DEBIAN_FRONTEND=noninteractive
+    - apt-get update
+    - apt-get install -y
+        git
+        python3-pip
+        sudo
+        wget
+    - export DEBIAN_FRONTEND=noninteractive
     - ./init
     - cd formal
     # - ./make_env.sh
