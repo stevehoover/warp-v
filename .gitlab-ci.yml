@@ -17,7 +17,7 @@ formal:
     #     sudo
     #     wget
     # - export DEBIAN_FRONTEND=noninteractive
-    # - ./init
+    - ./init
     - cd formal
     # - ./make_env.sh
   script:
