@@ -19,6 +19,7 @@ formal:
     - export DEBIAN_FRONTEND=noninteractive
     - ./init
     - cd formal
+    - mkdir env
     - touch env/PASSED
     # - ./make_env.sh
   script:
