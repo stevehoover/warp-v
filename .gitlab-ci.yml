@@ -19,6 +19,7 @@ formal:
     - export DEBIAN_FRONTEND=noninteractive
     - ./init
     - cd formal
+    - touch env/PASSED
     # - ./make_env.sh
   script:
     - make tos_agree verif
