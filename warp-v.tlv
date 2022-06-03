@@ -1565,7 +1565,7 @@ m4+definitions(['
          |fetch
             /instr
                @M4_DECODE_STAGE
-                  $raw[M4_INSTR_RANGE] = {$Pc, 2'b0};
+                  $raw[M4_INSTR_RANGE] = {$Pc, $Pc[31:30]};
       ,
       \TLV
          // Default to HARDCODED_ARRAY
@@ -2975,7 +2975,7 @@ m4+definitions(['
          @M4_MEM_WR_STAGE
             m4+ifelse(M4_DMEM_STYLE, STUBBED,
                \TLV
-                  $ld_value[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value : 32'b0;
+                  $ld_value[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value ^ $addr : 32'b0;
                   `BOGUS_USE($st_mask)
                , M4_DMEM_STYLE, SRAM,
                \TLV
@@ -3723,7 +3723,7 @@ m4+definitions(['
          // =========
          // Reg Write
          // =========
-         m4+rf_wr(/regs, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+         m4+rf_wr(/regs, M4_REGS_RANGE, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
 
          // ======
          // FPU RF
@@ -3732,7 +3732,7 @@ m4+definitions(['
             \TLV
                /fpu
                   // TODO: $reg_wr_pending can go under /fpu?
-                  m4+rf_wr(/regs, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+                  m4+rf_wr(/regs, M4_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
          @M4_REG_WR_STAGE
@@ -3756,7 +3756,7 @@ m4+definitions(['
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[M4_WORD_RANGE] =
-              m4_ifelse(M4_RF_STYLE, STUBBED, $pc, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
+              m4_ifelse(M4_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[M4_WORD_RANGE], $pending} =
             m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
@@ -3791,7 +3791,7 @@ m4+definitions(['
 // Controlling definitions:
 //    M4_PENDING_ENABLED
 //    M4_RF_STYLE
-\TLV rf_wr(/_hier, $_we, $_waddr, $_wdata, $_wpending)
+\TLV rf_wr(/_hier, _RANGE, $_we, $_waddr, $_wdata, $_wpending)
    /* verilator lint_save */
    /* verilator lint_on WIDTH */
    @M4_REG_WR_STAGE
@@ -3811,7 +3811,7 @@ m4+definitions(['
       m4+ifelse(M4_PENDING_ENABLED, 1,
          \TLV
             // Write $pending along with $value, but coded differently because it must be reset.
-            /_hier[*]
+            /regs[_RANGE]
                <<1$pending = ! /instr$reset && (((#m4_strip_prefix(/_hier) == $_waddr) && $_we) ? $_wpending : $pending);
          )
    /* verilator lint_restore */
@@ -4392,7 +4392,7 @@ m4+definitions(['
       // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
-      $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+      $unconditioned_reg[m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_INDEX_RANGE)] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
    /regs[m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_RANGE)]
@@ -4572,7 +4572,7 @@ m4+definitions(['
                   // To update diagram, save from https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit?usp=sharing
                   // Open in Inkscape. Delete background rect. Edit > Resize Page to Selection. Drag into GitHub file editor. Copy URL. Cancel edit. Paste here.
                   this.newImageFromURL(
-                      "https://user-images.githubusercontent.com/11302288/160441894-a3b3cc46-b5d0-497f-a415-84bf2a26c16d.svg",
+                      "https://raw.githubusercontent.com/stevehoover/warp-v_includes/fdc6b34be4da56b5e0d8874f71632de9cf663935/viz/pipeline_diagram.svg",
                       {left: 0, top: 0, width: 100, height: 57},
                   )
                
