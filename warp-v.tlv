@@ -5020,7 +5020,7 @@ m4+definitions(['
             strokeWidth: 3,
             visible: st_valid
          })
-         m4_ifelse_block(M4_FORMAL, 1, , ['
+         m4_ifelse_block(M4_FORMAL, 1, ,M4_IMEM_STYLE, EXTERN, , ['
          //
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
