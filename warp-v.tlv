@@ -4399,6 +4399,7 @@ m4+definitions(['
             })
             return {instr_asm_box, instr_binary_box, instr_str}
           },
+          m4_ifelse(IMEM_STYLE, EXTERN, , ['
           render() {
              // Instruction memory is constant, so just create it once.
             m4_ifelse_block(M4_ISA, ['MINI'], ['
@@ -4412,6 +4413,8 @@ m4+definitions(['
             '])
             this.getObjects().instr_str.set({text: `${instr_str}`})
           },
+          '])
+          
    
 \TLV registers(/_top, _name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
@@ -4655,7 +4658,7 @@ m4+definitions(['
                         !this.commit ? "gray" :
                                        "blue"
                      let pc = '/instr$pc'.step(step).asInt()
-                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', m4_ifelse(M4_IMEM_STYLE, EXTERN, "           " , '|fetch/instr_mem[pc]$instr_str')).step(step).asString("<UNKNOWN>")
+                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
                      this.getObjects().instr.set({
                         text: instr_str,
                         fill: color,
