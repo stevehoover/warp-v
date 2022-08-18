@@ -1560,6 +1560,7 @@ m4+definitions(['
                       .douta(>>1$$raw[M4_INSTR_RANGE]),        // Port A RAM output data, width determined from NB_COL*COL_WIDTH
                       .doutb()                              // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
+      , M4_IMEM_STYLE, EXTERN,
       \TLV
          |fetch
             /instr
