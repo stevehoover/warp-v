@@ -4399,7 +4399,7 @@ m4+definitions(['
             })
             return {instr_asm_box, instr_binary_box, instr_str}
           },
-          m4_ifelse(IMEM_STYLE, EXTERN, , ['
+          m4_ifelse(M4_IMEM_STYLE, EXTERN, , ['
           render() {
              // Instruction memory is constant, so just create it once.
             m4_ifelse_block(M4_ISA, ['MINI'], ['
