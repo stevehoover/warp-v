@@ -3027,7 +3027,7 @@ m4+definitions(['
                   *dmem_web   = 4'b0;
                   *dmem_wea0  = !(|*dmem_wea); // Active low write
                   *dmem_ena   = !$valid_st;  // Active low enable
-                  /_cpu|mem/data>>m4_stage_eval(-M4_ALIGNMENT_VALUE>>1)$$ld_value[M4_WORD_RANGE]  = *dmem_doutb;
+                  /_cpu|mem/data>>m4_stage_eval(-M4_ALIGNMENT_VALUE>>1)$$ld_data[M4_WORD_RANGE]  = *dmem_doutb;
                ,
                \TLV
                   // Array. Required for VIZ.
