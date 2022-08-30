@@ -3004,8 +3004,7 @@ m4+definitions(['
                       .regcea(1'b0),                        // Port A output register enable
                       .regceb($spec_ld),                    // Port B output register enable
                       .douta(),                             // Port A RAM output data, width determined from NB_COL*COL_WIDTH
-                      .doutb(/_cpu|mem/data>>m4_stage_eval(-M4_ALIGNMENT_VALUE>>1)$$ld_value[M4_WORD_RANGE])
-                                                            // Port B RAM output data, width determined from NB_COL*COL_WIDTH
+                      .doutb(>>1$$ld_data[M4_WORD_RANGE])   // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
                ,
                \TLV
