@@ -337,7 +337,7 @@ m4+definitions(['
          This can be enabled for testing in Makerchip environment.'],
      RISCV_FORMAL_ALTOPS, 0)
    m4_ifndef(
-      ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED'],
+      ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m4_ifelse(M4_IMPL, 0, HARDCODED_ARRAY, SRAM),
       ['# DMem style: SRAM, ARRAY, STUBBED'],
       DMEM_STYLE, m4_ifelse(M4_IMPL, 0, ARRAY, SRAM),
@@ -1560,6 +1560,16 @@ m4+definitions(['
                       .douta(>>1$$raw[M4_INSTR_RANGE]),        // Port A RAM output data, width determined from NB_COL*COL_WIDTH
                       .doutb()                              // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
+      , M4_IMEM_STYLE, EXTERN,
+      \TLV
+         |fetch
+            /instr
+               @M4_FETCH_STAGE
+                  ?$fetch
+                     *imem_addr = $next_pc;
+               @m4_eval(M4_FETCH_STAGE + 1)
+                  ?$fetch
+                     $raw[M4_INSTR_RANGE] = *imem_data;
       , M4_IMEM_STYLE, STUBBED,
       \TLV
          |fetch
@@ -3006,6 +3016,18 @@ m4+definitions(['
                       .douta(),                             // Port A RAM output data, width determined from NB_COL*COL_WIDTH
                       .doutb(>>1$$ld_data[M4_WORD_RANGE])   // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
+               , M4_DMEM_STYLE, EXTERN,
+               \TLV  
+                  *dmem_addrb = $addr;
+                  *dmem_enb   = !$valid_ld;  // Active low enable
+                  *dmem_addra = $addr;
+                  *dmem_dina  = $st_value;
+                  *dmem_dinb  = 32'b0;
+                  *dmem_wea   = {4{$valid_st}} & $st_mask;
+                  *dmem_web   = 4'b0;
+                  *dmem_wea0  = !(|*dmem_wea); // Active low write
+                  *dmem_ena   = !$valid_st;  // Active low enable
+                  >>1$ld_data[M4_WORD_RANGE]  = *dmem_doutb;
                ,
                \TLV
                   // Array. Required for VIZ.
@@ -4376,6 +4398,7 @@ m4+definitions(['
             })
             return {instr_asm_box, instr_binary_box, instr_str}
           },
+          m4_ifelse(M4_IMEM_STYLE, EXTERN, , ['
           render() {
              // Instruction memory is constant, so just create it once.
             m4_ifelse_block(M4_ISA, ['MINI'], ['
@@ -4389,6 +4412,8 @@ m4+definitions(['
             '])
             this.getObjects().instr_str.set({text: `${instr_str}`})
           },
+          '])
+          
    
 \TLV registers(/_top, _name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
@@ -4632,7 +4657,7 @@ m4+definitions(['
                         !this.commit ? "gray" :
                                        "blue"
                      let pc = '/instr$pc'.step(step).asInt()
-                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
+                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', M4_IMEM_STYLE, EXTERN, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
                      this.getObjects().instr.set({
                         text: instr_str,
                         fill: color,
@@ -4994,7 +5019,7 @@ m4+definitions(['
             strokeWidth: 3,
             visible: st_valid
          })
-         m4_ifelse_block(M4_FORMAL, 1, , ['
+         m4_ifelse_block(M4_FORMAL, 1, ,M4_IMEM_STYLE, EXTERN, , ['
          //
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
