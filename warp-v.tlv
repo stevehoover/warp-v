@@ -2986,7 +2986,7 @@ m4+definitions(['
             /* DMEM_STYLE: M4_DMEM_STYLE */
             m4+ifelse(M4_DMEM_STYLE, STUBBED,
                \TLV
-                  $ld_value[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value ^ $addr : 32'b0;
+                  $ld_data[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value ^ $addr : 32'b0;
                   `BOGUS_USE($st_mask)
                , M4_DMEM_STYLE, SRAM,
                \TLV
