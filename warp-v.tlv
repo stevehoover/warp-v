@@ -5025,8 +5025,8 @@ m4+definitions(['
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
-                  top: 18 * pc + 50,
-                  left: 630,
+                  top: 18 * pc + 60,
+                  left: 361,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
