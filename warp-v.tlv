@@ -1098,7 +1098,7 @@ m4+definitions(['
 '])
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/cc27801ff64687d54094da698ed28c40351ed288/risc-v_defs.tlv'])'])
+   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7b13f554709dcfa7f4245d9e75da62277bdd593a/risc-v_defs.tlv'])'])
    
    // Heavy-handed lint_off's based on config.
    // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
@@ -1590,7 +1590,8 @@ m4+definitions(['
             m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instrs[m4_instr_ind] = m4_echo(['m4_instr']m4_instr_ind); '])
             
             // String representations of the instructions for debug.
-            assign instr_strs = '{m4_asm_mem_expr "END                                     "};
+            m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instr_strs[m4_instr_ind] = "m4_echo(['m4_instr_str']m4_instr_ind)"; '])
+            assign instr_strs[M4_NUM_INSTRS] = "END                                     ";
          
          |fetch
             m4+ifelse(M4_VIZ, 1,
