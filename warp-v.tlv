@@ -1516,6 +1516,7 @@ m4+definitions(['
    // IMem and Fetch
    // ==============
    
+   /* DMEM_STYLE: M4_DMEM_STYLE, FORMAL: M4_FORMAL */
    m4+ifelse(M4_FORMAL, 1,
       \TLV
          // For formal
@@ -3000,7 +3001,7 @@ m4+definitions(['
                       .RAM_DEPTH(M4_DATA_MEM_WORDS_HIGH),   // Specify RAM depth (number of entries)
                       .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
                       .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
-                    ) imem (
+                    ) dmem (
                       .addra($addr),                        // Port A address bus, width determined from RAM_DEPTH
                       .addrb($addr),                        // Port B address bus, width determined from RAM_DEPTH
                       .dina($st_value),                     // Port A RAM input data, width determined from NB_COL*COL_WIDTH
@@ -3026,7 +3027,7 @@ m4+definitions(['
                   *dmem_dinb  = 32'b0;
                   *dmem_wea   = {4{$valid_st}} & $st_mask;
                   *dmem_web   = 4'b0;
-                  *dmem_wea0  = !(|*dmem_wea); // Active low write
+                  *dmem_wea0  = !(| *dmem_wea); // Active low write
                   *dmem_ena   = !$valid_st;  // Active low enable
                   >>1$ld_data[M4_WORD_RANGE]  = *dmem_doutb;
                ,
@@ -4603,6 +4604,7 @@ m4+definitions(['
                   // Open in Inkscape. Delete background rect. Edit > Resize Page to Selection. Drag into GitHub file editor. Copy URL. Cancel edit. Paste here.
                   this.newImageFromURL(
                       "https://raw.githubusercontent.com/stevehoover/warp-v_includes/fdc6b34be4da56b5e0d8874f71632de9cf663935/viz/pipeline_diagram.svg",
+                      "",
                       {left: 0, top: 0, width: 100, height: 57},
                   )
                
