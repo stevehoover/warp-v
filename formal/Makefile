@@ -3,6 +3,7 @@
 SHELL=/bin/bash
 
 export PATH:=$(shell pwd)/env/bin:$(PATH)
+NPROC?=$(shell nproc)
 
 .PHONY: all clean compile verif env riscv-formal
 
@@ -39,7 +40,7 @@ verif: checks.cfg out/warp-v_formal.sv env riscv-formal
 	@#python3 riscv-formal/checks/genchecks.py --basedir riscv-formal
 	bison --version
 	python3 $(CURDIR)/riscv-formal/checks/genchecks.py checks $(CURDIR)/riscv-formal
-	$(MAKE) -k -C checks -j$$(nproc)
+	$(MAKE) -k -C checks -j$(NPROC)
 
 all: verif
 
