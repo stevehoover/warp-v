@@ -23,7 +23,7 @@ formal:
     - touch env/PASSED
     # - ./make_env.sh
   script:
-    - make tos_agree verif
+    - NPROC=1 make tos_agree verif
 
 .react-build:
   image: node:16
