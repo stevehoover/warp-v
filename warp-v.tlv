@@ -5300,7 +5300,7 @@ m4+definitions(['
            },
       where: {_where_},
          
-   //////// VIZUALIZING THE MAIN CPU //////////////
+//////// VIZUALIZING THE MAIN CPU //////////////
 \TLV cpu_viz(/_des_pipe, _fill_color)
    /* CPU_VIZ HERE */
    m4_def(viz_logic_macro_name, M4_isa['_viz_logic'])
@@ -5523,7 +5523,7 @@ m4+definitions(['
    
    
    
-         //////// VIZUALIZING THE INSERTION RING //////////////
+//////// VIZUALIZING THE INSERTION RING //////////////
 \TLV ring_viz(/_name)
    m4_define(['M4_RINGVIZ_REF_TOP'],-100)
    m4_define(['M4_RINGVIZ_REF_LEFT'],700)
