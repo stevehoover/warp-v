@@ -6,6 +6,8 @@ workflow:
     - if: $CI_COMMIT_BRANCH
 
 formal:
+  tags:
+    - size-md
   stage: test
   image: gcr.io/hdl-containers/formal
   before_script:
@@ -19,13 +21,15 @@ formal:
     - export DEBIAN_FRONTEND=noninteractive
     - ./init
     - cd formal
-    # - mkdir env
-    # - touch env/PASSED
-    - ./make_env.sh
+    - mkdir env
+    - touch env/PASSED
+    # - ./make_env.sh
   script:
     - NPROC=1 make tos_agree verif
 
 .react-build:
+  tags:
+    - size-md
   image: node:16
   before_script:
     - cd configurator
@@ -38,6 +42,8 @@ formal:
       - public
 
 react-build:
+  tags:
+    - size-md
   stage: test
   extends:
     - .react-build
