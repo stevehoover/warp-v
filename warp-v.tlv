@@ -337,10 +337,10 @@ m4+definitions(['
          This can be enabled for testing in Makerchip environment.'],
      RISCV_FORMAL_ALTOPS, 0)
    m4_ifndef(
-      ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED'],
+      ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m4_ifelse(M4_IMPL, 0, HARDCODED_ARRAY, SRAM),
       ['# DMem style: SRAM, ARRAY, STUBBED'],
-      DMEM_STYLE, m4ifelse(M4_IMPL, 0, ARRAY, SRAM),
+      DMEM_STYLE, m4_ifelse(M4_IMPL, 0, ARRAY, SRAM),
       ['# RF style: ARRAY, STUBBED'],
       RF_STYLE, ARRAY)
 
@@ -1098,7 +1098,7 @@ m4+definitions(['
 '])
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/cc27801ff64687d54094da698ed28c40351ed288/risc-v_defs.tlv'])'])
+   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7b13f554709dcfa7f4245d9e75da62277bdd593a/risc-v_defs.tlv'])'])
    
    // Heavy-handed lint_off's based on config.
    // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
@@ -1516,6 +1516,7 @@ m4+definitions(['
    // IMem and Fetch
    // ==============
    
+   /* DMEM_STYLE: M4_DMEM_STYLE, FORMAL: M4_FORMAL */
    m4+ifelse(M4_FORMAL, 1,
       \TLV
          // For formal
@@ -1560,12 +1561,22 @@ m4+definitions(['
                       .douta(>>1$$raw[M4_INSTR_RANGE]),        // Port A RAM output data, width determined from NB_COL*COL_WIDTH
                       .doutb()                              // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
+      , M4_IMEM_STYLE, EXTERN,
+      \TLV
+         |fetch
+            /instr
+               @M4_FETCH_STAGE
+                  ?$fetch
+                     *imem_addr = $next_pc;
+               @m4_eval(M4_FETCH_STAGE + 1)
+                  ?$fetch
+                     $raw[M4_INSTR_RANGE] = *imem_data;
       , M4_IMEM_STYLE, STUBBED,
       \TLV
          |fetch
             /instr
                @M4_DECODE_STAGE
-                  $raw[M4_INSTR_RANGE] = {$Pc, 2'b0};
+                  $raw[M4_INSTR_RANGE] = {$Pc, $Pc[31:30]};
       ,
       \TLV
          // Default to HARDCODED_ARRAY
@@ -1580,7 +1591,8 @@ m4+definitions(['
             m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instrs[m4_instr_ind] = m4_echo(['m4_instr']m4_instr_ind); '])
             
             // String representations of the instructions for debug.
-            assign instr_strs = '{m4_asm_mem_expr "END                                     "};
+            m4_forloop(['m4_instr_ind'], 0, M4_NUM_INSTRS, ['assign instr_strs[m4_instr_ind] = "m4_echo(['m4_instr_str']m4_instr_ind)"; '])
+            assign instr_strs[M4_NUM_INSTRS] = "END                                     ";
          
          |fetch
             m4+ifelse(M4_VIZ, 1,
@@ -2973,9 +2985,10 @@ m4+definitions(['
          // Load
          // ====
          @M4_MEM_WR_STAGE
+            /* DMEM_STYLE: M4_DMEM_STYLE */
             m4+ifelse(M4_DMEM_STYLE, STUBBED,
                \TLV
-                  $ld_value[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value : 32'b0;
+                  $ld_data[M4_WORD_RANGE] = <<1$valid_st ? <<1$st_value ^ $addr : 32'b0;
                   `BOGUS_USE($st_mask)
                , M4_DMEM_STYLE, SRAM,
                \TLV
@@ -2988,23 +3001,35 @@ m4+definitions(['
                       .RAM_DEPTH(M4_DATA_MEM_WORDS_HIGH),   // Specify RAM depth (number of entries)
                       .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
                       .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
-                    ) imem (
+                    ) dmem (
                       .addra($addr),                        // Port A address bus, width determined from RAM_DEPTH
                       .addrb($addr),                        // Port B address bus, width determined from RAM_DEPTH
-                      .dina($st_data),                      // Port A RAM input data, width determined from NB_COL*COL_WIDTH
+                      .dina($st_value),                     // Port A RAM input data, width determined from NB_COL*COL_WIDTH
                       .dinb(32'b0),                         // Port B RAM input data, width determined from NB_COL*COL_WIDTH
                       .clka(clk),                           // Clock
                       .wea({4{$valid_st}} & $st_mask),      // Port A write enable, width determined from NB_COL
                       .web(4'b0),                           // Port B write enable, width determined from NB_COL
                       .ena($valid_st),                      // Port A RAM Enable, for additional power savings, disable port when not in use
-                      .enb($ld_valid),                      // Port B RAM Enable, for additional power savings, disable port when not in use
+                      .enb($spec_ld),                       // Port B RAM Enable, for additional power savings, disable port when not in use
                       .rsta(1'b0),                          // Port A output reset (does not affect memory contents)
                       .rstb(1'b0),                          // Port B output reset (does not affect memory contents)
                       .regcea(1'b0),                        // Port A output register enable
-                      .regceb($ld_valid),                   // Port B output register enable
+                      .regceb($spec_ld),                    // Port B output register enable
                       .douta(),                             // Port A RAM output data, width determined from NB_COL*COL_WIDTH
-                      .doutb(>>1$$ld_valid[M4_WORD_RANGE])  // Port B RAM output data, width determined from NB_COL*COL_WIDTH
+                      .doutb(>>1$$ld_data[M4_WORD_RANGE])   // Port B RAM output data, width determined from NB_COL*COL_WIDTH
                     );
+               , M4_DMEM_STYLE, EXTERN,
+               \TLV  
+                  *dmem_addrb = $addr;
+                  *dmem_enb   = !$valid_ld;  // Active low enable
+                  *dmem_addra = $addr;
+                  *dmem_dina  = $st_value;
+                  *dmem_dinb  = 32'b0;
+                  *dmem_wea   = {4{$valid_st}} & $st_mask;
+                  *dmem_web   = 4'b0;
+                  *dmem_wea0  = !(| *dmem_wea); // Active low write
+                  *dmem_ena   = !$valid_st;  // Active low enable
+                  >>1$ld_data[M4_WORD_RANGE]  = *dmem_doutb;
                ,
                \TLV
                   // Array. Required for VIZ.
@@ -3012,7 +3037,7 @@ m4+definitions(['
                      $ANY = /instr$ANY; // Find signal from outside of /bank.
                      /mem[M4_DATA_MEM_WORDS_RANGE]
                      ?$spec_ld
-                        $ld_value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Value;
+                        $ld_data[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] = /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]$Value;
 
                      // Array writes are not currently permitted to use assignment
                      // syntax, so \always_comb is used, and this must be outside of
@@ -3028,11 +3053,11 @@ m4+definitions(['
                            if ($valid_st && $st_mask[#bank])
                               /mem[$addr[M4_DATA_MEM_WORDS_INDEX_MAX + M4_SUB_WORD_BITS : M4_SUB_WORD_BITS]]<<0$$^Value[(M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (M4_WORD_HIGH / M4_ADDRS_PER_WORD) - 1: #bank * (M4_WORD_HIGH / M4_ADDRS_PER_WORD)];
                         end
-                  // Combine $ld_value per bank, assuming little-endian.
-                  //$ld_value[M4_WORD_RANGE] = /bank[*]$ld_value;
+                  // Combine $ld_data per bank, assuming little-endian.
+                  //$ld_data[M4_WORD_RANGE] = /bank[*]$ld_data;
                   // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
                   // build the concatination.
-                  $ld_value[M4_WORD_RANGE] = {m4_forloop(['m4_ind'], 0, M4_ADDRS_PER_WORD, ['m4_ifelse(m4_ind, 0, [''], [', '])/bank[m4_eval(M4_ADDRS_PER_WORD - m4_ind - 1)]$ld_value'])};
+                  $ld_data[M4_WORD_RANGE] = {m4_forloop(['m4_ind'], 0, M4_ADDRS_PER_WORD, ['m4_ifelse(m4_ind, 0, [''], [', '])/bank[m4_eval(M4_ADDRS_PER_WORD - m4_ind - 1)]$ld_data'])};
                )
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -3050,6 +3075,9 @@ m4+definitions(['
                      ///src[2:1]
                      //   $ANY = /_cpu|fetch/instr/fpu/src>>M4_ALIGNMENT_VALUE$ANY;
                )
+         // For consistency with other memories, assign $ld_value in @M4_MEM_WR_STAGE+1. 
+         @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE + 1)
+            $ld_value[M4_WORD_RANGE] = /_cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ld_data;
 
 
 
@@ -3723,7 +3751,7 @@ m4+definitions(['
          // =========
          // Reg Write
          // =========
-         m4+rf_wr(/regs, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+         m4+rf_wr(/regs, M4_REGS_RANGE, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
 
          // ======
          // FPU RF
@@ -3732,7 +3760,7 @@ m4+definitions(['
             \TLV
                /fpu
                   // TODO: $reg_wr_pending can go under /fpu?
-                  m4+rf_wr(/regs, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+                  m4+rf_wr(/regs, M4_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
          @M4_REG_WR_STAGE
@@ -3756,7 +3784,7 @@ m4+definitions(['
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[M4_WORD_RANGE] =
-              m4_ifelse(M4_RF_STYLE, STUBBED, $pc, /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
+              m4_ifelse(M4_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[M4_WORD_RANGE], $pending} =
             m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
@@ -3791,7 +3819,7 @@ m4+definitions(['
 // Controlling definitions:
 //    M4_PENDING_ENABLED
 //    M4_RF_STYLE
-\TLV rf_wr(/_hier, $_we, $_waddr, $_wdata, $_wpending)
+\TLV rf_wr(/_hier, _RANGE, $_we, $_waddr, $_wdata, $_wpending)
    /* verilator lint_save */
    /* verilator lint_on WIDTH */
    @M4_REG_WR_STAGE
@@ -3811,7 +3839,7 @@ m4+definitions(['
       m4+ifelse(M4_PENDING_ENABLED, 1,
          \TLV
             // Write $pending along with $value, but coded differently because it must be reset.
-            /_hier[*]
+            /regs[_RANGE]
                <<1$pending = ! /instr$reset && (((#m4_strip_prefix(/_hier) == $_waddr) && $_we) ? $_wpending : $pending);
          )
    /* verilator lint_restore */
@@ -4372,6 +4400,7 @@ m4+definitions(['
             })
             return {instr_asm_box, instr_binary_box, instr_str}
           },
+          m4_ifelse(M4_IMEM_STYLE, EXTERN, , ['
           render() {
              // Instruction memory is constant, so just create it once.
             m4_ifelse_block(M4_ISA, ['MINI'], ['
@@ -4385,6 +4414,8 @@ m4+definitions(['
             '])
             this.getObjects().instr_str.set({text: `${instr_str}`})
           },
+          '])
+          
    
 \TLV registers(/_top, _name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
@@ -4392,7 +4423,7 @@ m4+definitions(['
       // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
-      $unconditioned_reg[M4_REGS_INDEX_RANGE] = $reg;
+      $unconditioned_reg[m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_INDEX_RANGE)] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[M4_WORD_RANGE] = $reg_value;
    /regs[m4_echo(['M4_']m4_to_upper(_sig_prefix)REGS_RANGE)]
@@ -4572,7 +4603,8 @@ m4+definitions(['
                   // To update diagram, save from https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit?usp=sharing
                   // Open in Inkscape. Delete background rect. Edit > Resize Page to Selection. Drag into GitHub file editor. Copy URL. Cancel edit. Paste here.
                   this.newImageFromURL(
-                      "https://user-images.githubusercontent.com/11302288/160441894-a3b3cc46-b5d0-497f-a415-84bf2a26c16d.svg",
+                      "https://raw.githubusercontent.com/stevehoover/warp-v_includes/fdc6b34be4da56b5e0d8874f71632de9cf663935/viz/pipeline_diagram.svg",
+                      "",
                       {left: 0, top: 0, width: 100, height: 57},
                   )
                
@@ -4628,7 +4660,7 @@ m4+definitions(['
                         !this.commit ? "gray" :
                                        "blue"
                      let pc = '/instr$pc'.step(step).asInt()
-                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
+                     let instr_str = m4_ifelse(M4_FORMAL, 1, "           " + '/instr$mnemonic', M4_IMEM_STYLE, EXTERN, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
                      this.getObjects().instr.set({
                         text: instr_str,
                         fill: color,
@@ -4990,13 +5022,13 @@ m4+definitions(['
             strokeWidth: 3,
             visible: st_valid
          })
-         m4_ifelse_block(M4_FORMAL, 1, , ['
+         m4_ifelse_block(M4_FORMAL, 1, ,M4_IMEM_STYLE, EXTERN, , ['
          //
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
-                  top: 18 * pc + 50,
-                  left: 630,
+                  top: 18 * pc + 60,
+                  left: 361,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
@@ -5125,151 +5157,150 @@ m4+definitions(['
    
 
 \TLV memory_viz(/_bank_size, /_mem_size, _where_)
-   /_mem_size
-      \viz_js
-         all: {
-            box: {
-               fill: "#208028",
-               width: 190,
-               height: 650,
-               stroke: "black",
-               strokeWidth: 0
-            },
-            init() {
-               let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
-                  top: 10,
-                  left: 10, // Center aligned
-                  fontSize: 20,
-                  fontWeight: 800,
-                  fontFamily: "monospace",
-                  fill: "white"
-               })
-               return {dmem_header}
-            },
-         },
-         where: {_where_},
-         where0: {left: 10, top: 80},
-         box: {
-               fill: "white",
-               width: 40,
-               height: 14,
-               strokeWidth: 0
-            },
-         layout: {top: 17}, //vertically
-         init() {
-            let index =
-               new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
-                  left: 10,
-                  fontSize: 14,
-                  fontFamily: "monospace"
-               })
-            return {index}
-         }
-   /_bank_size
-      \viz_js
-         box: {strokeWidth: 0},
-         all: {
-            box: {
-                  width: 190,
-                  height: 650,
-                  stroke: "black",
-                  strokeWidth: 0
-                 },
-            init() {
-               let bankname = new fabric.Text("bank", {
-                  top: 40,
-                  left: 100,
-                  fontSize: 14,
-                  fontWeight: 800,
-                  fontFamily: "monospace",
-                  fill: "black"
-               })
-               return {bankname}
-            }
-         },
-         where: {_where_},
-         where0: {left: 150, top: 60},
-         init() {
-            let banknum = new fabric.Text(String(this.scopes.bank.index), {
-               top: -19,
-               left: 10,
-               fontSize: 14,
-               fontWeight: 800,
-               fontFamily: "monospace",
-               fill: "black"
-            })
-            return {banknum}
-         },
-         render() {
-            // Update write address highlighting.
-            // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
-            // Unhighlight
-            let unhighlight_addr = this.highlighted_addr
-            let unhighlight = typeof unhighlight_addr != "undefined"
-            let valid_ld = '/instr$valid_ld'.asBool(false)
-            let valid_st = '/instr$valid_st'.asBool(false)
-            let st_mask = '/instr$st_mask'.asInt(0)
-            let addr = '/instr$addr'.asInt(-1) >> 2 // (word-address)
-            let color = valid_st ? "#b0ffff" : "#b0ffff"
-            let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
-            // Re-highlight index.
-            if (unhighlight) {
-               this.scopes.instr.children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
-            }
-            if (highlight) {
-               this.scopes.instr.children.mem.children[addr].initObjects.box.set({fill: color})
-            }
-            for (let i = 0; i < 4; i++) {
-               if (unhighlight) {
-                  this.scopes.instr.children.bank.children[i].children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
+   m4+ifelse(M4_DMEM_STYLE, ARRAY,
+      \TLV
+         /_mem_size
+            \viz_js
+               all: {
+                  box: {
+                     fill: "#208028",
+                     width: 190,
+                     height: 650,
+                     stroke: "black",
+                     strokeWidth: 0
+                  },
+                  init() {
+                     let dmem_header = new fabric.Text("🗃️ DMem (hex)", {
+                        top: 10,
+                        left: 10, // Center aligned
+                        fontSize: 20,
+                        fontWeight: 800,
+                        fontFamily: "monospace",
+                        fill: "white"
+                     })
+                     return {dmem_header}
+                  },
+               },
+               where: {_where_},
+               where0: {left: 10, top: 80},
+               box: {
+                     fill: "white",
+                     width: 40,
+                     height: 14,
+                     strokeWidth: 0
+                  },
+               layout: {top: 17}, //vertically
+               init() {
+                  let index =
+                     new fabric.Text(parseInt(this.getIndex()).toString() + ":", {
+                        left: 10,
+                        fontSize: 14,
+                        fontFamily: "monospace"
+                     })
+                  return {index}
                }
-               if (highlight && ((st_mask >> i) & 1 != 0)) {
-                  this.scopes.instr.children.bank.children[i].children.mem.children[addr].initObjects.box.set({fill: color})
-               }
-            }
-            this.highlighted_addr = highlight ? addr : undefined
-         },
-         layout: {left: -30},
-      /_mem_size
-         \viz_js
-            box: {
-                  fill: "white",
-                  width: 30,
-                  height: 16,
-                  stroke: "#208028",
-                  strokeWidth: 0.75
-                 },
-            layout: {top: 17},
-            init() {
-               let data = new fabric.Text("", {
-                  top: 2,
-                  left: 6,
-                  fontSize: 14,
-                  fontFamily: "monospace"
-               })
-               return {data}
-            },
-            render() {
-               let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.scopes.bank.index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
-               //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
-               this.getInitObject("data").set({text: '$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0")})
-               this.getInitObject("data").set({fill: mod ? "blue" : "black"})
-            }
-         
+         /_bank_size
+            \viz_js
+               box: {strokeWidth: 0},
+               all: {
+                  box: {
+                        width: 190,
+                        height: 650,
+                        stroke: "black",
+                        strokeWidth: 0
+                       },
+                  init() {
+                     let bankname = new fabric.Text("bank", {
+                        top: 40,
+                        left: 100,
+                        fontSize: 14,
+                        fontWeight: 800,
+                        fontFamily: "monospace",
+                        fill: "black"
+                     })
+                     return {bankname}
+                  }
+               },
+               where: {_where_},
+               where0: {left: 150, top: 60},
+               init() {
+                  let banknum = new fabric.Text(String(this.scopes.bank.index), {
+                     top: -19,
+                     left: 10,
+                     fontSize: 14,
+                     fontWeight: 800,
+                     fontFamily: "monospace",
+                     fill: "black"
+                  })
+                  return {banknum}
+               },
+               render() {
+                  // Update write address highlighting.
+                  // (We record and clear the old highlighting (in this.fromInit()) so we don't have to render each instruction individually.)
+                  // Unhighlight
+                  let unhighlight_addr = this.highlighted_addr
+                  let unhighlight = typeof unhighlight_addr != "undefined"
+                  let valid_ld = '/instr$valid_ld'.asBool(false)
+                  let valid_st = '/instr$valid_st'.asBool(false)
+                  let st_mask = '/instr$st_mask'.asInt(0)
+                  let addr = '/instr$addr'.asInt(-1) >> 2 // (word-address)
+                  let color = valid_st ? "#b0ffff" : "#b0ffff"
+                  let highlight = (valid_ld || valid_st) && (addr >= M4_DATA_MEM_WORDS_MIN && addr <= M4_DATA_MEM_WORDS_MAX)
+                  // Re-highlight index.
+                  if (unhighlight) {
+                     this.scopes.instr.children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
+                  }
+                  if (highlight) {
+                     this.scopes.instr.children.mem.children[addr].initObjects.box.set({fill: color})
+                  }
+                  for (let i = 0; i < 4; i++) {
+                     if (unhighlight) {
+                        this.scopes.instr.children.bank.children[i].children.mem.children[unhighlight_addr].initObjects.box.set({fill: "white"})
+                     }
+                     if (highlight && ((st_mask >> i) & 1 != 0)) {
+                        this.scopes.instr.children.bank.children[i].children.mem.children[addr].initObjects.box.set({fill: color})
+                     }
+                  }
+                  this.highlighted_addr = highlight ? addr : undefined
+               },
+               layout: {left: -30},
+            /_mem_size
+               \viz_js
+                  box: {
+                        fill: "white",
+                        width: 30,
+                        height: 16,
+                        stroke: "#208028",
+                        strokeWidth: 0.75
+                       },
+                  layout: {top: 17},
+                  init() {
+                     let data = new fabric.Text("", {
+                        top: 2,
+                        left: 6,
+                        fontSize: 14,
+                        fontFamily: "monospace"
+                     })
+                     return {data}
+                  },
+                  render() {
+                     let mod = ('/instr$valid_st'.asBool(false)) && ((('/instr$st_mask'.asInt(-1) >> this.scopes.bank.index) & 1) == 1) && ('/instr$addr'.asInt(-1) >> M4_SUB_WORD_BITS == this.getIndex()) // selects which bank to write on
+                     //let oldValStr = mod ? `(${'$Value'.asInt(NaN).toString(16)})` : "" // old value for dmem
+                     this.getInitObject("data").set({text: '$Value'.step(1).asInt(NaN).toString(16).padStart(2,"0")})
+                     this.getInitObject("data").set({fill: mod ? "blue" : "black"})
+                  }
+      )
 
 \TLV layout_viz(_where_, _fill_color) 
    \viz_js
       //Main layout
       box: {
             fill: _fill_color,
-            //width: 10 + (550 + 605) + 190 + 10 + m4_ifelse(M4_EXT_F, 1, ['M4_VIZ_MEM_LEFT_ADJUST'], 0),
-            //height: (76 + 18 * M4_NUM_INSTRS >= 670) ? (20 + 76 + 18 * M4_NUM_INSTRS) : 670,
             strokeWidth: 0
            },
-      layout_tag: "boogers",
       where: {_where_},
          
-   //////// VIZUALIZING THE MAIN CPU //////////////
+//////// VIZUALIZING THE MAIN CPU //////////////
 \TLV cpu_viz(/_des_pipe, _fill_color)
    /* CPU_VIZ HERE */
    m4_def(viz_logic_macro_name, M4_isa['_viz_logic'])
@@ -5492,7 +5523,7 @@ m4+definitions(['
    
    
    
-         //////// VIZUALIZING THE INSERTION RING //////////////
+//////// VIZUALIZING THE INSERTION RING //////////////
 \TLV ring_viz(/_name)
    m4_define(['M4_RINGVIZ_REF_TOP'],-100)
    m4_define(['M4_RINGVIZ_REF_LEFT'],700)

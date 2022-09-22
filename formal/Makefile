@@ -3,6 +3,7 @@
 SHELL=/bin/bash
 
 export PATH:=$(shell pwd)/env/bin:$(PATH)
+NPROC?=$(shell nproc)
 
 .PHONY: all clean compile verif env riscv-formal
 
@@ -42,7 +43,8 @@ verif: checks.cfg out/warp-v_formal.sv env riscv-formal
 	echo -e "\e[0Ksection_start:`date +%s`:verif[collapsed=true]\r\e[0KVerification"
 	bison --version
 	python3 $(CURDIR)/riscv-formal/checks/genchecks.py checks $(CURDIR)/riscv-formal
-	$(MAKE) -k -C checks -j$$(nproc)
+
+	$(MAKE) -k -C checks -j$(NPROC)
 	echo -e "\e[0Ksection_end:`date +%s`:verif\r\e[0K"
 
 all: verif
