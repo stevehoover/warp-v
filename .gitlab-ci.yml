@@ -1,0 +1,58 @@
+stages:
+  - test
+
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+
+formal:
+  tags:
+    - size-md
+  stage: test
+  image: gcr.io/hdl-containers/formal
+  before_script:
+    - export PATH="/root/.local/bin:$PATH"
+    - apt-get update
+    - apt-get install -y
+        git
+        python3-pip
+        sudo
+        wget
+    - export DEBIAN_FRONTEND=noninteractive
+    - ./init
+    - cd formal
+    - mkdir env
+    - touch env/PASSED
+    # - ./make_env.sh
+  script:
+    - NPROC=1 make tos_agree verif
+
+.react-build:
+  tags:
+    - size-md
+  image: node:16
+  before_script:
+    - cd configurator
+    - yarn --frozen-lockfile
+  script:
+    - CI=false yarn build
+    - cp -r build/ ../public/
+  artifacts:
+    paths:
+      - public
+
+react-build:
+  tags:
+    - size-md
+  stage: test
+  extends:
+    - .react-build
+  rules:
+    - if: $CI_COMMIT_BRANCH != "main"
+
+pages:
+  stage: test
+  extends:
+    - .react-build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

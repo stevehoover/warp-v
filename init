@@ -3,24 +3,39 @@
 
 # One-time initialization of this repository, to be run after cloning.
 
+APT_GET="$([[ ! -z $CI ]] && echo "apt-get install -y" || echo "sudo apt-get install")"
+
 # Install submodules.
+echo -e "\e[0Ksection_start:`date +%s`:init-submodules[collapsed=true]\r\e[0KUpdating submodules"
+
 git submodule update --init --recursive
+
+echo -e "\e[0Ksection_end:`date +%s`:init-submodules\r\e[0K"
 
 
 # Install required packages
+
+echo -e "\e[0Ksection_start:`date +%s`:init-pip[collapsed=true]\r\e[0KInstalling sandpiper-saas and makerchip-app"
 
 pip3 install sandpiper-saas
 # To use Makerchip for editing.
 pip3 install makerchip-app
 
+echo -e "\e[0Ksection_end:`date +%s`:init-pip\r\e[0K"
+
 # Installations for Ubuntu.
 if which apt > /dev/null; then
+
+  echo -e "\e[0Ksection_start:`date +%s`:init-apt[collapsed=true]\r\e[0KInstalling build dependencies via apt-get"
+
   # Required by yosys.
-  sudo apt-get install build-essential clang bison flex \
+  $APT_GET build-essential clang bison flex \
 	    libreadline-dev gawk tcl-dev libffi-dev git \
 	    graphviz xdot pkg-config python3 libboost-system-dev \
 	    libboost-python-dev libboost-filesystem-dev zlib1g-dev
   # To avoid a bug with `gitk` and `git gui` that results from our use of special unicode
   # character in warp-v.tlv (for visualization):
-  sudo apt install unifont
+  $APT_GET unifont
+
+  echo -e "\e[0Ksection_end:`date +%s`:init-apt\r\e[0K"
 fi
