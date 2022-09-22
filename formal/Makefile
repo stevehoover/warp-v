@@ -38,6 +38,7 @@ compile: out/warp-v_formal.sv
 verif: checks.cfg out/warp-v_formal.sv env riscv-formal
 	@# Should use this, but until Clifford accepts pull request, we have a local copy of genchecks.py.
 	@#python3 riscv-formal/checks/genchecks.py --basedir riscv-formal
+	yosys -V
 	bison --version
 	python3 $(CURDIR)/riscv-formal/checks/genchecks.py checks $(CURDIR)/riscv-formal
 	$(MAKE) -k -C checks -j$(NPROC)
