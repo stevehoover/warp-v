@@ -48,11 +48,11 @@ react-build:
   extends:
     - .react-build
   rules:
-    - if: $CI_COMMIT_BRANCH != "main"
+    - if: $CI_COMMIT_BRANCH != "master"
 
 pages:
   stage: test
   extends:
     - .react-build
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "master"
