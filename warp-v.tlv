@@ -1100,41 +1100,42 @@ m4+definitions(['
 '])
 \SV
    m4_ifelse(M4_ISA, RISCV, ['
+      m4_def(verilator_lint, ['m4_show(m4_new_line()['/* verilator lint_$1 $2 */'])'])
       // Heavy-handed lint_off's based on config.
       // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-      m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
-      m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
-      m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
+      m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , m4_verilator lint(off, WIDTH))
+      m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, PINMISSING))
+      m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, SELRANGE))
       
       m4_ifelse(M4_EXT_M, 1, ['
          m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
          `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
          '])
-         m4_show(['/* verilator lint_off WIDTH */'])
-         m4_show(['/* verilator lint_off CASEINCOMPLETE */'])
+         m4_verilator_lint(off, WIDTH)
+         m4_verilator_lint(off, CASEINCOMPLETE)
          // TODO : Update links after merge to master!
          m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_div.sv'])
          m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_fast_mul.sv'])
-         m4_show(['/* verilator lint_on CASEINCOMPLETE */'])
-         m4_show(['/* verilator lint_on WIDTH */'])
+         m4_verilator_lint(on, CASEINCOMPLETE)
+         m4_verilator_lint(on, WIDTH)
       '])
 
       m4_ifelse_block(M4_EXT_B, 1, ['
-         /* verilator lint_off WIDTH */
-         /* verilator lint_off PINMISSING */
-         /* verilator lint_off CASEOVERLAP */
+         m4_verilator_lint(off, WIDTH)
+         m4_verilator_lint(off, PINMISSING)
+         m4_verilator_lint(off, CASEOVERLAP)
          m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
-         /* verilator lint_on WIDTH */
-         /* verilator lint_on CASEOVERLAP */
-         /* verilator lint_on PINMISSING */   
+         m4_verilator_lint(on, WIDTH)
+         m4_verilator_lint(on, CASEOVERLAP)
+         m4_verilator_lint(on, PINMISSING)   
       '])
        
       m4_ifelse_block(M4_EXT_F, 1, ['
-         /* verilator lint_off WIDTH */
-         /* verilator lint_off CASEINCOMPLETE */   
+         m4_verilator_lint(off, WIDTH)
+         m4_verilator_lint(off, CASEINCOMPLETE)   
          m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
-         /* verilator lint_on CASEINCOMPLETE */
-         /* verilator lint_on WIDTH */
+         m4_verilator_lint(on, CASEINCOMPLETE)
+         m4_verilator_lint(on, WIDTH)
       '])
 
    '])
