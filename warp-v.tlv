@@ -28,6 +28,8 @@
    // -----------------------------------------------------------------------------
    // This code is mastered in https://github.com/stevehoover/warp-v.git
 
+   // For usage examples, visit warp-v.org.
+
 m4+definitions(['
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
    
@@ -294,9 +296,9 @@ m4+definitions(['
       m4_ifndef(
          ISA, RISCV,
          EXT_M, 1,
-         RISCV_FORMAL_ALTOPS, 1,
          VIZ, 1,
          STANDARD_CONFIG, 4-stage)
+      m4_ifndef(RISCV_FORMAL_ALTOPS, M4_EXT_M)
    '])
    
    // Machine:
@@ -1095,23 +1097,54 @@ m4+definitions(['
 
    // TODO: Remove after released to Makerchip/SaaS.
    m4_def(ifdef_tlv, ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
+
+   // m4+warpv_setup() region definition.
+   m4_def(warpv_setup, ['\SV
+      m4_ifelse(M4_ISA, RISCV, ['
+         // Heavy-handed lint_off's based on config.
+         // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
+         m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
+         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
+         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
+         
+         m4_ifelse(M4_EXT_M, 1, ['
+            m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
+            `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
+            '])
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off CASEINCOMPLETE */
+            // TODO : Update links after merge to master!
+            m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_div.sv'])
+            m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_fast_mul.sv'])
+            /* verilator lint_on CASEINCOMPLETE */
+            /* verilator lint_on WIDTH */
+         '])
+
+         m4_ifelse_block(M4_EXT_B, 1, ['
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off PINMISSING */
+            /* verilator lint_off CASEOVERLAP */
+            m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
+            /* verilator lint_on WIDTH */
+            /* verilator lint_on CASEOVERLAP */
+            /* verilator lint_on PINMISSING */   
+         '])
+         
+         m4_ifelse_block(M4_EXT_F, 1, ['
+            /* verilator lint_off WIDTH */
+            /* verilator lint_off CASEINCOMPLETE */   
+            m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
+            /* verilator lint_on CASEINCOMPLETE */
+            /* verilator lint_on WIDTH */
+         '])
+
+      '])
+   '])
 '])
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7b13f554709dcfa7f4245d9e75da62277bdd593a/risc-v_defs.tlv'])'])
 
-\TLV lint()
-   // Configure Verilator lint the first time this is called for RISCV ISA.
-   m4+ifelse(m4_lint_done['']M4_ISA, ['m4_lint_doneRISCV'],
-      \TLV
-         m4_def(lint_done, 1)
-         // Heavy-handed lint_off's based on config.
-         // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-         m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_M['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
-         m4_ifelse(m4_eval(M4_EXT_M), 0, , /* verilator lint_off CASEINCOMPLETE */)
-         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
-         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
-      )
 
 
 // A default testbench for all ISAs.
@@ -3127,25 +3160,6 @@ m4+definitions(['
 //  "M" Extension   //
 //==================//
 
-\SV
-   m4_ifelse_block(M4_EXT_M, 1, ['
-      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['M-ext supported for RISC-V only.']m4_new_line)'])
-      m4_ifelse_block(M4_FORMAL, 1, ['
-         m4_def(RISCV_FORMAL_ALTOPS, 1)         // enable ALTOPS if compiling for formal verification of M extension
-      '])
-      m4_ifelse_block(M4_RISCV_FORMAL_ALTOPS, 1, ['
-      `define RISCV_FORMAL_ALTOPS
-    '])
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */
-      // TODO : Update links after merge to master!
-      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_div.sv'])
-      m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_fast_mul.sv'])
-      /* verilator lint_on CASEINCOMPLETE */
-      /* verilator lint_on WIDTH */
-         
-   '])
-
 \TLV m_extension()
 
    // RISC-V M-Extension instructions in WARP-V are fixed latency
@@ -3246,16 +3260,6 @@ m4+definitions(['
 //      RISC-V      //
 //  "F" Extension   //
 //==================//
-
-\SV
-   m4_ifelse_block(M4_EXT_F, 1, ['
-      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['F-ext supported for RISC-V only.']m4_new_line)'])
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off CASEINCOMPLETE */   
-      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
-      /* verilator lint_on CASEINCOMPLETE */
-      /* verilator lint_on WIDTH */
-   '])
 
 \TLV fpu_exe(/_name, /_top, #_expwidth, #_sigwidth, #_intwidth, $_input1, $_input2, $_input3, $_int_input, $_int_output, $_operation, $_roundingmode, $_nreset, $_clock, $_input_valid, $_outvalid, $_lt_compare, $_eq_compare, $_gt_compare, $_unordered, $_output, $_output11 , $_output_class, $_exception_invaild_output, $_exception_infinite_output, $_exception_overflow_output, $_exception_underflow_output, $_exception_inexact_output) 
    /_name
@@ -3387,17 +3391,6 @@ m4+definitions(['
 //  "B" Extension   // WIP. NOT FROZEN
 //==================//
 
-\SV
-   m4_ifelse_block(M4_EXT_B, 1, ['
-      m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['B-ext supported for RISC-V only.']m4_new_line)'])
-      /* verilator lint_off WIDTH */
-      /* verilator lint_off PINMISSING */
-      /* verilator lint_off CASEOVERLAP */
-      m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
-      /* verilator lint_on WIDTH */
-      /* verilator lint_on CASEOVERLAP */
-      /* verilator lint_on PINMISSING */   
-   '])      
 \TLV b_extension()
 
    // Few of RISC-V B-Extension instructions (CRC and CMUL) in WARP-V are of fixed latency.
@@ -3431,7 +3424,6 @@ m4+definitions(['
 //=========================//
 
 \TLV cpu(/_cpu)
-   m4+lint()
    // Generated logic
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
    m4_def(gen, M4_isa['_gen'])
@@ -6020,7 +6012,6 @@ m4+definitions(['
             '])
       ,
       \TLV
-         m4+lint()
          // Single Core.
          
          // m4+warpv() (but inlined to reduce macro depth)
@@ -6037,7 +6028,8 @@ m4+definitions(['
          '])
       )
 
-m4+module_def
+m4+warpv_setup()
+m4+module_def()
 \TLV //disabled_main()
    m4+warpv_top()
 \SV
