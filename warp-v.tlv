@@ -1099,14 +1099,19 @@ m4+definitions(['
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7b13f554709dcfa7f4245d9e75da62277bdd593a/risc-v_defs.tlv'])'])
-   
-   // Heavy-handed lint_off's based on config.
-   // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-   m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_M['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
-   m4_ifelse(m4_eval(M4_EXT_M), 0, , /* verilator lint_off CASEINCOMPLETE */)
-   m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
-   m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
 
+\TLV lint()
+   // Configure Verilator lint the first time this is called for RISCV ISA.
+   m4+ifelse(m4_lint_done['']M4_ISA, ['m4_lint_doneRISCV'],
+      \TLV
+         m4_def(lint_done, 1)
+         // Heavy-handed lint_off's based on config.
+         // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
+         m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_M['']M4_EXT_F), 0, , /* verilator lint_off WIDTH */)
+         m4_ifelse(m4_eval(M4_EXT_M), 0, , /* verilator lint_off CASEINCOMPLETE */)
+         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off PINMISSING */)
+         m4_ifelse(m4_eval(M4_EXT_B), 0, , /* verilator lint_off SELRANGE */)
+      )
 
 
 // A default testbench for all ISAs.
@@ -3426,6 +3431,7 @@ m4+definitions(['
 //=========================//
 
 \TLV cpu(/_cpu)
+   m4+lint()
    // Generated logic
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
    m4_def(gen, M4_isa['_gen'])
@@ -6014,6 +6020,7 @@ m4+definitions(['
             '])
       ,
       \TLV
+         m4+lint()
          // Single Core.
          
          // m4+warpv() (but inlined to reduce macro depth)
