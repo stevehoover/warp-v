@@ -109,8 +109,8 @@ function App() {
 }
 
 const initialProgramText = `// /=====================\\
-// | Count to 10 Program |
-// =====================/
+// |  Sum 1..9 Program  |
+// \=====================/
 //
 // Default program for RV32I test
 // Add 1,2,3,...,9 (in that order).
@@ -145,5 +145,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "b702607b5e7db179a2aff76be97ef5a01161a03e"
+export const warpVLatestSupportedCommit = "9ad096c3c55ff396636fa71225b1e0c9559185db"
 export const warpVLatestVersionCommit = "master"
