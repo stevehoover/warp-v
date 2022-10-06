@@ -1103,7 +1103,7 @@ m4+definitions(['
       m4_def(verilator_lint, ['m4_show(m4_new_line()['/* verilator lint_$1 $2 */'])'])
       // Heavy-handed lint_off's based on config.
       // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-      m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , m4_verilator lint(off, WIDTH))
+      m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , m4_verilator_lint(off, WIDTH))
       m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, PINMISSING))
       m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, SELRANGE))
       
@@ -1140,7 +1140,7 @@ m4+definitions(['
 
    '])
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7b13f554709dcfa7f4245d9e75da62277bdd593a/risc-v_defs.tlv'])'])
+   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/c9225bd29b0930a577a2aa2053253bcd70f42ed0/risc-v_defs.tlv'])'])
 
 
 
