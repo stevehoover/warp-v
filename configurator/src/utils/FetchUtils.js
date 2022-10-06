@@ -60,7 +60,7 @@ export function openInMakerchip(source, setMakerchipOpening, setDisclosureAndUrl
         .then(resp => resp.json())
         .then(json => {
             const url = json.url
-            openInNewTabOrFallBack(`https://makerchip.com${url}`, "_blank", setDisclosureAndUrl)
+            openInNewTabOrFallBack(`https://warp-v.makerchip.com${url}`, "_blank", setDisclosureAndUrl)
             setMakerchipOpening(false)
         })
 }

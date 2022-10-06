@@ -167,10 +167,11 @@ export function WarpVPageBase({
     }
 
     async function getSVForTlv(tlv, callback) {
+        const args = `-i test.tlv -o test.sv --m4out out/m4out --iArgs`
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {
-                args: `-i test.tlv -o test.sv --iArgs --m4out out/m4out ${configuratorGlobalSettings.generalSettings.formattingSettings.filter(setting => setting === "--fmtNoSource").join(" ")}`,
+                args: args,
                 responseType: "json",
                 sv_url_inc: true,
                 files: {

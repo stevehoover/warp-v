@@ -28,12 +28,10 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
             <CheckboxGroup value={generalSettings.formattingSettings}
                            onChange={onFormattingChange}>
                 <Stack direction="column">
-                    <Checkbox value="-p verilog">Verilog (vs. SystemVerilog)</Checkbox>
+                    <Checkbox value="--hdl verilog">Verilog (vs. SystemVerilog)</Checkbox>
                     <Checkbox value="--bestsv">Optimize SystemVerilog code for readability (versus
                         preserving line association with TL-Verilog source).</Checkbox>
                     <Checkbox value="--noline">Disable `line directive in SV output.</Checkbox>
-                    <Checkbox value="--fmtNoSource">Do not generate \source tags for correlating pre- and post-M4
-                        code.</Checkbox>
                     <Checkbox value="--fmtDeclSingleton"> Each HDL signal is declared in its own
                         declaration statement
                         with its own type specification.</Checkbox>
@@ -50,6 +48,10 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
                     <Checkbox value="--fmtFullHdlHier">Provide HDL hierarchy for all scopes, including
                         non-replicated
                         scopes.</Checkbox>
+                    <Checkbox value="--fmtInlineInjection">Provide X-injection and state recirculation for       
+                        assignments under 'when' conditions in the          
+                        assignment expressions themself where possible,     
+                        rather than in separate manufactured assignments.</Checkbox>
                     <Checkbox value="--fmtNoRespace">Preserve whitespace in HDL expressions as is. Do
                         not adjust
                         whitespace to preserve alignment of elements and comments of the
@@ -58,6 +60,14 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
                         hierarchy. Also, forces behavior of --fmtFlatSignals.</Checkbox>
                     <Checkbox value="--fmtPackBooleans">Pack an additional level of hierarchy for
                         boolean HDL signals. </Checkbox>
+                    <Checkbox value="--fmtStripUniquifiers">Eliminate the use of uniquifiers in HDL names where
+                        possible.</Checkbox>
+                    <Checkbox value="--fmtUseGenerate">Use the generate/endgenerate keywords that are
+                        optional in SystemVerilog.</Checkbox>
+                    <Checkbox value="--noDirectiveComments">For strict adherence to the Verilog specification, do
+                        not output comments on `line and `include lines.</Checkbox>
+                    <Checkbox value="--inlineGen" style={{visibility: 'hidden'}}>Produce generated content
+                        inline in the primary output file rather than in a separate file.</Checkbox>
                     {/*<Checkbox value='--fmtStripUniquifiers'>Eliminate the use of uniquifiers in HDL
                                         names where possible.</Checkbox> //TODO re-add after mono fix #433 */}
 

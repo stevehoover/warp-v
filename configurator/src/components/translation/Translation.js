@@ -51,11 +51,11 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     //    verilatorConfig.add("/* verilator lint_off WIDTH */")
     //    verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
     //}
-    //if (settings.isaExtensions.includes("B")) {
+    if (settings.isaExtensions.includes("B")) {
     //    verilatorConfig.add("/* verilator lint_off WIDTH */")
     //    verilatorConfig.add("/* verilator lint_off PINMISSING */")
-    //    verilatorConfig.add("/* verilator lint_off SELRANGE */")
-    //}
+        verilatorConfig.add("/* verilator lint_off SELRANGE */")
+    }
     if (settings.formattingSettings.includes("--fmtPackAll")) {
         verilatorConfig.add("/* verilator lint_on WIDTH */ // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613")
         verilatorConfig.delete("/* verilator lint_off WIDTH */")
@@ -79,18 +79,12 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${p
    // Include WARP-V.
    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
    m4_include_lib(['${settings.warpVVersion}'])
-   
 ${settings.customProgramEnabled ? `\\TLV ${isa.toLowerCase()}_${programName}_prog()
    ${programText.split("\n").join("\n   ")}` : ``}
-
-${settings.customProgramEnabled ? `m4+module_def()
+m4+module_def()
 \\TLV
    m4+warpv_top()
 \\SV
-   endmodule` : `m4+module_def()
-\\TLV
-   m4+warpv_top()
-\\SV
-   endmodule`}
+   endmodule
 `
 }

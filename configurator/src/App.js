@@ -17,9 +17,11 @@ function App() {
             isaExtensions: [],
             depth: 4,
             formattingSettings: [
+                "--inlineGen",
                 "--bestsv",
                 "--noline",
-                "--fmtNoSource"
+                "--fmtNoSource",
+                "--noDirectiveComments"
             ],
             customProgramEnabled: false
         },
@@ -122,17 +124,19 @@ const initialProgramText = `// /=====================\\
 // 5: offset
 // 6: store addr
 
+m4_label(begin)
 m4_asm(ORI, x6, x0, 0)// store_addr = 0
 m4_asm(ORI, x1, x0, 1)// cnt = 1
 m4_asm(ORI, x2, x0, 1010) // ten = 10
 m4_asm(ORI, x3, x0, 0)// out = 0
+m4_label(loop)
 m4_asm(ADD, x3, x1, x3)   //  -> out += cnt
 m4_asm(SW, x6, x3, 0) // store out at store_addr
 m4_asm(ADDI, x1, x1, 1)   // cnt ++
 m4_asm(ADDI, x6, x6, 100) // store_addr++
-m4_asm(BLT, x1, x2, 1111111110000) //  ^- branch back if cnt < 10
+m4_asm(BLT, x1, x2, :loop) //  ^- branch back if cnt < 10
 m4_asm(LW, x4, x6, 111111111100) // load the final value into tmp
-m4_asm(BGE, x1, x2, 1111111010100) // TERMINATE by branching to -1
+m4_asm(BGE, x1, x2, :begin) // TERMINATE at the last instruction.
 `
 
 export default App;
@@ -141,5 +145,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "4e47374fe0a1eadef2de4841d11dffec4e11b7f5"
+export const warpVLatestSupportedCommit = "b702607b5e7db179a2aff76be97ef5a01161a03e"
 export const warpVLatestVersionCommit = "master"
