@@ -31,6 +31,7 @@
    // For usage examples, visit warp-v.org.
 
 m4+definitions(['
+   m4_def(warpv_includes, ['['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/9d012385262a34055c4dc85778df4d2719c32f2b/']'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
    
    // A highly-parameterized CPU generator, configurable for:
@@ -1114,8 +1115,8 @@ m4+definitions(['
          m4_verilator_lint(off, WIDTH)
          m4_verilator_lint(off, CASEINCOMPLETE)
          // TODO : Update links after merge to master!
-         m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_div.sv'])
-         m4_sv_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/divmul/picorv32_pcpi_fast_mul.sv'])
+         m4_sv_include_url(m4_warpv_includes['divmul/picorv32_pcpi_div.sv'])
+         m4_sv_include_url(m4_warpv_includes['divmul/picorv32_pcpi_fast_mul.sv'])
          m4_verilator_lint(on, CASEINCOMPLETE)
          m4_verilator_lint(on, WIDTH)
       '])
@@ -1124,7 +1125,7 @@ m4+definitions(['
          m4_verilator_lint(off, WIDTH)
          m4_verilator_lint(off, PINMISSING)
          m4_verilator_lint(off, CASEOVERLAP)
-         m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/b-ext/top_bext_module.tlv'])
+         m4_include_url(m4_warpv_includes['b-ext/top_bext_module.tlv'])
          m4_verilator_lint(on, WIDTH)
          m4_verilator_lint(on, CASEOVERLAP)
          m4_verilator_lint(on, PINMISSING)   
@@ -1133,14 +1134,14 @@ m4+definitions(['
       m4_ifelse_block(M4_EXT_F, 1, ['
          m4_verilator_lint(off, WIDTH)
          m4_verilator_lint(off, CASEINCOMPLETE)   
-         m4_include_url(['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/master/fpu/topmodule.tlv'])
+         m4_include_url(m4_warpv_includes['fpu/topmodule.tlv'])
          m4_verilator_lint(on, CASEINCOMPLETE)
          m4_verilator_lint(on, WIDTH)
       '])
 
    '])
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v_includes/c9225bd29b0930a577a2aa2053253bcd70f42ed0/risc-v_defs.tlv'])'])
+   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
 
 
 
