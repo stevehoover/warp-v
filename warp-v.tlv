@@ -31,7 +31,7 @@
    // For usage examples, visit warp-v.org.
 
 m4+definitions(['
-   m4_def(warpv_includes, ['['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/9d012385262a34055c4dc85778df4d2719c32f2b/']'])
+   m4_def(warpv_includes, ['['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/34d74cc11b75b01d81101701a7dc93d045314ac6/']'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
    
    // A highly-parameterized CPU generator, configurable for:
@@ -653,7 +653,7 @@ m4+definitions(['
    // (Not intended to be exhaustive.)
    
    // Check that expressions are ordered.
-   m4_define(['m4_ordered'], ['
+   m4_func(ordered, ..., ['
       m4_ifelse($2, [''], [''], ['
          m4_ifelse(m4_eval(m4_echo($1) > m4_echo($2)), 1,
                    ['m4_errprint(['$1 (']$1[') is greater than $2 (']$2[').']m4_new_line())'])
@@ -4599,7 +4599,7 @@ m4+definitions(['
                   // To update diagram, save from https://docs.google.com/presentation/d/1tFjekV06XHTYOXCSjd3er2kthiPEPaWrXlHKnS0yt5Q/edit?usp=sharing
                   // Open in Inkscape. Delete background rect. Edit > Resize Page to Selection. Drag into GitHub file editor. Copy URL. Cancel edit. Paste here.
                   this.newImageFromURL(
-                      "https://raw.githubusercontent.com/stevehoover/warp-v_includes/fdc6b34be4da56b5e0d8874f71632de9cf663935/viz/pipeline_diagram.svg",
+                      "m4_warpv_includes['']viz/pipeline_diagram.svg",
                       "",
                       {left: 0, top: 0, width: 100, height: 57},
                   )
