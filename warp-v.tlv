@@ -30,10 +30,10 @@
 
    // For usage examples, visit warp-v.org.
 
-m4+definitions(['
-   m4_def(warpv_includes, ['['https:/']['/raw.githubusercontent.com/stevehoover/warp-v_includes/34d74cc11b75b01d81101701a7dc93d045314ac6/']'])
+\m4
+   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ec943ed510070c347c78a622a40d913bdab2f1ca/']'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
-   
+
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -288,22 +288,22 @@ m4+definitions(['
    // This is where you configure the CPU.
    // Note that WARP-V has a configurator at warp-v.org.
    
-   // m4_ifndef(..) allows external definition to take precedence.
+   // m4_default_def(..) allows external definition to take precedence.
 
    // Default parameters for formal verification continuous integration testing.
    // M4_FORMAL is only used within Makerchip in debug mode (for VIZ).
-   //m4_ifndef(FORMAL, 1)  // Uncomment to test formal verification in Makerchip.
+   //m4_default_def(FORMAL, 1)  // Uncomment to test formal verification in Makerchip.
    m4_ifelse(M4_FORMAL, 1, ['
-      m4_ifndef(
+      m4_default_def(
          ISA, RISCV,
          EXT_M, 1,
          VIZ, 1,
          STANDARD_CONFIG, 4-stage)
-      m4_ifndef(RISCV_FORMAL_ALTOPS, M4_EXT_M)
+      m4_default_def(RISCV_FORMAL_ALTOPS, M4_EXT_M)
    '])
-   
+
    // Machine:
-   m4_ifndef(
+   m4_default_def(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
      ISA, RISCV,
      ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
@@ -314,13 +314,13 @@ m4+definitions(['
    // --------------
    // For multi-core
    // --------------
-   m4_ifndef(
+   m4_default_def(
      ['# Number of cores. Previously this was defined externally as M4_CORE_CNT (via m4_define_hier), so accept that too.'],
      NUM_CORES, m4_ifelse(M4_CORE_CNT, ['M4_CORE_CNT'], 1, M4_CORE_CNT))
 
    // Only relevant, and only defined, if M4_NUM_CORES > 1:
-   
-   m4_ifexpr(M4_NUM_CORES > 1, ['m4_ifndef(
+
+   m4_ifexpr(M4_NUM_CORES > 1, ['m4_default_def(
      ['# VCs (meaningful if > 1 core).'],
      NUM_VCS, 2,
      ['# Number of priority levels in the NoC (meaningful if > 1 core).'],
@@ -328,7 +328,7 @@ m4+definitions(['
      ['# Max number of payload flits in a packet.'],
      MAX_PACKET_SIZE, 3)'])
    
-   m4_ifndef(
+   m4_default_def(
      ['# Include visualization'],
      VIZ, 1,
      ['# For implementation (vs. simulation). (0/1)'],
@@ -339,7 +339,7 @@ m4+definitions(['
          instead of actual mul/div, this is enabled automatically when formal is used. 
          This can be enabled for testing in Makerchip environment.'],
      RISCV_FORMAL_ALTOPS, 0)
-   m4_ifndef(
+   m4_default_def(
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m4_ifelse(M4_IMPL, 0, HARDCODED_ARRAY, SRAM),
       ['# DMem style: SRAM, ARRAY, STUBBED'],
@@ -347,7 +347,7 @@ m4+definitions(['
       ['# RF style: ARRAY, STUBBED'],
       RF_STYLE, ARRAY)
 
-   m4_ifndef(
+   m4_default_def(
      
      ['# A hook for a software-controlled reset. None by default.'],
      soft_reset, 1'b0,
@@ -392,7 +392,7 @@ m4+definitions(['
    m4_case(M4_STANDARD_CONFIG,
       ['1-stage'], ['
          // No pipeline
-         m4_ifndef(
+         m4_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 0,
@@ -403,11 +403,11 @@ m4+definitions(['
             REG_WR_STAGE, 0,
             MEM_WR_STAGE, 0,
             LD_RETURN_ALIGN, 1)
-         m4_ifndef(BRANCH_PRED, fallthrough)
+         m4_default_def(BRANCH_PRED, fallthrough)
       '],
       ['2-stage'], ['
          // 2-stage pipeline.
-         m4_ifndef(
+         m4_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 0,
@@ -418,11 +418,11 @@ m4+definitions(['
             REG_WR_STAGE, 1,
             MEM_WR_STAGE, 1,
             LD_RETURN_ALIGN, 2)
-         m4_ifndef(BRANCH_PRED, two_bit)
+         m4_default_def(BRANCH_PRED, two_bit)
       '],
       ['4-stage'], ['
          // A reasonable 4-stage pipeline.
-         m4_ifndef(
+         m4_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 1,
@@ -434,11 +434,11 @@ m4+definitions(['
             MEM_WR_STAGE, 3,
             EXTRA_REPLAY_BUBBLE, 1,
             LD_RETURN_ALIGN, 4)
-         m4_ifndef(BRANCH_PRED, two_bit)
+         m4_default_def(BRANCH_PRED, two_bit)
       '],
       ['6-stage'], ['
          // Deep pipeline
-         m4_ifndef(
+         m4_default_def(
             NEXT_PC_STAGE, 1,
             FETCH_STAGE, 1,
             DECODE_STAGE, 3,
@@ -450,12 +450,12 @@ m4+definitions(['
             MEM_WR_STAGE, 7,
             EXTRA_REPLAY_BUBBLE, 1,
             LD_RETURN_ALIGN, 7)
-         m4_ifndef(BRANCH_PRED, two_bit)
+         m4_default_def(BRANCH_PRED, two_bit)
       ']
    )
    
    // Supply defaults for extra cycles.
-   m4_ifndef(
+   m4_default_def(
       DELAY_BRANCH_TARGET_CALC, 0,
       EXTRA_PRED_TAKEN_BUBBLE, 0,
       EXTRA_REPLAY_BUBBLE, 0,
@@ -469,11 +469,11 @@ m4+definitions(['
    // ISA-Specific Configuration
    // --------------------------
 
-   m4_case(M4_ISA, ['MINI'], ['
+   m4_case(M4_ISA, MINI, ['
          // Mini-CPU Configuration:
          // Force predictor to fallthrough, since we can't predict early enough to help.
          m4_def(BRANCH_PRED, fallthrough)
-      '], ['RISCV'], ['
+      '], RISCV, ['
          // RISC-V Configuration:
 
          // ISA options:
@@ -482,17 +482,17 @@ m4+definitions(['
          //   RV32IM 2.0, w/ FA ISA extensions WIP.
 
          // Machine width
-         m4_ifndef(
+         m4_default_def(
            ['# Include visualization. (0/1)'],
            VIZ, 1,
            ['# Width of a "word". (32 for RV32X or 64 for RV64X)'],
            WORD_WIDTH, 32)
-         m4_define_vector(['M4_WORD'], M4_WORD_WIDTH)
+         m4_define_vector(WORD, M4_WORD_WIDTH)
          // ISA extensions,  1, or 0 (following M4 boolean convention).
          // TODO. Currently formal checks are broken when M4_EXT_F is set to 1.
          // TODO. Currently formal checks takes long time(~48 mins) when M4_EXT_B is set to 1.
          //       Hence, its disabled at present.
-         m4_ifndef(
+         m4_default_def(
             EXT_I, 1,
             EXT_E, 0,
             EXT_M, 0,
@@ -509,10 +509,10 @@ m4+definitions(['
             EXT_V, 0,
             EXT_N, 0)
          
-         m4_ifndef(['# For the time[h] CSR register, after this many cycles, time increments.'],
+         m4_default_def(['# For the time[h] CSR register, after this many cycles, time increments.'],
                    CYCLES_PER_TIME_UNIT, 1000000000)
-      '], ['MIPSI'], ['
-      '], ['POWER'], ['
+      '], MIPSI, ['
+      '], POWER, ['
       '], ['
          // Dummy "ISA".
          m4_def(DMEM_SIZE, 4)  // Override for narrow address.
@@ -521,8 +521,8 @@ m4+definitions(['
       ']
    )
    
-   m4_ifndef(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
-   m4_ifndef(
+   m4_default_def(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
+   m4_default_def(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
      PROG_NAME, m4_ifelse(M4_ISA, RISCV, m4_ifelse(M4_EXT_F, 1, fpu_test, m4_ifelse(M4_EXT_M, 1, divmul_test, m4_ifelse(M4_EXT_B, 1, bmi_test, cnt10))), cnt10))
    //m4_ifelse(M4_EXT_F, 1, fpu_test, cnt10)
@@ -531,21 +531,21 @@ m4+definitions(['
    // =====Done Defining Configuration=====
    
    
-   m4_define_hier(['M4_DATA_MEM_WORDS'], M4_DMEM_SIZE)
+   m4_define_hier(DATA_MEM_WORDS, M4_DMEM_SIZE)
    
    // For multi-core only:
    m4_ifexpr(M4_NUM_CORES > 1, ['
    
       // Define hierarchies based on parameters.
-      m4_define_hier(['M4_CORE'], M4_NUM_CORES)
-      m4_define_hier(['M4_VC'], M4_NUM_VCS)
-      m4_define_hier(['M4_PRIO'], M4_NUM_PRIOS)
+      m4_define_hier(CORE, M4_NUM_CORES)
+      m4_define_hier(VC, M4_NUM_VCS)
+      m4_define_hier(PRIO, M4_NUM_PRIOS)
       
       // RISC-V Only
       m4_ifelse(M4_ISA, ['RISCV'], [''], ['m4_errprint(['Multi-core supported for RISC-V only.']m4_new_line)'])
       
       // Headere flit fields. 
-      m4_define_vector_with_fields(M4_FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
+      m4_define_vector_with_fields(FLIT, 32, UNUSED, m4_eval(M4_CORE_INDEX_CNT * 2 + M4_VC_INDEX_CNT), VC, m4_eval(M4_CORE_INDEX_CNT * 2), SRC, M4_CORE_INDEX_CNT, DEST, 0)
    '])
 
    // Characterize ISA and apply configuration.
@@ -654,15 +654,15 @@ m4+definitions(['
    
    // Check that expressions are ordered.
    m4_func(ordered, ..., ['
-      m4_ifelse($2, [''], [''], ['
-         m4_ifelse(m4_eval(m4_echo($1) > m4_echo($2)), 1,
-                   ['m4_errprint(['$1 (']$1[') is greater than $2 (']$2[').']m4_new_line())'])
+      m4_ifelse(['$2'], [''], [''], ['
+         m4_ifelse(m4_eval(M4_$1 > M4_$2), 1,
+                   ['m4_errprint(['$1 (']M4_$1[') is greater than $2 (']M4_$2[').']m4_nl())'])
          m4_ordered(m4_shift($@))
       '])
    '])
    // TODO:; It should be M4_NEXT_PC_STAGE-1, below.
-   m4_ordered(['M4_NEXT_PC_STAGE'], ['M4_FETCH_STAGE'], ['M4_DECODE_STAGE'], ['M4_BRANCH_PRED_STAGE'], ['M4_REG_RD_STAGE'],
-              ['M4_EXECUTE_STAGE'], ['M4_RESULT_STAGE'], ['M4_REG_WR_STAGE'], ['M4_MEM_WR_STAGE'])
+   m4_ordered(NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE, REG_RD_STAGE,
+              EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE)
                                  
    // Check reg bypass limit
    m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
@@ -690,51 +690,51 @@ m4+definitions(['
    //   |fetch@M4_FETCH$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]
    // Outputs:
    //   |fetch/instr?$fetch$raw[M4_INSTR_RANGE] (at or after @M4_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
-   m4_ifndef(IMEM_MACRO_NAME, M4_isa['_imem'])
+   m4_default_def(IMEM_MACRO_NAME, M4_isa['_imem'])
    
    // For each ISA, define:
-   //   m4_define_vector(['M4_INSTR'], XX)   // (or, m4_define_vector_with_fields(...)) Instruction vector.
-   //   m4_define_vector(['M4_ADDR'], XX)    // An address.
-   //   m4_define(['M4_BITS_PER_ADDR'], XX)  // Each memory address holds XX bits.
-   //   m4_define_vector(['M4_WORD'], XX)    // Width of general-purpose registers.
-   //   m4_define_hier(['M4_REGS'], XX)      // General-purpose register file.
+   //   m4_define_vector(INSTR, XX)   // (or, m4_define_vector_with_fields(...)) Instruction vector.
+   //   m4_define_vector(ADDR, XX)    // An address.
+   //   m4_define(BITS_PER_ADDR, XX)  // Each memory address holds XX bits.
+   //   m4_define_vector(WORD, XX)    // Width of general-purpose registers.
+   //   m4_define_hier(REGS, XX)      // General-purpose register file.
 
    m4_case(M4_ISA,
       ['MINI'], ['
-         m4_define_vector_with_fields(M4_INSTR, 40, DEST_CHAR, 32, EQUALS_CHAR, 24, SRC1_CHAR, 16, OP_CHAR, 8, SRC2_CHAR, 0)
-         m4_define_vector(M4_ADDR, 12)
-         m4_define(['M4_BITS_PER_ADDR'], 12)  // Each memory address holds 12 bits.
-         m4_define_vector(M4_WORD, 12)
-         m4_define_hier(M4_REGS, 8)   // (Plural to avoid name conflict w/ SV "reg" keyword.)
+         m4_define_vector_with_fields(INSTR, 40, DEST_CHAR, 32, EQUALS_CHAR, 24, SRC1_CHAR, 16, OP_CHAR, 8, SRC2_CHAR, 0)
+         m4_define_vector(ADDR, 12)
+         m4_def(BITS_PER_ADDR, 12)  // Each memory address holds 12 bits.
+         m4_define_vector(WORD, 12)
+         m4_define_hier(REGS, 8)   // (Plural to avoid name conflict w/ SV "reg" keyword.)
       '],
       ['RISCV'], ['
          // Definitions matching "The RISC-V Instruction Set Manual Vol. I: User-Level ISA", Version 2.2.
 
-         m4_define_vector(['M4_INSTR'], 32)
-         m4_define_vector(['M4_ADDR'], 32)
-         m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
-         m4_define_vector(['M4_WORD'], 32)
-         m4_define_hier(['M4_REGS'], m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
-         m4_define_hier(['M4_FPU_REGS'], 32, 0)   // (though, the hierarchy is called /regs, not /fpu_regs)
+         m4_define_vector(INSTR, 32)
+         m4_define_vector(ADDR, 32)
+         m4_def(BITS_PER_ADDR, 8)  // 8 for byte addressing.
+         m4_define_vector(WORD, 32)
+         m4_define_hier(REGS, m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
+         m4_define_hier(FPU_REGS, 32, 0)   // (though, the hierarchy is called /regs, not /fpu_regs)
          
          // Controls SV generation:
-         m4_define(['m4_use_localparams'], 0)
+         m4_define(['m4_use_localparams'], 1)
       '],
       ['MIPSI'], ['
-         m4_define_vector_with_fields(M4_INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
-         m4_define_vector(['M4_ADDR'], 32)
+         m4_define_vector_with_fields(INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
+         m4_define_vector(ADDR, 32)
          m4_define(['M4_BITS_PER_ADDR'], 8)  // 8 for byte addressing.
-         m4_define_vector(['M4_WORD'], 32)
-         m4_define_hier(['M4_REGS'], 32, 1)
+         m4_define_vector(WORD, 32)
+         m4_define_hier(REGS, 32, 1)
       '],
       ['POWER'], ['
       '],
       ['DUMMY'], ['
-         m4_define_vector(M4_INSTR, 2)
-         m4_define_vector(M4_ADDR, 2)
+         m4_define_vector(INSTR, 2)
+         m4_define_vector(ADDR, 2)
          m4_define(['M4_BITS_PER_ADDR'], 2)
-         m4_define_vector(M4_WORD, 2)
-         m4_define_hier(M4_REGS, 8)
+         m4_define_vector(WORD, 2)
+         m4_define_hier(REGS, 8)
       '])
    
    
@@ -746,9 +746,9 @@ m4+definitions(['
    m4_def(SUB_WORD_BITS, m4_width(m4_eval(M4_ADDRS_PER_WORD - 1)))
    m4_def(ADDRS_PER_INSTR, m4_eval(M4_INSTR_CNT / M4_BITS_PER_ADDR))
    m4_def(SUB_PC_BITS, m4_width(m4_eval(M4_ADDRS_PER_INSTR - 1)))
-   m4_define_vector(['M4_PC'], M4_ADDR_HIGH, M4_SUB_PC_BITS)
+   m4_define_vector(PC, M4_ADDR_HIGH, M4_SUB_PC_BITS)
    m4_def(FULL_PC, ['{$Pc, M4_SUB_PC_BITS'b0}'])
-   m4_define_hier(M4_DATA_MEM_ADDRS, m4_eval(M4_DATA_MEM_WORDS_HIGH * M4_ADDRS_PER_WORD))  // Addressable data memory locations.
+   m4_define_hier(DATA_MEM_ADDRS, m4_eval(M4_DATA_MEM_WORDS_HIGH * M4_ADDRS_PER_WORD))  // Addressable data memory locations.
    m4_def(INJECT_RETURNING_LD, m4_eval(M4_LD_RETURN_ALIGN > 0))
    m4_def(PENDING_ENABLED, M4_INJECT_RETURNING_LD)
    
@@ -843,12 +843,12 @@ m4+definitions(['
             // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
             //   of this instruction.
             // Params: $@ (m4_redirect_masking_triggers contains param use)
-            m4_pushdef(['m4_redir_cond'],
+            //0
+            m4_push(redir_cond,
                        ['(>>']M4_$1_BUBBLES['$2 && !(']m4_echo(m4_redirect_masking_triggers)[') && $GoodPathMask'][M4_$1_BUBBLES][')'])
-            m4_append(redirect_list, M4_$1_BUBBLES))
+            m4_append(redirect_list, M4_$1_BUBBLES)
             m4_append(redirect_squash_terms,
                       [' & (']m4_redir_cond($@)[' ? {{']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - M4_$1_BUBBLES - $4)['{1'b1}}, {']m4_eval(M4_$1_BUBBLES + $4)['{1'b0}}} : {']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
-            //m4_errprint(['|']m4_echo(m4_redirect_squash_terms)['| '])
             m4_append(redirect_shadow_terms,
                       [' & (']m4_redir_cond($@)[' ? {{']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1 - M4_$1_BUBBLES - $9)['{1'b1}}, {']m4_eval(M4_$1_BUBBLES + $9)['{1'b0}}} : {']m4_eval(M4_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
             m4_prepend(redirect_pc_terms,
@@ -863,14 +863,15 @@ m4+definitions(['
                       ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
             m4_append(redirect_cell_viz,
                       ['if (stage == ']M4_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m4_ifelse(M4_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
-            m4_popdef(['m4_redir_cond'])
+            m4_pop(redir_cond)
           '])
 
    // Specify and process redirect conditions.
    // TODO: Found a bug...
    //       Priority is naturally given to later triggers.
    //       Must explicitly mask earlier higher-priority triggers.
-   //       
+   //    
+
    m4_process_redirect_conditions(
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
       ['NO_FETCH, $NoFetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
@@ -937,7 +938,7 @@ m4+definitions(['
    // Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    m4_def(
       define_csr,
-      ['m4_define_vector_with_fields(['M4_CSR_']m4_to_upper(['$1']), $3)
+      ['m4_define_vector_with_fields(['CSR_']m4_to_upper(['$1']), $3)
         m4_def(csrs,
                m4_dquote(m4_quote(m4_csrs['']m4_ifelse(m4_csrs, [''], [''], [','])$1)))
         m4_def(csr_$1_args, ['$@'])
@@ -1052,7 +1053,7 @@ m4+definitions(['
    m4_case(M4_ISA, MINI, ['
       // An out-of-place correction for the fact that in Mini-CPU, instruction
       // addresses are to different memory than data, and the memories have different widths.
-      m4_define_vector(['M4_PC'], 10, 0)
+      m4_define_vector(PC, 10, 0)
       
    '], RISCV, ['
       // Included as tlv lib file.
@@ -1098,51 +1099,66 @@ m4+definitions(['
 
    // TODO: Remove after released to Makerchip/SaaS.
    m4_def(ifdef_tlv, ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
-'])
-\SV
-   m4_ifelse(M4_ISA, RISCV, ['
-      m4_def(verilator_lint, ['m4_show(m4_new_line()['/* verilator lint_$1 $2 */'])'])
-      // Heavy-handed lint_off's based on config.
-      // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-      m4_ifelse(m4_eval(M4_EXT_B['']M4_EXT_F), 0, , m4_verilator_lint(off, WIDTH))
-      m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, PINMISSING))
-      m4_ifelse(m4_eval(M4_EXT_B), 0, , m4_verilator_lint(off, SELRANGE))
-      
-      m4_ifelse(M4_EXT_M, 1, ['
-         m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
-         `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
+\m4
+   // Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
+   // based on model config.
+   m4_proc(sv_content, ['
+      m4_ifelse(M4_ISA, RISCV, ['
+         // Functions to append to sv_out. Verilator lint pragmas and SV includes.
+         m4_var(sv_out, [''])
+         m4_proc(verilator_lint, on_off, tag, ['
+            m4_append_var(sv_out, m4_nl['   /* verilator lint_']m4_on_off m4_tag[' */'])
          '])
-         m4_verilator_lint(off, WIDTH)
-         m4_verilator_lint(off, CASEINCOMPLETE)
-         // TODO : Update links after merge to master!
-         m4_sv_include_url(m4_warpv_includes['divmul/picorv32_pcpi_div.sv'])
-         m4_sv_include_url(m4_warpv_includes['divmul/picorv32_pcpi_fast_mul.sv'])
-         m4_verilator_lint(on, CASEINCOMPLETE)
-         m4_verilator_lint(on, WIDTH)
-      '])
+         m4_proc(sv_inc, file, ['
+            m4_append_var(sv_out, m4_nl['   m4_sv_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
+         '])
+         m4_proc(tlv_inc, file, ['
+            m4_append_var(sv_out, m4_nl['   m4_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
+         '])
+         
+         // Heavy-handed lint_off's based on config.
+         // TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
+         m4_if(M4_EXT_B || M4_EXT_F, m4_verilator_lint(off, WIDTH))
+         m4_if(M4_EXT_B, m4_verilator_lint(off, PINMISSING))
+         m4_if(M4_EXT_B, m4_verilator_lint(off, SELRANGE))
 
-      m4_ifelse_block(M4_EXT_B, 1, ['
-         m4_verilator_lint(off, WIDTH)
-         m4_verilator_lint(off, PINMISSING)
-         m4_verilator_lint(off, CASEOVERLAP)
-         m4_include_url(m4_warpv_includes['b-ext/top_bext_module.tlv'])
-         m4_verilator_lint(on, WIDTH)
-         m4_verilator_lint(on, CASEOVERLAP)
-         m4_verilator_lint(on, PINMISSING)   
-      '])
-       
-      m4_ifelse_block(M4_EXT_F, 1, ['
-         m4_verilator_lint(off, WIDTH)
-         m4_verilator_lint(off, CASEINCOMPLETE)   
-         m4_include_url(m4_warpv_includes['fpu/topmodule.tlv'])
-         m4_verilator_lint(on, CASEINCOMPLETE)
-         m4_verilator_lint(on, WIDTH)
-      '])
+         m4_if(M4_EXT_M, ['
+            m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
+            `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
+            '])
+            m4_verilator_lint(off, WIDTH)
+            m4_verilator_lint(off, CASEINCOMPLETE)
+            // TODO : Update links after merge to master!
+            m4_sv_inc(['divmul/picorv32_pcpi_div.sv'])
+            m4_sv_inc(['divmul/picorv32_pcpi_fast_mul.sv'])
+            m4_verilator_lint(on, CASEINCOMPLETE)
+            m4_verilator_lint(on, WIDTH)
+         '])
 
+         m4_if(M4_EXT_B, ['
+            m4_verilator_lint(off, WIDTH)
+            m4_verilator_lint(off, PINMISSING)
+            m4_verilator_lint(off, CASEOVERLAP)
+            m4_tlv_inc(['b-ext/top_bext_module.tlv'])
+            m4_verilator_lint(on, WIDTH)
+            m4_verilator_lint(on, CASEOVERLAP)
+            m4_verilator_lint(on, PINMISSING)
+         '])
+
+         m4_if(M4_EXT_F, ['
+            m4_verilator_lint(off, WIDTH)
+            m4_verilator_lint(off, CASEINCOMPLETE)
+            m4_tlv_inc(['fpu/topmodule.tlv'])
+            m4_verilator_lint(on, CASEINCOMPLETE)
+            m4_verilator_lint(on, WIDTH)
+         '])
+      '])
+      m4_out(m4_sv_out)
    '])
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m4_ifelse(M4_ISA, ['RISCV'], ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
-
+   m4_ifelse(M4_ISA, RISCV, ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
+\SV
+   m4_echo(m4_sv_content)
 
 
 // A default testbench for all ISAs.
@@ -1205,7 +1221,7 @@ m4+definitions(['
 
 \TLV mini_imem(_prog_name)
    // Instantiate the program. (This approach is required for an m4-defined name.)
-   m4_define(['m4_prog'], ['mini_']_prog_name['_prog'])
+   m4_def(prog, ['mini_']_prog_name['_prog'])
    m4+m4_prog()
    |fetch
       /instr
@@ -1571,8 +1587,8 @@ m4+definitions(['
                @M4_FETCH_STAGE
                   // For SRAM
                   // --------
-                  m4_ifndef(IMEM_SIZE, 1024)
-                  m4_define_hier(['M4_IMEM_SRAM'], M4_IMEM_SIZE)
+                  m4_default_def(IMEM_SIZE, 1024)
+                  m4_define_hier(IMEM_SRAM, M4_IMEM_SIZE)
                   \SV_plus
                     sram #(
                       .NB_COL(4),                           // Specify number of columns (number of bytes)
@@ -1782,8 +1798,10 @@ m4+definitions(['
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
 // This keeps the implications contained.
-\TLV riscv_decode_expr()
-   m4_echo(m4_decode_expr)
+\m4
+   m4_TLV_proc(riscv_decode_expr, ['
+      m4_out(m4_echo(m4_decode_expr))
+   '])
 
 \TLV riscv_rslt_mux_expr()
    // in case of second issue, the results are pulled out of the /orig_inst or /load_inst scope. 
@@ -1805,6 +1823,12 @@ m4+definitions(['
          '])
          M4_WORD_CNT'b0['']m4_echo(m4_rslt_mux_expr);
    
+\m4
+   m4_TLV_proc(instr_types_decode, ..., ['
+      m4_out(\SV_plus)
+      m4_out(m4_types_decode(m4_instr_types_args))
+   '])
+
 \TLV riscv_decode()
    // TODO: ?$valid_<stage> conditioning should be replaced by use of m4_prev_instr_valid_through(..).
    ?$valid_decode
@@ -1829,8 +1853,7 @@ m4+definitions(['
       `BOGUS_USE($raw_shamt $raw_aq $raw_rl $raw_rs3 $raw_rm)  // Avoid "unused" messages. Remove these as they become used.
 
       // Instruction type decode
-      \SV_plus
-         m4_types_decode(m4_instr_types_args)
+      m4+instr_types_decode()
 
       // Instruction decode.
       m4+riscv_decode_expr()
@@ -4123,11 +4146,11 @@ m4+definitions(['
 //          {..., $dest} = $head ? $data[..];
 //          $acceptable = $dest
 \TLV insertion_ring(/_hop, |_in, @_in, |_out, @_out, $_reset, |_name, /_flit, #_hop_dist, #_depth)
-   m4_pushdef(['m4_in_delay'], m4_defaulted_arg(#_in_delay, 0))
-   m4_pushdef(['m4_hop_dist'], m4_defaulted_arg(#_hop_dist, 1))
-   m4_pushdef(['m4_hop_name'], m4_strip_prefix(/_hop))
-   m4_pushdef(['M4_HOP'], ['M4_']m4_translit(m4_hop_name, ['a-z'], ['A-Z']))
-   m4_pushdef(['m4_prev_hop_index'], (m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT']))
+   m4_push(in_delay, m4_defaulted_arg(#_in_delay, 0))
+   m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
+   m4_push(hop_name, m4_strip_prefix(/_hop))
+   m4_push(HOP, ['M4_']m4_translit(m4_hop_name, ['a-z'], ['A-Z']))
+   m4_push(prev_hop_index, (m4_hop_name + m4_echo(M4_HOP['_CNT']) - 1) % m4_echo(M4_HOP['_CNT']))
    
    // ========
    // The Flow
@@ -4208,15 +4231,15 @@ m4+definitions(['
               $would_bypass ? 1'b0 :
                    $RETAIN;
 
-   m4_popdef(['m4_in_delay'])
-   m4_popdef(['m4_hop_dist'])
-   m4_popdef(['m4_hop_name'])
-   m4_popdef(['M4_HOP'])
-   m4_popdef(['m4_prev_hop_index'])
+   m4_pop(in_delay)
+   m4_pop(hop_dist)
+   m4_pop(hop_name)
+   m4_pop(HOP)
+   m4_pop(prev_hop_index)
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
    m4+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
-   m4_pushdef(['m4_trans_ind'], m4_ifelse(/_trans, [''], [''], ['   ']))
+   m4_push(trans_ind, m4_ifelse(/_trans, [''], [''], ['   ']))
    // In1 is blocked if output is blocked.
    // In1 is blocked if output is blocked or in2 is available.
    |_in1
@@ -4239,7 +4262,7 @@ m4+definitions(['
             /_trans
          m4_trans_ind   $ANY = /_top|_in1>>m4_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m4_align(@_in1, @_out)$ANY :
                                                                           /_top|_in2/_trans>>m4_align(@_in2, @_out)$ANY;
-   m4_popdef(['m4_trans_ind'])
+   m4_pop(trans_ind)
    
    
 // Can be used to build for many-core without a NoC (during development).
@@ -5973,7 +5996,7 @@ m4+definitions(['
 //   - m4+<M4_isa>_default_makerchip_tb
 //   - m4+default_makerchip_tb
 \TLV warpv_makerchip_tb()
-   m4_ifndef(TESTBENCH_NAME, m4_ifdef_tlv(M4_isa['_']M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, m4_ifdef_tlv(M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, ['default'])))
+   m4_default_def(TESTBENCH_NAME, m4_ifdef_tlv(M4_isa['_']M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, m4_ifdef_tlv(M4_PROG_NAME['_makerchip_tb'], M4_PROG_NAME, ['default'])))
    m4_def(tb_macro_name, m4_ifdef_tlv(M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_isa['_']M4_TESTBENCH_NAME['_makerchip_tb'], M4_TESTBENCH_NAME['_makerchip_tb']))
    m4+m4_tb_macro_name()
 

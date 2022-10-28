@@ -32,6 +32,10 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
                     <Checkbox value="--bestsv">Optimize SystemVerilog code for readability (versus
                         preserving line association with TL-Verilog source).</Checkbox>
                     <Checkbox value="--noline">Disable `line directive in SV output.</Checkbox>
+                    <Checkbox value="--clkAlways">Use the global/free-running clock for all flip-flops.</Checkbox>
+                    <Checkbox value="--clkEnable">Use enable flip-flops, not clock gating. (Good for FPGAs.)</Checkbox>
+                    <Checkbox value="--clkStageAlways">Apply clock gating/enabling only to the first
+                        of a series of flip-flops. Generally this will be less area, higher power.</Checkbox>
                     <Checkbox value="--fmtDeclSingleton"> Each HDL signal is declared in its own
                         declaration statement
                         with its own type specification.</Checkbox>

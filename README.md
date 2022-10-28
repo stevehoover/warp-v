@@ -182,3 +182,8 @@ TODO: Add implementation data here.
 ## Retiming Experiments
 
 We utilized the pipeline flexibility of TL-Verilog and WARP-V's pipeline parameterization to experiment with Vivado's ability to retime logic optimally. This showed that it is not necessary to precisely partition the CPU pipeline logic among pipeline stages in order to get good quality results. However, when tools must retime logic, runtime can be significantly impacted. Here is [more detail](doc/retiming.md).
+
+
+# Known Hardware Implementations
+
+  - [Open MPW-7, WARP-V 4-Stage](https://platform.efabless.com/projects/1287)
