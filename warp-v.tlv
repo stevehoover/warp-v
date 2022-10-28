@@ -1107,13 +1107,13 @@
          // Functions to append to sv_out. Verilator lint pragmas and SV includes.
          m4_var(sv_out, [''])
          m4_proc(verilator_lint, on_off, tag, ['
-            m4_append_var(sv_out, m4_nl['   /* verilator lint_']m4_on_off m4_tag[' */'])
+            m4_append_var(sv_out, m4_nl['m4_show(['   /* verilator lint_']']m4_on_off m4_tag['[' */'])'])
          '])
          m4_proc(sv_inc, file, ['
-            m4_append_var(sv_out, m4_nl['   m4_sv_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
+            m4_append_var(sv_out, m4_nl['m4_sv_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
          '])
          m4_proc(tlv_inc, file, ['
-            m4_append_var(sv_out, m4_nl['   m4_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
+            m4_append_var(sv_out, m4_nl['m4_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
          '])
          
          // Heavy-handed lint_off's based on config.
@@ -1158,7 +1158,7 @@
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, RISCV, ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
 \SV
-   m4_echo(m4_sv_content)
+   m4_echo(m4_sv_content())
 
 
 // A default testbench for all ISAs.

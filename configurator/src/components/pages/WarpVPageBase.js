@@ -189,7 +189,7 @@ export function WarpVPageBase({
 
         if (data["out/test.sv"]) {
             const verilog = data["out/test.sv"]
-                .replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])
+                .replace("`include \"test_gen.sv\"", "// gen included here\n" + data["out/test_gen.sv"])   // (Due to --inlineGen being forced, this no longer matters.)
                 .split("\n")
                 .filter(line => !line.startsWith("`include \"sp_default.vh\""))
                 .join("\n")
