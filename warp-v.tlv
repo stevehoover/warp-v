@@ -1108,7 +1108,7 @@
          m4_var(sv_out, [''])
          m4_proc(verilator_lint, on_off, tag, ['
             // TODO: Use m4_output_sv_line in place of show...
-            m4_append_var(sv_out, ['']m4_nl['   ']['m4_show(['m4_ifelse(m4_include_url_depth, ['0'], [''], ['['']m4_nl['   '])['/* verilator lint_']']']m4_on_off m4_tag['['[' */']'])'])
+            m4_append_var(sv_out, ['']m4_nl['   ']['m4_show(['m4_ifelse(m4_include_url_depth, ['0'], [''], ['['']m4_nl['   ']'])['/* verilator lint_']']']m4_on_off m4_tag['['[' */']'])'])
          '])
          m4_proc(sv_inc, file, ['
             m4_append_var(sv_out, m4_nl['   ']['m4_sv_include_url(m4_warpv_includes']m4_dquote(m4_file)[')'])
