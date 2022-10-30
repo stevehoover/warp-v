@@ -167,7 +167,9 @@ export function WarpVPageBase({
     }
 
     async function getSVForTlv(tlv, callback) {
-        const args = `-i test.tlv -o test.sv --m4out out/m4out --iArgs`
+        // Extract settings to be applied to sandpiper-saas command-line, not via --iArgs (aka, args for the sandpiper wrapper script).
+        const externSettings = configuratorGlobalSettings.generalSettings.formattingSettings.filter(formattingArg => formattingArg === "--fmtNoSource")
+        const args = `-i test.tlv -o test.sv --m4out out/m4out ${externSettings.join(" ")} --iArgs`
         const data = await makerchipFetch.post(
             "/function/sandpiper-faas",
             {

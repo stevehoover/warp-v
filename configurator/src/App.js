@@ -145,5 +145,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "e32527cfcaa56e6308c3ad061850b544668ffa13"
+export const warpVLatestSupportedCommit = "9c55723aa62a3155fb25aa937c71389ee17fd656"
 export const warpVLatestVersionCommit = "master"

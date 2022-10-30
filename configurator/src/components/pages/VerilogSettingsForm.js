@@ -31,6 +31,7 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
                     <Checkbox value="--hdl verilog">Verilog (vs. SystemVerilog)</Checkbox>
                     <Checkbox value="--bestsv">Optimize SystemVerilog code for readability (versus
                         preserving line association with TL-Verilog source).</Checkbox>
+                    <Checkbox value="--fmtNoSource">Disable \source tags in TL-Verilog. (Note, this is not an option in Makerchip.)</Checkbox>
                     <Checkbox value="--noline">Disable `line directive in SV output.</Checkbox>
                     <Checkbox value="--clkAlways">Use the global/free-running clock for all flip-flops.</Checkbox>
                     <Checkbox value="--clkEnable">Use enable flip-flops, not clock gating. (Good for FPGAs.)</Checkbox>

@@ -51,11 +51,11 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     //    verilatorConfig.add("/* verilator lint_off WIDTH */")
     //    verilatorConfig.add("/* verilator lint_off CASEINCOMPLETE */")
     //}
-    if (settings.isaExtensions.includes("B")) {
+    //if (settings.isaExtensions.includes("B")) {
     //    verilatorConfig.add("/* verilator lint_off WIDTH */")
     //    verilatorConfig.add("/* verilator lint_off PINMISSING */")
-        verilatorConfig.add("/* verilator lint_off SELRANGE */")
-    }
+    //    verilatorConfig.add("/* verilator lint_off SELRANGE */")
+    //}
     if (settings.formattingSettings.includes("--fmtPackAll")) {
         verilatorConfig.add("/* verilator lint_on WIDTH */ // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613")
         verilatorConfig.delete("/* verilator lint_off WIDTH */")
@@ -72,9 +72,8 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
    
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    */
-m4+definitions(['
+\\m4
 ${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${programName})`] : []).concat(definitions).join("\n   ") : ""}
-'])
 \\SV
    // Include WARP-V.
    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
