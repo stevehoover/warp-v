@@ -31,8 +31,8 @@
    // For usage examples, visit warp-v.org.
 
 \m4
-   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ec943ed510070c347c78a622a40d913bdab2f1ca/']'])
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
+   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ea7e9ce53f27a710fa11646032e456f351f9c92f/']'])
+   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
@@ -716,9 +716,6 @@
          m4_define_vector(WORD, 32)
          m4_define_hier(REGS, m4_ifelse(M4_EXT_E, 1, 16, 32), 1)
          m4_define_hier(FPU_REGS, 32, 0)   // (though, the hierarchy is called /regs, not /fpu_regs)
-         
-         // Controls SV generation:
-         m4_define(['m4_use_localparams'], 1)
       '],
       ['MIPSI'], ['
          m4_define_vector_with_fields(INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
