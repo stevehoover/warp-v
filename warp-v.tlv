@@ -31,7 +31,7 @@
    // For usage examples, visit warp-v.org.
 
 \m4
-   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ea7e9ce53f27a710fa11646032e456f351f9c92f/']'])
+   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/a921c883255eba37b9b8e66899845afe7a62b510/']'])
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 
    // A highly-parameterized CPU generator, configurable for:
