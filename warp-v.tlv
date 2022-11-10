@@ -30,9 +30,10 @@
 
    // For usage examples, visit warp-v.org.
 
+\SV
+   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m4
    m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/a921c883255eba37b9b8e66899845afe7a62b510/']'])
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
@@ -1153,9 +1154,9 @@
       '])
       m4_out(m4_sv_out)
    '])
+\SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, RISCV, ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
-\SV
    m4_echo(m4_sv_content())
 
 
