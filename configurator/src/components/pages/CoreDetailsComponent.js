@@ -1,7 +1,7 @@
 import {Box, Button, Code, Container, Heading, HStack, Icon, Image, Link, Text, Tooltip} from '@chakra-ui/react';
 import {FaLongArrowAltRight} from 'react-icons/all';
 import {useState} from "react";
-import {downloadFile, openInMakerchip} from "../../utils/FetchUtils";
+import {downloadOrCopyFile, openInMakerchip} from "../../utils/FetchUtils";
 import {QuestionOutlineIcon} from "@chakra-ui/icons";
 
 const m4fileName = "your_warpv_core_configuration.m4"
@@ -27,9 +27,17 @@ export function CoreDetailsComponent({
     }
 
     function handleDownloadSelectedFileClicked() {
-        if (selectedFile === "m4") downloadFile(m4fileName, macrosForJson.join("\n"))
-        else if (selectedFile === "tlv") downloadFile(tlvFileName, tlvForJson)
-        else if (selectedFile === "rtl") downloadFile(systemVerilogFileName, sVForJson)
+        handleDownloadOrCopySelectedFileClicked(false);
+    }
+
+    function handleCopySelectedFileClicked() {
+        handleDownloadOrCopySelectedFileClicked(true);
+    }
+
+    function handleDownloadOrCopySelectedFileClicked(copy) {
+        if (selectedFile === "m4") downloadOrCopyFile(copy, m4fileName, macrosForJson.join("\n"))
+        else if (selectedFile === "tlv") downloadOrCopyFile(copy, tlvFileName, tlvForJson)
+        else if (selectedFile === "rtl") downloadOrCopyFile(copy, systemVerilogFileName, sVForJson)
     }
 
     function replaceImports(old) {
@@ -113,7 +121,8 @@ export function CoreDetailsComponent({
                 <HStack mb={3}>
                     <Button colorScheme="teal" onClick={handleDownloadSelectedFileClicked}>Download File</Button>
                     <Button colorScheme="blue" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
-                            isLoading={makerchipOpening}>Edit in Makerchip as source</Button>
+                            isLoading={makerchipOpening}>Edit in Makerchip as Source</Button>
+                    <Button colorScheme="teal" onClick={handleCopySelectedFileClicked}>Copy Code</Button>
                 </HStack>
 
                 <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100vh" maxW="100%">

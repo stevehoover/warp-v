@@ -2,7 +2,7 @@ import React, {useEffect} from "react";
 import {Box, Button, Heading, HStack, Image, useToast} from "@chakra-ui/react";
 import {getTLVCodeForDefinitions, translateJsonToM4Macros, translateParametersToJson} from "../translation/Translation";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
-import {downloadFile, openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
+import {downloadOrCopyFile, openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
 import useFetch from "../../utils/useFetch";
 
 export function WarpVPageBase({
@@ -246,7 +246,7 @@ export function WarpVPageBase({
             const macros = translateJsonToM4Macros(coreJson);
             const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
             getSVForTlv(tlv, sv => {
-                downloadFile('verilog.sv', sv);
+                downloadOrCopyFile(false, 'verilog.sv', sv);
                 setDownloadingCode(false)
             });
         }

@@ -33,7 +33,7 @@
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m4
-   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/a921c883255eba37b9b8e66899845afe7a62b510/']'])
+   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ca70d4e2538ae9fe792f9db1d3eafbac5d4a9a2c/']'])
 
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:

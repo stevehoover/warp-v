@@ -10,17 +10,21 @@ import {
     Text
 } from "@chakra-ui/react";
 
-export function downloadFile(filename, text) {
-    const element = document.createElement('a');
-    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-    element.setAttribute('download', filename);
+export function downloadOrCopyFile(copy, filename, text) {
+    if (copy) {
+        navigator.clipboard.writeText(text);
+    } else {
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', filename);
 
-    element.style.display = 'none';
-    document.body.appendChild(element);
+        element.style.display = 'none';
+        document.body.appendChild(element);
 
-    element.click();
+        element.click();
 
-    document.body.removeChild(element);
+        document.body.removeChild(element);
+    }
 }
 
 export function OpenInMakerchipModal({disclosure, url}) {
