@@ -961,9 +961,9 @@
          m4_define_csr(instret,    12'hC02,    ['32, INSTRET, 0'],             ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_define_csr(instreth,   12'hC82,    ['32, INSTRETH, 0'],            ['32'b0'],                     ['{32{1'b1}}'],                     1)
          m4_ifelse(M4_EXT_F, 1, ['
-         m4_define_csr(fflags,     12'h001,    ['5, FFLAGS, 0'],               ['5'b0'],                      ['{5{1'b1}}'],                      1)
-         m4_define_csr(frm,        12'h002,    ['3, FRM, 0'],                  ['3'b0'],                      ['{3{1'b1}}'],                      1)
-         m4_define_csr(fcsr,       12'h003,    ['8, FCSR, 0'],                 ['8'b0'],                      ['{8{1'b1}}'],                      1)
+          m4_define_csr(fflags,    12'h001,    ['5, FFLAGS, 0'],               ['5'b0'],                      ['{5{1'b1}}'],                      1)
+          m4_define_csr(frm,       12'h002,    ['3, FRM, 0'],                  ['3'b0'],                      ['{3{1'b1}}'],                      1)
+          m4_define_csr(fcsr,      12'h003,    ['8, FCSR, 0'],                 ['8'b0'],                      ['{8{1'b1}}'],                      1)
          '])                                
       '])
       
@@ -1066,6 +1066,7 @@
 
    // Define m4+module_def macro to be used as a region line providing the module definition, either inside makerchip,
    // or outside for formal.
+   m4_pragma_disable_quote_checks
    m4_def(module_def,
           ['m4_ifelse(M4_FORMAL, 0,
                       ['\SV['']m4_new_line['']m4_makerchip_module'],
@@ -1094,6 +1095,7 @@
          output logic [3: 0] rvfi_mem_wmask,
          output logic [31: 0] rvfi_mem_rdata,
          output logic [31: 0] rvfi_mem_wdata);'])'])
+   m4_pragma_enable_quote_checks
 
    // TODO: Remove after released to Makerchip/SaaS.
    m4_def(ifdef_tlv, ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
@@ -1123,7 +1125,7 @@
 
          m4_if(M4_EXT_M, ['
             m4_ifelse(M4_RISCV_FORMAL_ALTOPS, 1, ['
-            `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
+             `define RISCV_FORMAL_ALTOPS         // enable ALTOPS if compiling for formal verification of M extension
             '])
             m4_verilator_lint(off, WIDTH)
             m4_verilator_lint(off, CASEINCOMPLETE)
