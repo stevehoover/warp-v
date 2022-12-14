@@ -33,7 +33,9 @@
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m4
-   m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ca70d4e2538ae9fe792f9db1d3eafbac5d4a9a2c/']'])
+   m4_use(m5)
+   //+m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ca70d4e2538ae9fe792f9db1d3eafbac5d4a9a2c/']'])
+   m4_def(warpv_includes, ['['./warp-v_includes_m5/']'])
 
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
@@ -166,7 +168,7 @@
    //
    // TODO: Once Makerchip supports multifile editing, split this up.
    //       WARP should be a library, and each CPU uses this library to create a CPU.
-   //       Stages should be defined using a generic mechanism (just defining M4_*_STAGE constants).
+   //       Stages should be defined using a generic mechanism (just defining m5_*_STAGE constants).
    //       Redirects should be defined using a generic mechanism to define each redirect, then
    //       instantiate the logic (including PC logic).
    //       IMem, RF should be m4+ macros.
@@ -353,7 +355,7 @@
      ['# A hook for a software-controlled reset. None by default.'],
      soft_reset, 1'b0,
      
-     ['# A hook for CPU back-pressure in M4_REG_RD_STAGE.
+     ['# A hook for CPU back-pressure in M5_REG_RD_STAGE.
          Various sources of back-pressure can add to this expression.
          Currently, this is envisioned for CSR writes that cannot be processed, such as
          NoC packet writes.'],
@@ -362,19 +364,19 @@
    // Define the implementation configuration, including pipeline depth and staging.
    // Define the following:
    //   Stages:
-   //     M4_NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
-   //     M4_FETCH_STAGE: Instruction fetch.
-   //     M4_DECODE_STAGE: Instruction decode.
-   //     M4_BRANCH_PRED_STAGE: Branch predict (taken/not-taken). Currently, we mispredict to a known branch target,
+   //     m5_NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
+   //     m5_FETCH_STAGE: Instruction fetch.
+   //     m5_DECODE_STAGE: Instruction decode.
+   //     m5_BRANCH_PRED_STAGE: Branch predict (taken/not-taken). Currently, we mispredict to a known branch target,
    //                           so branch prediction is only relevant if target is computed before taken/not-taken is known.
    //                           For other ISAs prediction is forced to fallthrough, and there is no pred-taken redirect.
-   //     M4_REG_RD_STAGE: Register file read.
-   //     M4_EXECUTE_STAGE: Operation execution.
-   //     M4_RESULT_STAGE: Select execution result.
-   //     M4_BRANCH_TARGET_CALC_STAGE: Calculate branch target (generally EXECUTE, but some designs
+   //     m5_REG_RD_STAGE: Register file read.
+   //     m5_EXECUTE_STAGE: Operation execution.
+   //     m5_RESULT_STAGE: Select execution result.
+   //     m5_BRANCH_TARGET_CALC_STAGE: Calculate branch target (generally EXECUTE, but some designs
    //                                  might produce offset from EXECUTE, then compute target).
-   //     M4_MEM_WR_STAGE: Memory write.
-   //     M4_REG_WR_STAGE: Register file write.
+   //     m5_MEM_WR_STAGE: Memory write.
+   //     m5_REG_WR_STAGE: Register file write.
    //     Deltas (default to 0):
    //       M4_DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
    //   Latencies (default to 0):
@@ -393,7 +395,7 @@
    m4_case(M4_STANDARD_CONFIG,
       ['1-stage'], ['
          // No pipeline
-         m4_default_def(
+         m5_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 0,
@@ -402,13 +404,14 @@
             EXECUTE_STAGE, 0,
             RESULT_STAGE, 0,
             REG_WR_STAGE, 0,
-            MEM_WR_STAGE, 0,
+            MEM_WR_STAGE, 0)
+         m4_default_def(
             LD_RETURN_ALIGN, 1)
          m4_default_def(BRANCH_PRED, fallthrough)
       '],
       ['2-stage'], ['
          // 2-stage pipeline.
-         m4_default_def(
+         m5_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 0,
@@ -417,13 +420,14 @@
             EXECUTE_STAGE, 1,
             RESULT_STAGE, 1,
             REG_WR_STAGE, 1,
-            MEM_WR_STAGE, 1,
+            MEM_WR_STAGE, 1)
+         m4_default_def(
             LD_RETURN_ALIGN, 2)
          m4_default_def(BRANCH_PRED, two_bit)
       '],
       ['4-stage'], ['
          // A reasonable 4-stage pipeline.
-         m4_default_def(
+         m5_default_def(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
             DECODE_STAGE, 1,
@@ -432,14 +436,15 @@
             EXECUTE_STAGE, 2,
             RESULT_STAGE, 2,
             REG_WR_STAGE, 3,
-            MEM_WR_STAGE, 3,
+            MEM_WR_STAGE, 3)
+         m4_default_def(
             EXTRA_REPLAY_BUBBLE, 1,
             LD_RETURN_ALIGN, 4)
          m4_default_def(BRANCH_PRED, two_bit)
       '],
       ['6-stage'], ['
          // Deep pipeline
-         m4_default_def(
+         m5_default_def(
             NEXT_PC_STAGE, 1,
             FETCH_STAGE, 1,
             DECODE_STAGE, 3,
@@ -448,7 +453,8 @@
             EXECUTE_STAGE, 5,
             RESULT_STAGE, 5,
             REG_WR_STAGE, 6,
-            MEM_WR_STAGE, 7,
+            MEM_WR_STAGE, 7)
+         m4_default_def(
             EXTRA_REPLAY_BUBBLE, 1,
             LD_RETURN_ALIGN, 7)
          m4_default_def(BRANCH_PRED, two_bit)
@@ -469,7 +475,6 @@
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
-
    m4_case(M4_ISA, MINI, ['
          // Mini-CPU Configuration:
          // Force predictor to fallthrough, since we can't predict early enough to help.
@@ -552,43 +557,43 @@
    // Characterize ISA and apply configuration.
    
    // Characterize the ISA, including:
-   // M4_NOMINAL_BRANCH_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
+   // m5_NOMINAL_BRANCH_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
    //                                      can be available.
    // M4_HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
    // Defaults:
    m4_def(HAS_INDIRECT_JUMP, 0)
    m4_case(M4_ISA, ['MINI'], ['
          // Mini-CPU Characterization:
-         m4_def(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['M4_EXECUTE_STAGE'])
+         m5_macro(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['m5_EXECUTE_STAGE'])
       '], ['RISCV'], ['
          // RISC-V Characterization:
-         m4_def(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['M4_DECODE_STAGE'])
+         m5_macro(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['m5_DECODE_STAGE'])
          m4_def(HAS_INDIRECT_JUMP, 1)
       '], ['MIPSI'], ['
          // MIPS I Characterization:
-         m4_def(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['M4_DECODE_STAGE'])
-         m4_def(HAS_INDIRECT_JUMP, 1)
+         m5_macro(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['m5_DECODE_STAGE'])
+         m5_macro(HAS_INDIRECT_JUMP, 1)
       '], ['POWER'], ['
       '], ['DUMMY'], ['
          // DUMMY Characterization:
-         m4_def(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['M4_DECODE_STAGE'])
+         m5_macro(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['m5_DECODE_STAGE'])
       ']
    )
    
    // Calculated stages:
-   m4_def(BRANCH_TARGET_CALC_STAGE, m4_eval(M4_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
+   m5_macro(BRANCH_TARGET_CALC_STAGE, m4_eval(m5_NOMINAL_BRANCH_TARGET_CALC_STAGE + M4_DELAY_BRANCH_TARGET_CALC))
    // Calculated alignments:
-   m4_def(REG_BYPASS_STAGES,  m4_eval(M4_REG_WR_STAGE - M4_REG_RD_STAGE))
+   m5_macro(REG_BYPASS_STAGES,  m4_eval(m5_REG_WR_STAGE - m5_REG_RD_STAGE))
 
    // Latencies/bubbles calculated from stage parameters and extra bubbles:
    // (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
-   m4_def(PRED_TAKEN_BUBBLES, m4_eval(M4_BRANCH_PRED_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE),
-          REPLAY_BUBBLES,     m4_eval(M4_REG_RD_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE),
-          JUMP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE),
-          BRANCH_BUBBLES,     m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE),
-          INDIRECT_JUMP_BUBBLES, m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE),
-          NON_PIPELINED_BUBBLES, m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_NON_PIPELINED_BUBBLE),
-          TRAP_BUBBLES,       m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE),
+   m4_def(PRED_TAKEN_BUBBLES, m4_eval(m5_BRANCH_PRED_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_PRED_TAKEN_BUBBLE),
+          REPLAY_BUBBLES,     m4_eval(m5_REG_RD_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_REPLAY_BUBBLE),
+          JUMP_BUBBLES,       m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_JUMP_BUBBLE),
+          BRANCH_BUBBLES,     m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_BRANCH_BUBBLE),
+          INDIRECT_JUMP_BUBBLES, m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_INDIRECT_JUMP_BUBBLE),
+          NON_PIPELINED_BUBBLES, m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_NON_PIPELINED_BUBBLE),
+          TRAP_BUBBLES,       m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + M4_EXTRA_TRAP_BUBBLE),
           ['# Bubbles between second issue of a long-latency instruction and
               the replay of the instruction it squashed (so always zero).'],
           SECOND_ISSUE_BUBBLES, 0)
@@ -599,8 +604,8 @@
    //   $1: VIZ left of stage in diagram
    //   $2: Stage name
    //   $3: Next $1
-   m4_def(stages, ['m4_ifelse(['$2'],,,['m4_append(stages_js, ['defineStage("$2", ']M4_$2_STAGE - M4_NEXT_PC_STAGE[', $1, $3); '])m4_stages(m4_shift(m4_shift($@)))'])'])
-   m4_stages(
+   m5_macro(stages, ['m4_ifelse(['$2'],,,['m4_append(stages_js, ['defineStage("$2", ']m5_$2_STAGE - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m4_shift(m4_shift($@)))'])'])
+   m5_stages(
       8.5, NEXT_PC,
       13, FETCH,
       21, DECODE,
@@ -612,7 +617,7 @@
       93, MEM_WR,
       100)
    
-   m4_def(VIZ_STAGE, M4_MEM_WR_STAGE)
+   m5_macro(VIZ_STAGE, m5_MEM_WR_STAGE)
 
    
    
@@ -633,7 +638,7 @@
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
    
    m4_ifelse(M4_RETIMING_EXPERIMENT, ['M4_RETIMING_EXPERIMENT'], [''], ['
-      m4_def(NEXT_PC_STAGE, 0,
+      m5_def(NEXT_PC_STAGE, 0,
              FETCH_STAGE, 0,
              DECODE_STAGE, 0,
              BRANCH_PRED_STAGE, 0,
@@ -652,21 +657,24 @@
    // ========================
    
    // (Not intended to be exhaustive.)
-   
+
+\m5
    // Check that expressions are ordered.
-   m4_func(ordered, ..., ['
-      m4_ifelse(['$2'], [''], [''], ['
-         m4_ifelse(m4_eval(M4_$1 > M4_$2), 1,
-                   ['m4_errprint(['$1 (']M4_$1[') is greater than $2 (']M4_$2[').']m4_nl())'])
-         m4_ordered(m4_shift($@))
-      '])
-   '])
-   // TODO:; It should be M4_NEXT_PC_STAGE-1, below.
-   m4_ordered(NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE, REG_RD_STAGE,
-              EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE)
-                                 
+   fn(ordered, ..., {
+      m5_ifeq(['$2'], [''], [''], {
+         m5_if(m5_$1 > m5_$2, {
+            m4_errprint(['$1 (']m5_$1[') is greater than $2 (']m5_$2[').']m4_nl())
+         })
+         ordered(m4_shift($@))
+      })
+   })
+   // TODO:; It should be m5_NEXT_PC_STAGE-1, below.
+   ordered(NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE, REG_RD_STAGE,
+           EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE)
+
    // Check reg bypass limit
-   m4_ifelse(m4_eval(M4_REG_BYPASS_STAGES > 3), 1, ['m4_errprint(['Too many stages of register bypass (']M4_REG_BYPASS_STAGES['.'])'])
+   if(m5_REG_BYPASS_STAGES > 3, ['m4_errprint(['Too many stages of register bypass (']m5_REG_BYPASS_STAGES[').'])'])
+\m4
    
 
 
@@ -690,7 +698,7 @@
    // Inputs:
    //   |fetch@M4_FETCH$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]
    // Outputs:
-   //   |fetch/instr?$fetch$raw[M4_INSTR_RANGE] (at or after @M4_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
+   //   |fetch/instr?$fetch$raw[m5_INSTR_RANGE] (at or after @m5_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
    m4_default_def(IMEM_MACRO_NAME, M4_isa['_imem'])
    
    // For each ISA, define:
@@ -837,7 +845,7 @@
    //   $9: 1 for bad-path redirects (used by RVFI only)
    //   $10: (opt) ['wait'] to freeze fetch until subsequent redirect
    m4_def(process_redirect_condition,
-          ['// expression in @M4_NEXT_PC_STAGE asserting for the redirect condition.
+          ['// expression in @m5_NEXT_PC_STAGE asserting for the redirect condition.
             // = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
             //   of this instruction.
             // Params: $@ (m4_redirect_masking_triggers contains param use)
@@ -886,7 +894,7 @@
    // TODO: It would be great to auto-sort.
    // TODO: JUMP timing is nominally DECODE for most uarch's (immediate jumps), but this ordering forces
    //       redirect to be no earlier than REPLAY (REG_RD).
-   m4_ordered(m4_redirect_list)
+   m5_ordered(m4_redirect_list)
 
    
    // A macro for generating a when condition for instruction logic (just for a bit of power savings). (We probably won't
@@ -910,14 +918,14 @@
    //  $4: Reset value
    //  $5: Writable bits mask
    //  $6: 0, 1, RO indicating whether to allow side-effect writes.
-   //      If 1, these signals in scope |fetch@M4_EXECUTE_STAGE must provide a write value:
+   //      If 1, these signals in scope |fetch@m5_EXECUTE_STAGE must provide a write value:
    //         o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
    //         o $csr_<csr_name>_hw_wr_value: the value to write
    //         o $csr_<csr_name>_hw_wr_mask: mask of bits to write
    //        Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
    //        rare that a bit can be written by both hardware and software.
    //      If RO, the CSR is read-only and code can be simpler. The CSR signal must be provided:
-   //         o $csr_<csr_name>: The read-only CSR value (used in |fetch@M4_EXECUTE_STAGE).
+   //         o $csr_<csr_name>: The read-only CSR value (used in |fetch@m5_EXECUTE_STAGE).
    // Variables set by this macro:
    m4_def(['# List of CSRs.'],
           csrs, [''])
@@ -1099,10 +1107,10 @@
 
    // TODO: Remove after released to Makerchip/SaaS.
    m4_def(ifdef_tlv, ['m4_ifdef(['m4tlv_$1__body'], m4_shift($@))'])
-\m4
+\m5
    // Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
    // based on model config.
-   m4_proc(sv_content, ['
+   fn(sv_content, {
       m4_ifelse(M4_ISA, RISCV, ['
          // Functions to append to sv_out. Verilator lint pragmas and SV includes.
          m4_var(sv_out, [''])
@@ -1155,11 +1163,11 @@
          '])
       '])
       m4_out(m4_sv_out)
-   '])
+   })
 \SV
    m4_ifexpr(M4_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m4_ifelse(M4_ISA, RISCV, ['m4_include_lib(m4_warpv_includes['risc-v_defs.tlv'])'])
-   m4_echo(m4_sv_content())
+   m4_echo(m5_sv_content())
 
 
 // A default testbench for all ISAs.
@@ -1167,7 +1175,7 @@
 \TLV default_makerchip_tb()
    |fetch
       /instr
-         @M4_MEM_WR_STAGE
+         @m5_MEM_WR_STAGE
             $passed = ! $reset && ($Pc == (M4_NUM_INSTRS - 1)) && $good_path;
             $failed = *cyc_cnt > 200;
 
@@ -1226,7 +1234,7 @@
    m4+m4_prog()
    |fetch
       /instr
-         @M4_FETCH_STAGE
+         @m5_FETCH_STAGE
             ?$fetch
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
 
@@ -1323,7 +1331,7 @@
 // Execution unit logic for Mini.
 // Context: pipeline
 \TLV mini_exe(@_exe_stage, @_rslt_stage)
-   @M4_REG_RD_STAGE
+   @m5_REG_RD_STAGE
       /src[*]
          $valid = /instr$valid_decode && ($is_reg || $is_imm);
          ?$valid
@@ -1377,7 +1385,7 @@
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
       ?$jump
          $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @m5_BRANCH_TARGET_CALC_STAGE
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
 
@@ -1578,14 +1586,14 @@
          // No instruction memory.
          |fetch
             /instr
-               @M4_FETCH_STAGE
+               @m5_FETCH_STAGE
                   ?$fetch
                      `BOGUS_USE($$raw[M4_INSTR_RANGE])
       , M4_IMEM_STYLE, SRAM,
       \TLV
          |fetch
             /instr
-               @M4_FETCH_STAGE
+               @m5_FETCH_STAGE
                   // For SRAM
                   // --------
                   m4_default_def(IMEM_SIZE, 1024)
@@ -1618,17 +1626,17 @@
       \TLV
          |fetch
             /instr
-               @M4_FETCH_STAGE
+               @m5_FETCH_STAGE
                   ?$fetch
                      *imem_addr = $next_pc;
-               @m4_eval(M4_FETCH_STAGE + 1)
+               @m4_eval(m5_FETCH_STAGE + 1)
                   ?$fetch
                      $raw[M4_INSTR_RANGE] = *imem_data;
       , M4_IMEM_STYLE, STUBBED,
       \TLV
          |fetch
             /instr
-               @M4_DECODE_STAGE
+               @m5_DECODE_STAGE
                   $raw[M4_INSTR_RANGE] = {$Pc, $Pc[31:30]};
       ,
       \TLV
@@ -1651,12 +1659,12 @@
             m4+ifelse(M4_VIZ, 1,
                \TLV
                   /instr_mem[m4_eval(M4_NUM_INSTRS-1):0]
-                     @M4_VIZ_STAGE
+                     @m5_VIZ_STAGE
                         $instr[M4_INSTR_RANGE] = *instrs[instr_mem];
                         $instr_str[40*8-1:0] = *instr_strs[instr_mem];
                )
             /instr
-               @M4_FETCH_STAGE
+               @m5_FETCH_STAGE
                   ?$fetch
                      $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
       )
@@ -1666,9 +1674,9 @@
    //--------------
    /['']/ CSR m4_to_upper(csr_name)
    //--------------
-   @M4_DECODE_STAGE
+   @m5_DECODE_STAGE
       $is_csr_['']csr_name = $raw[31:20] == csr_index;
-   @M4_EXECUTE_STAGE
+   @m5_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
       // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
       m4_def(THIS_CSR_RANGE, m4_echo(['M4_CSR_']m4_to_upper(csr_name)['_RANGE']))
@@ -2023,7 +2031,7 @@
    // if B_EXT is enabled, this handles the stalling logic
    m4_ifelse(M4_EXT_B, 1, ['m4+b_extension()'])
    
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @m5_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
          $branch_target[M4_PC_RANGE] = $Pc[M4_PC_RANGE] + $raw_b_imm[M4_PC_RANGE];
          $misaligned_pc = | $raw_b_imm[1:0];
@@ -2576,7 +2584,7 @@
    m4+m4_prog()
    |fetch
       /instr
-         @M4_FETCH_STAGE
+         @m5_FETCH_STAGE
             ?$fetch
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
 
@@ -2728,7 +2736,7 @@
 // Execution unit logic for MIPS I.
 // Context: pipeline
 \TLV mipsi_exe(@_exe_stage, @_rslt_stage)
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @m5_BRANCH_TARGET_CALC_STAGE
       // TODO: Branch delay slot not implemented.
       // (PC is an instruction address, not a byte address.)
       ?$valid_decode_branch
@@ -2892,7 +2900,7 @@
    m4+m4_prog()
    |fetch
       /instr
-         @M4_FETCH_STAGE
+         @m5_FETCH_STAGE
             ?$fetch
                $raw[M4_INSTR_RANGE] = *instrs\[$Pc[m4_eval(M4_PC_MIN + m4_width(M4_NUM_INSTRS-1) - 1):M4_PC_MIN]\];
 
@@ -2916,7 +2924,7 @@
 // Execution unit logic for POWER.
 // Context: pipeline
 \TLV power_exe(@_exe_stage, @_rslt_stage)
-   @M4_REG_RD_STAGE
+   @m5_REG_RD_STAGE
       /src[*]
          $valid = /instr$valid_decode && ($is_reg || $is_imm);
          ?$valid
@@ -2950,7 +2958,7 @@
       ?$jump
          $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
    // TODO: Depends on $rslt. Check timing.
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @m5_BRANCH_TARGET_CALC_STAGE
       ?$branch
          $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + $rslt[M4_PC_RANGE];
 
@@ -2965,7 +2973,7 @@
    // Dummy IMem contains 2 dummy instructions.
    |fetch
       /instr
-         @M4_FETCH_STAGE
+         @m5_FETCH_STAGE
             ?$fetch
                $raw[M4_INSTR_RANGE] = $Pc[M4_PC_MIN:M4_PC_MIN] == 1'b0 ? 2'b01 : 2'b10;
 
@@ -2993,7 +3001,7 @@
 // Execution unit logic for RISC-V.
 // Context: pipeline
 \TLV dummy_exe(@_exe_stage, @_rslt_stage)
-   @M4_REG_RD_STAGE
+   @m5_REG_RD_STAGE
       $exe_rslt[M4_WORD_RANGE] = 2'b1;
    // Note that some result muxing is performed in @_exe_stage, and the rest in @_rslt_stage.
    @_exe_stage
@@ -3011,7 +3019,7 @@
          
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
       $jump_target[M4_PC_RANGE] = $rslt[M4_PC_RANGE];
-   @M4_BRANCH_TARGET_CALC_STAGE
+   @m5_BRANCH_TARGET_CALC_STAGE
       $branch_target[M4_PC_RANGE] = $Pc + M4_PC_CNT'b1 + /instr$raw[M4_PC_CNT-1:0]; // $raw represents immediate field
          
 
@@ -3044,7 +3052,7 @@
          // ====
          // Load
          // ====
-         @M4_MEM_WR_STAGE
+         @m5_MEM_WR_STAGE
             /* DMEM_STYLE: M4_DMEM_STYLE */
             m4+ifelse(M4_DMEM_STYLE, STUBBED,
                \TLV
@@ -3124,7 +3132,7 @@
    |mem
       /data
          // This becomes a one-liner once $ANY acts on subscopes.
-         @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
+         @m4_eval(m4_strip_prefix(['@m5_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE)
             $ANY = /_cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ANY;
             /src[2:1]
                $ANY = /_cpu|fetch/instr/src>>M4_ALIGNMENT_VALUE$ANY;
@@ -3135,8 +3143,8 @@
                      ///src[2:1]
                      //   $ANY = /_cpu|fetch/instr/fpu/src>>M4_ALIGNMENT_VALUE$ANY;
                )
-         // For consistency with other memories, assign $ld_value in @M4_MEM_WR_STAGE+1. 
-         @m4_eval(m4_strip_prefix(['@M4_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE + 1)
+         // For consistency with other memories, assign $ld_value in @m5_MEM_WR_STAGE+1. 
+         @m4_eval(m4_strip_prefix(['@m5_MEM_WR_STAGE']) - M4_ALIGNMENT_VALUE + 1)
             $ld_value[M4_WORD_RANGE] = /_cpu|fetch/instr>>M4_ALIGNMENT_VALUE$ld_data;
 
 
@@ -3151,23 +3159,23 @@
 // Branch predictor macros:
 // Context: pipeline
 // Inputs:
-//   @M4_EXECUTE_STAGE
+//   @m5_EXECUTE_STAGE
 //      $reset
 //      $branch: This instruction is a branch.
 //      ?$branch
 //         $taken: This branch is taken.
 // Outputs:
-//   @M4_BRANCH_PRED_STAGE
+//   @m5_BRANCH_PRED_STAGE
 //      $pred_taken
 \TLV branch_pred_fallthrough()
-   @M4_BRANCH_PRED_STAGE
+   @m5_BRANCH_PRED_STAGE
       $pred_taken = 1'b0;
 
 \TLV branch_pred_two_bit()
-   @M4_BRANCH_PRED_STAGE
+   @m5_BRANCH_PRED_STAGE
       ?$branch
-         $pred_taken = >>m4_stage_eval(@M4_EXECUTE_STAGE + 1 - @M4_BRANCH_PRED_STAGE)$BranchState[1];
-   @M4_EXECUTE_STAGE
+         $pred_taken = >>m4_stage_eval(@m5_EXECUTE_STAGE + 1 - @m5_BRANCH_PRED_STAGE)$BranchState[1];
+   @m5_EXECUTE_STAGE
       $branch_or_reset = ($branch && $commit) || $reset;
       ?$branch_or_reset
          $BranchState[1:0] <=
@@ -3205,9 +3213,9 @@
 
    // Relative to typical 1-cycle latency instructions.
 
-   @M4_NEXT_PC_STAGE
+   @m5_NEXT_PC_STAGE
       $second_issue_div_mul = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
-   @M4_EXECUTE_STAGE
+   @m5_EXECUTE_STAGE
       {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
                                                      $second_issue_div_mul ? '0 :
                                                      ($commit && $div_mul) ? {$divtype_instr, $multype_instr, 6'b1} :
@@ -3396,11 +3404,11 @@
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
    
    m4_def(FPU_DIV_LATENCY, 26)  // Relative to typical 1-cycle latency instructions.
-   @M4_NEXT_PC_STAGE
+   @m5_NEXT_PC_STAGE
       $fpu_second_issue_div_sqrt = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_fpu_div_sqrt_second_issue;
-   @M4_EXECUTE_STAGE
+   @m5_EXECUTE_STAGE
       {$fpu_div_sqrt_stall, $fpu_stall_cnt[5:0]} =    $reset ? 7'b0 :
-                                                   <<m4_eval(M4_EXECUTE_STAGE - M4_NEXT_PC_STAGE)$fpu_second_issue_div_sqrt ? 7'b0 :
+                                                   <<m4_eval(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE)$fpu_second_issue_div_sqrt ? 7'b0 :
                                                    ($commit && $fpu_div_sqrt_type_instr) ? {$fpu_div_sqrt_type_instr, 6'b1} :
                                                    >>1$fpu_div_sqrt_stall ? {1'b1, >>1$fpu_stall_cnt + 6'b1} :
                                                    7'b0;
@@ -3423,9 +3431,9 @@
 
    m4_def(CLMUL_LATENCY, 5)
    m4_def(CRC_LATENCY, 5)
-   @M4_NEXT_PC_STAGE
+   @m5_NEXT_PC_STAGE
       $second_issue_clmul_crc = >>M4_NON_PIPELINED_BUBBLES$trigger_next_pc_clmul_crc_second_issue;
-   @M4_EXECUTE_STAGE
+   @m5_EXECUTE_STAGE
       {$clmul_stall, $crc_stall, $clmul_crc_stall_cnt[5:0]} =  $reset ? '0 :
                                          $second_issue_clmul_crc ? '0 :
                                          ($commit && $clmul_crc_type_instr) ? {$clmul_type_instr, $crc_type_instr, 6'b1} :
@@ -3463,16 +3471,16 @@
          
          
          // Provide a longer reset to cover the pipeline depth.
-         @m4_stage_eval(@M4_NEXT_PC_STAGE<<1)
+         @m4_stage_eval(@m5_NEXT_PC_STAGE<<1)
             $soft_reset = (m4_soft_reset) || *reset;
             $Cnt[7:0] <= $soft_reset   ? 8'b0 :       // reset
                          $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
                                          $Cnt + 8'b1; // increment
             $reset = $soft_reset || $Cnt < m4_eval(M4_LD_RETURN_ALIGN + M4_MAX_REDIRECT_BUBBLES + 3);
-         @M4_FETCH_STAGE
+         @m5_FETCH_STAGE
             $fetch = ! $reset && ! $NoFetch;
             // (M4_IMEM_MACRO_NAME instantiation produces ?$fetch$raw.)
-         @M4_NEXT_PC_STAGE
+         @m5_NEXT_PC_STAGE
             
             // ========
             // Overview
@@ -3531,7 +3539,7 @@
             // 9) Not redir'edZ  oooooooo         Good-path
             //
             // Above depicts a waterfall diagram where three triggering redirection conditions X, Y, and Z are detected on three different
-            // instructions. A trigger in the 1st depicted stage, M4_NEXT_PC_STAGE, results in a zero-bubble redirect so it would be
+            // instructions. A trigger in the 1st depicted stage, m5_NEXT_PC_STAGE, results in a zero-bubble redirect so it would be
             // a condition that is factored directly into the next-PC logic of the triggering instruction, and it would have
             // no impact on the $GoodPathMask.
             //
@@ -3649,7 +3657,7 @@
             $Pc[M4_PC_RANGE] <= $next_pc;
             $NoFetch <= $next_no_fetch;
          
-         @M4_DECODE_STAGE
+         @m5_DECODE_STAGE
 
             // ======
             // DECODE
@@ -3667,7 +3675,7 @@
          m4_def(branch_pred_macro_name, ['branch_pred_']M4_BRANCH_PRED)
          m4+m4_branch_pred_macro_name()
          
-         @M4_REG_RD_STAGE
+         @m5_REG_RD_STAGE
             // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
             $reg_wr_pending = $ld && ! $second_issue && 1'b['']M4_INJECT_RETURNING_LD;
             `BOGUS_USE($reg_wr_pending)  // Not used if no bypass and no pending.
@@ -3699,11 +3707,11 @@
          
          // Instantiate the program. (This approach is required for an m4-defined name.)
          m4_def(exe_macro_name, M4_isa['_exe'])
-         m4+m4_exe_macro_name(@M4_EXECUTE_STAGE, @M4_RESULT_STAGE)
+         m4+m4_exe_macro_name(@m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
          
-         @M4_BRANCH_PRED_STAGE
+         @m5_BRANCH_PRED_STAGE
             m4_ifelse(M4_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
-         @M4_EXECUTE_STAGE
+         @m5_EXECUTE_STAGE
 
             // =======
             // Control
@@ -3783,7 +3791,7 @@
                   m4+rf_wr(/regs, M4_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
-         @M4_REG_WR_STAGE
+         @m5_REG_WR_STAGE
             `BOGUS_USE(/orig_inst/src[2]$dummy) // To pull $dummy through $ANY expressions, avoiding empty expressions.
 
          // TODO. Seperate the $rslt and $reg_wr_pending committed to both "int" and "fpu" regs.
@@ -3797,23 +3805,23 @@
    // Pending has an additional read for the dest register as we need to replay for write-after-write
    // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
    // bypass the dest reg's pending bit.
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue);'])
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue);'])
-   m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue);'])
+   m4_ifexpr(m5_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue);'])
+   m4_ifexpr(m5_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue);'])
+   m4_ifexpr(m5_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue);'])
    /src[_src_range]
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[M4_WORD_RANGE] =
-              m4_ifelse(M4_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>M4_REG_BYPASS_STAGES$value);
+              m4_ifelse(m5_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>m5_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[M4_WORD_RANGE], $pending} =
             m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($reg == M4_REGS_INDEX_CNT'b0) ? {M4_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
             // Bypass stages. Both register and pending are bypassed.
             // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(/instr$bypass_avail1 && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(/instr$bypass_avail2 && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
-            m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(/instr$bypass_avail3 && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
-            {$rf_value, m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/instr/regs[$reg]>>M4_REG_BYPASS_STAGES$pending'])};
+            m4_ifexpr(m5_REG_BYPASS_STAGES >= 1, ['(/instr$bypass_avail1 && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
+            m4_ifexpr(m5_REG_BYPASS_STAGES >= 2, ['(/instr$bypass_avail2 && (/instr>>2$dest_reg == $reg)) ? {/instr>>2$rslt, /instr>>2$reg_wr_pending} :'])
+            m4_ifexpr(m5_REG_BYPASS_STAGES >= 3, ['(/instr$bypass_avail3 && (/instr>>3$dest_reg == $reg)) ? {/instr>>3$rslt, /instr>>3$reg_wr_pending} :'])
+            {$rf_value, m4_ifelse(m5_PENDING_ENABLED, 0, ['1'b0'], ['/instr/regs[$reg]>>m5_REG_BYPASS_STAGES$pending'])};
          /* verilator lint_on WIDTH */
       // Replay if source register is pending.
       $replay = $is_reg_condition && $pending;
@@ -3824,10 +3832,10 @@
       $dest_pending =
          m4_ifelse(M4_ISA['']_rf, ['RISCV'], ['($dest_reg == M4_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
          // Bypass stages.
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['($bypass_avail1 && (>>1$dest_reg == $dest_reg)) ? /instr>>1$reg_wr_pending :'])
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['($bypass_avail2 && (>>2$dest_reg == $dest_reg)) ? /instr>>2$reg_wr_pending :'])
-         m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['($bypass_avail3 && (>>3$dest_reg == $dest_reg)) ? /instr>>3$reg_wr_pending :'])
-         m4_ifelse(M4_PENDING_ENABLED, 0, ['1'b0'], ['/regs[$dest_reg]>>M4_REG_BYPASS_STAGES$pending']);
+         m4_ifexpr(m5_REG_BYPASS_STAGES >= 1, ['($bypass_avail1 && (>>1$dest_reg == $dest_reg)) ? /instr>>1$reg_wr_pending :'])
+         m4_ifexpr(m5_REG_BYPASS_STAGES >= 2, ['($bypass_avail2 && (>>2$dest_reg == $dest_reg)) ? /instr>>2$reg_wr_pending :'])
+         m4_ifexpr(m5_REG_BYPASS_STAGES >= 3, ['($bypass_avail3 && (>>3$dest_reg == $dest_reg)) ? /instr>>3$reg_wr_pending :'])
+         m4_ifelse(m5_PENDING_ENABLED, 0, ['1'b0'], ['/regs[$dest_reg]>>m5_REG_BYPASS_STAGES$pending']);
    // Combine replay conditions for pending source or dest registers.
    $pending_replay = | /src[*]$replay || ($is_dest_condition && $dest_pending);
 
@@ -3842,7 +3850,7 @@
 \TLV rf_wr(/_hier, _RANGE, $_we, $_waddr, $_wdata, $_wpending)
    /* verilator lint_save */
    /* verilator lint_on WIDTH */
-   @M4_REG_WR_STAGE
+   @m5_REG_WR_STAGE
       m4+ifelse(M4_RF_STYLE, STUBBED,
          \TLV
             // Exclude the register file.
@@ -3867,7 +3875,7 @@
 \TLV cnt10_makerchip_tb()
    |fetch
       /instr
-         @M4_REG_WR_STAGE
+         @m5_REG_WR_STAGE
             // Assert these to end simulation (before Makerchip cycle limit).
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {M4_PC_CNT{1'b1}};
             $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == M4_WORD_CNT'd45);
@@ -3887,7 +3895,7 @@
    // /instr to avoid unnecessary recirculation.
    |fetch
       /instr
-         @M4_EXECUTE_STAGE
+         @m5_EXECUTE_STAGE
             // characterise non-speculatively in execute stage
 
             // RVFI interface for formal verification.
@@ -3900,7 +3908,7 @@
             $rvfi_order[63:0] = $reset                  ? 64'b0 :
                                 ($commit || $rvfi_trap) ? >>1$rvfi_order + 64'b1 :
                                                           $RETAIN;
-         @M4_REG_WR_STAGE
+         @m5_REG_WR_STAGE
             // verify in register writeback stage
 
             // This scope is a copy of /orig_inst if $second_issue, else pull current instruction
@@ -3916,7 +3924,7 @@
             // for the first issue of these instructions, $rvfi_valid is not asserted and hence the current outputs are 
             // not considered by riscv-formal
 
-            $rvfi_valid       = ! |fetch/instr<<m4_eval(M4_REG_WR_STAGE - (M4_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
+            $rvfi_valid       = ! |fetch/instr<<m4_eval(m5_REG_WR_STAGE - (m5_NEXT_PC_STAGE - 1))$reset &&    // Avoid asserting before $reset propagates to this stage.
                                 ($retire || $rvfi_trap );
             *rvfi_valid       = $rvfi_valid;
             *rvfi_halt        = $rvfi_trap;
@@ -3963,9 +3971,9 @@
       @-1
          $reset = *reset;
       /instr
-         // Stage numbering has @0 == |fetch@M4_EXECUTE_STAGE 
+         // Stage numbering has @0 == |fetch@m5_EXECUTE_STAGE 
          @0
-            $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;  // (including $reset)
+            $ANY = /_cpu|fetch/instr>>m5_EXECUTE_STAGE$ANY;  // (including $reset)
             $is_pkt_wr = $is_csr_write && ($is_csr_pktwr || $is_csr_pkttail);
             $vc[M4_VC_INDEX_RANGE] = $csr_pktwrvc[M4_VC_INDEX_RANGE];
             // This PKTWR write is blocked if the skid buffer blocked last cycle.
@@ -4019,25 +4027,25 @@
    //      - CSR mux and result MUX
    |fetch
       /instr
-         // Data from VC_FIFO is made available by the end of |ingress_out@-1(arb/byp) == M4_EXECUTE_STAGE-1
+         // Data from VC_FIFO is made available by the end of |ingress_out@-1(arb/byp) == m5_EXECUTE_STAGE-1
          // reflecting prior-prior!-stage PKTRDVCS
-         // so it can be captured in PKTRD and used by M4_EXECUTE_STAGE (== |ingress_out@0(out))
-         @M4_EXECUTE_STAGE  // == |ingress_out@0
+         // so it can be captured in PKTRD and used by m5_EXECUTE_STAGE (== |ingress_out@0(out))
+         @m5_EXECUTE_STAGE  // == |ingress_out@0
             // CSR PKTRD is written by hardware as the head of the ingress buffer.
             // Write if there is head data, else, CSR is invalid.
-            $csr_pktrd_valid = /_cpu|ingress_out<<M4_EXECUTE_STAGE$trans_valid;
+            $csr_pktrd_valid = /_cpu|ingress_out<<m5_EXECUTE_STAGE$trans_valid;
             ?$csr_pktrd_valid
-               $csr_pktrd[M4_WORD_RANGE] = /_cpu|ingress_out/flit<<M4_EXECUTE_STAGE$flit;
+               $csr_pktrd[m5_WORD_RANGE] = /_cpu|ingress_out/flit<<m5_EXECUTE_STAGE$flit;
             $non_spec_abort = $aborting_trap && $good_path;
-         @M4_NEXT_PC_STAGE
+         @m5_NEXT_PC_STAGE
             // Mark instructions that are replayed. These are non-speculative. We use this indication for CSR pkt reads,
             // which can only pull flits from ingress FIFOs non-speculatively (currently).
             $replayed = >>m4_eval(M4_TRAP_BUBBLES + 1)$non_spec_abort;
    |ingress_out
       @-1
-         // Note that we access signals here that are produced in @M4_DECODE_STAGE, so @M4_DECODE_STAGE must not be the same physical stage as @M4_EXECUTE_STAGE.
+         // Note that we access signals here that are produced in @m5_DECODE_STAGE, so @m5_DECODE_STAGE must not be the same physical stage as @m5_EXECUTE_STAGE.
          /instr
-            $ANY = /_cpu|fetch/instr>>M4_EXECUTE_STAGE$ANY;
+            $ANY = /_cpu|fetch/instr>>m5_EXECUTE_STAGE$ANY;
          $is_pktrd = /instr$is_csr_instr && /instr$is_csr_pktrd;
          // Detect a recent change to PKTRDVCS that could invalidate the use of a stale PKTRDVCS value and must avoid read (which will force a replay).
          $pktrdvcs_changed = /instr>>1$is_csr_write && /instr>>1$is_csr_pktrdvcs;
@@ -4269,7 +4277,7 @@
 // Can be used to build for many-core without a NoC (during development).
 \TLV dummy_noc(/_cpu)
    |fetch
-      @M4_EXECUTE_STAGE
+      @m5_EXECUTE_STAGE
          /instr
             $csr_pktrd[31:0] = 32'b0;
    
@@ -4323,7 +4331,7 @@
 \TLV riscv_viz_logic()
    // Code that supports 
    |fetch
-      @M4_VIZ_STAGE
+      @m5_VIZ_STAGE
          /instr
             // A type-independent immediate value, for debug. (For R-type, funct7 is used as immediate).
             $imm_value[M4_WORD_RANGE] =
@@ -4721,18 +4729,18 @@
                      let ret = []
                      if (this.goodPath === null) {
                      } else if (this.goodPath) {
-                        let stage = this.stage + M4_NEXT_PC_STAGE;  // Absolute stage (not relative to NEXT_PC)
+                        let stage = this.stage + m5_NEXT_PC_STAGE;  // Absolute stage (not relative to NEXT_PC)
                         //
                         // Draw all register bypass arcs from this cell into REG_RD.
                         //
                         // TODO: Not implemented for FPU.
-                        if (stage == M4_EXECUTE_STAGE + 1) {
-                           for (bypassAmount = 1; bypassAmount <= M4_REG_BYPASS_STAGES; bypassAmount++) {
+                        if (stage == m5_EXECUTE_STAGE + 1) {
+                           for (bypassAmount = 1; bypassAmount <= m5_REG_BYPASS_STAGES; bypassAmount++) {
                               for (let rs = 1; rs <= 2; rs++) {
                                  try {
-                                    let bypassSig = m4_ifexpr(M4_REG_BYPASS_STAGES >= 1, ['(bypassAmount == 1) ? '/instr$bypass_avail1' :'])
-                                                    m4_ifexpr(M4_REG_BYPASS_STAGES >= 2, ['(bypassAmount == 2) ? '/instr$bypass_avail2' :'])
-                                                    m4_ifexpr(M4_REG_BYPASS_STAGES >= 3, ['(bypassAmount == 3) ? '/instr$bypass_avail3' :'])
+                                    let bypassSig = m4_ifexpr(m5_REG_BYPASS_STAGES >= 1, ['(bypassAmount == 1) ? '/instr$bypass_avail1' :'])
+                                                    m4_ifexpr(m5_REG_BYPASS_STAGES >= 2, ['(bypassAmount == 2) ? '/instr$bypass_avail2' :'])
+                                                    m4_ifexpr(m5_REG_BYPASS_STAGES >= 3, ['(bypassAmount == 3) ? '/instr$bypass_avail3' :'])
                                                                                                                  null
                                     let rd = '/instr$dest_reg'.step(this.instr).asInt(0)
                                     let bypass = bypassSig.step(bypassAmount + this.instr).asBool(false) &&
@@ -5329,7 +5337,7 @@
    m4_def(ALL_LEFT, -500)
    m4+m4_viz_logic_macro_name()
    /_des_pipe
-      @M4_VIZ_STAGE
+      @m5_VIZ_STAGE
          m4+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
          m4_ifelse(M4_FORMAL, 1, , ['m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
@@ -5983,10 +5991,10 @@
 //   /_hier: Scope of core(s), e.g. [''] or ['/core[*]'].
 \TLV makerchip_pass_fail(/_hier)
    |done
-      @M4_MEM_WR_STAGE
+      @m5_MEM_WR_STAGE
          // Assert these to end simulation (before Makerchip cycle limit).
-         *passed = & /top/_hier|fetch/instr>>M4_REG_WR_STAGE$passed;
-         *failed = | /top/_hier|fetch/instr>>M4_REG_WR_STAGE$failed;
+         *passed = & /top/_hier|fetch/instr>>m5_REG_WR_STAGE$passed;
+         *failed = | /top/_hier|fetch/instr>>m5_REG_WR_STAGE$failed;
 
 
 // Instantiate the chosen testbench, based on M4_isa, M4_PROG_NAME, and/or M4_TESTBENCH_NAME.
@@ -6016,7 +6024,7 @@
          /M4_CORE_HIER
             // TODO: Find a better place for this:
             // Block CPU |fetch pipeline if blocked.
-            m4_def(cpu_blocked, m4_cpu_blocked || /core|egress_in/instr<<M4_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<M4_EXECUTE_STAGE$pktrd_blocked)
+            m4_def(cpu_blocked, m4_cpu_blocked || /core|egress_in/instr<<m5_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<m5_EXECUTE_STAGE$pktrd_blocked)
             m4+cpu(/core)
             //m4+dummy_noc(/core)
             m4+noc_cpu_buffers(/core, m4_eval(M4_MAX_PACKET_SIZE + 1))
