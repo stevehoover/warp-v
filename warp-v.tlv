@@ -498,7 +498,7 @@
          EXT_E, 0,
          EXT_M, 0,
          EXT_A, 0,
-         EXT_F, 1,
+         EXT_F, 0,
          EXT_D, 0,
          EXT_Q, 0,
          EXT_L, 0,
@@ -934,7 +934,7 @@
    // Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    def(define_csr, [
         define_vector_with_fields(['CSR_']m5_uppercase(['$1']), $3)
-        append_var(csrs, m5_with_comma(m5_defn  m5_ifeq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
+        append_var(csrs, m5_ifeq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
         def(csr_$1_args, ['$@'])
         // 32'b0 = ['{{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
         def(csrrx_rslt_expr, m5_quote(['$is_csr_']$1[' ? {{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m5_csrrx_rslt_expr))
@@ -1062,7 +1062,7 @@
    // Define m4+module_def macro to be used as a region line providing the module definition, either inside makerchip,
    // or outside for formal.
    pragma_disable_quote_checks
-   ['']m4_def(module_def,
+   =m4_def(module_def,
           ['m5_ifeq(m5_FORMAL, 0,
                   ['\SV['']m5_nl['']m4_makerchip_module'],
                   ['   module warpv(input logic clk,
@@ -1094,6 +1094,8 @@
 
    // Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
    // based on model config.
+   
+   pragma_enable_verbose_checks
    fn(sv_content, {
       ifeq(m5_ISA, RISCV, [
          // Functions to append to sv_out. Verilator lint pragmas and SV includes.
@@ -1146,8 +1148,9 @@
             verilator_lint(on, WIDTH)
          ])
       ])
-      (m5_sv_out)
+      ~(m5_sv_out)
    })
+   pragma_disable_verbose_checks
 \SV
    m5_if(m5_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
    m5_ifeq(m5_ISA, RISCV, ['m4_include_lib(m5_warpv_includes['risc-v_defs.tlv'])'])
@@ -1802,7 +1805,7 @@
 
    // in the case of second isssue for multiplication with ALTOPS enabled (or running formal checks for M extension), 
    // the module gives out the result in two cycles but we explicitly flop the $mul_rslt 
-   // (by alignment with 3+NON_PIPELINED_BUBBLES to augment the 5 cycle behavior of the mul operation
+   // (by alignment with 3+NON_PIPELINED_BUBBLES to augment the 5 cycle behavior of the mul operation)
 
    $rslt[m5_WORD_RANGE] =
          $second_issue_ld ? /orig_load_inst$ld_rslt : m4_ifelse_block(m5_EXT_M, 1, ['
@@ -1819,7 +1822,7 @@
 \m4
    m4_TLV_proc(instr_types_decode, ..., ['
       m4_out(\SV_plus)
-      m4_out(m4_types_decode(m5_instr_types_args))
+      m4_out(m5_types_decode(m5_instr_types_args))
    '])
 
 \TLV riscv_decode()
@@ -3511,16 +3514,16 @@
             //                 $GoodPathMask for Redir'edX => {o,X,o,y,y,y,o,o} == {1,1,1,1,0,0,1,1}
             // Waterfall View: |
             //                 V
-            // 0)       oooooooo                  Good-path
-            // 1) InstX  ooooooXo  (Non-aborting) Good-path
-            // 2)         ooooooxx
-            // 3) InstY    ooYyyxxx  (Aborting)
-            // 4) InstZ     ooyyxZxx
-            // 5) Redir'edY  oyyxxxxx
-            // 6) TargetY     ooxxxxxx
-            // 7) Redir'edX    oxxxxxxx
-            // 8) TargetX       oooooooo          Good-path
-            // 9) Not redir'edZ  oooooooo         Good-path
+            // 0:       oooooooo                  Good-path
+            // 1: InstX  ooooooXo  (Non-aborting) Good-path
+            // 2:         ooooooxx
+            // 3: InstY    ooYyyxxx  (Aborting)
+            // 4: InstZ     ooyyxZxx
+            // 5: Redir'edY  oyyxxxxx
+            // 6: TargetY     ooxxxxxx
+            // 7: Redir'edX    oxxxxxxx
+            // 8: TargetX       oooooooo          Good-path
+            // 9: Not redir'edZ  oooooooo         Good-path
             //
             // Above depicts a waterfall diagram where three triggering redirection conditions X, Y, and Z are detected on three different
             // instructions. A trigger in the 1st depicted stage, m5_NEXT_PC_STAGE, results in a zero-bubble redirect so it would be
@@ -4115,7 +4118,7 @@
 //   o VC-specific ring slots
 //   o per-VC insertion FIFOs (or ring-ingress FIFOs plus one insertion buffer) providing source
 //     buffering; packets make a full circuit around the ring and back to their source to ensure
-//     draining or preservation of the insertion FIFO.)
+//     draining or preservation of the insertion FIFO.
 //
 // For traffic from node, FIFO permits only one packet from node at a time, and fully buffers.
 // Head packet and control info are not included.
@@ -4266,7 +4269,7 @@
             $csr_pktrd[31:0] = 32'b0;
    
 // For building just the insertion ring in isolation.
-// The diagram builds, but unfortunately it is messed up :(.
+// The diagram builds, but unfortunately it is messed up.
 \TLV main_ring_only()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
    /m5_CORE_HIER
@@ -4902,7 +4905,7 @@
          //
          // Fetch Instruction
          //
-         // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {  // TODO: make indexing recursive.
+         // TODO: indexing only works in direct lineage.  let fetchInstr = new fabric.Text('|fetch/instr_mem[$Pc]$instr'.asString(), {...})  // TODO: make indexing recursive.
          //let fetchInstr = new fabric.Text('$raw'.asString("--"), {
          //   top: 50,
          //   left: 90,
@@ -4963,7 +4966,7 @@
             }
             let str = `${regStr(dest_reg_valid, '$dest_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
                       `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
-                      ('$imm_valid` ? `i[${'$imm_value'.asInt(NaN)}]` : ""
+                      ('$imm_valid' ? `i[${'$imm_value'.asInt(NaN)}]` : "")
          '], ['
          '])
          // srcX Arrow function
