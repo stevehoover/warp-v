@@ -344,6 +344,7 @@
           instead of actual mul/div, this is enabled automatically when formal is used. 
           This can be enabled for testing in Makerchip environment.'],
       RISCV_FORMAL_ALTOPS, 0)
+   
    default_def(
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m5_if(m5_IMPL, SRAM, HARDCODED_ARRAY),
