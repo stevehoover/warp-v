@@ -1157,7 +1157,6 @@
    m5_ifeq(m5_ISA, RISCV, ['m4_include_lib(m5_warpv_includes['risc-v_defs.tlv'])'])
    m5_eval(m5_sv_content())
 
-
 // A default testbench for all ISAs.
 // Requires m4+makerchip_pass_fail(..).
 \TLV default_makerchip_tb()
@@ -1395,25 +1394,26 @@
    // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
    //
    // Regs:
-   // 1: cnt
-   // 2: ten
-   // 3: out
-   // 4: tmp
-   // 5: offset
-   // 6: store addr
+   // t1: cnt
+   // t2: ten
+   // t3: out
+   // t4: tmp
+   // t5: offset
+   // t6: store addr
  
-   m5_asm(ORI, x6, x0, 0)        //     store_addr = 0
-   m5_asm(ORI, x1, x0, 1)        //     cnt = 1
-   m5_asm(ORI, x2, x0, 1010)     //     ten = 10
-   m5_asm(ORI, x3, x0, 0)        //     out = 0
-   m5_asm(ADD, x3, x1, x3)       //  -> out += cnt
-   m5_asm(SW, x6, x3, 0)         //     store out at store_addr
-   m5_asm(ADDI, x1, x1, 1)       //     cnt ++
-   m5_asm(ADDI, x6, x6, 100)     //     store_addr++
-   m5_asm(BLT, x1, x2, 1111111110000) //  ^- branch back if cnt < 10
-   m5_asm(LW, x4, x6,   111111111100) //     load the final value into tmp
-   m5_asm(BGE, x1, x2, 1111111010100) //     TERMINATE by branching to -1
-
+   m5_asm(ORI, t6, zero, 0)        //     store_addr = 0
+   m5_asm(ORI, t1, zero, 1)        //     cnt = 1
+   m5_asm(ORI, t2, zero, 1010)     //     ten = 10
+   m5_asm(ORI, t3, zero, 0)        //     out = 0
+   m5_asm(ADD, t3, t1, t3)       //  -> out += cnt
+   m5_asm(SW, t6, t3, 0)         //     store out at store_addr
+   m5_asm(ADDI, t1, t1, 1)       //     cnt ++
+   m5_asm(ADDI, t6, t6, 100)     //     store_addr++
+   m5_asm(BLT, t1, t2, 1111111110000) //  ^- branch back if cnt < 10
+   m5_asm(LW, t4, t6,   111111111100) //     load the final value into tmp
+   m5_asm(BGE, t1, t2, 1111111010100) //     TERMINATE by branching to -1
+   //-m5_assemble_line([' dir ij     # comment # another'])
+   
 \TLV riscv_divmul_test_prog()
    // /==========================\
    // | M-extension Test Program |
@@ -1421,11 +1421,11 @@
    //
    //3 MULs followed by 3 DIVs, check r11-r15 for correct results
 
-   m5_asm(ORI, x8, x0, 1011)
-   m5_asm(ORI, x9, x0, 1010)
-   m5_asm(ORI, x10, x0, 10101010)
+   m5_asm(ORI, x8, zero, 1011)
+   m5_asm(ORI, x9, zero, 1010)
+   m5_asm(ORI, x10, zero, 10101010)
    m5_asm(MUL, x11, x8, r9)
-   m5_asm(ORI, x6, x0, 0)
+   m5_asm(ORI, x6, zero, 0)
    m5_asm(SW, x6, x11, 0)
    m5_asm(MUL, x12, x9, r10)
    m5_asm(LW, x4, x6, 0)
@@ -1435,7 +1435,7 @@
    m5_asm(DIV, x14, x11, x8)
    m5_asm(DIV, x15, x13, x10)
    m5_asm(LW, x5, x6, 0)
-   m5_asm(ADDI, x4, x0, 101101)
+   m5_asm(ADDI, x4, zero, 101101)
    m5_asm(BGE, x8, x9, 111111111110)
 
 \TLV riscv_fpu_test_prog()
@@ -1452,47 +1452,47 @@
    m5_asm(FMVWX, x1, x1)
    m5_asm(FMVWX, x2, x2)
    m5_asm(FMVWX, x3, x3)
-   m5_asm(FSW, x0, x1, 000001000000)
-   m5_asm(FSW, x0, x2, 000001000100)
-   m5_asm(FLW, x16, x0, 000001000000)
-   m5_asm(FLW, x17, x0, 000001000100)
+   m5_asm(FSW, zero, x1, 000001000000)
+   m5_asm(FSW, zero, x2, 000001000100)
+   m5_asm(FLW, x16, zero, 000001000000)
+   m5_asm(FLW, x17, zero, 000001000100)
    m5_asm(FMADDS, x5, x1, x2, x3, 000)
    m5_asm(FMSUBS, x6, x1, x2, x3, 000)
    m5_asm(FNMSUBS, x7, x1, x2, x3, 000)
    m5_asm(FNMADDS, x8, x1, x2, x3, 000)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FADDS, x9, x1, x2, 000)
    m5_asm(FSUBS, x10, x1, x2, 000)
    m5_asm(FMULS, x11, x1, x2, 000)
    m5_asm(FDIVS, x12, x1, x2, 000)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FSQRTS, x13, x1, 000)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FSGNJS, x14, x1, x2)
    m5_asm(FSGNJNS, x15, x1, x2)
    m5_asm(FSGNJXS, x16, x1, x2)
    m5_asm(FMINS, x17, x1, x2)
    m5_asm(FMAXS, x18, x1, x2)
    m5_asm(FCVTSW, x23, x2, 000)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FCVTSWU, x24, x3, 000)
    m5_asm(FMVXW, x5, x11)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FEQS, x19, x1, x2)
    m5_asm(FLTS, x20, x2, x1)
    m5_asm(FLES, x21, x1, x2)
    m5_asm(FCLASSS, x22, x1)
    m5_asm(FEQS, x19, x1, x2)
-   m5_asm(CSRRS, x20, x0, 10)
-   m5_asm(CSRRS, x20, x0, 11)
+   m5_asm(CSRRS, x20, zero, 10)
+   m5_asm(CSRRS, x20, zero, 11)
    m5_asm(FCVTWS, x12, x23, 000)
    m5_asm(FCVTWUS, x13, x24, 000)
-   m5_asm(ORI, x0, x0, 0)
+   m5_asm(ORI, zero, zero, 0)
    
 \TLV riscv_bmi_test_prog()
    // /==========================\
@@ -1550,7 +1550,7 @@
    m5_asm(BFP, x20, x1, x2)
    m5_asm(SHFLI, x21, x1, 11111)
    m5_asm(UNSHFLI, x22, x1, 11111)
-   m5_asm(ORI, x0, x0, 0)
+   m5_asm(ORI, zero, zero, 0)
    
 // Provides the instruction memory and fetch logic, producing.
 //   $raw
@@ -3866,8 +3866,8 @@
          @m5_REG_WR_STAGE
             // Assert these to end simulation (before Makerchip cycle limit).
             $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {m5_PC_CNT{1'b1}};
-            $Reg4Became45 <= $reset ? 1'b0 : $Reg4Became45 || ($ReachedEnd && /regs[4]$value == m5_WORD_CNT'd45);
-            $passed = ! $reset && $ReachedEnd && $Reg4Became45;
+            $Reg29Became45 <= $reset ? 1'b0 : $Reg29Became45 || ($ReachedEnd && /regs[29]$value == m5_WORD_CNT'd45);
+            $passed = ! $reset && $ReachedEnd && $Reg29Became45;
             $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
 
 \TLV formal()
@@ -4468,6 +4468,7 @@
                   fontFamily: "monospace",
                   fill: "white"
                })
+               this.abi_x_map = m5_js_abi_x_map;
                return {rf_header, rf_header2}
             },
          },
@@ -4500,6 +4501,8 @@
             let pending = m5_if(m5_PENDING_ENABLED, [''<<1$pending'.asBool(false)'], ['false'])
             let reg = parseInt(this.getIndex())
             let regIdent = ("m5_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
+            // TODO: Enable this (ABI reg names) and make room for it. Do also for F-regs.
+            //regIdent = regIdent + "(" + this.getScope("regs").parent.context.abi_x_map[reg] + ")";
             let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
             this.getObjects().reg.set({text:
                regIdent + ": " +
