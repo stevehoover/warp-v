@@ -1412,8 +1412,44 @@
    m5_asm(BLT, t1, t2, 1111111110000) //  ^- branch back if cnt < 10
    m5_asm(LW, t4, t6,   111111111100) //     load the final value into tmp
    m5_asm(BGE, t1, t2, 1111111010100) //     TERMINATE by branching to -1
-   //-m5_assemble_line([' dir ij     # comment # another'])
+
+\m5
+   TLV_fn(riscv_fast_multiply_prog, {
+      pragma_disable_quote_checks
+      ~assemble(['
+# ========= Begin Assembly Code ==========
+fast_multiply:
+   #LI t0, 0
+   ORI t0, x0, 0
    
+next_digit:
+   ANDI t1, a1, 1           # is rightmost bit 1?
+   SRAI a1, a1, 1
+   
+   BEQ  t1, zero, skip      # if right most bit 0, don't add
+   ADD  t0, t0, a0
+skip:
+   SLLI a0, a0, 1           # double first argument
+   BNE  a1, zero, next_digit
+   MV   a0, t0
+   RET
+# ========== End Assembly Code ==========
+         '])
+      pragma_enable_quote_checks
+      /// Temporarily have this act like cnt10.
+      ~asm(ORI, t6, zero, 0)        //     store_addr = 0
+      ~asm(ORI, t1, zero, 1)        //     cnt = 1
+      ~asm(ORI, t2, zero, 1010)     //     ten = 10
+      ~asm(ORI, t3, zero, 0)        //     out = 0
+      ~asm(ADD, t3, t1, t3)       //  -> out += cnt
+      ~asm(SW, t6, t3, 0)         //     store out at store_addr
+      ~asm(ADDI, t1, t1, 1)       //     cnt ++
+      ~asm(ADDI, t6, t6, 100)     //     store_addr++
+      ~asm(BLT, t1, t2, 1111111110000) //  ^- branch back if cnt < 10
+      ~asm(LW, t4, t6,   111111111100) //     load the final value into tmp
+      ~asm(BGE, t1, t2, 1111111010100) //     TERMINATE by branching to -1
+   })
+  
 \TLV riscv_divmul_test_prog()
    // /==========================\
    // | M-extension Test Program |
@@ -1795,10 +1831,10 @@
 
 // These are expanded in a separate TLV  macro because multi-line expansion is a no-no for line tracking.
 // This keeps the implications contained.
-\m4
-   m4_TLV_proc(riscv_decode_expr, ['
-      m4_out(m5_decode_expr)
-   '])
+\m5
+   TLV_fn(riscv_decode_expr, {
+      ~decode_expr
+   })
 
 \TLV riscv_rslt_mux_expr()
    // in case of second issue, the results are pulled out of the /orig_inst or /load_inst scope. 
@@ -1820,11 +1856,11 @@
          '])
          m5_WORD_CNT'b0['']m5_rslt_mux_expr;
    
-\m4
-   m4_TLV_proc(instr_types_decode, ..., ['
-      m4_out(\SV_plus)
-      m4_out(m5_types_decode(m5_instr_types_args))
-   '])
+\m5
+   TLV_fn(instr_types_decode, ..., {
+      ~(\SV_plus)
+      ~types_decode(m5_instr_types_args)
+   })
 
 \TLV riscv_decode()
    // TODO: ?$valid_<stage> conditioning should be replaced by use of m5_prev_instr_valid_through(..).
