@@ -1,5 +1,7 @@
 \m4_TLV_version 1d --noline: tl-x.org
 \SV
+   // TODO: Temporary:
+   //m4_define(['m5_PROG_NAME'], fast_multiply)
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
    //
@@ -948,8 +950,9 @@
    
    case(m5_ISA, RISCV, [
       ifeq(m5_NO_COUNTER_CSRS, 1, [''], [
+         // TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
          // Define Counter CSRs
-         //            Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
+         //         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
          define_csr(cycle,      12'hC00,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
          define_csr(cycleh,     12'hC80,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
          define_csr(time,       12'hC01,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
@@ -1158,13 +1161,15 @@
    m5_eval(m5_sv_content())
 
 // A default testbench for all ISAs.
+// Pass when the assembler label "pass" is reached if defined. O.w. end of program.
+// Fail at the cycle limit or when the label "fail" is reached.
 // Requires m4+makerchip_pass_fail(..).
 \TLV default_makerchip_tb()
    |fetch
       /instr
          @m5_MEM_WR_STAGE
-            $passed = ! $reset && ($Pc == (m5_NUM_INSTRS - 1)) && $good_path;
-            $failed = *cyc_cnt > 200;
+            $passed = ! $reset && ($Pc == m5_if_def(label_pass_addr, ['m5_label_pass_addr'], ['(m5_NUM_INSTRS - 1)'])) && $good_path;
+            $failed = *cyc_cnt > 200 m5_if_def(label_fail_addr, [' || (($Pc == m5_label_fail_addr) && $good_path)']);
 
 
 
@@ -1383,71 +1388,80 @@
 //============================//
 
 // Define all instructions of the program (as Verilog expressions for the binary value in m5_instr#.
-\TLV riscv_cnt10_prog()
-
-   // /=====================\
-   // | Count to 10 Program |
-   // \=====================/
-   //
-   // Default program for RV32I test
-   // Add 1,2,3,...,9 (in that order).
-   // Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
-   //
-   // Regs:
-   // t1: cnt
-   // t2: ten
-   // t3: out
-   // t4: tmp
-   // t5: offset
-   // t6: store addr
- 
-   m5_asm(ORI, t6, zero, 0)        //     store_addr = 0
-   m5_asm(ORI, t1, zero, 1)        //     cnt = 1
-   m5_asm(ORI, t2, zero, 1010)     //     ten = 10
-   m5_asm(ORI, t3, zero, 0)        //     out = 0
-   m5_asm(ADD, t3, t1, t3)       //  -> out += cnt
-   m5_asm(SW, t6, t3, 0)         //     store out at store_addr
-   m5_asm(ADDI, t1, t1, 1)       //     cnt ++
-   m5_asm(ADDI, t6, t6, 100)     //     store_addr++
-   m5_asm(BLT, t1, t2, 1111111110000) //  ^- branch back if cnt < 10
-   m5_asm(LW, t4, t6,   111111111100) //     load the final value into tmp
-   m5_asm(BGE, t1, t2, 1111111010100) //     TERMINATE by branching to -1
-
 \m5
-   TLV_fn(riscv_fast_multiply_prog, {
-      pragma_disable_quote_checks
+   TLV_fn(riscv_cnt10_prog, {
       ~assemble(['
-# ========= Begin Assembly Code ==========
-fast_multiply:
-   #LI t0, 0
-   ORI t0, x0, 0
+         # /=====================\
+         # | Count to 10 Program |
+         # \=====================/
+         #
+         # Default program for RV32I test
+         # Add 1,2,3,...,9 (in that order).
+         # Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
+         #
+         # Regs:
+         # t1: cnt
+         # t2: ten
+         # t3: out
+         # t4: tmp
+         # t5: offset
+         # t6: store addr
+         reset:
+            ORI t6, zero, 0          #     store_addr = 0
+            ORI t1, zero, 1          #     cnt = 1
+            ORI t2, zero, 1010       #     ten = 10
+            ORI t3, zero, 0          #     out = 0
+         loop:
+            ADD t3, t1, t3           #  -> out += cnt
+            SW t6, 0(t3)             #     store out at store_addr
+            ADDI t1, t1, 1           #     cnt ++
+            ADDI t6, t6, 100         #     store_addr++
+            BLT t1, t2, loop         #  ^- branch back if cnt < 10
+         # Result should be 0x2d.
+            LW t4, 111111111100(t6)  #     load the final value into tmp
+            ADDI t5, zero, 101101    #     expected result (0x2d)
+            BEQ t4, t5, pass         #     pass if as expected
+         fail:
+            ADD t5, t5, zero         #     nop fail
+         pass:
+            ADD t4, t4, zero         #     nop pass
+      '])
+   })
    
-next_digit:
-   ANDI t1, a1, 1           # is rightmost bit 1?
-   SRAI a1, a1, 1
-   
-   BEQ  t1, zero, skip      # if right most bit 0, don't add
-   ADD  t0, t0, a0
-skip:
-   SLLI a0, a0, 1           # double first argument
-   BNE  a1, zero, next_digit
-   MV   a0, t0
-   RET
-# ========== End Assembly Code ==========
-         '])
-      pragma_enable_quote_checks
-      /// Temporarily have this act like cnt10.
-      ~asm(ORI, t6, zero, 0)        //     store_addr = 0
-      ~asm(ORI, t1, zero, 1)        //     cnt = 1
-      ~asm(ORI, t2, zero, 1010)     //     ten = 10
-      ~asm(ORI, t3, zero, 0)        //     out = 0
-      ~asm(ADD, t3, t1, t3)       //  -> out += cnt
-      ~asm(SW, t6, t3, 0)         //     store out at store_addr
-      ~asm(ADDI, t1, t1, 1)       //     cnt ++
-      ~asm(ADDI, t6, t6, 100)     //     store_addr++
-      ~asm(BLT, t1, t2, 1111111110000) //  ^- branch back if cnt < 10
-      ~asm(LW, t4, t6,   111111111100) //     load the final value into tmp
-      ~asm(BGE, t1, t2, 1111111010100) //     TERMINATE by branching to -1
+   TLV_fn(riscv_fast_multiply_prog, {
+      ~assemble(['
+         # /------------------------\
+         # | Multiply Without M-Ext |
+         # \------------------------/
+         # Call:
+         reset:
+            ORI a0, zero, 1011       #     multiplican 1
+            ORI a1, zero, 1001       #     multiplican 2
+            JAL ra, fast_multiply    #     Multiply!
+            ADDI t0, zero, 1100011   #     expected result
+            BEQ a0, t0, pass         #     pass if as expected
+         fail:
+            ADD zero, t1, zero         #     nop fail
+         pass:
+            ADD zero, t2, zero         #     nop pass
+         
+         fast_multiply:
+            #LI t0, 0
+            ORI t0, zero, 0
+
+         next_digit:
+            ANDI t1, a1, 1           # is rightmost bit 1?
+            SRAI a1, a1, 1
+
+            BEQ  t1, zero, skip      # if right most bit 0, don't add
+            ADD  t0, t0, a0
+         skip:
+            SLLI a0, a0, 1           # double first argument
+            BNE  a1, zero, next_digit
+            MV   a0, t0
+            RET
+         # ========== End Assembly Code ==========
+      '])
    })
   
 \TLV riscv_divmul_test_prog()
@@ -1673,7 +1687,7 @@ skip:
             logic [m5_INSTR_RANGE] instrs [0:m5_NUM_INSTRS-1];
             logic [40*8-1:0] instr_strs [0:m5_NUM_INSTRS];
             
-            m4_forloop(['m5_instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(['m5_instr']m5_instr_ind); '])
+            m4_forloop(['m5_instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(m5_eval(['m5_instr']m5_instr_ind)); '])
             
             // String representations of the instructions for debug.
             m4_forloop(['m5_instr_ind'], 0, m5_NUM_INSTRS, ['assign instr_strs[m5_instr_ind] = "m5_eval(['m5_instr_str']m5_instr_ind)"; '])
@@ -3673,7 +3687,7 @@ skip:
             $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1;
             // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
             {$next_pc[m5_PC_RANGE], $next_no_fetch} =
-               $reset ? {m5_PC_CNT'b0, 1'b0} :
+               $reset ? {m5_calc(m5_PC_CNT - 1)'b['']m5_if_def(label_reset_addr, m5_label_reset_addr, 0), 2'b0} :  /// Start PC at the assembly code "reset" label or address 0.
                // ? : terms for each condition (order does matter)
                m5_redirect_pc_terms
                           ({$pc_inc, 1'b0});
@@ -3897,14 +3911,7 @@ skip:
    /* verilator lint_restore */
 
 \TLV cnt10_makerchip_tb()
-   |fetch
-      /instr
-         @m5_REG_WR_STAGE
-            // Assert these to end simulation (before Makerchip cycle limit).
-            $ReachedEnd <= $reset ? 1'b0 : $ReachedEnd || $Pc == {m5_PC_CNT{1'b1}};
-            $Reg29Became45 <= $reset ? 1'b0 : $Reg29Became45 || ($ReachedEnd && /regs[29]$value == m5_WORD_CNT'd45);
-            $passed = ! $reset && $ReachedEnd && $Reg29Became45;
-            $failed = ! $reset && (*cyc_cnt > 500 || (*cyc_cnt > 5 && $commit && $illegal));
+   m4+default_makerchip_tb()
 
 \TLV formal()
    
