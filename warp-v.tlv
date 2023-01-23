@@ -760,7 +760,7 @@
    
    
    def(['# Amount to shift mem left (to make room for FP regs).'],
-       VIZ_MEM_LEFT_ADJUST, m5_if(m5_EXT_F, 170, 0))
+       VIZ_MEM_LEFT_ADJUST, m5_if(m5_EXT_F, 190, 0))
 
 
    
@@ -1409,17 +1409,17 @@
          reset:
             ORI t6, zero, 0          #     store_addr = 0
             ORI t1, zero, 1          #     cnt = 1
-            ORI t2, zero, 1010       #     ten = 10
+            ORI t2, zero, 10         #     ten = 10
             ORI t3, zero, 0          #     out = 0
          loop:
             ADD t3, t1, t3           #  -> out += cnt
             SW t6, 0(t3)             #     store out at store_addr
             ADDI t1, t1, 1           #     cnt ++
-            ADDI t6, t6, 100         #     store_addr++
+            ADDI t6, t6, 4           #     store_addr++
             BLT t1, t2, loop         #  ^- branch back if cnt < 10
          # Result should be 0x2d.
-            LW t4, 111111111100(t6)  #     load the final value into tmp
-            ADDI t5, zero, 101101    #     expected result (0x2d)
+            LW t4, -4(t6)            #     load the final value into tmp
+            ADDI t5, zero, 0x2d      #     expected result (0x2d)
             BEQ t4, t5, pass         #     pass if as expected
          fail:
             ADD t5, t5, zero         #     nop fail
@@ -1435,11 +1435,11 @@
          # \------------------------/
          # Call:
          reset:
-            ORI a0, zero, 1011       #     multiplican 1
-            ORI a1, zero, 1001       #     multiplican 2
-            JAL ra, fast_multiply    #     Multiply!
-            ADDI t0, zero, 1100011   #     expected result
-            BEQ a0, t0, pass         #     pass if as expected
+            ORI a0, zero, 0b1011       #     multiplican 1
+            ORI a1, zero, 0b1001       #     multiplican 2
+            JAL ra, fast_multiply      #     Multiply!
+            ADDI t0, zero, 0b1100011   #     expected result
+            BEQ a0, t0, pass           #     pass if as expected
          fail:
             ADD zero, t1, zero         #     nop fail
          pass:
@@ -1493,66 +1493,66 @@
    // | F-extension Test Program |
    // \==========================/
    //
-   m5_asm(LUI, x1, 01110001010101100000)
-   m5_asm(ADDI, x1, x1, 010001000001)
-   m5_asm(LUI, x2, 01100101100101001111)
-   m5_asm(ADDI, x2, x2, 010001000000)
-   m5_asm(LUI, x3, 01001101110111110001)
-   m5_asm(ADDI, x3, x3, 010000000000)
-   m5_asm(FMVWX, x1, x1)
-   m5_asm(FMVWX, x2, x2)
-   m5_asm(FMVWX, x3, x3)
-   m5_asm(FSW, zero, x1, 000001000000)
-   m5_asm(FSW, zero, x2, 000001000100)
-   m5_asm(FLW, x16, zero, 000001000000)
-   m5_asm(FLW, x17, zero, 000001000100)
-   m5_asm(FMADDS, x5, x1, x2, x3, 000)
-   m5_asm(FMSUBS, x6, x1, x2, x3, 000)
-   m5_asm(FNMSUBS, x7, x1, x2, x3, 000)
-   m5_asm(FNMADDS, x8, x1, x2, x3, 000)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FADDS, x9, x1, x2, 000)
-   m5_asm(FSUBS, x10, x1, x2, 000)
-   m5_asm(FMULS, x11, x1, x2, 000)
-   m5_asm(FDIVS, x12, x1, x2, 000)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FSQRTS, x13, x1, 000)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FSGNJS, x14, x1, x2)
-   m5_asm(FSGNJNS, x15, x1, x2)
-   m5_asm(FSGNJXS, x16, x1, x2)
-   m5_asm(FMINS, x17, x1, x2)
-   m5_asm(FMAXS, x18, x1, x2)
-   m5_asm(FCVTSW, x23, x2, 000)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FCVTSWU, x24, x3, 000)
-   m5_asm(FMVXW, x5, x11)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FEQS, x19, x1, x2)
-   m5_asm(FLTS, x20, x2, x1)
-   m5_asm(FLES, x21, x1, x2)
-   m5_asm(FCLASSS, x22, x1)
-   m5_asm(FEQS, x19, x1, x2)
-   m5_asm(CSRRS, x20, zero, 10)
-   m5_asm(CSRRS, x20, zero, 11)
-   m5_asm(FCVTWS, x12, x23, 000)
-   m5_asm(FCVTWUS, x13, x24, 000)
-   m5_asm(ORI, zero, zero, 0)
+   m5_asm(LUI, x1, 0b01110001010101100000)
+   m5_asm(ADDI, x1, x1, 0b010001000001)
+   m5_asm(LUI, x2, 0b01100101100101001111)
+   m5_asm(ADDI, x2, x2, 0b010001000000)
+   m5_asm(LUI, x3, 0b01001101110111110001)
+   m5_asm(ADDI, x3, x3, 0b010000000000)
+   m5_asm(FMV_W_X, x1, x1)
+   m5_asm(FMV_W_X, x2, x2)
+   m5_asm(FMV_W_X, x3, x3)
+   m5_asm(FSW, zero, x1, 0b000001000000)
+   m5_asm(FSW, zero, x2, 0b000001000100)
+   m5_asm(FLW, x16, zero, 0b000001000000)
+   m5_asm(FLW, x17, zero, 0b000001000100)
+   m5_asm(FMADD_S, x5, x1, x2, x3, 000)
+   m5_asm(FMSUB_S, x6, x1, x2, x3, 000)
+   m5_asm(FNMSUB_S, x7, x1, x2, x3, 000)
+   m5_asm(FNMADD_S, x8, x1, x2, x3, 000)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FADD_S, x9, x1, x2, 000)
+   m5_asm(FSUB_S, x10, x1, x2, 000)
+   m5_asm(FMUL_S, x11, x1, x2, 000)
+   m5_asm(FDIV_S, x12, x1, x2, 000)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FSQRT_S, x13, x1, 000)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FSGNJ_S, x14, x1, x2)
+   m5_asm(FSGNJN_S, x15, x1, x2)
+   m5_asm(FSGNJX_S, x16, x1, x2)
+   m5_asm(FMIN_S, x17, x1, x2)
+   m5_asm(FMAX_S, x18, x1, x2)
+   m5_asm(FCVT_S_W, x23, x2, 000)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FCVT_S_WU, x24, x3, 000)
+   m5_asm(FMV_X_W, x5, x11)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FEQ_S, x19, x1, x2)
+   m5_asm(FLT_S, x20, x2, x1)
+   m5_asm(FLE_S, x21, x1, x2)
+   m5_asm(FCLASS_S, x22, x1)
+   m5_asm(FEQ_S, x19, x1, x2)
+   m5_asm(CSRRS, x20, zero, 0b10)
+   m5_asm(CSRRS, x20, zero, 0b11)
+   m5_asm(FCVT_W_S, x12, x23, 000)
+   m5_asm(FCVT_WU_S, x13, x24, 000)
+   m5_asm(ORI, zero, zero, 0b0)
    
 \TLV riscv_bmi_test_prog()
    // /==========================\
    // | B-extension Test Program |
    // \==========================/
    //
-   m5_asm(LUI, x1, 01110001010101100000)
-   m5_asm(ADDI, x1, x1, 010001000001)
-   m5_asm(ADDI, x2, x2, 010001000010)
-   m5_asm(ADDI, x3, x3, 010000000011)
+   m5_asm(LUI, x1, 0b01110001010101100000)
+   m5_asm(ADDI, x1, x1, 0b010001000001)
+   m5_asm(ADDI, x2, x2, 0b010001000010)
+   m5_asm(ADDI, x3, x3, 0b010000000011)
    m5_asm(ANDN, x5, x1, x2)
    m5_asm(ORN, x6, x1, x2)
    m5_asm(XNOR, x7, x1, x2)
@@ -1566,15 +1566,15 @@
    m5_asm(SBEXT, x20, x1, x2)
    m5_asm(GORC, x20, x1, x2)
    m5_asm(GREV, x13, x1, x2)
-   m5_asm(SLOI, x8, x1, 111)
-   m5_asm(SROI, x20, x1, 111)
-   m5_asm(RORI, x9, x1, 111)
-   m5_asm(SBCLRI, x10, x1, 111)
-   m5_asm(SBSETI, x11, x1, 111)
-   m5_asm(SBINVI, x12, x1, 111)
-   m5_asm(SBEXTI, x20, x1, 111)
-   m5_asm(GORCI, x20, x1, 111)
-   m5_asm(GREVI, x13, x1, 111)
+   m5_asm(SLOI, x8, x1, 0b111)
+   m5_asm(SROI, x20, x1, 0b111)
+   m5_asm(RORI, x9, x1, 0b111)
+   m5_asm(SBCLRI, x10, x1, 0b111)
+   m5_asm(SBSETI, x11, x1, 0b111)
+   m5_asm(SBINVI, x12, x1, 0b111)
+   m5_asm(SBEXTI, x20, x1, 0b111)
+   m5_asm(GORCI, x20, x1, 0b111)
+   m5_asm(GREVI, x13, x1, 0b111)
    m5_asm(CLMUL, x14, x1, x2)
    m5_asm(CLMULR, x15, x1, x2)
    m5_asm(CLZ, x19, x1)
@@ -1598,9 +1598,9 @@
    m5_asm(PACKU, x18, x1, x2)
    m5_asm(PACKH, x19, x1, x2)
    m5_asm(BFP, x20, x1, x2)
-   m5_asm(SHFLI, x21, x1, 11111)
-   m5_asm(UNSHFLI, x22, x1, 11111)
-   m5_asm(ORI, zero, zero, 0)
+   m5_asm(SHFLI, x21, x1, 0b11111)
+   m5_asm(UNSHFLI, x22, x1, 0b11111)
+   m5_asm(ORI, zero, zero, 0b0)
    
 // Provides the instruction memory and fetch logic, producing.
 //   $raw
@@ -1926,31 +1926,31 @@
             // could be better to use just $op5 decode for this.
 
             // Categorize FP instrs that read int regs.
-            $fcvts_w_type_instr = $is_fcvtsw_instr ||
-                                  $is_fcvtswu_instr;
-            $fcvtw_s_type_instr = $is_fcvtws_instr ||
-                                  $is_fcvtwus_instr;
-            $fpu_div_sqrt_type_instr = $is_fdivs_instr || $is_fsqrts_instr;
-            $fmvxw_type_instr = $is_fmvxw_instr;
-            $fmvwx_type_instr = $is_fmvwx_instr;
+            $fcvts_w_type_instr = $is_fcvt_s_w_instr ||
+                                  $is_fcvt_s_wu_instr;
+            $fcvtw_s_type_instr = $is_fcvt_w_s_instr ||
+                                  $is_fcvt_wu_s_instr;
+            $fpu_div_sqrt_type_instr = $is_fdiv_s_instr || $is_fsqrt_s_instr;
+            $fmvxw_type_instr = $is_fmv_x_w_instr;
+            $fmvwx_type_instr = $is_fmv_w_x_instr;
             // These instructions modifies FP CSR's "frm" and generates "fflags".
-            $fpu_csr_fflags_type_instr = $is_fmadds_instr ||
-                                         $is_fmsubs_instr ||
-                                         $is_fnmsubs_instr ||
-                                         $is_fnmadds_instr ||
-                                         $is_fadds_instr ||
-                                         $is_fsubs_instr ||
-                                         $is_fmuls_instr ||
-                                         $is_fdivs_instr ||
-                                         $is_fsqrts_instr ||
+            $fpu_csr_fflags_type_instr = $is_fmadd_s_instr ||
+                                         $is_fmsub_s_instr ||
+                                         $is_fnmsub_s_instr ||
+                                         $is_fnmadd_s_instr ||
+                                         $is_fadd_s_instr ||
+                                         $is_fsub_s_instr ||
+                                         $is_fmul_s_instr ||
+                                         $is_fdiv_s_instr ||
+                                         $is_fsqrt_s_instr ||
                                          $fcvtw_s_type_instr ||
                                          $fcvts_w_type_instr;
             // These instructions do not modify FP CSR's "frm", but they do generate "fflags".
-            $fpu_fflags_type_instr = $is_fmins_instr ||
-                                     $is_fmaxs_instr ||
-                                     $is_feqs_instr ||
-                                     $is_flts_instr ||
-                                     $is_fles_instr;
+            $fpu_fflags_type_instr = $is_fmin_s_instr ||
+                                     $is_fmax_s_instr ||
+                                     $is_feq_s_instr ||
+                                     $is_flt_s_instr ||
+                                     $is_fle_s_instr;
             // Generalized FP instrucions.                               
             $fpu_type_instr = $fpu_csr_fflags_type_instr ||
                               $fpu_fflags_type_instr ||
@@ -1958,15 +1958,15 @@
                               $fmvwx_type_instr ||
                               $is_flw_instr ||
                               $is_fsw_instr ||
-                              $is_fsgnjs_instr ||
-                              $is_fsgnjns_instr ||
-                              $is_fsgnjxs_instr ||
-                              $is_fclasss_instr;
+                              $is_fsgnj_s_instr ||
+                              $is_fsgnjn_s_instr ||
+                              $is_fsgnjx_s_instr ||
+                              $is_fclass_s_instr;
             // FPU instrs with int dest reg.
-            $fpu_instr_with_int_dest = $is_feqs_instr ||
-                                       $is_flts_instr ||
-                                       $is_fles_instr ||
-                                       $is_fclasss_instr ||
+            $fpu_instr_with_int_dest = $is_feq_s_instr ||
+                                       $is_flt_s_instr ||
+                                       $is_fle_s_instr ||
+                                       $is_fclass_s_instr ||
                                        $fmvxw_type_instr ||
                                        $fcvtw_s_type_instr;
             // FPU instrs with all int srcs.
@@ -2314,30 +2314,30 @@
          m4+ifelse(m5_EXT_F, 1,
             \TLV
                // Determining the type of fpu_operation according to the fpu_exe macro
-               $fpu_operation[4:0] = ({5{$is_fmadds_instr }}  & 5'h2 ) |
-                                     ({5{$is_fmsubs_instr }}  & 5'h3 ) |
-                                     ({5{$is_fnmsubs_instr}}  & 5'h4 ) |
-                                     ({5{$is_fnmadds_instr}}  & 5'h5 ) |
-                                     ({5{$is_fadds_instr  }}  & 5'h6 ) |
-                                     ({5{$is_fsubs_instr  }}  & 5'h7 ) |
-                                     ({5{$is_fmuls_instr  }}  & 5'h8 ) |
-                                     ({5{$is_fdivs_instr  }}  & 5'h9 ) |
-                                     ({5{$is_fsqrts_instr }}  & 5'ha ) |
-                                     ({5{$is_fsgnjs_instr }}  & 5'hb ) |
-                                     ({5{$is_fsgnjns_instr}}  & 5'hc ) |
-                                     ({5{$is_fsgnjxs_instr}}  & 5'hd ) |
-                                     ({5{$is_fmins_instr  }}  & 5'he ) |
-                                     ({5{$is_fmaxs_instr  }}  & 5'hf ) |
-                                     ({5{$is_fcvtws_instr }}  & 5'h10) |
-                                     ({5{$is_fcvtwus_instr}}  & 5'h11) |
-                                     ({5{$is_fmvxw_instr  }}  & 5'h12) |
-                                     ({5{$is_feqs_instr   }}  & 5'h13) |
-                                     ({5{$is_flts_instr   }}  & 5'h14) |
-                                     ({5{$is_fles_instr   }}  & 5'h15) |
-                                     ({5{$is_fclasss_instr}}  & 5'h16) |
-                                     ({5{$is_fcvtsw_instr }}  & 5'h17) |
-                                     ({5{$is_fcvtswu_instr}}  & 5'h18) |
-                                     ({5{$is_fmvwx_instr  }}  & 5'h19);
+               $fpu_operation[4:0] = ({5{$is_fmadd_s_instr }}  & 5'h2 ) |
+                                     ({5{$is_fmsub_s_instr }}  & 5'h3 ) |
+                                     ({5{$is_fnmsub_s_instr}}  & 5'h4 ) |
+                                     ({5{$is_fnmadd_s_instr}}  & 5'h5 ) |
+                                     ({5{$is_fadd_s_instr  }}  & 5'h6 ) |
+                                     ({5{$is_fsub_s_instr  }}  & 5'h7 ) |
+                                     ({5{$is_fmul_s_instr  }}  & 5'h8 ) |
+                                     ({5{$is_fdiv_s_instr  }}  & 5'h9 ) |
+                                     ({5{$is_fsqrt_s_instr }}  & 5'ha ) |
+                                     ({5{$is_fsgnj_s_instr }}  & 5'hb ) |
+                                     ({5{$is_fsgnjn_s_instr}}  & 5'hc ) |
+                                     ({5{$is_fsgnjx_s_instr}}  & 5'hd ) |
+                                     ({5{$is_fmin_s_instr  }}  & 5'he ) |
+                                     ({5{$is_fmax_s_instr  }}  & 5'hf ) |
+                                     ({5{$is_fcvt_w_s_instr }}  & 5'h10) |
+                                     ({5{$is_fcvt_wu_s_instr}}  & 5'h11) |
+                                     ({5{$is_fmv_x_w_instr  }}  & 5'h12) |
+                                     ({5{$is_feq_s_instr   }}  & 5'h13) |
+                                     ({5{$is_flt_s_instr   }}  & 5'h14) |
+                                     ({5{$is_fle_s_instr   }}  & 5'h15) |
+                                     ({5{$is_fclass_s_instr}}  & 5'h16) |
+                                     ({5{$is_fcvt_s_w_instr }}  & 5'h17) |
+                                     ({5{$is_fcvt_s_wu_instr}}  & 5'h18) |
+                                     ({5{$is_fmv_w_x_instr  }}  & 5'h19);
                // Needed for division-sqrt module  
                $nreset = ! *reset;
                $clock = *clk;
@@ -2356,32 +2356,32 @@
                $int_input[31:0] = /src[1]$reg_value;
 
                // Results
-               $fmadds_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
-               $fmsubs_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
-               $fnmadds_rslt[m5_WORD_RANGE] = /fpu1$output_result;
-               $fnmsubs_rslt[m5_WORD_RANGE] = /fpu1$output_result;
-               $fadds_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
-               $fsubs_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
-               $fmuls_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
-               $fsgnjs_rslt[m5_WORD_RANGE]  = $fsgnjs_output;
-               $fsgnjns_rslt[m5_WORD_RANGE] = $fsgnjns_output;
-               $fsgnjxs_rslt[m5_WORD_RANGE] = $fsgnjxs_output;
-               $fmins_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
-               $fmaxs_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
-               $fcvtws_rslt[m5_WORD_RANGE]  = /fpu1$int_output;
-               $fcvtwus_rslt[m5_WORD_RANGE] = /fpu1$int_output;
-               $fmvxw_rslt[m5_WORD_RANGE]   = /fpu/src[1]$reg_value;
-               $feqs_rslt[m5_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
-               $flts_rslt[m5_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
-               $fles_rslt[m5_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
-               $fclasss_rslt[m5_WORD_RANGE] = {28'b0, /fpu1$output_class};
-               $fcvtsw_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
-               $fcvtswu_rslt[m5_WORD_RANGE] = /fpu1$output_result;
-               $fmvwx_rslt[m5_WORD_RANGE]   = /src[1]$reg_value;
+               $fmadd_s_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
+               $fmsub_s_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
+               $fnmadd_s_rslt[m5_WORD_RANGE] = /fpu1$output_result;
+               $fnmsub_s_rslt[m5_WORD_RANGE] = /fpu1$output_result;
+               $fadd_s_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
+               $fsub_s_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
+               $fmul_s_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
+               $fsgnj_s_rslt[m5_WORD_RANGE]  = $fsgnjs_output;
+               $fsgnjn_s_rslt[m5_WORD_RANGE] = $fsgnjns_output;
+               $fsgnjx_s_rslt[m5_WORD_RANGE] = $fsgnjxs_output;
+               $fmin_s_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
+               $fmax_s_rslt[m5_WORD_RANGE]   = /fpu1$output_result;
+               $fcvt_w_s_rslt[m5_WORD_RANGE]  = /fpu1$int_output;
+               $fcvt_wu_s_rslt[m5_WORD_RANGE] = /fpu1$int_output;
+               $fmv_x_w_rslt[m5_WORD_RANGE]   = /fpu/src[1]$reg_value;
+               $feq_s_rslt[m5_WORD_RANGE]    = {31'b0 , /fpu1$eq_compare};
+               $flt_s_rslt[m5_WORD_RANGE]    = {31'b0 , /fpu1$lt_compare}; 
+               $fle_s_rslt[m5_WORD_RANGE]    = {31'b0 , {/fpu1$eq_compare & /fpu1$lt_compare}};
+               $fclass_s_rslt[m5_WORD_RANGE] = {28'b0, /fpu1$output_class};
+               $fcvt_s_w_rslt[m5_WORD_RANGE]  = /fpu1$output_result;
+               $fcvt_s_wu_rslt[m5_WORD_RANGE] = /fpu1$output_result;
+               $fmv_w_x_rslt[m5_WORD_RANGE]   = /src[1]$reg_value;
 
                // Pulling Instructions from /orig_inst scope
-               $fdivs_rslt[m5_WORD_RANGE]   = m5_WORD_CNT'b0;
-               $fsqrts_rslt[m5_WORD_RANGE]  = m5_WORD_CNT'b0;
+               $fdiv_s_rslt[m5_WORD_RANGE]   = m5_WORD_CNT'b0;
+               $fsqrt_s_rslt[m5_WORD_RANGE]  = m5_WORD_CNT'b0;
                `BOGUS_USE(/fpu1$in_ready /fpu1$sqrtresult /fpu1$unordered /fpu1$exception_invaild_output /fpu1$exception_infinite_output /fpu1$exception_overflow_output /fpu1$exception_underflow_output /fpu1$exception_inexact_output)
             )
          
@@ -4485,12 +4485,13 @@
       $unconditioned_reg[m5_eval(['m5_']m5_uppercase(_sig_prefix)REGS_INDEX_RANGE)] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[m5_WORD_RANGE] = $reg_value;
+   m5_var(rf_type, m5_if_eq(_sig_prefix, [''], x, f))
    /regs[m5_eval(['m5_']m5_uppercase(_sig_prefix)REGS_RANGE)]
       \viz_js
          all: {
             box: {
                fill: "#2028b0",
-               width: 145,
+               width: 170,
                height: 650,
                stroke: "black",
                strokeWidth: 0
@@ -4511,7 +4512,7 @@
                   fontFamily: "monospace",
                   fill: "white"
                })
-               this.abi_x_map = m5_js_abi_x_map;
+               this.abi_['']m5_rf_type['']_map = m5_eval(m5_js_abi_['']m5_rf_type['']_map);
                return {rf_header, rf_header2}
             },
          },
@@ -4519,7 +4520,7 @@
          where0: {left: 10, top: 80},
          box: {
                fill: "white",
-               width: 125,
+               width: 150,
                height: 14,
                strokeWidth: 0
             },
@@ -4542,14 +4543,22 @@
                read_valid |= rs_valid[i]
             }
             let pending = m5_if(m5_PENDING_ENABLED, [''<<1$pending'.asBool(false)'], ['false'])
+            
+            // Construct string for register value (including reg index, ABI name, and previous value).
             let reg = parseInt(this.getIndex())
-            let regIdent = ("m5_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString()
-            // TODO: Enable this (ABI reg names) and make room for it. Do also for F-regs.
-            //regIdent = regIdent + "(" + this.getScope("regs").parent.context.abi_x_map[reg] + ")";
-            let oldValStr = mod ? `(${'$value'.asInt(NaN).toString(16)})` : ""
-            this.getObjects().reg.set({text:
-               regIdent + ": " +
-               '$value'.step(1).asInt(NaN).toString(16) + oldValStr})
+            const maxStrLen = 15
+            let regStr = '$value'.step(1).asInt(NaN).toString(16)
+            if (mod) {
+               regStr = `${'$value'.asInt(NaN).toString(16)}->` + regStr;
+            }
+            let regIdent = ("m5_ISA" == "MINI") ? String.fromCharCode("a".charCodeAt(0) + reg) : reg.toString().padStart(2, " ")
+            regIdent += "|" + this.getScope("regs").parent.context.abi_['']m5_rf_type['']_map[reg] + ":"
+            regStr = regIdent.padEnd(maxStrLen - regStr.length, " ") + regStr
+            if (regStr.length > maxStrLen) {
+               regStr = "…" + regStr.substr(regStr.length - maxStrLen + 1)
+            }
+            // Color the string.
+            this.getObjects().reg.set({text: regStr})
             this.getObjects().reg.set({fill: pending ? "darkorange" : mod ? "blue" : "black"})
             this.getBox().set({fill: mod ? ('/instr$second_issue'.asBool(false) ? "#ffd0b0" : "#b0ffff") : read_valid ? "#d0e8ff" : "white"})
          }
@@ -5071,7 +5080,7 @@
          // load arrow
          let ld_st_addr = ('$addr'.asInt() / 4)
          let ld_valid = '$valid_ld'.asBool(false)
-         objects.ld_arrow = new fabric.Line([1165 + m5_VIZ_MEM_LEFT_ADJUST, (17 * ld_st_addr) + 96, 1080 + (valid_dest_fpu_reg_valid ? m5_VIZ_MEM_LEFT_ADJUST : 0), 96 + 17 * the_dest_reg], {
+         objects.ld_arrow = new fabric.Line([1165 + m5_VIZ_MEM_LEFT_ADJUST, (17 * ld_st_addr) + 96, 1105 + (valid_dest_fpu_reg_valid ? m5_VIZ_MEM_LEFT_ADJUST : 0), 96 + 17 * the_dest_reg], {
             stroke: "#c03050",
             strokeWidth: 3,
             visible: ld_valid
@@ -5384,7 +5393,7 @@
             m4+ifelse(m5_EXT_F, 1,
                \TLV
                   /fpu
-                     m4+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 955 + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
+                     m4+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 350 + 605 + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
                )
             m4+memory_viz(/bank[m5_calc(m5_ADDRS_PER_WORD-1):0] , /mem[m5_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m5_if(m5_EXT_F, ['m5_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
    m4_ifelse_block(m5_FORMAL, 1, ['
