@@ -1,7 +1,5 @@
 \m4_TLV_version 1d --noline: tl-x.org
 \SV
-   // TODO: Temporary:
-   //m4_define(['m5_PROG_NAME'], fast_multiply)
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
    //
@@ -35,11 +33,9 @@
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m4
-   m4_use(m5)
+   m4_use(m5-0.1)
 \m5
-   //+m4_def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ca70d4e2538ae9fe792f9db1d3eafbac5d4a9a2c/']'])
-   // TODO: TEMPORARY
-   def(warpv_includes, ['['./warp-v_includes_m5/']'])
+   def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/8d6472d45fc4b184b4b4f5aca77a282b91877c09/']'])
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -691,7 +687,7 @@
    
    // Instruction Memory macros are responsible for providing the instruction memory interface for fetch, as:
    // Inputs:
-   //   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
+   //   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
    // Outputs:
    //   |fetch/instr?$fetch$raw[m5_INSTR_RANGE] (at or after @m5_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
    default_def(IMEM_MACRO_NAME, m5_isa['_imem'])
@@ -744,9 +740,9 @@
    // Computed ISA uarch Parameters (based on ISA-specific parameters).
 
    def(ADDRS_PER_WORD, m5_calc(m5_WORD_CNT / m5_BITS_PER_ADDR))
-   def(SUB_WORD_BITS, m5_width(m5_calc(m5_ADDRS_PER_WORD - 1)))
+   def(SUB_WORD_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_WORD - 1)))
    def(ADDRS_PER_INSTR, m5_calc(m5_INSTR_CNT / m5_BITS_PER_ADDR))
-   def(SUB_PC_BITS, m5_width(m5_calc(m5_ADDRS_PER_INSTR - 1)))
+   def(SUB_PC_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_INSTR - 1)))
    define_vector(PC, m5_ADDR_HIGH, m5_SUB_PC_BITS)
    def(FULL_PC, ['{$Pc, m5_SUB_PC_BITS'b0}'])
    define_hier(DATA_MEM_ADDRS, m5_calc(m5_DATA_MEM_WORDS_HIGH * m5_ADDRS_PER_WORD))  // Addressable data memory locations.
@@ -1228,7 +1224,7 @@
       /instr
          @m5_FETCH_STAGE
             ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV mini_gen()
    // No M4-generated code for mini.
@@ -1704,7 +1700,7 @@
             /instr
                @m5_FETCH_STAGE
                   ?$fetch
-                     $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+                     $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
       )
 
 // Logic for a single CSR.
@@ -1773,10 +1769,10 @@
       ,
       \TLV
          // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
-         $RemainingCyclesWithinTimeUnit[m5_width(m5_CYCLES_PER_TIME_UNIT)-1:0] <=
+         $RemainingCyclesWithinTimeUnit[m5_binary_width(m5_CYCLES_PER_TIME_UNIT)-1:0] <=
               ($reset || $time_unit_expires) ?
-                     m5_width(m5_CYCLES_PER_TIME_UNIT)'d['']m5_calc(m5_CYCLES_PER_TIME_UNIT - 1) :
-                     $RemainingCyclesWithinTimeUnit - m5_width(m5_CYCLES_PER_TIME_UNIT)'b1;
+                     m5_binary_width(m5_CYCLES_PER_TIME_UNIT)'d['']m5_calc(m5_CYCLES_PER_TIME_UNIT - 1) :
+                     $RemainingCyclesWithinTimeUnit - m5_binary_width(m5_CYCLES_PER_TIME_UNIT)'b1;
          $time_unit_expires = !( | $RemainingCyclesWithinTimeUnit);  // reaches zero
 
          $full_csr_cycle_hw_wr_value[63:0]   = {$csr_cycleh,   $csr_cycle  } + 64'b1;
@@ -2624,7 +2620,7 @@
       /instr
          @m5_FETCH_STAGE
             ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV mipsi_gen()
    // No M4-generated code for MIPS I.
@@ -2940,7 +2936,7 @@
       /instr
          @m5_FETCH_STAGE
             ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV power_gen()
    // No M4-generated code for POWER.
