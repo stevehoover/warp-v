@@ -1,2 +1,4 @@
 # makerchip-app backup files.
 *.bak
+build/
+*.conf
