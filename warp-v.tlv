@@ -35,13 +35,16 @@
 \m4
    m4_use(m5-0.1)
 \m5
+   if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
+
    // For a while, remain backward-compatible with M4 parameterization.
    macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_DEBUG(HI$1)m5_def(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
    import_m4_params(ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
                     BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
                     EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
-                    REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN)
+                    REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
+                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
    
    def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/8d6472d45fc4b184b4b4f5aca77a282b91877c09/']'])
    
@@ -1072,8 +1075,8 @@
    // or outside for formal.
    pragma_disable_quote_checks
    =m4_def(module_def,
-          ['m5_ifeq(m5_FORMAL, 0,
-                  ['\SV['']m5_nl['']m4_makerchip_module'],
+          ['\SV['']m5_nl['']m5_ifeq(m5_FORMAL, 0,
+                  ['m4_makerchip_module'],
                   ['   module warpv(input logic clk,
          input logic reset,
          output logic failed,
@@ -1612,9 +1615,6 @@
 //   *instrs[]
 //   *instr_strs[]
 \TLV riscv_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m4-defined name.)
-   m5_inline_macro(prog, ['riscv_']_prog_name['_prog'])
-   m4+m5_prog()
    
    // ==============
    // IMem and Fetch
@@ -1687,6 +1687,9 @@
          // For simulation
          // --------------
          
+         // Define the program. (This approach is required for an m5-defined name.)
+         m5_inline_macro(prog, ['riscv_']_prog_name['_prog'])
+         m4+m5_prog()
          \SV_plus
             // The program in an instruction memory.
             logic [m5_INSTR_RANGE] instrs [0:m5_NUM_INSTRS-1];
