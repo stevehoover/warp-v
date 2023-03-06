@@ -40,6 +40,37 @@ cd warp-v
 ./init
 ```
 
+# Build with Fusesoc
+
+- Install edalize with sandpiper support
+ 
+```git clone https://github.com/shariethernet/edalize.git```
+
+``` cd edalize```
+
+```git checkout main```
+
+```pip3 install --user -r dev-requirements.txt```
+
+```pre-commit install```
+
+```pip3 install --user -e .```
+
+- Install fusesoc
+
+```pip install fusesoc```
+
+- Add warpv to fusesoc core library
+
+```fusesoc library add warpv .```
+
+- Build warp-v with Fusesoc (default configuration)
+
+```fusesoc run --target=sandpiper warpv```
+
+Warp-v can be configured according to your requirement by setting the `mxdef:` in `warp-v.core` 
+
+Note: In the the .core files use [] wherever you intend to use (). As Fusesoc parsers donot support (), the [] acts as a place holder and gets replaced by () later on.
 
 # Features
 

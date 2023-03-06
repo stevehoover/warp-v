@@ -1,0 +1,30 @@
+CAPI=2:
+name : ::warpv:0
+
+filesets:
+    warpv_config:
+        files:
+            - warp-v_config.tlv 
+        file_type: TLVerilogSource
+
+    warpv:
+        files:
+            - warp-v.tlv
+        file_type: TLVerilogSource
+
+targets:
+    sandpiper:
+        default_tool: sandpipersaas
+        filesets: [warpv]
+        tools:
+            sandpipersaas:
+                sandpiper_saas:
+                    - --bestsv
+                    - --inlineGen
+                mxdef:
+                    - m5_CONFIG_EXPR=m5_def[STANDARD_CONFIG,4-stage]
+                output_dir:
+                    - "warpv_rtl"
+                output_file: 
+                    - "warpv_rtl.sv"
+        toplevel: [warpv]
