@@ -1,4 +1,3 @@
- 
 #!/bin/bash
 
 # One-time initialization of this repository, to be run after cloning.
@@ -39,3 +38,5 @@ if which apt > /dev/null; then
 
   echo -e "\e[0Ksection_end:`date +%s`:init-apt\r\e[0K"
 fi
+
+echo -e "\e[0KNow, be sure to accept the terms of service of sandpiper-saas and makerchip-app by running them."
