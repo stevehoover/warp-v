@@ -1073,7 +1073,7 @@
    def(NUM_INSTRS, 0)
 
 
-   // Define m5+module_def macro to be used as a region line providing the module definition, either inside makerchip,
+   // Define m5_module_def macro to be used in \SV context, providing the module definition, either inside makerchip,
    // or outside for formal.
    def(module_def, ['
       m5_ifeq(m5_FORMAL, 0,
@@ -1105,6 +1105,8 @@
             output logic [31: 0] rvfi_mem_wdata);
          '])
    '])
+   // For backward-compatibility, the old M4 version of this, used as an m4+ region.
+   eval(['m4_define(['m4_module_def'], ['\SV']m5_nl['   ']m5_defn(module_def))'])
 
    // Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
    // based on model config.
