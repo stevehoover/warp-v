@@ -18,8 +18,8 @@ tos_agree:
 out/warp-v_formal.sv: ../warp-v.tlv
 	rm -rf out
 	mkdir out
-	# Note: Currently "--m4def M4_FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
-	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys --m4def M4_FORMAL=1
+	# Note: Currently "--m5def M5_FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
+	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys --m5def m5_FORMAL=1
 	
 env: env/PASSED
 

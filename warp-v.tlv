@@ -1,4 +1,4 @@
-\m4_TLV_version 1d: tl-x.org
+\m5_TLV_version 1d: tl-x.org
 \SV
    // -----------------------------------------------------------------------------
    // Copyright (c) 2018, Steven F. Hoover
@@ -30,24 +30,11 @@
 
    // For usage examples, visit warp-v.org.
 
+\m5
+   use(m5-0.2)
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
-\m4
-   m4_use(m5-0.1)
 \m5
-   if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
-
-   // For a while, remain backward-compatible with M4 parameterization.
-   macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_DEBUG(HI$1)m5_def(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
-   import_m4_params(ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
-                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
-                    EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
-                    EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
-                    REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
-                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
-   
-   def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/8d6472d45fc4b184b4b4f5aca77a282b91877c09/']'])
-   
    // A highly-parameterized CPU generator, configurable for:
    //   o An ISA of your choice, where the following ISAs are currently defined herein:
    //      - An uber-simple mini CPU for academic use
@@ -62,25 +49,26 @@
    //   o A simple RISC-V assembler. (The Mini ISA needs no assembler as it uses strings for instructions.)
    //   o A tiny test program for each ISA
 
-   // Notes:
-   //   o THIS CODE MAKES HEAVY USE OF MACRO PREPROCESSING WITH M4 (https://www.gnu.org/software/m4/manual/m4.html),
-   //     AS WELL AS "M4+" MACROS SUPPORTED BY PERL PREPROCESSING. NEITHER OF THESE ARE
-   //     CURRENTLY DOCUMENTED OR SUPPORTED FOR GENERAL USE. This design is shared to illustrate
-   //     the potential. While we openly welcome collaboration, there are no current expectations that folks
-   //     will be able to evolve the design independently. If you are interested in collaboration,
-   //     please contact steve.hoover@redwoodeda.com.
-   //   o If you've come here to learn about RISC-V design with TL-Verilog, you might be better served
-   //     to start with these models created in the Microprocessor for You in Thirty Hours (MYTH) Workshop:
-   //     https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md.
-   //   o The preprocessed code is represented in the "Nav-TLV" tab. You can debug using
-   //     Nav-TLV and find corresponding source lines by clicking Nav-TLV line numbers.
-   //   o The "Diagram" may fail to generate due to the size of the design.
+   // If you've come here to learn about RISC-V design with TL-Verilog, the WARP-V source code
+   // may not be the best place to start. WARP-V is highly parameterized using M5 (docs available
+   // within the Makerchip IDE) and this parameterization can be confusing to someone new to
+   // TL-Verilog. You might be better served to start with:
+   //   o A "RVMYTH" TL-Verilog RISC-V design created in the Microprocessor for You in
+   //     Thirty Hours (MYTH) Workshop:
+   //     https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md
+   //   o A TL-Verilog RISC-V design course: https://makerchip.com/sandbox?tabs=Courses
+   //   o By compiling this code in Makerchip, the "Nav-TLV" tab will contain the
+   //     preprocessed code. Parameterization has been resolved in this code, and you can
+   //     navigate the code interactively and find corresponding source lines by clicking
+   //     Nav-TLV line numbers.
+   
+   // Note that the "Diagram" may fail to generate due to the size of the design.
    
 
 
    // The CPU
 
-   // The code is parameterized, using the M4 macro preprocessor, for adjustable pipeline
+   // The code is parameterized, using the M5 macro preprocessor, for adjustable pipeline
    // depth.
    //
    // Overview:
@@ -182,7 +170,7 @@
    //       Stages should be defined using a generic mechanism (just defining m5_*_STAGE constants).
    //       Redirects should be defined using a generic mechanism to define each redirect, then
    //       instantiate the logic (including PC logic).
-   //       IMem, RF should be m4+ macros.
+   //       IMem, RF should be m5+ macros.
    //       Should create generic instruction definition macros (like the RISC-V ones, but generic).
 
 
@@ -247,8 +235,8 @@
    // ==========
    
    // This design is a RISC-V (RV32IMF) implementation.
-   // The ISA is characterized using M4 macros, and the microarchitecture is generated from this characterization, so
-   // the ISA can be modified through M4 definitions.
+   // The ISA is characterized using M5 macros, and the microarchitecture is generated from this characterization, so
+   // the ISA can be modified through M5 definitions.
    // Notes:
    //   o Unaligned load/store are handled by trapping, though no s/w is available to handle the trap.
    // The implementation is based on "The RISC-V Instruction Set Manual Vol. I: User-Level ISA," Version 2.2: https://riscv.org/specifications/
@@ -260,7 +248,7 @@
    // ======
    
    // WIP.
-   // Unlike RISC-V, this does not use M4 to characterize the ISA.
+   // Unlike RISC-V, this does not use M5 to characterize the ISA.
    // Not implemented:
    //   o FPU
    //   o Mult/Div and HI/LO regs
@@ -274,7 +262,7 @@
    // =====
    
    // WIP. 
-   // Unlike RISC-V, this does not use M4 to characterize the ISA.
+   // Unlike RISC-V, this does not use M5 to characterize the ISA.
    // No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
    // not to provide a production-worthy Power design.
    
@@ -299,6 +287,20 @@
    // Configuration
    // =============
    
+   // For passing configuration via the command line.
+   if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
+
+   // For a while, remain backward-compatible with M4 parameterization.
+   macro(import_m4_params, ['m5_if_def(m4_m4prefix(['$1']), ['m5_DEBUG(HI$1)m5_def(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
+   import_m4_params(ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
+                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
+                    EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
+                    EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
+                    REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
+                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
+   
+   def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/c5bcde41e02dcd6bd18dd60da47bedb134a60a07/']'])
+
    // This is where you configure the CPU.
    // Note that WARP-V has a configurator at warp-v.org.
    
@@ -330,7 +332,7 @@
    // --------------
    default_def(
      ['# Number of cores. Previously this was defined externally as m5_CORE_CNT (via m5_define_hier), so accept that too.'],
-     NUM_CORES, m4_ifelse(m5_CORE_CNT, ['m5_CORE_CNT'], 1, m5_CORE_CNT))
+     NUM_CORES, m5_ifeq(m5_CORE_CNT, ['m5_CORE_CNT'], 1, m5_CORE_CNT))
 
    // Only relevant, and only defined, if m5_NUM_CORES > 1:
 
@@ -395,7 +397,7 @@
    //                         If |mem stages reflect nominal alignment w/ load instruction, this is the
    //                         nominal load latency.
    //     Deltas (default to 0):
-   //       M4 EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
+   //       m5_EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
    //       m5_EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
    //       m5_EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
    //       m5_EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
@@ -403,7 +405,7 @@
    //       m5_EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
    //       m5_EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
    //   m5_BRANCH_PRED: {fallthrough, two_bit, ...}
-   case(m5_STANDARD_CONFIG,
+   case(STANDARD_CONFIG,
       ['1-stage'], [
          // No pipeline
          default_def(
@@ -481,7 +483,7 @@
    // --------------------------
    // ISA-Specific Configuration
    // --------------------------
-   case(m5_ISA, MINI, [
+   case(ISA, MINI, [
       // Mini-CPU Configuration:
       // Force predictor to fallthrough, since we can't predict early enough to help.
       def(BRANCH_PRED, fallthrough)
@@ -500,7 +502,7 @@
         ['# Width of a "word". (32 for RV32X or 64 for RV64X)'],
         WORD_WIDTH, 32)
       define_vector(WORD, m5_WORD_WIDTH)
-      // ISA extensions,  1, or 0 (following M4 boolean convention).
+      // ISA extensions,  1, or 0 (following M5 boolean convention).
       // TODO. Currently formal checks are broken when m5_EXT_F is set to 1.
       // TODO. Currently formal checks takes long time(~48 mins) when m5_EXT_B is set to 1.
       //       Hence, its disabled at present.
@@ -535,9 +537,9 @@
    default_def(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
    default_def(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
-     PROG_NAME, m4_ifelse(m5_ISA, RISCV, m4_ifelse(m5_EXT_F, 1, fpu_test, m4_ifelse(m5_EXT_M, 1, divmul_test, m4_ifelse(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
-   //m4_ifelse(m5_EXT_F, 1, fpu_test, cnt10)
-   //m4_ifelse(m5_EXT_B, 1, bmi_test, cnt10)
+     PROG_NAME, m5_ifeq(m5_ISA, RISCV, m5_ifeq(m5_EXT_F, 1, fpu_test, m5_ifeq(m5_EXT_M, 1, divmul_test, m5_ifeq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
+   //m5_ifeq(m5_EXT_F, 1, fpu_test, cnt10)
+   //m5_ifeq(m5_EXT_B, 1, bmi_test, cnt10)
 
    // =====Done Defining Configuration=====
    
@@ -567,7 +569,7 @@
    // m5_HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
    // Defaults:
    def(HAS_INDIRECT_JUMP, 0)
-   case(m5_ISA, ['MINI'], [
+   case(ISA, ['MINI'], [
       // Mini-CPU Characterization:
       macro(NOMINAL_BRANCH_TARGET_CALC_STAGE, ['m5_EXECUTE_STAGE'])
    ], ['RISCV'], [
@@ -634,7 +636,7 @@
    // Unfortunately, this modeling does not work because of the redirection logic. When timed @0, the $GoodPathMask would
    // need to be redistributed, with each bit in a different stage to enable $commit to be computed in @0. So, to make
    // this work, each bit of $GoodPathMask would have to become a separate signal, and each signal assignment would need
-   // its own @stage scope, affected by m5_RETIMING_EXPERIMENT. Since this is all generated by M4 ugliness, it was too
+   // its own @stage scope, affected by m5_RETIMING_EXPERIMENT. Since this is all generated by M5, it was too
    // complicated to justify the experiment.
    //
    // For now, the RETIMING_EXPERIMENT sets $commit to 1'b1, and produces results that make synthesis look good.
@@ -705,13 +707,13 @@
    default_def(IMEM_MACRO_NAME, m5_isa['_imem'])
    
    // For each ISA, define:
-   //   m5_define_vector(INSTR, XX)   // (or, m5_define_vector_with_fields(...)) Instruction vector.
-   //   m5_define_vector(ADDR, XX)    // An address.
-   //   m4_define(BITS_PER_ADDR, XX)  // Each memory address holds XX bits.
-   //   m5_define_vector(WORD, XX)    // Width of general-purpose registers.
-   //   m5_define_hier(REGS, XX)      // General-purpose register file.
+   //   define_vector(INSTR, XX)   // (or, m5_define_vector_with_fields(...)) Instruction vector.
+   //   define_vector(ADDR, XX)    // An address.
+   //   def(BITS_PER_ADDR, XX)     // Each memory address holds XX bits.
+   //   define_vector(WORD, XX)    // Width of general-purpose registers.
+   //   define_hier(REGS, XX)      // General-purpose register file.
 
-   case(m5_ISA,
+   case(ISA,
       ['MINI'], [
          define_vector_with_fields(INSTR, 40, DEST_CHAR, 32, EQUALS_CHAR, 24, SRC1_CHAR, 16, OP_CHAR, 8, SRC2_CHAR, 0)
          define_vector(ADDR, 12)
@@ -809,7 +811,7 @@
    // Redirects are described in the TLV code. Supporting macro definitions are here.
 
    // m5_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
-   def(redirect_list, ['-100'])  // list fed to m4_ordered
+   def(redirect_list, ['-100'])  // list fed to m5_ordered
    def(redirect_squash_terms, ['['']'])  // & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
    def(redirect_shadow_terms, ['['']'])  // & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
    def(redirect_pc_terms, [''])      // ternary operator terms for redirecting PC (later-stage redirects must be first)
@@ -859,9 +861,9 @@
       append_macro(redirect_shadow_terms,
                 [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_$1_BUBBLES - $9)['{1'b1}}, {']m5_calc(m5_$1_BUBBLES + $9)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
       prepend_macro(redirect_pc_terms,
-                 ['']m5_redir_cond($@)[' ? {>>']m5_$1_BUBBLES['$3, ']m4_ifelse($10, wait, 1'b1, 1'b0)['} : '])
+                 ['']m5_redir_cond($@)[' ? {>>']m5_$1_BUBBLES['$3, ']m5_ifeq($10, wait, 1'b1, 1'b0)['} : '])
       if(['$4'], [
-         //m5_def(ABORT_BEFORE_$1, m4_abort_terms)   // The instruction was aborted prior to this abort condition.
+         //m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
          append_macro(abort_terms,
                       [' || $2'])
          append_macro(redirect_masking_triggers,
@@ -870,7 +872,7 @@
       append_macro(redirect_viz,
                 ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
       append_macro(redirect_cell_viz,
-                ['if (stage == ']m5_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m4_ifelse(m5_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
+                ['if (stage == ']m5_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_ifeq(m5_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
    ])
 
    // Specify and process redirect conditions.
@@ -882,11 +884,11 @@
    process_redirect_conditions(
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
       ['NO_FETCH, $NoFetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
-      m4_ifelse(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
+      m5_ifeq(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
       ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 0'],
       ['JUMP, $jump, $jump_target, 0, "Jp", "purple", 61, 11, 0'],
       ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "Br", "blue", 70, 20, 0'],
-      m4_ifelse(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
+      m5_ifeq(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
       ['NON_PIPELINED, $non_pipelined, $pc_inc, 0, "NP", "red", 75.6, 25, 1, wait'],
       ['TRAP, $aborting_trap, $trap_target, 1, "AT", "#ff0080", 75.6, 7, 0'],
       ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080", 75.6, 12, 0'])
@@ -956,7 +958,7 @@
         def(num_csrs, m5_calc(m5_num_csrs + 1))
    ])
    
-   case(m5_ISA, RISCV, [
+   case(ISA, RISCV, [
       ifeq(m5_NO_COUNTER_CSRS, 1, [''], [
          // TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
          // Define Counter CSRs
@@ -1055,7 +1057,7 @@
    // GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
    // --------------------------------------------------
    
-   case(m5_ISA, MINI, [
+   case(ISA, MINI, [
       // An out-of-place correction for the fact that in Mini-CPU, instruction
       // addresses are to different memory than data, and the memories have different widths.
       define_vector(PC, 10, 0)
@@ -1071,38 +1073,38 @@
    def(NUM_INSTRS, 0)
 
 
-   // Define m4+module_def macro to be used as a region line providing the module definition, either inside makerchip,
+   // Define m5+module_def macro to be used as a region line providing the module definition, either inside makerchip,
    // or outside for formal.
-   pragma_disable_quote_checks
-   =m4_def(module_def,
-          ['\SV['']m5_nl['']m5_ifeq(m5_FORMAL, 0,
-                  ['m4_makerchip_module'],
-                  ['   module warpv(input logic clk,
-         input logic reset,
-         output logic failed,
-         output logic passed,
-         output logic  rvfi_valid,
-         output logic [31:0] rvfi_insn,
-         output logic [63 : 0] rvfi_order,
-         output logic rvfi_halt,
-         output logic rvfi_trap,
-         output logic rvfi_intr,
-         output logic [1: 0] rvfi_ixl,
-         output logic [1: 0] rvfi_mode,
-         output logic [4: 0] rvfi_rs1_addr,
-         output logic [4: 0] rvfi_rs2_addr,
-         output logic [31: 0] rvfi_rs1_rdata,
-         output logic [31: 0] rvfi_rs2_rdata,
-         output logic [4: 0] rvfi_rd_addr,
-         output logic [31: 0] rvfi_rd_wdata,
-         output logic [31:0] rvfi_pc_rdata,
-         output logic [31:0] rvfi_pc_wdata,
-         output logic [31:0] rvfi_mem_addr,
-         output logic [3: 0] rvfi_mem_rmask,
-         output logic [3: 0] rvfi_mem_wmask,
-         output logic [31: 0] rvfi_mem_rdata,
-         output logic [31: 0] rvfi_mem_wdata);'])'])
-   pragma_enable_quote_checks
+   def(module_def, ['
+      m5_ifeq(m5_FORMAL, 0,
+         ['m5_makerchip_module'], ['
+         module warpv(input logic clk,
+            input logic reset,
+            output logic failed,
+            output logic passed,
+            output logic  rvfi_valid,
+            output logic [31:0] rvfi_insn,
+            output logic [63 : 0] rvfi_order,
+            output logic rvfi_halt,
+            output logic rvfi_trap,
+            output logic rvfi_intr,
+            output logic [1: 0] rvfi_ixl,
+            output logic [1: 0] rvfi_mode,
+            output logic [4: 0] rvfi_rs1_addr,
+            output logic [4: 0] rvfi_rs2_addr,
+            output logic [31: 0] rvfi_rs1_rdata,
+            output logic [31: 0] rvfi_rs2_rdata,
+            output logic [4: 0] rvfi_rd_addr,
+            output logic [31: 0] rvfi_rd_wdata,
+            output logic [31:0] rvfi_pc_rdata,
+            output logic [31:0] rvfi_pc_wdata,
+            output logic [31:0] rvfi_mem_addr,
+            output logic [3: 0] rvfi_mem_rmask,
+            output logic [3: 0] rvfi_mem_wmask,
+            output logic [31: 0] rvfi_mem_rdata,
+            output logic [31: 0] rvfi_mem_wdata);
+         '])
+   '])
 
    // Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
    // based on model config.
@@ -1171,7 +1173,7 @@
 // A default testbench for all ISAs.
 // Pass when the assembler label "pass" is reached if defined. O.w. end of program.
 // Fail at the cycle limit or when the label "fail" is reached.
-// Requires m4+makerchip_pass_fail(..).
+// Requires m5+makerchip_pass_fail(..).
 \TLV default_makerchip_tb()
    |fetch
       /instr
@@ -1229,9 +1231,9 @@
       }; 
 
 \TLV mini_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m4-defined name.)
-   m5_inline_macro(prog, ['mini_']_prog_name['_prog'])
-   m4+m5_prog()
+   // Instantiate the program. (This approach is required for an m5-defined name.)
+   m5_macro(prog, ['mini_']_prog_name['_prog'])
+   m5+m5_prog()
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -1239,7 +1241,7 @@
                $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV mini_gen()
-   // No M4-generated code for mini.
+   // No M5-generated code for mini.
 
 
 // Decode logic for Mini-CPU.
@@ -1621,7 +1623,7 @@
    // ==============
    
    /* DMEM_STYLE: m5_DMEM_STYLE, FORMAL: m5_FORMAL */
-   m4+ifelse(m5_FORMAL, 1,
+   m5+ifelse(m5_FORMAL, 1,
       \TLV
          // For formal
          // ----------
@@ -1688,8 +1690,8 @@
          // --------------
          
          // Define the program. (This approach is required for an m5-defined name.)
-         m5_inline_macro(prog, ['riscv_']_prog_name['_prog'])
-         m4+m5_prog()
+         m5_macro(prog, ['riscv_']_prog_name['_prog'])
+         m5+m5_prog()
          \SV_plus
             // The program in an instruction memory.
             logic [m5_INSTR_RANGE] instrs [0:m5_NUM_INSTRS-1];
@@ -1702,7 +1704,7 @@
             assign instr_strs[m5_NUM_INSTRS] = "END                                     ";
          
          |fetch
-            m4+ifelse(m5_VIZ, 1,
+            m5+ifelse(m5_VIZ, 1,
                \TLV
                   /instr_mem[m5_calc(m5_NUM_INSTRS-1):0]
                      @m5_VIZ_STAGE
@@ -1727,7 +1729,7 @@
       // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
       m5_def(THIS_CSR_RANGE, m5_eval(['m5_CSR_']m5_uppercase(csr_name)['_RANGE']))
       
-      m4+ifelse(side_effects, 1,
+      m5+ifelse(side_effects, 1,
          \TLV
             // hw_wr_mask conditioned by hw_wr.
             $csr_['']csr_name['']_hw_wr_en_mask[m5_THIS_CSR_RANGE] = {m5_eval(['m5_CSR_']m5_uppercase(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
@@ -1739,7 +1741,7 @@
             // The CSR value with no side-effect writes.
             $upd_csr_['']csr_name[m5_THIS_CSR_RANGE] = $csr_['']csr_name;
          )
-      m4+ifelse(side_effects, RO,
+      m5+ifelse(side_effects, RO,
          \TLV
          ,
          \TLV
@@ -1762,13 +1764,13 @@
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
-   // TODO: This doesn't maintain alignment. Need an m4+foreach macro.
+   // TODO: This doesn't maintain alignment. Need an m5+foreach macro.
    m4_foreach(csr, csrs, ['
-   m4+riscv_csr(m5_eval(['m5_csr_']csr['_args']))
+   m5+riscv_csr(m5_eval(['m5_csr_']csr['_args']))
    '])
 
 \TLV riscv_csr_logic()
-   m4+ifelse(m5_csrs, [''], [''],
+   m5+ifelse(m5_csrs, [''], [''],
       \TLV
          // CSR write value for CSR write instructions.
          $csr_wr_value[m5_WORD_RANGE] = $raw_funct3[2] ? {27'b0, $raw_rs1} : /src[1]$reg_value;
@@ -1776,7 +1778,7 @@
 
    // Counter CSR
    //
-   m4+ifelse(m5_NO_COUNTER_CSRS, 1,
+   m5+ifelse(m5_NO_COUNTER_CSRS, 1,
       \TLV
       ,
       \TLV
@@ -1790,7 +1792,7 @@
          $full_csr_cycle_hw_wr_value[63:0]   = {$csr_cycleh,   $csr_cycle  } + 64'b1;
          $full_csr_time_hw_wr_value[63:0]    = {$csr_timeh,    $csr_time   } + 64'b1;
          $full_csr_instret_hw_wr_value[63:0] = {$csr_instreth, $csr_instret} + 64'b1;
-         m4+ifelse(m5_EXT_F, 1,
+         m5+ifelse(m5_EXT_F, 1,
             \TLV
                // If the value of $raw_rm (or rm field in instruction encoding) is 3'b111(dynamic RoundingMode) or if $fpu_second_issue_div_sqrt
                // occurs then, take the previous "rm"(RoundingMode) stored in "frm" CSR or else take that from instruction encoding itself.
@@ -1817,7 +1819,7 @@
          $csr_instreth_hw_wr = $commit;
          $csr_instreth_hw_wr_mask[31:0] = {32{1'b1}};
          $csr_instreth_hw_wr_value[31:0] = $full_csr_instret_hw_wr_value[63:32];
-         m4+ifelse(m5_EXT_F, 1,
+         m5+ifelse(m5_EXT_F, 1,
             \TLV
                $csr_fflags_hw_wr = (($commit && ($fpu_csr_fflags_type_instr || $fpu_fflags_type_instr))  || $fpu_second_issue_div_sqrt);
                $csr_fflags_hw_wr_mask[4:0] = {5{1'b1}};
@@ -1834,7 +1836,7 @@
       )
    
    // For multicore CSRs:
-   m4+ifelse(m5_calc(m5_NUM_CORES > 1), 1,
+   m5+ifelse(m5_calc(m5_NUM_CORES > 1), 1,
       \TLV
          $csr_pktavail_hw_wr = 1'b0;
          $csr_pktavail_hw_wr_mask[m5_VC_RANGE]  = {m5_VC_HIGH{1'b1}};
@@ -1867,12 +1869,12 @@
    // (by alignment with 3+NON_PIPELINED_BUBBLES to augment the 5 cycle behavior of the mul operation)
 
    $rslt[m5_WORD_RANGE] =
-         $second_issue_ld ? /orig_load_inst$ld_rslt : m4_ifelse_block(m5_EXT_M, 1, ['
+         $second_issue_ld ? /orig_load_inst$ld_rslt : m5_if_eq_block(m5_EXT_M, 1, ['
          ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
-         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m4_ifelse(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
-         ']) m4_ifelse_block(m5_EXT_F, 1, ['
+         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m5_ifeq(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
+         ']) m5_if_eq_block(m5_EXT_F, 1, ['
          ($fpu_second_issue_div_sqrt && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_fpu) ? |fetch/instr/fpu1$output_div_sqrt11 : 
-         ']) m4_ifelse_block(m5_EXT_B, 1, ['
+         ']) m5_if_eq_block(m5_EXT_B, 1, ['
          ($second_issue_clmul_crc && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_clmul) ? |fetch/instr$clmul_output : 
          ($second_issue_clmul_crc && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_crc) ? |fetch/instr$rvb_crc_output : 
          '])
@@ -1908,12 +1910,12 @@
       `BOGUS_USE($raw_shamt $raw_aq $raw_rl $raw_rs3 $raw_rm)  // Avoid "unused" messages. Remove these as they become used.
 
       // Instruction type decode
-      m4+instr_types_decode()
+      m5+instr_types_decode()
 
       // Instruction decode.
-      m4+riscv_decode_expr()
+      m5+riscv_decode_expr()
       
-      m4+ifelse(m5_EXT_M, 1,
+      m5+ifelse(m5_EXT_M, 1,
          \TLV
             // Instruction requires integer mul/div unit and is long-latency.
             $divtype_instr = ($is_div_instr || $is_divu_instr || $is_rem_instr || $is_remu_instr);
@@ -1926,7 +1928,7 @@
             `BOGUS_USE($multype_instr)
          )
 
-      m4+ifelse(m5_EXT_F, 1,
+      m5+ifelse(m5_EXT_F, 1,
          \TLV
             // Instruction requires floating point unit and is long-latency.
             // TODO. Current implementation decodes the floating type instructions seperatly.
@@ -1984,7 +1986,7 @@
             $fpu_instr_with_int_src1 = $is_fsw_instr;
          )
       
-      m4+ifelse(m5_EXT_B, 1,
+      m5+ifelse(m5_EXT_B, 1,
          \TLV
             // These are long-latency Instruction requires B-extension enabled.
             $clmul_type_instr = $is_clmul_instr ||
@@ -2032,7 +2034,7 @@
    $dest_reg_valid = m5_if(m5_EXT_F, ['((! $fpu_type_instr) || $fpu_instr_with_int_dest) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
                      | $dest_reg;   // r0 not valid.  TODO: Huh? What about FP? No formal failure?
    
-   m4+ifelse(m5_EXT_F, 1,
+   m5+ifelse(m5_EXT_F, 1,
       \TLV
          // Implementing a different encoding for floating point instructions.
          ?$valid_decode
@@ -2069,13 +2071,13 @@
 
 \TLV riscv_exe(@_exe_stage, @_rslt_stage)
    // if M_EXT is enabled, this handles the stalling logic
-   m5_if(m5_EXT_M, ['m4+m_extension()'])
+   m5_if(m5_EXT_M, ['m5+m_extension()'])
 
    // if F_EXT is enabled, this handles the stalling logic
-   m5_if(m5_EXT_F, ['m4+f_extension()'])
+   m5_if(m5_EXT_F, ['m5+f_extension()'])
 
    // if B_EXT is enabled, this handles the stalling logic
-   m5_if(m5_EXT_B, ['m4+b_extension()'])
+   m5_if(m5_EXT_B, ['m5+b_extension()'])
    
    @m5_BRANCH_TARGET_CALC_STAGE
       ?$valid_decode_branch
@@ -2087,15 +2089,15 @@
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
-      m4+ifelse(m5_EXT_M, 1,
+      m5+ifelse(m5_EXT_M, 1,
          \TLV
             // Verilog instantiation must happen outside when conditions' scope
             $divblk_valid = $divtype_instr && $commit;
             $mulblk_valid = $multype_instr && $commit;
             /* verilator lint_off WIDTH */
             /* verilator lint_off CASEINCOMPLETE */   
-            m4+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
-            m4+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
+            m5+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+            m5+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
             // for the division module, the valid signal must be asserted for the entire computation duration, hence >>1$div_stall is used for this purpose
             // for multiplication it is just a single cycle pulse to start operating
 
@@ -2107,7 +2109,7 @@
             // retain till next M-type instruction, to be used again at second issue
          )
  
-      m4+ifelse(m5_EXT_F, 1,
+      m5+ifelse(m5_EXT_F, 1,
          \TLV
             // "F" Extension.
 
@@ -2120,18 +2122,18 @@
             $input_valid = $fpu_div_sqrt_type_instr && |fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit;
             `BOGUS_USE($fpu_div_sqrt_valid)
             // Main FPU execution
-            m4+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
+            m5+fpu_exe(/fpu1,|fetch/instr, 8, 24, 32, $operand_a, $operand_b, $operand_c, $int_input, $int_output, $fpu_operation, $rounding_mode, $nreset, $clock, $input_valid, $outvalid, $lt_compare, $eq_compare, $gt_compare, $unordered, $output_result, $output_div_sqrt11, $output_class, $exception_invaild_output, $exception_infinite_output, $exception_overflow_output, $exception_underflow_output, $exception_inexact_output)
 
             // Sign-injection macros
-            m4+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
-            m4+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
-            m4+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
+            m5+sgn_mv_injn(8, 24, $operand_a, $operand_b, $fsgnjs_output)
+            m5+sgn_neg_injn(8, 24, $operand_a, $operand_b, $fsgnjns_output)
+            m5+sgn_abs_injn(8, 24, $operand_a, $operand_b, $fsgnjxs_output)
             /* verilator lint_on WIDTH */
             /* verilator lint_on CASEINCOMPLETE */
          )
       
       
-      m4+ifelse(m5_EXT_B, 1,
+      m5+ifelse(m5_EXT_B, 1,
          \TLV
             // "B" Extension.
             // TODO. Current implementation of BMI is not optimized in terms of encode-decode of instruction inside macro, hence its latency and generated logic increases.
@@ -2147,39 +2149,39 @@
             /* verilator lint_off CASEINCOMPLETE */
             /* verilator lint_off PINMISSING */
             /* verilator lint_off CASEOVERLAP */
-            m4+clz_final(|fetch/instr, /clz_stage, 32, 0, 1, $input_a, $clz_final_output)
-            m4+ctz_final(|fetch/instr, /ctz_stage, /reverse, 32, 0, 1, $input_a, $ctz_final_output)
-            m4+popcnt(|fetch/instr, /pop_stage, $input_a, $popcnt_output, 32)
-            m4+andn($input_a, $input_b, $andn_output[31:0])
-            m4+orn($input_a, $input_b, $orn_output[31:0])
-            m4+xnor($input_a, $input_b, $xnor_output[31:0])
-            m4+pack($input_a, $input_b, $pack_output, 32)
-            m4+packu($input_a, $input_b, $packu_output, 32)
-            m4+packh($input_a, $input_b, $packh_output, 32)
-            m4+minu($input_a, $input_b, $minu_output, 32)
-            m4+maxu($input_a, $input_b, $maxu_output, 32)
-            m4+min($input_a, $input_b, $min_output, 32)
-            m4+max($input_a, $input_b, $max_output, 32)
-            m4+sbset($input_a, $input_b, $sbset_output, 32)
-            m4+sbclr($input_a, $input_b, $sbclr_output, 32)
-            m4+sbinv($input_a, $input_b, $sbinv_output, 32)
-            m4+sbext($input_a, $input_b, $sbext_output, 32)
-            m4+sbseti($input_a, $input_b, $sbseti_output, 32)
-            m4+sbclri($input_a, $input_b, $sbclri_output, 32)
-            m4+sbinvi($input_a, $input_b, $sbinvi_output, 32)
-            m4+sbexti($input_a, $input_b, $sbexti_output, 32)
-            m4+slo($input_a, $input_b, $slo_output, 32)
-            m4+sro($input_a, $input_b, $sro_output, 32)
-            m4+sloi($input_a, $input_b, $sloi_output, 32)
-            m4+sroi($input_a, $input_b, $sroi_output, 32)
-            m4+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
-            m4+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
-            m4+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
-            m4+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $raw[3], $raw[13], $raw[14], $raw[29], $raw[30], $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
-            m4+bfp($input_a, $input_b, $bfp_output, 32)
-            m4+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
-            m4+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
-            m4+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
+            m5+clz_final(|fetch/instr, /clz_stage, 32, 0, 1, $input_a, $clz_final_output)
+            m5+ctz_final(|fetch/instr, /ctz_stage, /reverse, 32, 0, 1, $input_a, $ctz_final_output)
+            m5+popcnt(|fetch/instr, /pop_stage, $input_a, $popcnt_output, 32)
+            m5+andn($input_a, $input_b, $andn_output[31:0])
+            m5+orn($input_a, $input_b, $orn_output[31:0])
+            m5+xnor($input_a, $input_b, $xnor_output[31:0])
+            m5+pack($input_a, $input_b, $pack_output, 32)
+            m5+packu($input_a, $input_b, $packu_output, 32)
+            m5+packh($input_a, $input_b, $packh_output, 32)
+            m5+minu($input_a, $input_b, $minu_output, 32)
+            m5+maxu($input_a, $input_b, $maxu_output, 32)
+            m5+min($input_a, $input_b, $min_output, 32)
+            m5+max($input_a, $input_b, $max_output, 32)
+            m5+sbset($input_a, $input_b, $sbset_output, 32)
+            m5+sbclr($input_a, $input_b, $sbclr_output, 32)
+            m5+sbinv($input_a, $input_b, $sbinv_output, 32)
+            m5+sbext($input_a, $input_b, $sbext_output, 32)
+            m5+sbseti($input_a, $input_b, $sbseti_output, 32)
+            m5+sbclri($input_a, $input_b, $sbclri_output, 32)
+            m5+sbinvi($input_a, $input_b, $sbinvi_output, 32)
+            m5+sbexti($input_a, $input_b, $sbexti_output, 32)
+            m5+slo($input_a, $input_b, $slo_output, 32)
+            m5+sro($input_a, $input_b, $sro_output, 32)
+            m5+sloi($input_a, $input_b, $sloi_output, 32)
+            m5+sroi($input_a, $input_b, $sroi_output, 32)
+            m5+rorl_final(32, 1, $input_a, $sftamt, $rorl_final_output, 31, 0)
+            m5+rorr_final(32, 1, $input_a, $sftamt, $rorr_final_output, 31, 0)
+            m5+brev_final(|fetch/instr, /brev_stage, 32, 32, 0, 1, $input_a, $sftamt, $grev_final_output)
+            m5+bext_dep(1, |fetch/instr, 32, 1, 1, 0, $bmi_clk, $bmi_reset, $din_valid_bext_dep, $din_ready_bext_dep, $input_a, $input_b, $raw[3], $raw[13], $raw[14], $raw[29], $raw[30], $dout_valid_bext_dep, $dout_ready_bext_dep, $bext_dep_output[31:0])
+            m5+bfp($input_a, $input_b, $bfp_output, 32)
+            m5+clmul(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_clmul, $din_ready_clmul, $input_a, $input_b, $raw[3], $raw[12], $raw[13], $dout_valid_clmul, $dout_ready_clmul, $clmul_output[31:0])
+            m5+rvb_crc(1, |fetch/instr, 32, $bmi_clk, $bmi_reset, $din_valid_rvb_crc, $din_ready_rvb_crc, $input_a, $raw[20], $raw[21], $raw[23], $dout_valid_rvb_crc, $dout_ready_rvb_crc, $rvb_crc_output[31:0])
+            m5+rvb_bitcnt(1, |fetch/instr, 32, 0, $bmi_clk, $bmi_reset, $din_valid_rvb_bitcnt, $din_ready_rvb_bitcnt, $input_a, $raw[3], $raw[20], $raw[21], $raw[22], $dout_valid_rvb_bitcnt, $dout_ready_rvb_bitcnt, $rvb_bitcnt_output[31:0])
             // %Warning-MULTIDRIVEN reported by Verilator for $raw because not all bits are pulled to this stage. Rather than lint_on, this will pull all bits.
             `BOGUS_USE($raw)
             /* verilator lint_on WIDTH */
@@ -2191,14 +2193,14 @@
          )
 
       // hold_inst scope is not needed when long latency instructions are disabled
-      m4_ifelse(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
+      m5_ifeq(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
       // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
       // TODO: This becomes a one-liner once $ANY acts on subscope.
       /hold_inst
          $ANY = 1'b0 m5_if(m5_EXT_M, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m5_if(m5_EXT_F, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) m5_if(m5_EXT_B, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr$ANY : >>1$ANY;
          /src[2:1]
             $ANY = 1'b0 m5_if(m5_EXT_M, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m5_if(m5_EXT_F, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) m5_if(m5_EXT_B, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr/src$ANY : >>1$ANY;
-         m4+ifelse(m5_EXT_F, 1,
+         m5+ifelse(m5_EXT_F, 1,
             \TLV
                /fpu
                   $ANY = 1'b0 m5_if(m5_EXT_M, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit) m5_if(m5_EXT_B, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr/fpu$ANY : >>1$ANY;
@@ -2236,14 +2238,14 @@
          $jal_rslt[m5_WORD_RANGE]   = m5_FULL_PC + 4;
          $jalr_rslt[m5_WORD_RANGE]  = m5_FULL_PC + 4;
          // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
-         m4+ifelse(m5_INJECT_RETURNING_LD, 1,
+         m5+ifelse(m5_INJECT_RETURNING_LD, 1,
             \TLV
                $lb_rslt[m5_WORD_RANGE]    = m5_WORD_CNT'b0;
                $lh_rslt[m5_WORD_RANGE]    = m5_WORD_CNT'b0;
                $lw_rslt[m5_WORD_RANGE]    = m5_WORD_CNT'b0;
                $lbu_rslt[m5_WORD_RANGE]   = m5_WORD_CNT'b0;
                $lhu_rslt[m5_WORD_RANGE]   = m5_WORD_CNT'b0;
-               m4_ifelse_block(m5_EXT_F, 1, ['
+               m5_if_eq_block(m5_EXT_F, 1, ['
                $flw_rslt[m5_WORD_RANGE] = 32'b0;
                '])
             ,
@@ -2253,7 +2255,7 @@
                $lw_rslt[m5_WORD_RANGE]    = /orig_load_inst$ld_rslt;
                $lbu_rslt[m5_WORD_RANGE]   = /orig_load_inst$ld_rslt;
                $lhu_rslt[m5_WORD_RANGE]   = /orig_load_inst$ld_rslt;
-               m4_ifelse_block(m5_EXT_F, 1, ['
+               m5_if_eq_block(m5_EXT_F, 1, ['
                $flw_rslt[m5_WORD_RANGE]   = /orig_load_inst$ld_rslt;
                '])
             )
@@ -2289,7 +2291,7 @@
          
          // "M" Extension.
          
-         m4+ifelse(m5_EXT_M, 1,
+         m5+ifelse(m5_EXT_M, 1,
             \TLV
                // for Verilog modules instantiation
                $clk = *clk;
@@ -2319,7 +2321,7 @@
          // "F" Extension.
          
          // TODO: Move this under /fpu.
-         m4+ifelse(m5_EXT_F, 1,
+         m5+ifelse(m5_EXT_F, 1,
             \TLV
                // Determining the type of fpu_operation according to the fpu_exe macro
                $fpu_operation[4:0] = ({5{$is_fmadd_s_instr }}  & 5'h2 ) |
@@ -2393,7 +2395,7 @@
                `BOGUS_USE(/fpu1$in_ready /fpu1$sqrtresult /fpu1$unordered /fpu1$exception_invaild_output /fpu1$exception_infinite_output /fpu1$exception_overflow_output /fpu1$exception_underflow_output /fpu1$exception_inexact_output)
             )
          
-         m4+ifelse(m5_EXT_B, 1,
+         m5+ifelse(m5_EXT_B, 1,
             \TLV
                // Currently few of the instructions are custom build in TL-Verilog and will work fine on inputs in power of 2.
                $is_src_type_instr =     $is_andn_instr       ||
@@ -2517,9 +2519,9 @@
 
    // CSR logic
    // ---------
-   m4+riscv_csrs([''](m5_csrs)[''])
+   m5+riscv_csrs([''](m5_csrs)[''])
    @_exe_stage
-      m4+riscv_csr_logic()
+      m5+riscv_csr_logic()
       
       // Memory inputs.
       ?$valid_exe
@@ -2578,7 +2580,7 @@
       
    @_rslt_stage
       // Mux the correct result.
-      m4+riscv_rslt_mux_expr()
+      m5+riscv_rslt_mux_expr()
 
 
 //============================//
@@ -2625,9 +2627,9 @@
       };
 
 \TLV mipsi_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m4-defined name.)
-   m5_inline_macro(prog, ['mipsi_']_prog_name['_prog'])
-   m4+m5_prog()
+   // Instantiate the program. (This approach is required for an m5-defined name.)
+   m5_macro(prog, ['mipsi_']_prog_name['_prog'])
+   m5+m5_prog()
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -2635,7 +2637,7 @@
                $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV mipsi_gen()
-   // No M4-generated code for MIPS I.
+   // No M5-generated code for MIPS I.
 
 
 // Decode logic for MIPS I.
@@ -2941,9 +2943,9 @@
       };
 
 \TLV power_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m4-defined name.)
-   m5_inline_macro(prog, ['power_']_prog_name['_prog'])
-   m4+m5_prog()
+   // Instantiate the program. (This approach is required for an m5-defined name.)
+   m5_macro(prog, ['power_']_prog_name['_prog'])
+   m5+m5_prog()
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -2951,7 +2953,7 @@
                $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV power_gen()
-   // No M4-generated code for POWER.
+   // No M5-generated code for POWER.
 
 
 // Decode logic for Power.
@@ -3024,7 +3026,7 @@
                $raw[m5_INSTR_RANGE] = $Pc[m5_PC_MIN:m5_PC_MIN] == 1'b0 ? 2'b01 : 2'b10;
 
 \TLV dummy_gen()
-   // No M4-generated code for dummy.
+   // No M5-generated code for dummy.
 
 \TLV dummy_decode()
    /src[2:1]
@@ -3100,7 +3102,7 @@
          // ====
          @m5_MEM_WR_STAGE
             /* DMEM_STYLE: m5_DMEM_STYLE */
-            m4+ifelse(m5_DMEM_STYLE, STUBBED,
+            m5+ifelse(m5_DMEM_STYLE, STUBBED,
                \TLV
                   $ld_data[m5_WORD_RANGE] = <<1$valid_st ? <<1$st_value ^ $addr : 32'b0;
                   `BOGUS_USE($st_mask)
@@ -3182,7 +3184,7 @@
             $ANY = /_cpu|fetch/instr>>m5_ALIGNMENT_VALUE$ANY;
             /src[2:1]
                $ANY = /_cpu|fetch/instr/src>>m5_ALIGNMENT_VALUE$ANY;
-            m4+ifelse(m5_EXT_F, 1,
+            m5+ifelse(m5_EXT_F, 1,
                \TLV
                   /fpu
                      $ANY = /_cpu|fetch/instr/fpu>>m5_ALIGNMENT_VALUE$ANY;
@@ -3248,7 +3250,7 @@
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
 
    // latency for division is different for ALTOPS case
-   m4_ifelse(m5_RISCV_FORMAL_ALTOPS, 1, ['
+   m5_ifeq(m5_RISCV_FORMAL_ALTOPS, 1, ['
         m5_def(DIV_LATENCY, 12)
    '],['
         m5_def(DIV_LATENCY, 37)
@@ -3350,19 +3352,19 @@
       $is_pos_normal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && ((! (& /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]));
       $is_pos_subnormal = (! /_top['']$_input1[(#_expwidth + #_sigwidth) - 1]) && (! (| /_top['']$_input1[(#_expwidth + #_sigwidth) - 2 : (#_sigwidth - 1)])) && (| /_top['']$_input1[(#_sigwidth - 2) : 0]);
       
-      m4+fn_to_rec(1, #_expwidth, #_sigwidth, /_top['']$_input1, $fn_to_rec_a) 
-      m4+fn_to_rec(2, #_expwidth, #_sigwidth, /_top['']$_input2, $fn_to_rec_b) 
-      m4+fn_to_rec(3, #_expwidth, #_sigwidth, /_top['']$_input3, $fn_to_rec_c) 
+      m5+fn_to_rec(1, #_expwidth, #_sigwidth, /_top['']$_input1, $fn_to_rec_a) 
+      m5+fn_to_rec(2, #_expwidth, #_sigwidth, /_top['']$_input2, $fn_to_rec_b) 
+      m5+fn_to_rec(3, #_expwidth, #_sigwidth, /_top['']$_input3, $fn_to_rec_c) 
       
       $is_operation_int_to_recfn = (/_top['']$_operation == 5'h17  ||  /_top['']$_operation == 5'h18);
       ?$is_operation_int_to_recfn
          $signedin = (/_top['']$_operation == 5'h17) ? 1'b1 : 1'b0 ;
-         m4+int_to_recfn(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedin, /_top['']$_int_input, /_top['']$_roundingmode, $output_int_to_recfn, $exception_flags_int_to_recfn)
+         m5+int_to_recfn(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedin, /_top['']$_int_input, /_top['']$_roundingmode, $output_int_to_recfn, $exception_flags_int_to_recfn)
          
       
       $is_operation_class = (/_top['']$_operation == 5'h16);
       ?$is_operation_class
-         m4+is_sig_nan(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $issignan)
+         m5+is_sig_nan(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $issignan)
          $_output_class[3:0] = $is_neg_infinite   ? 4'h0 :
                               $is_neg_normal     ? 4'h1 :
                               $is_neg_subnormal  ? 4'h2 :
@@ -3376,11 +3378,11 @@
       $is_operation_add_sub = (/_top['']$_operation == 5'h6  ||  /_top['']$_operation == 5'h7);
       ?$is_operation_add_sub
          $subOp = (/_top['']$_operation == 5'h6) ? 1'b0 : 1'b1;
-         m4+add_sub_recfn(1, #_expwidth, #_sigwidth, $control, $subOp, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_add_sub, $exception_flags_add_sub)
+         m5+add_sub_recfn(1, #_expwidth, #_sigwidth, $control, $subOp, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_add_sub, $exception_flags_add_sub)
          
       $is_operation_mul = (/_top['']$_operation == 5'h8);
       ?$is_operation_mul
-         m4+mul_recfn(1, #_expwidth, #_sigwidth, $control, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_mul, $exception_flags_mul)
+         m5+mul_recfn(1, #_expwidth, #_sigwidth, $control, $fn_to_rec_a, $fn_to_rec_b, /_top['']$_roundingmode, $output_mul, $exception_flags_mul)
          
       $is_operation_div_sqrt = (/_top['']$_operation == 5'h9 || /_top['']$_operation == 5'ha);
       //?$is_operation_div_sqrt
@@ -3389,13 +3391,13 @@
       $get_valid = /_top['']$_input_valid;
       $operand_div_sqrt_a[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_to_rec_a[(#_expwidth + #_sigwidth):0] : $RETAIN;
       $operand_div_sqrt_b[(#_expwidth + #_sigwidth):0] = ($get_valid) ? $fn_to_rec_b[(#_expwidth + #_sigwidth):0] : $RETAIN;
-      m4+div_sqrt_recfn_small(1, #_expwidth, #_sigwidth, /_top['']$_nreset, /_top['']$_clock, $control, $in_ready, $get_valid, $div_sqrt_Op, $operand_div_sqrt_a, $operand_div_sqrt_b, /_top['']$_roundingmode, $_outvalid, $sqrtresult, $output_div_sqrt, $exception_flags_div_sqrt)
+      m5+div_sqrt_recfn_small(1, #_expwidth, #_sigwidth, /_top['']$_nreset, /_top['']$_clock, $control, $in_ready, $get_valid, $div_sqrt_Op, $operand_div_sqrt_a, $operand_div_sqrt_b, /_top['']$_roundingmode, $_outvalid, $sqrtresult, $output_div_sqrt, $exception_flags_div_sqrt)
       $result_div_sqrt_temp[(#_expwidth + #_sigwidth):0] = ($_outvalid) ? $output_div_sqrt : $RETAIN;
       
       $is_operation_compare = (/_top['']$_operation == 5'he || /_top['']$_operation == 5'hf || /_top['']$_operation == 5'h13 || /_top['']$_operation == 5'h14 || /_top['']$_operation == 5'h15);
       ?$is_operation_compare
          $signaling_compare =  ($fn_to_rec_a == $fn_to_rec_b) ? 1'b0 : 1'b1;
-         m4+compare_recfn(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $fn_to_rec_b, $signaling_compare, $_lt_compare, $_eq_compare, $_gt_compare, $_unordered, $exception_flags_compare)
+         m5+compare_recfn(1, #_expwidth, #_sigwidth, $fn_to_rec_a, $fn_to_rec_b, $signaling_compare, $_lt_compare, $_eq_compare, $_gt_compare, $_unordered, $exception_flags_compare)
          $output_min[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_to_rec_b : $fn_to_rec_a;
          $output_max[(#_expwidth + #_sigwidth):0] = ($_gt_compare == 1'b1) ? $fn_to_rec_a : $fn_to_rec_b;
          
@@ -3405,7 +3407,7 @@
                      (/_top['']$_operation == 5'h3) ? 2'b01 :
                      (/_top['']$_operation == 5'h4) ? 2'b10 :
                      (/_top['']$_operation == 5'h5) ? 2'b11 : 2'hx;
-         m4+mul_add_recfn(1, #_expwidth, #_sigwidth, $control, $op_mul_add, $fn_to_rec_a, $fn_to_rec_b, $fn_to_rec_c, /_top['']$_roundingmode, $output_mul_add, $exception_flags_mul_add)
+         m5+mul_add_recfn(1, #_expwidth, #_sigwidth, $control, $op_mul_add, $fn_to_rec_a, $fn_to_rec_b, $fn_to_rec_c, /_top['']$_roundingmode, $output_mul_add, $exception_flags_mul_add)
          
       $final_output_module[(#_expwidth + #_sigwidth):0] = (/_top['']$_operation == 5'h2 || /_top['']$_operation == 5'h3 || /_top['']$_operation == 5'h4 || /_top['']$_operation == 5'h5) ? $output_mul_add :
                                                       (/_top['']$_operation == 5'h6 || /_top['']$_operation == 5'h7) ? $output_add_sub :
@@ -3419,10 +3421,10 @@
       $is_operation_recfn_to_int = (/_top['']$_operation == 5'h10  ||  /_top['']$_operation == 5'h11);
       ?$is_operation_recfn_to_int
          $signedout = (/_top['']$_operation == 5'h10) ? 1'b1 : 1'b0 ;
-         m4+recfn_to_int(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedout, $fn_to_rec_a, /_top['']$_roundingmode, $_int_output, $exception_flags_recfn_to_int)
+         m5+recfn_to_int(1, #_expwidth, #_sigwidth, #_intwidth, $control, $signedout, $fn_to_rec_a, /_top['']$_roundingmode, $_int_output, $exception_flags_recfn_to_int)
          
-      m4+rec_to_fn(1, #_expwidth, #_sigwidth, $final_output_module, $result_fn)
-      m4+rec_to_fn(2, #_expwidth, #_sigwidth, $result_div_sqrt_temp, $result_fn11)
+      m5+rec_to_fn(1, #_expwidth, #_sigwidth, $final_output_module, $result_fn)
+      m5+rec_to_fn(2, #_expwidth, #_sigwidth, $result_div_sqrt_temp, $result_fn11)
       // Output for div_sqrt module
       $_output11[(#_expwidth + #_sigwidth) - 1:0] = $result_fn11;
       // Output for other modules
@@ -3501,11 +3503,11 @@
 
 \TLV cpu(/_cpu)
    // Generated logic
-   // Instantiate the _gen macro for the right ISA. (This approach is required for an m4-defined name.)
+   // Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
    m4_def(gen, m5_isa['_gen'])
-   m4+m4_gen()
+   m5+m4_gen()
    // Instruction memory and fetch of $raw.
-   m4+m5_IMEM_MACRO_NAME(m5_PROG_NAME)
+   m5+m5_IMEM_MACRO_NAME(m5_PROG_NAME)
 
 
    // /=========\
@@ -3643,7 +3645,7 @@
                <<1$reset ? m5_calc(m5_MAX_REDIRECT_BUBBLES + 2)'b0 :  // All bad-path (through self) on reset (next mask based on next reset).
                $next_good_path_mask;
             
-            m4+ifelse(m5_FORMAL, 1,
+            m5+ifelse(m5_FORMAL, 1,
                \TLV
                   // Formal verfication must consider trapping instructions. For this, we need to maintain $RvfiGoodPathMask, which is similar to
                   // $GoodPathMask, except that it does not mask out aborted instructions.
@@ -3671,7 +3673,7 @@
                   $ANY = /_cpu|mem/data>>m5_LD_RETURN_ALIGN$ANY;
                   /src[2:1]
                      $ANY = /_cpu|mem/data/src>>m5_LD_RETURN_ALIGN$ANY;
-                  m4+ifelse(m5_EXT_F, 1,
+                  m5+ifelse(m5_EXT_F, 1,
                      \TLV
                         /fpu
                            $ANY = /_cpu|mem/data/fpu>>m5_LD_RETURN_ALIGN$ANY;
@@ -3684,7 +3686,7 @@
                   $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst$ANY;
                   /src[2:1]
                      $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/src$ANY;
-                  m4+ifelse(m5_EXT_F, 1,
+                  m5+ifelse(m5_EXT_F, 1,
                      \TLV
                         /fpu
                            $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/fpu$ANY;
@@ -3714,12 +3716,12 @@
             $valid_decode_branch = $valid_decode && $branch;
             // A load that will return later.
             //$split_ld = $spec_ld && 1'b['']m5_INJECT_RETURNING_LD;
-            // Instantiate the program. (This approach is required for an m4-defined name.)
-            m5_inline_macro(decode_macro_name, m5_isa['_decode'])
-            m4+m5_decode_macro_name()
-         // Instantiate the program. (This approach is required for an m4-defined name.)
-         m5_inline_macro(branch_pred_macro_name, ['branch_pred_']m5_BRANCH_PRED)
-         m4+m5_branch_pred_macro_name()
+            // Instantiate the program. (This approach is required for an m5-defined name.)
+            m5_macro(decode_macro_name, m5_isa['_decode'])
+            m5+m5_decode_macro_name()
+         // Instantiate the program. (This approach is required for an m5-defined name.)
+         m5_macro(branch_pred_macro_name, ['branch_pred_']m5_BRANCH_PRED)
+         m5+m5_branch_pred_macro_name()
          
          @m5_REG_RD_STAGE
             // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
@@ -3731,11 +3733,11 @@
             // ======
             
             // Obtain source register values and pending bit for source registers.
-            m4+operands( , /src, 2:1)
+            m5+operands( , /src, 2:1)
             /src[*]
                $dummy = 1'b0;  // Dummy signal to pull through $ANY expressions when not building verification harness (since SandPiper currently complains about empty $ANY).
             
-            m4+ifelse(m5_EXT_F, 1,
+            m5+ifelse(m5_EXT_F, 1,
                \TLV
                   //
                   // ======
@@ -3743,7 +3745,7 @@
                   // ======
                   //
                   /fpu
-                     m4+operands(fpu_, /fpu_src, 3:1)
+                     m5+operands(fpu_, /fpu_src, 3:1)
                )
             $replay = ($pending_replay m5_if(m5_EXT_F, ['|| /fpu$pending_replay']));
          
@@ -3751,9 +3753,9 @@
          // Execute
          // =======
          
-         // Instantiate the program. (This approach is required for an m4-defined name.)
-         m5_inline_macro(exe_macro_name, m5_isa['_exe'])
-         m4+m5_exe_macro_name(@m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
+         // Instantiate the program. (This approach is required for an m5-defined name.)
+         m5_macro(exe_macro_name, m5_isa['_exe'])
+         m5+m5_exe_macro_name(@m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
          
          @m5_BRANCH_PRED_STAGE
             m5_ifeq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
@@ -3799,7 +3801,7 @@
             // $commit = m5_prev_instr_valid_through(m5_MAX_REDIRECT_BUBBLES + 1), where +1 accounts for this
             // instruction's redirects. However, to meet timing, we consider this instruction separately, so,
             // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
-            m4_ifelse_block(m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
+            m5_if_eq_block(m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
             // Normal case:
             $good_path = m5_prev_instr_valid_through(m5_MAX_REDIRECT_BUBBLES);
             $commit = $good_path && ! $abort;
@@ -3812,29 +3814,29 @@
             // Conditions that commit results.
             $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m5_if(m5_EXT_F, ['&&  (! >>m5_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
-            m4_ifelse_block(m5_EXT_F, 1, ['
+            m5_if_eq_block(m5_EXT_F, 1, ['
             /fpu
                $valid_dest_reg_valid = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$second_issue && /instr>>m5_LD_RETURN_ALIGN$is_flw_instr));
             '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
-   m4+fixed_latency_fake_memory(/_cpu, 0)
+   m5+fixed_latency_fake_memory(/_cpu, 0)
    |fetch
       /instr
          // =========
          // Reg Write
          // =========
-         m4+rf_wr(/regs, m5_REGS_RANGE, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+         m5+rf_wr(/regs, m5_REGS_RANGE, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
 
          // ======
          // FPU RF
          // ======
-         m4+ifelse(m5_EXT_F, 1,
+         m5+ifelse(m5_EXT_F, 1,
             \TLV
                /fpu
                   // TODO: $reg_wr_pending can go under /fpu?
-                  m4+rf_wr(/regs, m5_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+                  m5+rf_wr(/regs, m5_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
          @m5_REG_WR_STAGE
@@ -3897,7 +3899,7 @@
    /* verilator lint_save */
    /* verilator lint_on WIDTH */
    @m5_REG_WR_STAGE
-      m4+ifelse(m5_RF_STYLE, STUBBED,
+      m5+ifelse(m5_RF_STYLE, STUBBED,
          \TLV
             // Exclude the register file.
             `BOGUS_USE($_we $_waddr $_wdata)
@@ -3910,7 +3912,7 @@
                      /_hier[$_waddr]<<0$$^value[m5_WORD_RANGE] <= $_wdata;
                end
          )
-      m4+ifelse(m5_PENDING_ENABLED, 1,
+      m5+ifelse(m5_PENDING_ENABLED, 1,
          \TLV
             // Write $pending along with $value, but coded differently because it must be reset.
             /regs[_RANGE]
@@ -3919,7 +3921,7 @@
    /* verilator lint_restore */
 
 \TLV cnt10_makerchip_tb()
-   m4+default_makerchip_tb()
+   m5+default_makerchip_tb()
 
 \TLV formal()
    
@@ -3998,10 +4000,10 @@
             `BOGUS_USE(/src[2]$dummy)
 
 // Ingress/Egress packet buffers between the CPU and NoC.
-// Packet buffers are m4+vc_flop_fifo_v2(...)s. See m4+vc_flop_fifo_v2 definition in tlv_flow_lib package
+// Packet buffers are m5+vc_flop_fifo_v2(...)s. See m5+vc_flop_fifo_v2 definition in tlv_flow_lib package
 //   and instantiations below for interface.
 // A header flit is inserted containing {src, dest}.
-// NoC must provide |egress_out interface and |ingress_in m4+vc_flop_fifo_v2(...) interface.
+// NoC must provide |egress_out interface and |ingress_in m5+vc_flop_fifo_v2(...) interface.
 \TLV noc_cpu_buffers(/_cpu, #depth)
    // Egress FIFO.
 
@@ -4047,7 +4049,7 @@
       |egress_in
          @1
             $vc_trans_valid = /_cpu|egress_in/skid_buffer$valid_pkt_wr && (/_cpu|egress_in/skid_buffer$vc == #vc);
-   m4+vc_flop_fifo_v2(/_cpu, |egress_in, @1, |egress_out, @1, #depth, /flit, m5_VC_RANGE, m5_PRIO_RANGE)
+   m5+vc_flop_fifo_v2(/_cpu, |egress_in, @1, |egress_out, @1, #depth, /flit, m5_VC_RANGE, m5_PRIO_RANGE)
    
    // Ingress FIFO.
    //
@@ -4100,7 +4102,7 @@
             $has_credit = /_cpu|ingress_out/instr>>1$csr_pktrdvcs[#vc] &&
                           /_cpu|ingress_out$do_pktrd;
             $Prio[m5_PRIO_INDEX_RANGE] <= '0;
-   m4+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, m5_VC_RANGE, m5_PRIO_RANGE)
+   m5+vc_flop_fifo_v2(/_cpu, |ingress_in, @0, |ingress_out, @0, #depth, /flit, m5_VC_RANGE, m5_PRIO_RANGE)
 
 
 
@@ -4139,7 +4141,7 @@
          $avail = $trans_valid;
          $valid_head = $trans_valid && ! $body;
          $valid_tail = $trans_valid && /flit$tail;
-   m4+insertion_ring(/_cpu, |egress_out, @1, |ingress_in, @0, /_cpu|ingress_in<<1$reset, |rg, /flit, 2, #_depth)
+   m5+insertion_ring(/_cpu, |egress_out, @1, |ingress_in, @0, /_cpu|ingress_in<<1$reset, |rg, /flit, 2, #_depth)
 
 
 
@@ -4151,7 +4153,7 @@
 //
 // See diagram here: https://docs.google.com/drawings/d/1VS_oaNYgT3p4b64nGSAjs5FKSvs_-s8OTfTY4gQjX6o/edit?usp=sharing
 //
-// This macro provides a ring with support for multi-flit packets. It is unable to utilize the m4+simple_ring macro because flits
+// This macro provides a ring with support for multi-flit packets. It is unable to utilize the m5+simple_ring macro because flits
 // pulled from the ring to the insertion FIFO are pulled prior to the ring flit mux, whereas the ring macros
 // pull the output flit after. This difference implies that the other ring macros support local loopback, whereas
 // this one does not; packets will loopback around the ring.
@@ -4205,11 +4207,11 @@
    // ========
 
    // Relax the timing on input backpressure with a skid buffer.
-   m4+skid_buffer(/_hop, |_in, @_in, |_name['']_in_present, @0, /_flit, $_reset)
+   m5+skid_buffer(/_hop, |_in, @_in, |_name['']_in_present, @0, /_flit, $_reset)
    // Block head flit if FIFO not empty.
-   m4+connect(/_hop, |_name['']_in_present, @0, |_name['']_node_to_fifo, @0, /_flit, [''], ['|| (! /_hop|_name['']_fifo_in<>0$would_bypass && $head)'])
+   m5+connect(/_hop, |_name['']_in_present, @0, |_name['']_node_to_fifo, @0, /_flit, [''], ['|| (! /_hop|_name['']_fifo_in<>0$would_bypass && $head)'])
    // Pipeline for ring hop.
-   m4+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
+   m5+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
    // Connect hops in a ring.
    |_name['']_arriving
       @0
@@ -4220,21 +4222,21 @@
       @0
          $blocked = /_hop[(#m4_hop_name + 1) % m5_eval(m5_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
    // Fork off ring
-   m4+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
+   m5+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
    
    // Fork from continuing to non_deflected or into FIFO
-   m4+fork(/_hop, |_name['']_continuing, @0, $head_out, |_name['']_not_deflected, @0, $true, |_name['']_deflected, @0, /_flit)
+   m5+fork(/_hop, |_name['']_continuing, @0, $head_out, |_name['']_not_deflected, @0, $true, |_name['']_deflected, @0, /_flit)
    
    // Flop prior to FIFO.
-   m4+stage(ff, /_hop, |_name['']_deflected, @0, |_name['']_deflected_st1, @1, /_flit)
+   m5+stage(ff, /_hop, |_name['']_deflected, @0, |_name['']_deflected_st1, @1, /_flit)
    // Mux into FIFO. (Priority to deflected blocks node.)
-   m4+arb2(/_hop, |_name['']_deflected_st1, @1, |_name['']_node_to_fifo, @0, |_name['']_fifo_in, @0, /_flit)
+   m5+arb2(/_hop, |_name['']_deflected_st1, @1, |_name['']_node_to_fifo, @0, |_name['']_fifo_in, @0, /_flit)
    // The insertion FIFO.
-   m4+flop_fifo_v2(/_hop, |_name['']_fifo_in, @0, |_name['']_fifo_out, @0, #_depth, /_flit)
+   m5+flop_fifo_v2(/_hop, |_name['']_fifo_in, @0, |_name['']_fifo_out, @0, #_depth, /_flit)
    // Block FIFO output until a full packet is ready (tail from node in FIFO)
-   m4+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
+   m5+connect(/_hop, |_name['']_fifo_out, @0, |_name['']_fifo_inj, @0, /_flit, [''], ['|| ! (/_hop|_name['']_fifo_in<>0$node_tail_flit_in_fifo)'])
    // Ring
-   m4+arb3(/_hop, |_name['']_not_deflected, @0, |_name['']_fifo_inj, @0, |_name, @0, /_flit)
+   m5+arb3(/_hop, |_name['']_not_deflected, @0, |_name['']_fifo_inj, @0, |_name, @0, /_flit)
 
 
    // Decode arriving header flit.
@@ -4286,8 +4288,8 @@
    m4_pop(prev_hop_index)
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
-   m4+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
-   m4_push(trans_ind, m4_ifelse(/_trans, [''], [''], ['   ']))
+   m5+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
+   m4_push(trans_ind, m5_ifeq(/_trans, [''], [''], ['   ']))
    // In1 is blocked if output is blocked.
    // In1 is blocked if output is blocked or in2 is available.
    |_in1
@@ -4341,7 +4343,7 @@
                                                   : {*cyc_cnt[m5_FLIT_UNUSED_CNT-3:0], $tail, 1'b0, m5_calc(m5_VC_INDEX_CNT + m5_CORE_INDEX_CNT * 2)'b1};
          @0
             $avail = /flit$bogus_head || /flit$tail || /flit$bogus_mid;
-      m4+insertion_ring(/core, |egress_out, @1, |ingress_in, @0, /core|ingress_in<<1$reset, |rg, /flit, 4, 4)  // /flit, hop_latency, FIFO_depth
+      m5+insertion_ring(/core, |egress_out, @1, |ingress_in, @0, /core|ingress_in<<1$reset, |rg, /flit, 4, 4)  // /flit, hop_latency, FIFO_depth
       |ingress_in
          @0
             $blocked = 1'b0;
@@ -4470,7 +4472,7 @@
           m5_ifeq(m5_IMEM_STYLE, EXTERN, [''], ['
           render() {
              // Instruction memory is constant, so just create it once.
-            m4_ifelse_block(m5_ISA, ['MINI'], ['
+            m5_if_eq_block(m5_ISA, ['MINI'], ['
                let instr_str = '$instr'.goTo(0).asString("?")
             '], m5_ISA, ['RISCV'], ['
                let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
@@ -4981,7 +4983,7 @@
          //
          // Instruction with values.
          //
-         m4_ifelse_block(m5_ISA, ['MINI'], ['
+         m5_if_eq_block(m5_ISA, ['MINI'], ['
             let str = '$dest_char'.asString("?")
             str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n ="
             str += '/src[1]$char'.asString("?")
@@ -4999,7 +5001,7 @@
                    '/src[src]$unconditioned_is_reg'.asBool(false)) {
                   ret += `\n      ${regStr("x", true, '/src[src]$unconditioned_reg'.asInt(NaN),     '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                }
-               m4_ifelse_block(m5_EXT_F, 1, ['
+               m5_if_eq_block(m5_EXT_F, 1, ['
                if ('/fpu/src[src]$unconditioned_is_reg'.asBool(false)) {
                   ret += `\n      ${regStr("f", true, '/fpu/src[src]$unconditioned_reg'.asInt(NaN), '/fpu/src[src]$unconditioned_reg_value'.asInt(NaN))}`
                }
@@ -5008,7 +5010,7 @@
             }
             let dest_reg_valid = '$dest_reg_valid'.asBool(false)
             let str = `${regStr("x", dest_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
-            m4_ifelse_block(m5_EXT_F, 1, ['
+            m5_if_eq_block(m5_EXT_F, 1, ['
             let dest_fpu_reg_valid = '/fpu$dest_reg_valid'.asBool(false)
             if (dest_fpu_reg_valid) {
                str = `${regStr("f", dest_fpu_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
@@ -5064,7 +5066,7 @@
          let dest_reg = '$dest_reg'.asInt(0)
          let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
          let valid_dest_fpu_reg_valid = false
-         m4_ifelse_block(m5_EXT_F, 1, ['
+         m5_if_eq_block(m5_EXT_F, 1, ['
          fpu_rs1_valid = '/fpu/src[1]$unconditioned_is_reg'.asBool()
          fpu_rs2_valid = '/fpu/src[2]$unconditioned_is_reg'.asBool()
          fpu_rs3_valid = '/fpu/src[3]$unconditioned_is_reg'.asBool()
@@ -5101,7 +5103,7 @@
             strokeWidth: 3,
             visible: st_valid
          })
-         m4_ifelse_block(m5_FORMAL, 1, [''], m5_IMEM_STYLE, EXTERN, [''], ['
+         m5_if_eq_block(m5_FORMAL, 1, [''], m5_IMEM_STYLE, EXTERN, [''], ['
          //
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
@@ -5236,7 +5238,7 @@
    
 
 \TLV memory_viz(/_bank_size, /_mem_size, _where_)
-   m4+ifelse(m5_DMEM_STYLE, ARRAY,
+   m5+ifelse(m5_DMEM_STYLE, ARRAY,
       \TLV
          /_mem_size
             \viz_js
@@ -5382,30 +5384,30 @@
 //////// VIZUALIZING THE MAIN CPU //////////////
 \TLV cpu_viz(/_des_pipe, _fill_color)
    /* CPU_VIZ HERE */
-   m5_inline_macro(viz_logic_macro_name, m5_isa['_viz_logic'])
+   m5_macro(viz_logic_macro_name, m5_isa['_viz_logic'])
    m5_def(COREOFFSET, 750)
    m5_def(ALL_TOP, -1000)
    m5_def(ALL_LEFT, -500)
-   m4+m5_viz_logic_macro_name()
+   m5+m5_viz_logic_macro_name()
    /_des_pipe
       @m5_VIZ_STAGE
-         m4+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
+         m5+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
-         m5_if(m5_FORMAL, [''], ['m4+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
+         m5_if(m5_FORMAL, [''], ['m5+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
             
          /instr
-            m4+instruction(['left: 10, top: 0'])
-            m4+registers(/instr, int, Int RF, , 2, ['left: 350 + 605, top: 10'])
-            m4+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
-            m4+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 265 + 18 * m5_num_csrs, width: 220, height: 330'])
-            m4+ifelse(m5_EXT_F, 1,
+            m5+instruction(['left: 10, top: 0'])
+            m5+registers(/instr, int, Int RF, , 2, ['left: 350 + 605, top: 10'])
+            m5+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
+            m5+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 265 + 18 * m5_num_csrs, width: 220, height: 330'])
+            m5+ifelse(m5_EXT_F, 1,
                \TLV
                   /fpu
-                     m4+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 350 + 605 + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
+                     m5+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 350 + 605 + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
                )
-            m4+memory_viz(/bank[m5_calc(m5_ADDRS_PER_WORD-1):0] , /mem[m5_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m5_if(m5_EXT_F, ['m5_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
-   m4_ifelse_block(m5_FORMAL, 1, ['
-   m4+riscv_formal_viz(['rvfi_testbench'], ['left: 450, top: 50, width: 150, height: 130'])
+            m5+memory_viz(/bank[m5_calc(m5_ADDRS_PER_WORD-1):0] , /mem[m5_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m5_if(m5_EXT_F, ['m5_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
+   m5_if_eq_block(m5_FORMAL, 1, ['
+   m5+riscv_formal_viz(['rvfi_testbench'], ['left: 450, top: 50, width: 150, height: 130'])
    '])
    
 // Visualization for RISCV Formal.
@@ -6049,68 +6051,69 @@
 
 
 // Instantiate the chosen testbench, based on m5_isa, m5_PROG_NAME, and/or m5_TESTBENCH_NAME.
-//   - m4+<m5_isa>_<m5_TESTBENCH_NAME>_makerchip_tb
-//   - m4+<m5_TESTBENCH_NAME>_makerchip_tb
-//   - m4+<m5_isa>_<m5_PROG_NAME>_makerchip_tb
-//   - m4+<m5_PROG_NAME>_makerchip_tb
-//   - m4+<m5_isa>_default_makerchip_tb
-//   - m4+default_makerchip_tb
+//   - m5+<m5_isa>_<m5_TESTBENCH_NAME>_makerchip_tb
+//   - m5+<m5_TESTBENCH_NAME>_makerchip_tb
+//   - m5+<m5_isa>_<m5_PROG_NAME>_makerchip_tb
+//   - m5+<m5_PROG_NAME>_makerchip_tb
+//   - m5+<m5_isa>_default_makerchip_tb
+//   - m5+default_makerchip_tb
 \TLV warpv_makerchip_tb()
-   m5_default_def(TESTBENCH_NAME, m4_ifdef_tlv(m5_isa['_']m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, m4_ifdef_tlv(m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, ['default'])))
-   m5_inline_macro(tb_macro_name, m4_ifdef_tlv(m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_TESTBENCH_NAME['_makerchip_tb']))
-   m4+m5_tb_macro_name()
+   m5_default_def(TESTBENCH_NAME, m5_if_def_tlv(m5_isa['_']m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, m5_if_def_tlv(m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, ['default'])))
+   m5_macro(tb_macro_name, m5_if_def_tlv(m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_TESTBENCH_NAME['_makerchip_tb']))
+   m5+m5_tb_macro_name()
 
 // A top-level macro supporting one core and no test-bench.
 \TLV warpv()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
-   m4+cpu(/top)
-   m5_if(m5_FORMAL, ['m4+formal()'])
+   m5+cpu(/top)
+   m5_if(m5_FORMAL, ['m5+formal()'])
 
 // A top-level macro for WARP-V.
 \TLV warpv_top()
    /* verilator lint_on WIDTH */  // Let's be strict about bit widths.
-   m4+ifelse(m5_calc(m5_NUM_CORES > 1), 1,
+   m5+ifelse(m5_calc(m5_NUM_CORES > 1), 1,
       \TLV
          // Multi-core
          /m5_CORE_HIER
             // TODO: Find a better place for this:
             // Block CPU |fetch pipeline if blocked.
             m5_def(cpu_blocked, m5_cpu_blocked || /core|egress_in/instr<<m5_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<m5_EXECUTE_STAGE$pktrd_blocked)
-            m4+cpu(/core)
-            //m4+dummy_noc(/core)
-            m4+noc_cpu_buffers(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
-            m4+noc_insertion_ring(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
-            m4+warpv_makerchip_tb()
-         //m4+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
-         m4+makerchip_pass_fail(/core[*])
+            m5+cpu(/core)
+            //m5+dummy_noc(/core)
+            m5+noc_cpu_buffers(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
+            m5+noc_insertion_ring(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
+            m5+warpv_makerchip_tb()
+         //m5+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
+         m5+makerchip_pass_fail(/core[*])
          /m5_CORE_HIER
             // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
-            m4_ifelse_block(m5_ISA, ['RISCV'], ['
-            m4_ifelse_block(m5_VIZ, 1, ['
-            m4+cpu_viz(|fetch, "#7AD7F0")
-            m4+ring_viz(/name)
+            m5_if_eq_block(m5_ISA, ['RISCV'], ['
+            m5_if_eq_block(m5_VIZ, 1, ['
+            m5+cpu_viz(|fetch, "#7AD7F0")
+            m5+ring_viz(/name)
             '])
             '])
       ,
       \TLV
          // Single Core.
          
-         // m4+warpv() (but inlined to reduce macro depth)
-         m4+cpu(/top)
-         m4_ifelse_block(m5_FORMAL, 1, ['
-         m4+formal()
+         // m5+warpv() (but inlined to reduce macro depth)
+         m5+cpu(/top)
+         m5_if_eq_block(m5_FORMAL, 1, ['
+         m5+formal()
          '])
-         m4_ifelse_block(M4_MAKERCHIP, 1, ['
-         m4+warpv_makerchip_tb()
-         m4+makerchip_pass_fail()
+         m5_if_eq_block(M4_MAKERCHIP, 1, ['
+         m5+warpv_makerchip_tb()
+         m5+makerchip_pass_fail()
          '])
-         m4_ifelse_block(m5_ISA, ['RISCV'], ['
-         m5_if(m5_VIZ, ['m4+cpu_viz(|fetch, "#7AD7F0")'])
+         m5_if_eq_block(m5_ISA, ['RISCV'], ['
+         m5_if(m5_VIZ, ['m5+cpu_viz(|fetch, "#7AD7F0")'])
          '])
       )
 
-m4+module_def()
+\SV
+   m5_module_def()
 \TLV //disabled_main()
-   m4+warpv_top()
+   m5+warpv_top()
 \SV
    endmodule
