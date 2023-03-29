@@ -1,6 +1,3 @@
 [submodule "formal/riscv-formal"]
 	path = formal/riscv-formal
 	url = https://github.com/cliffordwolf/riscv-formal.git
-[submodule "warp-v_includes"]
-	path = warp-v_includes
-	url = https://github.com/stevehoover/warp-v_includes.git
