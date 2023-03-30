@@ -1123,7 +1123,7 @@
          var(sv_out, [''])
          fn(verilator_lint, on_off, tag, [
             // TODO: Use m4_output_sv_line in place of show...
-            append_var(sv_out, m5_nl['   ']['m4_show(['m5_if(m4_include_url_depth, [''], ['m5_nl['   ']'])['/* verilator lint_']']']m5_on_off m5_tag['['[' */']'])'])
+            append_var(sv_out, m5_nl['   ']['m4_show(['m5_if(m4_include_url_depth, ['m5_nl['   ']'])['/* verilator lint_']']']m5_on_off m5_tag['['[' */']'])'])
          ])
          fn(sv_inc, file, [
             append_var(sv_out, m5_nl['   ']['m4_sv_include_url(m5_warpv_includes']m5_quote(m5_file)[')'])
