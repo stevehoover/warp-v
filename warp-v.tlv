@@ -291,7 +291,7 @@
    if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
 
    // For a while, remain backward-compatible with M4 parameterization.
-   macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_DEBUG(HI$1)m5_def(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
+   macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_def(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
    import_m4_params(ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
                     BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
@@ -299,8 +299,13 @@
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
                     DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
    
-   def(warpv_includes, ['['https://raw.githubusercontent.com/stevehoover/warp-v_includes/c5bcde41e02dcd6bd18dd60da47bedb134a60a07/']'])
-
+   // TODO: A convenient hack for local development that can be removed.
+   var(local, 0)
+   if(m5_local, [
+      var(warpv_includes, ['./warp-v_includes/'])
+   ], [
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/b4c0b50a17d386259be34b03384803609c625d80/'])
+   ])
    // This is where you configure the CPU.
    // Note that WARP-V has a configurator at warp-v.org.
    
@@ -309,7 +314,7 @@
    // Default parameters for formal verification continuous integration testing.
    // m5_FORMAL is only used within Makerchip in debug mode (for VIZ).
    //m5_default_def(FORMAL, 1)  // Uncomment to test formal verification in Makerchip.
-   ifeq(m5_FORMAL, 1, [
+   if_eq(m5_FORMAL, 1, [
       default_def(
          ISA, RISCV,
          EXT_M, 1,
@@ -332,7 +337,7 @@
    // --------------
    default_def(
      ['# Number of cores. Previously this was defined externally as m5_CORE_CNT (via m5_define_hier), so accept that too.'],
-     NUM_CORES, m5_ifeq(m5_CORE_CNT, ['m5_CORE_CNT'], 1, m5_CORE_CNT))
+     NUM_CORES, m5_if_eq(m5_CORE_CNT, ['m5_CORE_CNT'], 2, m5_CORE_CNT))
 
    // Only relevant, and only defined, if m5_NUM_CORES > 1:
 
@@ -537,9 +542,9 @@
    default_def(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
    default_def(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
-     PROG_NAME, m5_ifeq(m5_ISA, RISCV, m5_ifeq(m5_EXT_F, 1, fpu_test, m5_ifeq(m5_EXT_M, 1, divmul_test, m5_ifeq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
-   //m5_ifeq(m5_EXT_F, 1, fpu_test, cnt10)
-   //m5_ifeq(m5_EXT_B, 1, bmi_test, cnt10)
+     PROG_NAME, m5_if_eq(m5_ISA, RISCV, m5_if_eq(m5_EXT_F, 1, fpu_test, m5_if_eq(m5_EXT_M, 1, divmul_test, m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
+   //m5_if_eq(m5_EXT_F, 1, fpu_test, cnt10)
+   //m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10)
 
    // =====Done Defining Configuration=====
    
@@ -553,9 +558,9 @@
       define_hier(CORE, m5_NUM_CORES)
       define_hier(VC, m5_NUM_VCS)
       define_hier(PRIO, m5_NUM_PRIOS)
-      
+
       // RISC-V Only
-      ifeq(m5_ISA, ['RISCV'], [''], ['m5_errprint_nl(['Multi-core supported for RISC-V only.'])'])
+      if_eq(m5_ISA, ['RISCV'], [''], ['m5_errprint_nl(['Multi-core supported for RISC-V only.'])'])
       
       // Headere flit fields. 
       define_vector_with_fields(FLIT, 32, UNUSED, m5_calc(m5_CORE_INDEX_CNT * 2 + m5_VC_INDEX_CNT), VC, m5_calc(m5_CORE_INDEX_CNT * 2), SRC, m5_CORE_INDEX_CNT, DEST, 0)
@@ -611,7 +616,7 @@
    //   $1: VIZ left of stage in diagram
    //   $2: Stage name
    //   $3: Next $1
-   macro(stages, ['m5_ifeq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_$2_STAGE - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
+   macro(stages, ['m5_if_eq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_$2_STAGE - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
    stages(
       8.5, NEXT_PC,
       13, FETCH,
@@ -644,7 +649,7 @@
    // This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
    
-   ifeq(m5_RETIMING_EXPERIMENT, ['m5_RETIMING_EXPERIMENT'], [''], [
+   if_eq(m5_RETIMING_EXPERIMENT, ['m5_RETIMING_EXPERIMENT'], [''], [
       def(NEXT_PC_STAGE, 0,
           FETCH_STAGE, 0,
           DECODE_STAGE, 0,
@@ -667,7 +672,7 @@
 
    // Check that expressions are ordered.
    fn(ordered, ..., {
-      ifeq(['$2'], [''], [''], {
+      if_eq(['$2'], [''], [''], {
          if(m5_$1 > m5_$2, {
             errprint(['$1 (']m5_$1[') is greater than $2 (']m5_$2[').']m5_nl)
          })
@@ -825,7 +830,7 @@
    // Create several defines with items per redirect condition.
    def(NUM_REDIRECT_CONDITIONS, 0)  // Incremented for each condition.
    def(process_redirect_conditions, [
-      ifeq(['$@'], ['['']'], [''], [
+      if_eq(['$@'], ['['']'], [''], [
          process_redirect_condition($1, m5_NUM_REDIRECT_CONDITIONS)
          process_redirect_conditions(m5_shift($@))
       ])
@@ -861,7 +866,7 @@
       append_macro(redirect_shadow_terms,
                 [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_$1_BUBBLES - $9)['{1'b1}}, {']m5_calc(m5_$1_BUBBLES + $9)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
       prepend_macro(redirect_pc_terms,
-                 ['']m5_redir_cond($@)[' ? {>>']m5_$1_BUBBLES['$3, ']m5_ifeq($10, wait, 1'b1, 1'b0)['} : '])
+                 ['']m5_redir_cond($@)[' ? {>>']m5_$1_BUBBLES['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
       if(['$4'], [
          //m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
          append_macro(abort_terms,
@@ -872,7 +877,7 @@
       append_macro(redirect_viz,
                 ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
       append_macro(redirect_cell_viz,
-                ['if (stage == ']m5_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_ifeq(m5_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
+                ['if (stage == ']m5_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_if_eq(m5_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
    ])
 
    // Specify and process redirect conditions.
@@ -884,11 +889,11 @@
    process_redirect_conditions(
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
       ['NO_FETCH, $NoFetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
-      m5_ifeq(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
+      m5_if_eq(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
       ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 0'],
       ['JUMP, $jump, $jump_target, 0, "Jp", "purple", 61, 11, 0'],
       ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "Br", "blue", 70, 20, 0'],
-      m5_ifeq(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
+      m5_if_eq(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
       ['NON_PIPELINED, $non_pipelined, $pc_inc, 0, "NP", "red", 75.6, 25, 1, wait'],
       ['TRAP, $aborting_trap, $trap_target, 1, "AT", "#ff0080", 75.6, 7, 0'],
       ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080", 75.6, 12, 0'])
@@ -947,19 +952,19 @@
    // Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    def(define_csr, [
         define_vector_with_fields(['CSR_']m5_uppercase(['$1']), $3)
-        append_var(csrs, m5_ifeq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
+        append_var(csrs, m5_if_eq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
         def(csr_$1_args, ['$@'])
         // 32'b0 = ['{{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
         def(csrrx_rslt_expr, m5_quote(['$is_csr_']$1[' ? {{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m5_csrrx_rslt_expr))
         def(valid_csr_expr, m5_quote(m5_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
         def(csr_viz_init_each, m5_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: 40 + 18 * ']m5_num_csrs[', left: 20, fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 40 + 18 * ']m5_num_csrs[', left: 30, fontSize: 14, fontFamily: "monospace"}); '])
-        def(csr_viz_render_each, m5_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m5_ifeq($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").set({text: $1name + ": " + val_$1 + oldVal$1}); this.getInitObject("$1").set({fill: $1mod ? "blue" : "black"}); '])
+        def(csr_viz_render_each, m5_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = m5_if_eq($6, 1, '/instr$csr_$1_hw_wr'.asBool(false), val_$1 === old_val_$1); let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").set({text: $1name + ": " + val_$1 + oldVal$1}); this.getInitObject("$1").set({fill: $1mod ? "blue" : "black"}); '])
         def(num_csrs, m5_calc(m5_num_csrs + 1))
    ])
    
    case(ISA, RISCV, [
-      ifeq(m5_NO_COUNTER_CSRS, 1, [''], [
+      if_eq(m5_NO_COUNTER_CSRS, 1, [''], [
          // TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
          // Define Counter CSRs
          //         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
@@ -1076,7 +1081,7 @@
    // Define m5_module_def macro to be used in \SV context, providing the module definition, either inside makerchip,
    // or outside for formal.
    def(module_def, ['
-      m5_ifeq(m5_FORMAL, 0,
+      m5_if_eq(m5_FORMAL, 0,
          ['m5_makerchip_module'], ['
          module warpv(input logic clk,
             input logic reset,
@@ -1113,7 +1118,7 @@
    
    pragma_enable_verbose_checks
    fn(sv_content, {
-      ifeq(m5_ISA, RISCV, [
+      if_eq(m5_ISA, RISCV, [
          // Functions to append to sv_out. Verilator lint pragmas and SV includes.
          var(sv_out, [''])
          fn(verilator_lint, on_off, tag, [
@@ -1169,7 +1174,7 @@
    pragma_disable_verbose_checks
 \SV
    m5_if(m5_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/5895e0625b0f8f17bb2e21a83de6fa1c9229a846/pipeflow_lib.tlv'])'])
-   m5_ifeq(m5_ISA, RISCV, ['m4_include_lib(m5_warpv_includes['risc-v_defs.tlv'])'])
+   m5_if_eq(m5_ISA, RISCV, ['m4_include_lib(m5_warpv_includes['risc-v_defs.tlv'])'])
    m5_eval(m5_sv_content())
 
 // A default testbench for all ISAs.
@@ -1486,10 +1491,10 @@
    m5_asm(ORI, x8, zero, 1011)
    m5_asm(ORI, x9, zero, 1010)
    m5_asm(ORI, x10, zero, 10101010)
-   m5_asm(MUL, x11, x8, r9)
+   m5_asm(MUL, x11, x8, x9)
    m5_asm(ORI, x6, zero, 0)
    m5_asm(SW, x6, x11, 0)
-   m5_asm(MUL, x12, x9, r10)
+   m5_asm(MUL, x12, x9, x10)
    m5_asm(LW, x4, x6, 0)
    m5_asm(ADDI, x6, x6, 100)
    m5_asm(SW, x6, x12, 0)
@@ -1592,12 +1597,12 @@
    m5_asm(CLZ, x19, x1)
    m5_asm(CTZ, x20, x1)
    m5_asm(PCNT, x21, x1)
-   m5_asm(CRC32B, x22, x1)
-   m5_asm(CRC32H, x23, x1)
-   m5_asm(CRC32W, x24, x1)
-   m5_asm(CRC32CB, x26, x1)
-   m5_asm(CRC32CH, x27, x1)
-   m5_asm(CRC32CW, x28, x1)
+   m5_asm(CRC32_B, x22, x1)
+   m5_asm(CRC32_H, x23, x1)
+   m5_asm(CRC32_W, x24, x1)
+   m5_asm(CRC32C_B, x26, x1)
+   m5_asm(CRC32C_H, x27, x1)
+   m5_asm(CRC32C_W, x28, x1)
    m5_asm(MIN, x9, x1, x2)
    m5_asm(MAX, x10, x1, x2)
    m5_asm(MINU, x11, x1, x2)
@@ -1873,7 +1878,7 @@
    $rslt[m5_WORD_RANGE] =
          $second_issue_ld ? /orig_load_inst$ld_rslt : m5_if_eq_block(m5_EXT_M, 1, ['
          ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
-         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m5_ifeq(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
+         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr['']m5_if_eq(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
          ']) m5_if_eq_block(m5_EXT_F, 1, ['
          ($fpu_second_issue_div_sqrt && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_fpu) ? |fetch/instr/fpu1$output_div_sqrt11 : 
          ']) m5_if_eq_block(m5_EXT_B, 1, ['
@@ -1994,18 +1999,18 @@
             $clmul_type_instr = $is_clmul_instr ||
                                 $is_clmulr_instr ||
                                 $is_clmulh_instr ;
-            $crc_type_instr =  $is_crc32b_instr ||
-                                $is_crc32w_instr ||
-                                $is_crc32h_instr ||
-                                $is_crc32cb_instr ||
-                                $is_crc32cw_instr ||
-                                $is_crc32ch_instr;
+            $crc_type_instr =  $is_crc32_b_instr ||
+                               $is_crc32_w_instr ||
+                               $is_crc32_h_instr ||
+                               $is_crc32c_b_instr ||
+                               $is_crc32c_w_instr ||
+                               $is_crc32c_h_instr;
             $clmul_crc_type_instr = $clmul_type_instr || $crc_type_instr;
          )
 
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
-      $illegal_itype_with_funct7 = ( $is_srli_srai_instr m5_ifeq(m5_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
+      $illegal_itype_with_funct7 = ( $is_srli_srai_instr m5_if_eq(m5_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
       $illegal = ($illegal_itype_with_funct7['']m5_illegal_instr_expr) ||
                  ($raw[1:0] != 2'b11); // All legal instructions have opcode[1:0] == 2'b11. We ignore these bits in decode logic.
       $conditional_branch = $is_b_type;
@@ -2144,8 +2149,8 @@
 
             $din_valid_bext_dep = ($is_gorc_instr || $is_gorci_instr || $is_shfl_instr || $is_unshfl_instr || $is_bdep_instr || $is_bext_instr || $is_shfli_instr || $is_unshfli_instr) && |fetch/instr$commit;
             $din_valid_clmul = ($is_clmul_instr || $is_clmulr_instr || $is_clmulh_instr) && |fetch/instr$commit;
-            $din_valid_rvb_crc = ($is_crc32b_instr || $is_crc32h_instr || $is_crc32w_instr || $is_crc32cb_instr || $is_crc32ch_instr || $is_crc32cw_instr) && |fetch/instr$commit;
-            $din_valid_rvb_bitcnt = ($is_pcnt_instr || $is_sextb_instr || $is_sexth_instr) && |fetch/instr$commit;
+            $din_valid_rvb_crc = ($is_crc32_b_instr || $is_crc32_h_instr || $is_crc32_w_instr || $is_crc32c_b_instr || $is_crc32c_h_instr || $is_crc32c_w_instr) && |fetch/instr$commit;
+            $din_valid_rvb_bitcnt = ($is_pcnt_instr || $is_sext_b_instr || $is_sext_h_instr) && |fetch/instr$commit;
 
             /* verilator lint_off WIDTH */
             /* verilator lint_off CASEINCOMPLETE */
@@ -2195,7 +2200,7 @@
          )
 
       // hold_inst scope is not needed when long latency instructions are disabled
-      m5_ifeq(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
+      m5_if_eq(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
       // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
       // TODO: This becomes a one-liner once $ANY acts on subscope.
       /hold_inst
@@ -2416,14 +2421,14 @@
                                         $is_clz_instr        ||
                                         $is_ctz_instr        ||
                                         $is_pcnt_instr       ||
-                                        $is_sextb_instr      ||
-                                        $is_sexth_instr      ||
-                                        $is_crc32b_instr     ||
-                                        $is_crc32h_instr     ||
-                                        $is_crc32w_instr     ||
-                                        $is_crc32cb_instr    ||
-                                        $is_crc32ch_instr    ||
-                                        $is_crc32cw_instr    ||
+                                        $is_sext_b_instr     ||
+                                        $is_sext_h_instr     ||
+                                        $is_crc32_b_instr    ||
+                                        $is_crc32_h_instr    ||
+                                        $is_crc32_w_instr    ||
+                                        $is_crc32c_b_instr   ||
+                                        $is_crc32c_h_instr   ||
+                                        $is_crc32c_w_instr   ||
                                         $is_clmul_instr      ||
                                         $is_clmulr_instr     ||
                                         $is_clmulh_instr     ||
@@ -2486,32 +2491,32 @@
                $clz_rslt[m5_WORD_RANGE]    = {26'b0, $clz_final_output};
                $ctz_rslt[m5_WORD_RANGE]    = {26'b0, $ctz_final_output};
                $pcnt_rslt[m5_WORD_RANGE]   = {26'b0, $popcnt_output};
-               $sextb_rslt[m5_WORD_RANGE]   = $rvb_bitcnt_output;
-               $sexth_rslt[m5_WORD_RANGE]   = $rvb_bitcnt_output;
-               $min_rslt[m5_WORD_RANGE] = $min_output;
-               $max_rslt[m5_WORD_RANGE] = $max_output;
-               $minu_rslt[m5_WORD_RANGE] = $minu_output;
-               $maxu_rslt[m5_WORD_RANGE] = $maxu_output;
-               $shfl_rslt[m5_WORD_RANGE] = $bext_dep_output;
+               $sext_b_rslt[m5_WORD_RANGE] = $rvb_bitcnt_output;
+               $sext_h_rslt[m5_WORD_RANGE] = $rvb_bitcnt_output;
+               $min_rslt[m5_WORD_RANGE]    = $min_output;
+               $max_rslt[m5_WORD_RANGE]    = $max_output;
+               $minu_rslt[m5_WORD_RANGE]   = $minu_output;
+               $maxu_rslt[m5_WORD_RANGE]   = $maxu_output;
+               $shfl_rslt[m5_WORD_RANGE]   = $bext_dep_output;
                $unshfl_rslt[m5_WORD_RANGE] = $bext_dep_output;
-               $bdep_rslt[m5_WORD_RANGE] = $bext_dep_output;
-               $bext_rslt[m5_WORD_RANGE] = $bext_dep_output;
-               $pack_rslt[m5_WORD_RANGE] = $pack_output;
-               $packu_rslt[m5_WORD_RANGE] = $packu_output;
-               $packh_rslt[m5_WORD_RANGE] = $packh_output;
-               $bfp_rslt[m5_WORD_RANGE] = $bfp_output;
-               $shfli_rslt[m5_WORD_RANGE] = $bext_dep_output;
+               $bdep_rslt[m5_WORD_RANGE]   = $bext_dep_output;
+               $bext_rslt[m5_WORD_RANGE]   = $bext_dep_output;
+               $pack_rslt[m5_WORD_RANGE]   = $pack_output;
+               $packu_rslt[m5_WORD_RANGE]  = $packu_output;
+               $packh_rslt[m5_WORD_RANGE]  = $packh_output;
+               $bfp_rslt[m5_WORD_RANGE]    = $bfp_output;
+               $shfli_rslt[m5_WORD_RANGE]  = $bext_dep_output;
                $unshfli_rslt[m5_WORD_RANGE] = $bext_dep_output;
 
                $clmul_rslt[m5_WORD_RANGE]  = m5_WORD_CNT'b0;
                $clmulr_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
                $clmulh_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32b_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32h_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32w_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32cb_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32ch_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
-               $crc32cw_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32_b_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32_h_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32_w_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32c_b_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32c_h_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
+               $crc32c_w_rslt[m5_WORD_RANGE] = m5_WORD_CNT'b0;
 
                $dout_ready_bext_dep = $dout_valid_bext_dep && |fetch/instr$commit;
                $dout_ready_clmul = $dout_valid_clmul && |fetch/instr$commit;
@@ -3175,7 +3180,7 @@
                   //$ld_data[m5_WORD_RANGE] = /bank[*]$ld_data;
                   // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
                   // build the concatination.
-                  $ld_data[m5_WORD_RANGE] = {m4_forloop(['m5_ind'], 0, m5_ADDRS_PER_WORD, ['m5_ifeq(m5_ind, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_ind - 1)]$ld_data'])};
+                  $ld_data[m5_WORD_RANGE] = {m4_forloop(['m5_ind'], 0, m5_ADDRS_PER_WORD, ['m5_if_eq(m5_ind, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_ind - 1)]$ld_data'])};
                )
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -3252,7 +3257,7 @@
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
 
    // latency for division is different for ALTOPS case
-   m5_ifeq(m5_RISCV_FORMAL_ALTOPS, 1, ['
+   m5_if_eq(m5_RISCV_FORMAL_ALTOPS, 1, ['
         m5_def(DIV_LATENCY, 12)
    '],['
         m5_def(DIV_LATENCY, 37)
@@ -3760,7 +3765,7 @@
          m5+m5_exe_macro_name(@m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
          
          @m5_BRANCH_PRED_STAGE
-            m5_ifeq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
+            m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
          @m5_EXECUTE_STAGE
 
             // =======
@@ -3781,7 +3786,7 @@
             ?$valid_decode_branch
                $branch_redir_pc[m5_PC_RANGE] =
                   // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
-                  m5_ifeq(m5_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + m5_PC_CNT'b1 :'])
+                  m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + m5_PC_CNT'b1 :'])
                   $branch_target;
 
             $trap_target[m5_PC_RANGE] = $replay_trap ? $Pc : {m5_PC_CNT{1'b1}};  // TODO: What should this be? Using ones to terminate test for now.
@@ -3862,10 +3867,10 @@
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[m5_WORD_RANGE] =
-              m5_ifeq(m5_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>m5_REG_BYPASS_STAGES$value);
+              m5_if_eq(m5_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>m5_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[m5_WORD_RANGE], $pending} =
-            m5_ifeq(m5_ISA['']_rf, ['RISCV'], ['($reg == m5_REGS_INDEX_CNT'b0) ? {m5_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
+            m5_if_eq(m5_ISA['']_rf, ['RISCV'], ['($reg == m5_REGS_INDEX_CNT'b0) ? {m5_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
             // Bypass stages. Both register and pending are bypassed.
             // Bypassed registers must be from instructions that are good-path as of this instruction or are 2nd issuing.
             m5_if(m5_REG_BYPASS_STAGES >= 1, ['(/instr$bypass_avail1 && (/instr>>1$dest_reg == $reg)) ? {/instr>>1$rslt, /instr>>1$reg_wr_pending} :'])
@@ -3880,7 +3885,7 @@
    $is_dest_condition = $dest_reg_valid && /instr$valid_decode;
    ?$is_dest_condition
       $dest_pending =
-         m5_ifeq(m5_ISA['']_rf, ['RISCV'], ['($dest_reg == m5_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
+         m5_if_eq(m5_ISA['']_rf, ['RISCV'], ['($dest_reg == m5_REGS_INDEX_CNT'b0) ? 1'b0 :  // Read r0 as 0 (not pending). Not actually necessary, but it cuts off read of non-existent rs0, which might be an issue for formal verif tools.'])
          // Bypass stages.
          m5_if(m5_REG_BYPASS_STAGES >= 1, ['($bypass_avail1 && (>>1$dest_reg == $dest_reg)) ? /instr>>1$reg_wr_pending :'])
          m5_if(m5_REG_BYPASS_STAGES >= 2, ['($bypass_avail2 && (>>2$dest_reg == $dest_reg)) ? /instr>>2$reg_wr_pending :'])
@@ -3990,7 +3995,7 @@
                                  $trap           ? $trap_target :
                                  $jump           ? $jump_target :
                                  $mispred_branch ? ($taken ? $branch_target[m5_PC_RANGE] : $pc + m5_PC_CNT'b1) :
-                                 m5_ifeq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[m5_PC_RANGE] :'])
+                                 m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[m5_PC_RANGE] :'])
                                  $indirect_jump  ? $indirect_jump_target :
                                  $pc[31:2] +1'b1, 2'b00};
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[m5_ADDR_MAX:2], 2'b0} : 0;
@@ -4201,7 +4206,7 @@
    m4_push(in_delay, m4_defaulted_arg(#_in_delay, 0))
    m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
    m4_push(hop_name, m5_strip_prefix(/_hop))
-   m4_push(HOP, ['m5_']m5_translit(m4_hop_name, ['a-z'], ['A-Z']))
+   m5_push_var(HOP, ['m5_']m5_translit(m4_hop_name, ['a-z'], ['A-Z']))
    m4_push(prev_hop_index, (m4_hop_name + m5_eval(m5_HOP['_CNT']) - 1) % m5_eval(m5_HOP['_CNT']))
    
    // ========
@@ -4286,12 +4291,12 @@
    m4_pop(in_delay)
    m4_pop(hop_dist)
    m4_pop(hop_name)
-   m4_pop(HOP)
+   m5_pop(HOP)
    m4_pop(prev_hop_index)
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
    m5+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
-   m4_push(trans_ind, m5_ifeq(/_trans, [''], [''], ['   ']))
+   m4_push(trans_ind, m5_if_eq(/_trans, [''], [''], ['   ']))
    // In1 is blocked if output is blocked.
    // In1 is blocked if output is blocked or in2 is available.
    |_in1
@@ -4471,7 +4476,7 @@
             })
             return {instr_asm_box, instr_binary_box, instr_str}
           },
-          m5_ifeq(m5_IMEM_STYLE, EXTERN, [''], ['
+          m5_if_eq(m5_IMEM_STYLE, EXTERN, [''], ['
           render() {
              // Instruction memory is constant, so just create it once.
             m5_if_eq_block(m5_ISA, ['MINI'], ['
@@ -4743,7 +4748,7 @@
                         !this.commit ? "gray" :
                                        "blue"
                      let pc = '/instr$pc'.step(step).asInt()
-                     let instr_str = m5_ifeq(m5_FORMAL, 1, "           " + '/instr$mnemonic', m5_IMEM_STYLE, EXTERN, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
+                     let instr_str = m5_if_eq(m5_FORMAL, 1, "           " + '/instr$mnemonic', m5_IMEM_STYLE, EXTERN, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
                      this.getObjects().instr.set({
                         text: instr_str,
                         fill: color,
