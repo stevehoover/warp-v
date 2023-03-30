@@ -337,7 +337,7 @@
    // --------------
    default_def(
      ['# Number of cores. Previously this was defined externally as m5_CORE_CNT (via m5_define_hier), so accept that too.'],
-     NUM_CORES, m5_if_eq(m5_CORE_CNT, ['m5_CORE_CNT'], 2, m5_CORE_CNT))
+     NUM_CORES, m5_if_eq(m5_CORE_CNT, ['m5_CORE_CNT'], 1, m5_CORE_CNT))
 
    // Only relevant, and only defined, if m5_NUM_CORES > 1:
 
@@ -1488,22 +1488,22 @@
    //
    //3 MULs followed by 3 DIVs, check r11-r15 for correct results
 
-   m5_asm(ORI, x8, zero, 1011)
-   m5_asm(ORI, x9, zero, 1010)
-   m5_asm(ORI, x10, zero, 10101010)
+   m5_asm(ORI, x8, zero, 0b1011)
+   m5_asm(ORI, x9, zero, 0b1010)
+   m5_asm(ORI, x10, zero, 0b10101010)
    m5_asm(MUL, x11, x8, x9)
-   m5_asm(ORI, x6, zero, 0)
-   m5_asm(SW, x6, x11, 0)
+   m5_asm(ORI, x6, zero, 0b0)
+   m5_asm(SW, x6, x11, 0b0)
    m5_asm(MUL, x12, x9, x10)
-   m5_asm(LW, x4, x6, 0)
-   m5_asm(ADDI, x6, x6, 100)
-   m5_asm(SW, x6, x12, 0)
+   m5_asm(LW, x4, x6, 0b0)
+   m5_asm(ADDI, x6, x6, 0b100)
+   m5_asm(SW, x6, x12, 0b0)
    m5_asm(MUL, x13, x8, x10)
    m5_asm(DIV, x14, x11, x8)
    m5_asm(DIV, x15, x13, x10)
-   m5_asm(LW, x5, x6, 0)
-   m5_asm(ADDI, x4, zero, 101101)
-   m5_asm(BGE, x8, x9, 111111111110)
+   m5_asm(LW, x5, x6, 0b0)
+   m5_asm(ADDI, x4, zero, 0b101101)
+   m5_asm(BGE, x8, x9, 0b111111111110)
 
 \TLV riscv_fpu_test_prog()
    // /==========================\
