@@ -78,8 +78,9 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${p
    // Include WARP-V.
    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
    m4_include_lib(['${settings.warpVVersion}'])
-${settings.customProgramEnabled ? `\\TLV ${isa.toLowerCase()}_${programName}_prog()
-   ${programText.split("\n").join("\n   ")}` : ``}
+${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
+         ${programText.split("\n").join("\n         ")}
+      '])\n   })` : ``}
 m4+module_def()
 \\TLV
    m4+warpv_top()

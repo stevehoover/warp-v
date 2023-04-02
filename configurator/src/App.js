@@ -138,6 +138,8 @@ loop:
    LW t4, -4(t6)            #     load the final value into tmp
    ADDI t5, zero, 0x2d      #     expected result (0x2d)
    BEQ t4, t5, pass         #     pass if as expected
+
+   # Branch to one of these to report pass/fail to the default testbench.
 fail:
    ADD t5, t5, zero         #     nop fail
 pass:
@@ -150,5 +152,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "9fae77bbb560de3f64aee8f542734c976cd5e684"
+export const warpVLatestSupportedCommit = "4a291f6f7d5fca28b0573172df6588376bf93eb2"
 export const warpVLatestVersionCommit = "master"
