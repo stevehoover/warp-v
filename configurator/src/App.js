@@ -108,35 +108,40 @@ function App() {
     </ChakraProvider>;
 }
 
-const initialProgramText = `// /=====================\\
-// |  Sum 1..9 Program  |
-// \=====================/
-//
-// Default program for RV32I test
-// Add 1,2,3,...,9 (in that order).
-// Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
-//
-// Regs:
-// 1: cnt
-// 2: ten
-// 3: out
-// 4: tmp
-// 5: offset
-// 6: store addr
-
-m4_label(begin)
-m4_asm(ORI, x6, x0, 0)// store_addr = 0
-m4_asm(ORI, x1, x0, 1)// cnt = 1
-m4_asm(ORI, x2, x0, 1010) // ten = 10
-m4_asm(ORI, x3, x0, 0)// out = 0
-m4_label(loop)
-m4_asm(ADD, x3, x1, x3)   //  -> out += cnt
-m4_asm(SW, x6, x3, 0) // store out at store_addr
-m4_asm(ADDI, x1, x1, 1)   // cnt ++
-m4_asm(ADDI, x6, x6, 100) // store_addr++
-m4_asm(BLT, x1, x2, :loop) //  ^- branch back if cnt < 10
-m4_asm(LW, x4, x6, 111111111100) // load the final value into tmp
-m4_asm(BGE, x1, x2, :begin) // TERMINATE at the last instruction.
+const initialProgramText = `# /=====================\\
+# | Count to 10 Program |
+# \\=====================/
+#
+# Default program for RV32I test
+# Add 1,2,3,...,9 (in that order).
+# Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
+#
+# Regs:
+# t1: cnt
+# t2: ten
+# t3: out
+# t4: tmp
+# t5: offset
+# t6: store addr
+reset:
+   ORI t6, zero, 0          #     store_addr = 0
+   ORI t1, zero, 1          #     cnt = 1
+   ORI t2, zero, 10         #     ten = 10
+   ORI t3, zero, 0          #     out = 0
+loop:
+   ADD t3, t1, t3           #  -> out += cnt
+   SW t6, 0(t3)             #     store out at store_addr
+   ADDI t1, t1, 1           #     cnt ++
+   ADDI t6, t6, 4           #     store_addr++
+   BLT t1, t2, loop         #  ^- branch back if cnt < 10
+# Result should be 0x2d.
+   LW t4, -4(t6)            #     load the final value into tmp
+   ADDI t5, zero, 0x2d      #     expected result (0x2d)
+   BEQ t4, t5, pass         #     pass if as expected
+fail:
+   ADD t5, t5, zero         #     nop fail
+pass:
+   ADD t4, t4, zero         #     nop pass
 `
 
 export default App;
