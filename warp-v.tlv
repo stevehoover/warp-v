@@ -31,6 +31,7 @@
    // For usage examples, visit warp-v.org.
 
 \m5
+   ///debug_level(max)
    use(m5-0.2)
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
@@ -313,7 +314,7 @@
 
    // Default parameters for formal verification continuous integration testing.
    // m5_FORMAL is only used within Makerchip in debug mode (for VIZ).
-   //m5_default_def(FORMAL, 1)  // Uncomment to test formal verification in Makerchip.
+   default_def(FORMAL, 0)  // Uncomment to test formal verification in Makerchip.
    if_eq(m5_FORMAL, 1, [
       default_def(
          ISA, RISCV,
@@ -337,7 +338,7 @@
    // --------------
    default_def(
      ['# Number of cores. Previously this was defined externally as m5_CORE_CNT (via m5_define_hier), so accept that too.'],
-     NUM_CORES, m5_if_eq(m5_CORE_CNT, ['m5_CORE_CNT'], 1, m5_CORE_CNT))
+     NUM_CORES, m5_if_def(CORE_CNT, ['m5_CORE_CNT'], 1))
 
    // Only relevant, and only defined, if m5_NUM_CORES > 1:
 
@@ -616,7 +617,7 @@
    //   $1: VIZ left of stage in diagram
    //   $2: Stage name
    //   $3: Next $1
-   macro(stages, ['m5_if_eq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_$2_STAGE - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
+   macro(stages, ['m5_if_eq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_get($2_STAGE) - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
    stages(
       8.5, NEXT_PC,
       13, FETCH,
@@ -649,7 +650,7 @@
    // This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
    // The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
    
-   if_eq(m5_RETIMING_EXPERIMENT, ['m5_RETIMING_EXPERIMENT'], [''], [
+   if_def(RETIMING_EXPERIMENT, [
       def(NEXT_PC_STAGE, 0,
           FETCH_STAGE, 0,
           DECODE_STAGE, 0,
@@ -673,8 +674,8 @@
    // Check that expressions are ordered.
    fn(ordered, ..., {
       if_eq(['$2'], [''], [''], {
-         if(m5_$1 > m5_$2, {
-            errprint(['$1 (']m5_$1[') is greater than $2 (']m5_$2[').']m5_nl)
+         if(m5_get($1) > m5_get($2), {
+            errprint(['$1 (']m5_get($1)[') is greater than $2 (']m5_get($2)[').']m5_nl)
          })
          ordered(m5_shift($@))
       })
@@ -859,14 +860,14 @@
       // Params: $@ (m5_redirect_masking_triggers contains param use)
       //0
       macro(redir_cond,
-            ['(>>']m5_$1_BUBBLES['$2 && !(']m5_eval(m5_redirect_masking_triggers)[') && $GoodPathMask'][m5_$1_BUBBLES][')'])
-      append_macro(redirect_list, m5_$1_BUBBLES)
+            ['(>>']m5_call($1_BUBBLES)['$2 && !(']m5_eval(m5_redirect_masking_triggers())[') && $GoodPathMask'][m5_get($1_BUBBLES)][')'])
+      append_macro(redirect_list, m5_get($1_BUBBLES))
       append_macro(redirect_squash_terms,
-                [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_$1_BUBBLES - $4)['{1'b1}}, {']m5_calc(m5_$1_BUBBLES + $4)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+                [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_get($1_BUBBLES) - $4)['{1'b1}}, {']m5_calc(m5_get($1_BUBBLES) + $4)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
       append_macro(redirect_shadow_terms,
-                [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_$1_BUBBLES - $9)['{1'b1}}, {']m5_calc(m5_$1_BUBBLES + $9)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+                [' & (']m5_redir_cond($@)[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_get($1_BUBBLES) - $9)['{1'b1}}, {']m5_calc(m5_get($1_BUBBLES) + $9)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
       prepend_macro(redirect_pc_terms,
-                 ['']m5_redir_cond($@)[' ? {>>']m5_$1_BUBBLES['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
+                 ['']m5_redir_cond($@)[' ? {>>']m5_get($1_BUBBLES)['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
       if(['$4'], [
          //m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
          append_macro(abort_terms,
@@ -877,7 +878,7 @@
       append_macro(redirect_viz,
                 ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
       append_macro(redirect_cell_viz,
-                ['if (stage == ']m5_$1_BUBBLES[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_if_eq(m5_EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
+                ['if (stage == ']m5_get($1_BUBBLES)[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_if_defined_as(EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
    ])
 
    // Specify and process redirect conditions.
@@ -954,8 +955,8 @@
         define_vector_with_fields(['CSR_']m5_uppercase(['$1']), $3)
         append_var(csrs, m5_if_eq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
         def(csr_$1_args, ['$@'])
-        // 32'b0 = ['{{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['}']
-        def(csrrx_rslt_expr, m5_quote(['$is_csr_']$1[' ? {{']m5_calc(32 - m5_eval(['m5_CSR_']m5_uppercase(['$1'])['_CNT'])){1'b0}}, ['$csr_']$1['} : ']m5_csrrx_rslt_expr))
+        // 32'b0 = ['{{']m5_calc(32 - m5_eval(['m5_call(CSR_']m5_uppercase(['$1'])['_CNT)'])){1'b0}}, ['$csr_']$1['}']
+        def(csrrx_rslt_expr, m5_quote(['$is_csr_']$1[' ? {{']m5_calc(32 - m5_eval(['m5_call(CSR_']m5_uppercase(['$1'])['_CNT)'])){1'b0}}, ['$csr_']$1['} : ']m5_csrrx_rslt_expr))
         def(valid_csr_expr, m5_quote(m5_valid_csr_expr[' || $is_csr_']$1))
         // VIZ
         def(csr_viz_init_each, m5_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: 40 + 18 * ']m5_num_csrs[', left: 20, fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 40 + 18 * ']m5_num_csrs[', left: 30, fontSize: 14, fontFamily: "monospace"}); '])
@@ -964,7 +965,7 @@
    ])
    
    case(ISA, RISCV, [
-      if_eq(m5_NO_COUNTER_CSRS, 1, [''], [
+      if_defined_as(NO_COUNTER_CSRS, 1, [''], [
          // TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
          // Define Counter CSRs
          //         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
@@ -3099,7 +3100,7 @@
 // A fake memory with fixed latency.
 // The memory is placed in the fetch pipeline.
 // TODO: (/_cpu, @_mem, @_align)
-\TLV fixed_latency_fake_memory(/_cpu, m5_ALIGNMENT_VALUE)
+\TLV fixed_latency_fake_memory(/_cpu, _ALIGNMENT_VALUE)
    // This macro assumes little-endian.
    m5_if(m5_BIG_ENDIAN, ['m5_errprint(['Error: fixed_latency_fake_memory macro only supports little-endian memory.'])'])
    |fetch
@@ -3187,20 +3188,20 @@
    |mem
       /data
          // This becomes a one-liner once $ANY acts on subscopes.
-         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - m5_ALIGNMENT_VALUE)
-            $ANY = /_cpu|fetch/instr>>m5_ALIGNMENT_VALUE$ANY;
+         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - _ALIGNMENT_VALUE)
+            $ANY = /_cpu|fetch/instr>>_ALIGNMENT_VALUE$ANY;
             /src[2:1]
-               $ANY = /_cpu|fetch/instr/src>>m5_ALIGNMENT_VALUE$ANY;
+               $ANY = /_cpu|fetch/instr/src>>_ALIGNMENT_VALUE$ANY;
             m5+ifelse(m5_EXT_F, 1,
                \TLV
                   /fpu
-                     $ANY = /_cpu|fetch/instr/fpu>>m5_ALIGNMENT_VALUE$ANY;
+                     $ANY = /_cpu|fetch/instr/fpu>>_ALIGNMENT_VALUE$ANY;
                      ///src[2:1]
-                     //   $ANY = /_cpu|fetch/instr/fpu/src>>m5_ALIGNMENT_VALUE$ANY;
+                     //   $ANY = /_cpu|fetch/instr/fpu/src>>_ALIGNMENT_VALUE$ANY;
                )
          // For consistency with other memories, assign $ld_value in @m5_MEM_WR_STAGE+1. 
-         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - m5_ALIGNMENT_VALUE + 1)
-            $ld_value[m5_WORD_RANGE] = /_cpu|fetch/instr>>m5_ALIGNMENT_VALUE$ld_data;
+         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - _ALIGNMENT_VALUE + 1)
+            $ld_value[m5_WORD_RANGE] = /_cpu|fetch/instr>>_ALIGNMENT_VALUE$ld_data;
 
 
 
@@ -4206,8 +4207,9 @@
    m4_push(in_delay, m4_defaulted_arg(#_in_delay, 0))
    m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
    m4_push(hop_name, m5_strip_prefix(/_hop))
-   m5_push_var(HOP, ['m5_']m5_translit(m4_hop_name, ['a-z'], ['A-Z']))
-   m4_push(prev_hop_index, (m4_hop_name + m5_eval(m5_HOP['_CNT']) - 1) % m5_eval(m5_HOP['_CNT']))
+   /// Get a parameter of the hop hierarchy.
+   m5_push_macro(hop_param, ['m5_get(m5_translit(']m4_hop_name[', ['a-z'], ['A-Z'])_$1)'])
+   m4_push(prev_hop_index, (m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT))
    
    // ========
    // The Flow
@@ -4222,12 +4224,12 @@
    // Connect hops in a ring.
    |_name['']_arriving
       @0
-         $ANY = /_hop[(#m4_hop_name + m5_eval(m5_HOP['_CNT']) - 1) % m5_eval(m5_HOP['_CNT'])]|_name['']_leaving<>0$ANY;
+         $ANY = /_hop[(#m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT)]|_name['']_leaving<>0$ANY;
          /_flit
-            $ANY = /_hop[(#m4_hop_name + m5_eval(m5_HOP['_CNT']) - 1) % m5_eval(m5_HOP['_CNT'])]|_name['']_leaving/_flit<>0$ANY;
+            $ANY = /_hop[(#m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT)]|_name['']_leaving/_flit<>0$ANY;
    |_name['']_leaving
       @0
-         $blocked = /_hop[(#m4_hop_name + 1) % m5_eval(m5_HOP['_CNT'])]|_name['']_arriving<>0$blocked;
+         $blocked = /_hop[(#m4_hop_name + 1) % m5_hop_param(CNT)]|_name['']_arriving<>0$blocked;
    // Fork off ring
    m5+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
    
@@ -4250,7 +4252,7 @@
    |_name['']_arriving
       @0
          // Characterize arriving flit (head/tail/body, header)
-         {$vc[m5_VC_INDEX_RANGE], $dest[m5_eval(m5_HOP['_INDEX_RANGE'])]} =
+         {$vc[m5_VC_INDEX_RANGE], $dest[m5_hop_param(INDEX_RANGE)]} =
             $reset  ? '0 :
             ! $body ? {/flit$flit[m5_FLIT_VC_RANGE], /flit$flit[m5_FLIT_DEST_RANGE]} :
                       {>>1$vc, >>1$dest};
@@ -4291,7 +4293,7 @@
    m4_pop(in_delay)
    m4_pop(hop_dist)
    m4_pop(hop_name)
-   m5_pop(HOP)
+   m5_pop(hop_param)
    m4_pop(prev_hop_index)
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
@@ -4499,11 +4501,11 @@
       // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
-      $unconditioned_reg[m5_eval(['m5_']m5_uppercase(_sig_prefix)REGS_INDEX_RANGE)] = $reg;
+      $unconditioned_reg[m5_eval(['m5_get(']m5_uppercase(_sig_prefix)REGS_INDEX_RANGE))] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[m5_WORD_RANGE] = $reg_value;
    m5_var(rf_type, m5_if_eq(_sig_prefix, [''], x, f))
-   /regs[m5_eval(['m5_']m5_uppercase(_sig_prefix)REGS_RANGE)]
+   /regs[m5_eval(['m5_get(']m5_uppercase(_sig_prefix)REGS_RANGE))]
       \viz_js
          all: {
             box: {
