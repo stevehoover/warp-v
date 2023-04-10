@@ -873,7 +873,7 @@
          append_macro(abort_terms,
                       [' || $2'])
          append_macro(redirect_masking_triggers,
-                      ['[' || >>m5_$']['1_BUBBLES$2']'])
+                      ['[' || >>['m5_get(']$']['1['_BUBBLES)']$2']'])
       ])
       append_macro(redirect_viz,
                 ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
@@ -1239,9 +1239,8 @@
       }; 
 
 \TLV mini_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m5-defined name.)
-   m5_macro(prog, ['mini_']_prog_name['_prog'])
-   m5+m5_prog()
+   // Instantiate the program.
+   m5+call(['mini_']_prog_name['_prog'])
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -1697,18 +1696,17 @@
          // For simulation
          // --------------
          
-         // Define the program. (This approach is required for an m5-defined name.)
-         m5_macro(prog, ['riscv_']_prog_name['_prog'])
-         m5+m5_prog()
+         // Define the program.
+         m5+call(['riscv_']_prog_name['_prog'])
          \SV_plus
             // The program in an instruction memory.
             logic [m5_INSTR_RANGE] instrs [0:m5_NUM_INSTRS-1];
             logic [40*8-1:0] instr_strs [0:m5_NUM_INSTRS];
             
-            m4_forloop(['m5_instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(m5_eval(['m5_instr']m5_instr_ind)); '])
+            m4_forloop(['m5']['_instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(m5_eval(['m5_instr']m5_instr_ind)); '])
             
             // String representations of the instructions for debug.
-            m4_forloop(['m5_instr_ind'], 0, m5_NUM_INSTRS, ['assign instr_strs[m5_instr_ind] = "m5_eval(['m5_instr_str']m5_instr_ind)"; '])
+            m4_forloop(['m5']['_instr_ind'], 0, m5_NUM_INSTRS, ['assign instr_strs[m5_instr_ind] = "m5_eval(['m5_get(['instr_str']m5_instr_ind)'])"; '])
             assign instr_strs[m5_NUM_INSTRS] = "END                                     ";
          
          |fetch
@@ -1735,12 +1733,12 @@
    @m5_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
       // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
-      m5_def(THIS_CSR_RANGE, m5_eval(['m5_CSR_']m5_uppercase(csr_name)['_RANGE']))
+      m5_def(THIS_CSR_RANGE, 0['']m5_eval(['m5_get(['CSR_']m5_uppercase(csr_name)['_RANGE'])']))
       
       m5+ifelse(side_effects, 1,
          \TLV
             // hw_wr_mask conditioned by hw_wr.
-            $csr_['']csr_name['']_hw_wr_en_mask[m5_THIS_CSR_RANGE] = {m5_eval(['m5_CSR_']m5_uppercase(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
+            $csr_['']csr_name['']_hw_wr_en_mask[m5_THIS_CSR_RANGE] = {m5_eval(['m5_get(['CSR_']m5_uppercase(csr_name)['_HIGH'])']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
             // The CSR value, updated by side-effect writes.
             $upd_csr_['']csr_name[m5_THIS_CSR_RANGE] =
                  ($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name);
@@ -1773,8 +1771,8 @@
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
    // TODO: This doesn't maintain alignment. Need an m5+foreach macro.
-   m4_foreach(csr, csrs, ['
-   m5+riscv_csr(m5_eval(['m5_csr_']csr['_args']))
+   m4_foreach(['m4_csr'], csrs, ['
+   m5+riscv_csr(m5_eval(['m5_get(['csr_']']m4_csr['['_args'])']))
    '])
 
 \TLV riscv_csr_logic()
@@ -1786,7 +1784,7 @@
 
    // Counter CSR
    //
-   m5+ifelse(m5_NO_COUNTER_CSRS, 1,
+   m5+ifelse(m5_if_defined_as(NO_COUNTER_CSRS, 1, 1, 0), 1,
       \TLV
       ,
       \TLV
@@ -2635,9 +2633,7 @@
       };
 
 \TLV mipsi_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m5-defined name.)
-   m5_macro(prog, ['mipsi_']_prog_name['_prog'])
-   m5+m5_prog()
+   m5+call(['mipsi_']_prog_name['_prog'])
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -2951,9 +2947,7 @@
       };
 
 \TLV power_imem(_prog_name)
-   // Instantiate the program. (This approach is required for an m5-defined name.)
-   m5_macro(prog, ['power_']_prog_name['_prog'])
-   m5+m5_prog()
+   m5+call(['power_']_prog_name['_prog'])
    |fetch
       /instr
          @m5_FETCH_STAGE
@@ -3181,7 +3175,7 @@
                   //$ld_data[m5_WORD_RANGE] = /bank[*]$ld_data;
                   // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
                   // build the concatination.
-                  $ld_data[m5_WORD_RANGE] = {m4_forloop(['m5_ind'], 0, m5_ADDRS_PER_WORD, ['m5_if_eq(m5_ind, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_ind - 1)]$ld_data'])};
+                  $ld_data[m5_WORD_RANGE] = {m4_forloop(['m5']['_ind'], 0, m5_ADDRS_PER_WORD, ['m5_if_eq(m5_ind, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_ind - 1)]$ld_data'])};
                )
    // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
    // right alignment.
@@ -3512,10 +3506,9 @@
 \TLV cpu(/_cpu)
    // Generated logic
    // Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
-   m4_def(gen, m5_isa['_gen'])
-   m5+m4_gen()
+   m5+call(m5_isa['_gen'])
    // Instruction memory and fetch of $raw.
-   m5+m5_IMEM_MACRO_NAME(m5_PROG_NAME)
+   m5+call(m5_IMEM_MACRO_NAME, m5_PROG_NAME)
 
 
    // /=========\
@@ -3726,10 +3719,10 @@
             //$split_ld = $spec_ld && 1'b['']m5_INJECT_RETURNING_LD;
             // Instantiate the program. (This approach is required for an m5-defined name.)
             m5_macro(decode_macro_name, m5_isa['_decode'])
-            m5+m5_decode_macro_name()
+            m5+call(m5_decode_macro_name)
          // Instantiate the program. (This approach is required for an m5-defined name.)
          m5_macro(branch_pred_macro_name, ['branch_pred_']m5_BRANCH_PRED)
-         m5+m5_branch_pred_macro_name()
+         m5+call(m5_branch_pred_macro_name)
          
          @m5_REG_RD_STAGE
             // Pending value to write to dest reg. Loads (not replaced by returning ld) write pending.
@@ -3763,7 +3756,7 @@
          
          // Instantiate the program. (This approach is required for an m5-defined name.)
          m5_macro(exe_macro_name, m5_isa['_exe'])
-         m5+m5_exe_macro_name(@m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
+         m5+call(m5_exe_macro_name, @m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
          
          @m5_BRANCH_PRED_STAGE
             m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
@@ -3809,7 +3802,7 @@
             // $commit = m5_prev_instr_valid_through(m5_MAX_REDIRECT_BUBBLES + 1), where +1 accounts for this
             // instruction's redirects. However, to meet timing, we consider this instruction separately, so,
             // commit if valid as of the latest redirect from prior instructions and not abort of this instruction.
-            m5_if_eq_block(m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT, ['m5_RETIMING_EXPERIMENT_ALWAYS_COMMIT'], ['
+            m5_if_eq_block(m5_if_defined_as(RETIMING_EXPERIMENT_ALWAYS_COMMIT, 1, 1, 0), 0, ['
             // Normal case:
             $good_path = m5_prev_instr_valid_through(m5_MAX_REDIRECT_BUBBLES);
             $commit = $good_path && ! $abort;
@@ -4208,7 +4201,7 @@
    m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
    m4_push(hop_name, m5_strip_prefix(/_hop))
    /// Get a parameter of the hop hierarchy.
-   m5_push_macro(hop_param, ['m5_get(m5_translit(']m4_hop_name[', ['a-z'], ['A-Z'])_$1)'])
+   m5_push_macro(hop_param, ['m5_get(m5_translit(']m4_hop_name[', ['a-z'], ['A-Z'])_$']['1)'])
    m4_push(prev_hop_index, (m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT))
    
    // ========
@@ -4531,7 +4524,7 @@
                   fontFamily: "monospace",
                   fill: "white"
                })
-               this.abi_['']m5_rf_type['']_map = m5_eval(m5_js_abi_['']m5_rf_type['']_map);
+               this.abi_['']m5_rf_type['']_map = m5_eval(m5_get(['js_abi_']m5_rf_type['_map']));
                return {rf_header, rf_header2}
             },
          },
@@ -5397,7 +5390,7 @@
    m5_def(COREOFFSET, 750)
    m5_def(ALL_TOP, -1000)
    m5_def(ALL_LEFT, -500)
-   m5+m5_viz_logic_macro_name()
+   m5+call(m5_viz_logic_macro_name)
    /_des_pipe
       @m5_VIZ_STAGE
          m5+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
@@ -5615,10 +5608,10 @@
    
 //////// VIZUALIZING THE INSERTION RING //////////////
 \TLV ring_viz(/_name)
-   m4_define(['m5_RINGVIZ_REF_TOP'],-100)
-   m4_define(['m5_RINGVIZ_REF_LEFT'],700)
-   m4_define(['m5_RINGVIZ_GLOBAL_TOP'], m5_ALL_TOP + m5_RINGVIZ_REF_TOP)
-   m4_define(['m5_RINGVIZ_GLOBAL_LEFT'], m5_ALL_LEFT + m5_RINGVIZ_REF_LEFT)
+   m5_def(RINGVIZ_REF_TOP,-100)
+   m5_def(RINGVIZ_REF_LEFT,700)
+   m5_def(RINGVIZ_GLOBAL_TOP, m5_ALL_TOP + m5_RINGVIZ_REF_TOP)
+   m5_def(RINGVIZ_GLOBAL_LEFT, m5_ALL_LEFT + m5_RINGVIZ_REF_LEFT)
    |egress_out
       @1
          /flit
@@ -5627,28 +5620,28 @@
    |ringviz
       @0
          // Bunch of define statements parameterizing the VIZ
-         m4_define(['m5_NODES_RADIUS'],3)
-         m4_define(['m5_NODES_COLOR'],"#208028")
-         m4_define(['m5_AVAIL_COLOR'],"blue")
-         m4_define(['m5_BLOCKED_COLOR'],"red")
-         m4_define(['m5_INVAILD_COLOR'],"grey")
-         m4_define(['m5_EGRESS_OUT_TOP'], 200 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_EGRESS_OUT_LEFT'],515 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_FIFO_IN_TOP'],100 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_FIFO_IN_LEFT'],615 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_FIFO_OUT_TOP'], 600 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_FIFO_OUT_LEFT'],615 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_RG_TOP'],650 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_RG_LEFT'],765 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_INGRESS_IN_TOP'],25 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_INGRESS_IN_LEFT'],515 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_ARRIVING_TOP'],0 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_ARRIVING_LEFT'],765 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_DEFLECTED_TOP'],75 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_DEFLECTED_LEFT'],665 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_ENTRY_START_TOP'],150 + m5_RINGVIZ_GLOBAL_TOP)
-         m4_define(['m5_ENTRY_START_LEFT'],615 + m5_RINGVIZ_GLOBAL_LEFT)
-         m4_define(['m5_ENTRY_START_SPACE_TOP'],50)
+         m5_def(NODES_RADIUS,3)
+         m5_def(NODES_COLOR,"#208028")
+         m5_def(AVAIL_COLOR,"blue")
+         m5_def(BLOCKED_COLOR,"red")
+         m5_def(INVAILD_COLOR,"grey")
+         m5_def(EGRESS_OUT_TOP, 200 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(EGRESS_OUT_LEFT,515 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(FIFO_IN_TOP,100 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(FIFO_IN_LEFT,615 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(FIFO_OUT_TOP, 600 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(FIFO_OUT_LEFT,615 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(RG_TOP,650 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(RG_LEFT,765 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(INGRESS_IN_TOP,25 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(INGRESS_IN_LEFT,515 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(ARRIVING_TOP,0 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(ARRIVING_LEFT,765 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(DEFLECTED_TOP,75 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(DEFLECTED_LEFT,665 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(ENTRY_START_TOP,150 + m5_RINGVIZ_GLOBAL_TOP)
+         m5_def(ENTRY_START_LEFT,615 + m5_RINGVIZ_GLOBAL_LEFT)
+         m5_def(ENTRY_START_SPACE_TOP,50)
 
          /skid1
             $egress_is_head = ! *reset && (/top/core|egress_out>>1$valid_head);
@@ -6069,7 +6062,7 @@
 \TLV warpv_makerchip_tb()
    m5_default_def(TESTBENCH_NAME, m5_if_def_tlv(m5_isa['_']m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, m5_if_def_tlv(m5_PROG_NAME['_makerchip_tb'], m5_PROG_NAME, ['default'])))
    m5_macro(tb_macro_name, m5_if_def_tlv(m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_isa['_']m5_TESTBENCH_NAME['_makerchip_tb'], m5_TESTBENCH_NAME['_makerchip_tb']))
-   m5+m5_tb_macro_name()
+   m5+call(m5_tb_macro_name)
 
 // A top-level macro supporting one core and no test-bench.
 \TLV warpv()
