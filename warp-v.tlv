@@ -305,7 +305,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ac8c318cc21eb5dc77dff635b1b6a60932aba82b/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/b7777d072894aa4bb5af29d81e34ed467a4e6999/'])
    ])
    /// This is where you configure the CPU.
    /// Note that WARP-V has a configurator at warp-v.org.
@@ -3698,7 +3698,7 @@
             $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1;
             // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
             {$next_pc[m5_PC_RANGE], $next_no_fetch} =
-               $reset ? {m5_calc(m5_PC_CNT - 1)'b\m5_if_var_def(label_reset_addr, m5_label_reset_addr, 0), 2'b0} :  /// Start PC at the assembly code "reset" label or address 0.
+               $reset ? {m5_calc(m5_PC_CNT - 1)'b\m5_if_var_def(label_reset_addr, ['m5_label_reset_addr'], 0), 2'b0} :  /// Start PC at the assembly code "reset" label or address 0.
                // ? : terms for each condition (order does matter)
                m5_redirect_pc_terms
                           ({$pc_inc, 1'b0});
