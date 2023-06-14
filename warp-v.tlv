@@ -305,7 +305,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/b7777d072894aa4bb5af29d81e34ed467a4e6999/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/abbf797ae99cfc6c9510ffdacf3e43aecac0f07c/'])
    ])
    /// This is where you configure the CPU.
    /// Note that WARP-V has a configurator at warp-v.org.
@@ -1129,7 +1129,7 @@
             append_var(sv_out, m5_nl['   ']['m4_sv_include_url(m5_warpv_includes']m5_quote(m5_file)[')'])
          ])
          fn(tlv_inc, file, [
-            append_var(sv_out, m5_nl['   ']['m4_include_url(m5_warpv_includes']m5_quote(m5_file)[')'])
+            append_var(sv_out, m5_nl['   ']['m4_include_lib(m5_warpv_includes']m5_quote(m5_file)[')'])
          ])
          
          /// Heavy-handed lint_off's based on config.
@@ -1435,7 +1435,7 @@
             ADDI t6, t6, 4           #     store_addr++
             BLT t1, t2, loop         #  ^- branch back if cnt < 10
          # Result should be 0x2d.
-            LW t4, -0x4(t6)            #     load the final value into tmp
+            LW t4, -0x4(t6)          #     load the final value into tmp
             ADDI t5, zero, 0x2d      #     expected result (0x2d)
             BEQ t4, t5, pass         #     pass if as expected
          fail:
@@ -1450,7 +1450,7 @@
          # /------------------------\
          # | Multiply Without M-Ext |
          # \------------------------/
-         # Call:
+         
          reset:
             ORI a0, zero, 0b1011       #     multiplican 1
             ORI a1, zero, 0b1001       #     multiplican 2
@@ -1480,87 +1480,103 @@
          # ========== End Assembly Code ==========
       '])
    })
-  
-\TLV riscv_divmul_test_prog()
-   // /==========================\
-   // | M-extension Test Program |
-   // \==========================/
-   //
-   //3 MULs followed by 3 DIVs, check r11-r15 for correct results
-
-   m5_asm(ORI, x8, zero, 0b1011)
-   m5_asm(ORI, x9, zero, 0b1010)
-   m5_asm(ORI, x10, zero, 0b10101010)
-   m5_asm(MUL, x11, x8, x9)
-   m5_asm(ORI, x6, zero, 0b0)
-   m5_asm(SW, x6, x11, 0b0)
-   m5_asm(MUL, x12, x9, x10)
-   m5_asm(LW, x4, x6, 0b0)
-   m5_asm(ADDI, x6, x6, 0b100)
-   m5_asm(SW, x6, x12, 0b0)
-   m5_asm(MUL, x13, x8, x10)
-   m5_asm(DIV, x14, x11, x8)
-   m5_asm(DIV, x15, x13, x10)
-   m5_asm(LW, x5, x6, 0b0)
-   m5_asm(ADDI, x4, zero, 0b101101)
-   m5_asm(BGE, x8, x9, 0b111111111110)
-
-\TLV riscv_fpu_test_prog()
-   // /==========================\
-   // | F-extension Test Program |
-   // \==========================/
-   //
-   m5_asm(LUI, x1, 0b01110001010101100000)
-   m5_asm(ADDI, x1, x1, 0b010001000001)
-   m5_asm(LUI, x2, 0b01100101100101001111)
-   m5_asm(ADDI, x2, x2, 0b010001000000)
-   m5_asm(LUI, x3, 0b01001101110111110001)
-   m5_asm(ADDI, x3, x3, 0b010000000000)
-   m5_asm(FMV_W_X, x1, x1)
-   m5_asm(FMV_W_X, x2, x2)
-   m5_asm(FMV_W_X, x3, x3)
-   m5_asm(FSW, zero, x1, 0b000001000000)
-   m5_asm(FSW, zero, x2, 0b000001000100)
-   m5_asm(FLW, x16, zero, 0b000001000000)
-   m5_asm(FLW, x17, zero, 0b000001000100)
-   m5_asm(FMADD_S, x5, x1, x2, x3, 000)
-   m5_asm(FMSUB_S, x6, x1, x2, x3, 000)
-   m5_asm(FNMSUB_S, x7, x1, x2, x3, 000)
-   m5_asm(FNMADD_S, x8, x1, x2, x3, 000)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FADD_S, x9, x1, x2, 000)
-   m5_asm(FSUB_S, x10, x1, x2, 000)
-   m5_asm(FMUL_S, x11, x1, x2, 000)
-   m5_asm(FDIV_S, x12, x1, x2, 000)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FSQRT_S, x13, x1, 000)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FSGNJ_S, x14, x1, x2)
-   m5_asm(FSGNJN_S, x15, x1, x2)
-   m5_asm(FSGNJX_S, x16, x1, x2)
-   m5_asm(FMIN_S, x17, x1, x2)
-   m5_asm(FMAX_S, x18, x1, x2)
-   m5_asm(FCVT_S_W, x23, x2, 000)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FCVT_S_WU, x24, x3, 000)
-   m5_asm(FMV_X_W, x5, x11)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FEQ_S, x19, x1, x2)
-   m5_asm(FLT_S, x20, x2, x1)
-   m5_asm(FLE_S, x21, x1, x2)
-   m5_asm(FCLASS_S, x22, x1)
-   m5_asm(FEQ_S, x19, x1, x2)
-   m5_asm(CSRRS, x20, zero, 0b10)
-   m5_asm(CSRRS, x20, zero, 0b11)
-   m5_asm(FCVT_W_S, x12, x23, 000)
-   m5_asm(FCVT_WU_S, x13, x24, 000)
-   m5_asm(ORI, zero, zero, 0b0)
    
+   TLV_fn(riscv_divmul_test_prog, {
+      ~assemble(['
+         # /==========================\
+         # | M-extension Test Program |
+         # \==========================/
+         
+         # 3 MULs followed by 3 DIVs, check r11-r15 for correct results
+         
+         reset:
+            ORI x8, zero, 0b1011
+            ORI x9, zero, 0b1010
+            ORI x10, zero, 0b10101010
+            MUL x11, x8, x9
+            ORI x6, zero, 0b0
+            SW x6, 0b0(x11)
+            MUL x12, x9, x10
+            LW x4, 0b0(x6)
+            ADDI x6, x6, 0b100
+            SW x6, 0b0(x12)
+            MUL x13, x8, x10
+            DIV x14, x11, x8
+            DIV x15, x13, x10
+            LW x5, 0b0(x6)
+            ADDI x4, zero, 0b101101
+            BGE x8, x9, pass
+         fail:
+            ADD zero, t1, zero         #     nop fail
+         pass:
+            ADD zero, t2, zero         #     nop pass
+         # ========== End Assembly Code ==========
+      '])
+   })
+   
+   TLV_fn(riscv_fpu_test_prog, {
+      ~assemble(['
+         # /==========================\
+         # | F-extension Test Program |
+         # \==========================/
+         
+         reset:
+            LUI x1, 0b01110001010101100000
+            ADDI x1, x1, 0b010001000001
+            LUI x2, 0b01100101100101001111
+            ADDI x2, x2, 0b010001000000
+            LUI x3, 0b01001101110111110001
+            ADDI x3, x3, 0b010000000000
+            FMV_W_X x1, x1
+            FMV_W_X x2, x2
+            FMV_W_X x3, x3
+            FSW zero, 0b000001000000(x1)
+            FSW zero, 0b000001000100(x2)
+            FLW x16, 0b000001000000(zero)
+            FLW x17, 0b000001000100(zero)
+            FMADD_S x5, x1, x2, x3, rne
+            FMSUB_S x6, x1, x2, x3, rne
+            FNMSUB_S x7, x1, x2, x3, rne
+            FNMADD_S x8, x1, x2, x3, rne
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FADD_S x9, x1, x2, rne
+            FSUB_S x10, x1, x2, rne
+            FMUL_S x11, x1, x2, rne
+            FDIV_S x12, x1, x2, rne
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FSQRT_S x13, x1, rne
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FSGNJ_S x14, x1, x2
+            FSGNJN_S x15, x1, x2
+            FSGNJX_S x16, x1, x2
+            FMIN_S x17, x1, x2
+            FMAX_S x18, x1, x2
+            FCVT_S_W x23, x2, rne
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FCVT_S_WU x24, x3, rne
+            FMV_X_W x5, x11
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FEQ_S x19, x1, x2
+            FLT_S x20, x2, x1
+            FLE_S x21, x1, x2
+            FCLASS_S x22, x1
+            FEQ_S x19, x1, x2
+            CSRRS x20, frm, zero
+            CSRRS x20, fcsr, zero
+            FCVT_W_S x12, x23, rne
+            FCVT_WU_S x13, x24, rne
+            ORI zero, zero, 0b0
+         pass:
+            ADD zero, t2, zero         #     nop pass
+         # ========== End Assembly Code ==========
+      '])
+   })
+
 \TLV riscv_bmi_test_prog()
    // /==========================\
    // | B-extension Test Program |
