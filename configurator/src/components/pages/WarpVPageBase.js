@@ -182,6 +182,14 @@ export function WarpVPageBase({
             },
             false,
         )
+           .catch(err => {
+                toast({
+                    title: "Compilation fetch failed",
+                    status: "error"
+                })
+                console.error(err)
+                return {"out/m4out": "// Compilation failed.", "out/test.sv": "// Compilation failed.", "out/test_gen.sv": "// Compilation failed."}
+            })
         if (data["out/m4out"]) setTlvForJson(data["out/m4out"].replaceAll("\n\n", "\n").replace("[\\source test.tlv]", "")) // remove some extra spacing by removing extra newlines
         else toast({
             title: "Failed compilation",
@@ -277,10 +285,8 @@ export function WarpVPageBase({
 
 
         </Box>
-
-        <CoreDetailsComponent generalSettings={configuratorGlobalSettings.generalSettings}
-                              settings={configuratorGlobalSettings.settings}
-                              coreJson={coreJson}
+        {/* CoreDetailsComponent used to contain "generalSettings={configuratorGlobalSettings.generalSettings} settings={configuratorGlobalSettings.settings}", but this resulted in "generalSettings="[object Object]" settings="[object Object]"" and a warning from React: "Warning: React does not recognize the `generalSettings` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `generalsettings` instead. If you accidentally passed it from a parent component, remove it from the DOM element." */}
+        <CoreDetailsComponent coreJson={coreJson}
                               tlvForJson={tlvForJson}
                               macrosForJson={macrosForJson}
                               sVForJson={sVForJson}

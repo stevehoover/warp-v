@@ -13,16 +13,16 @@ export function translateParametersToJson(configuratorGlobalSettings, setConfigu
 export function translateJsonToM4Macros(json) {
     const {general, pipeline} = json;
     const lines = [];
-    //lines.push(`m4_def(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
-    lines.push(`m4_def(ISA, ${general.isa})`);
+    //lines.push(`var(M4_STANDARD_CONFIG, ${general.depth}-stage)`);
+    lines.push(`var(ISA, ${general.isa})`);
     general.isa !== "MIPSI" && general.isaExtensions?.forEach(extension => {
-        lines.push(`m4_def(EXT_${extension}, 1)`);
+        lines.push(`var(EXT_${extension}, 1)`);
     });
     if (general.isa !== "MIPSI") {
-        if (!general.isaExtensions?.includes("E")) lines.push(`m4_def(EXT_E, 0)`);
-        if (!general.isaExtensions?.includes("M")) lines.push(`m4_def(EXT_M, 0)`);
-        if (!general.isaExtensions?.includes("F")) lines.push(`m4_def(EXT_F, 0)`);
-        if (!general.isaExtensions?.includes("B")) lines.push(`m4_def(EXT_B, 0)`);
+        if (!general.isaExtensions?.includes("E")) lines.push(`var(EXT_E, 0)`);
+        if (!general.isaExtensions?.includes("M")) lines.push(`var(EXT_M, 0)`);
+        if (!general.isaExtensions?.includes("F")) lines.push(`var(EXT_F, 0)`);
+        if (!general.isaExtensions?.includes("B")) lines.push(`var(EXT_B, 0)`);
     }
 
     Object.entries(pipeline).forEach(entry => {
@@ -72,8 +72,10 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
    
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
    */
-\\m4
-${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${programName})`] : []).concat(definitions).join("\n   ") : ""}
+\\m5
+   use(m5-1.0)
+
+${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${programName})`] : []).concat(definitions).join("\n   ") : ""}
 \\SV
    // Include WARP-V.
    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
@@ -81,9 +83,9 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`m4_def(PROG_NAME, ${p
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
          ${programText.split("\n").join("\n         ")}
       '])\n   })` : ``}
-m4+module_def()
+m5+module_def()
 \\TLV
-   m4+warpv_top()
+   m5+warpv_top()
 \\SV
    endmodule
 `
