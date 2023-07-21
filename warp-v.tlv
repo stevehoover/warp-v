@@ -31,267 +31,271 @@
    // For usage examples, visit warp-v.org.
 
 \m5
-   ///debug_level(max)
+   /debug_level(max)
    use(m5-1.0)
 \SV
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m5
-   /// A highly-parameterized CPU generator, configurable for:
-   ///   o An ISA of your choice, where the following ISAs are currently defined herein:
-   ///      - An uber-simple mini CPU for academic use
-   ///      - RISC-V (incomplete)
-   ///   o Pipeline staging (from 1 to 7 stages)
-   ///   o Architectural parameters, like memory size, etc.
+   / A highly-parameterized CPU generator, configurable for:
+   /   o An ISA of your choice, where the following ISAs are currently defined herein:
+   /      - An uber-simple mini CPU for academic use
+   /      - RISC-V (incomplete)
+   /   o Pipeline staging (from 1 to 7 stages)
+   /   o Architectural parameters, like memory size, etc.
 
-   /// This file includes:
-   ///   o The configurable (esp. for pipeline depth) ISA-independent CPU logic.
-   ///   o ISA-specific decode and execute logic for mini-CPU, RISC-V, and a dummy
-   ///    (for diagrams).
-   ///   o A simple RISC-V assembler. (The Mini ISA needs no assembler as it uses strings for instructions.)
-   ///   o A tiny test program for each ISA
+   / This file includes:
+   /   o The configurable (esp. for pipeline depth) ISA-independent CPU logic.
+   /   o ISA-specific decode and execute logic for mini-CPU, RISC-V, and a dummy
+   /    (for diagrams).
+   /   o A simple RISC-V assembler. (The Mini ISA needs no assembler as it uses strings for instructions.)
+   /   o A tiny test program for each ISA
 
-   /// If you've come here to learn about RISC-V design with TL-Verilog, the WARP-V source code
-   /// may not be the best place to start. WARP-V is highly parameterized using M5 (docs available
-   /// within the Makerchip IDE) and this parameterization can be confusing to someone new to
-   /// TL-Verilog. You might be better served to start with:
-   ///   o A "RVMYTH" TL-Verilog RISC-V design created in the Microprocessor for You in
-   ///     Thirty Hours (MYTH) Workshop:
-   ///     https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md
-   ///   o A TL-Verilog RISC-V design course: https://makerchip.com/sandbox?tabs=Courses
-   ///   o By compiling this code in Makerchip, the "Nav-TLV" tab will contain the
-   ///     preprocessed code. Parameterization has been resolved in this code, and you can
-   ///     navigate the code interactively and find corresponding source lines by clicking
-   ///     Nav-TLV line numbers.
+   / If you've come here to learn about RISC-V design with TL-Verilog, the WARP-V source code
+   / may not be the best place to start. WARP-V is highly parameterized using M5 (docs available
+   / within the Makerchip IDE) and this parameterization can be confusing to someone new to
+   / TL-Verilog. You might be better served to start with:
+   /   o A "RVMYTH" TL-Verilog RISC-V design created in the Microprocessor for You in
+   /     Thirty Hours (MYTH) Workshop:
+   /     https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md
+   /   o A TL-Verilog RISC-V design course: https://makerchip.com/sandbox?tabs=Courses
+   /   o By compiling this code in Makerchip, the "Nav-TLV" tab will contain the
+   /     preprocessed code. Parameterization has been resolved in this code, and you can
+   /     navigate the code interactively and find corresponding source lines by clicking
+   /     Nav-TLV line numbers.
    
-   /// Note that the "Diagram" may fail to generate due to the size of the design.
+   / Note that the "Diagram" may fail to generate due to the size of the design.
    
 
 
-   /// The CPU
+   / The CPU
 
-   /// The code is parameterized, using the M5 macro preprocessor, for adjustable pipeline
-   /// depth.
-   ///
-   /// Overview:
-   ///   o One instruction traverses the single free-flowing CPU pipeline per cycle.
-   ///   o There is no branch or condition or target prediction.
-   ///   o Instructions are in-order, but the uarch supports loads that return their
-   ///     data out of order (though, they do not).
-   ///
-   /// Redirects:
-   ///
-   /// The PC is redirected, and inflight instructions are squashed (their results are
-   /// not committed) for:
-   ///   o no-fetch cycles (squashes only the no-fetch instruction itself)
-   ///   o 2nd-issue of split (long-latency) instructions (squashes only the clobbered instruction itself,
-   ///     which reissues next cycle)
-   ///   o jumps, which go to an absolute jump target address
-   ///   o predicted-taken branches, which speculatively redirect to the computed branch target
-   ///   o unconditioned and mispredicted taken branches, which go to branch target
-   ///   o mispredicted not-taken branches which go to the next sequential PC
-   ///   o instructions that read or write a pending register
-   ///     (See "Loads", below.)
-   ///   o traps, which go to a trap target
+   / The code is parameterized, using the M5 macro preprocessor, for adjustable pipeline
+   / depth.
+   /
+   / Overview:
+   /   o One instruction traverses the single free-flowing CPU pipeline per cycle.
+   /   o There is no branch or condition or target prediction.
+   /   o Instructions are in-order, but the uarch supports loads that return their
+   /     data out of order (though, they do not).
+   /
+   / Redirects:
+   /
+   / The PC is redirected, and inflight instructions are squashed (their results are
+   / not committed) for:
+   /   o no-fetch cycles (squashes only the no-fetch instruction itself)
+   /   o 2nd-issue of split (long-latency) instructions (squashes only the clobbered instruction itself,
+   /     which reissues next cycle)
+   /   o jumps, which go to an absolute jump target address
+   /   o predicted-taken branches, which speculatively redirect to the computed branch target
+   /   o unconditioned and mispredicted taken branches, which go to branch target
+   /   o mispredicted not-taken branches which go to the next sequential PC
+   /   o instructions that read or write a pending register
+   /     (See "Loads", below.)
+   /   o traps, which go to a trap target
   
-   ///
-   /// Loads:
-   ///
-   ///   o Load instructions complete without writing their destination registers. Destination
-   ///     registers are instead marked "pending", and reads of pending registers are replayed.
-   ///   o This could again result in a read of the same pending register and can repeat until
-   ///     the load returns. Writes to pending registers are also replayed, so there can be at
-   ///     most one oustanding load to any given register. 
-   ///   o This way, out-of-order loads are
-   ///     supported (though loads are implemented to have a fixed latency). A returning load
-   ///     reserves an instruction slot at the beginning of the pipeline to reserve a register
-   ///     write port. The returning load writes its result and clears the destination
-   ///     register's pending flag.
-   ///
-   /// To support L1 and L2 caches, it would be reasonable to delay register write (if
-   /// necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
-   /// for L1 misses. Power could be saved by going idle on replay until load will return
-   /// data.
-   ///
-   /// Long-latency pipelined instructions:
-   ///
-   ///    Long-latency pipelined instructions can utilize the same split issue and pending
-   ///    mechanisms as load instructions.
-   ///
-   /// Long-latency non-pipelined instructions:
-   ///
-   ///   o In the current implementation, bit manipulation(few), floating point and integer multiplication / 
-   ///     division instructions are non-pipelined, followed by "no-fetch" cycles 
-   ///     until the next redirect (which will be a second issue of the instruction).
-   ///   o The data required during second can be passed to the commit stage using /orig_inst scope
-   ///   o It does not matter whether registers are marked pending, but we do.
-   ///   o Process redirect conditions take care of the correct handling of PC for such instrctions.
-   ///   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
-   ///     for such instructions
-   /// 
-   /// Handling loads and long-latency instructions:
-   ///    
-   ///   o For any instruction that requires second issue, some of its attributes (such as
-   ///     destination register, raw value, rs1/rs2/rd) depending on where they are consumed
-   ///     need to be retained. $ANY construct is used to make this logic generic and use-dependent. 
-   ///   o In case of loads, the /orig_load_inst scope is used to hook up the 
-   ///     mem pipeline to the CPU pipeline in first pipestage (of CPU) to reserve slot for the load 
-   ///     flowing from mem to CPU in the second issue.
-   ///   o For non-pipelined instructions such as mul-div, the /hold_inst scope retains the values
-   ///     till the second issue.
-   ///   o Both the scopes are merged into /orig_inst scope depending on which instruction the second
-   ///     issue belongs to.
-   ///
-   /// Bypass:
-   ///
-   ///    Register bypass is provided if one instruction's result is not written to the
-   ///    register file in time for the next instruction's read. An additional bypass is
-   ///    provided for each additional cycle between read and write.
-   ///
-   /// Memory:
-   ///
-   ///    The program is stored in its own instruction memory (for simplicity).
-   ///    Data memory is separate.
-   ///
+   /
+   / Loads:
+   /
+   /   o Load instructions complete without writing their destination registers. Destination
+   /     registers are instead marked "pending", and reads of pending registers are replayed.
+   /   o This could again result in a read of the same pending register and can repeat until
+   /     the load returns. Writes to pending registers are also replayed, so there can be at
+   /     most one oustanding load to any given register. 
+   /   o This way, out-of-order loads are
+   /     supported (though loads are implemented to have a fixed latency). A returning load
+   /     reserves an instruction slot at the beginning of the pipeline to reserve a register
+   /     write port. The returning load writes its result and clears the destination
+   /     register's pending flag.
+   /
+   / To support L1 and L2 caches, it would be reasonable to delay register write (if
+   / necessary) to wait for L1 hits (extending the bypass window), and mark "pending"
+   / for L1 misses. Power could be saved by going idle on replay until load will return
+   / data.
+   /
+   / Long-latency pipelined instructions:
+   /
+   /    Long-latency pipelined instructions (of which we currently have none?) can utilize the
+   /    same split issue and pending mechanisms as load instructions. 2nd issue conflicts
+   /    must be addressed.
+   /
+   / Long-latency non-pipelined instructions:
+   /
+   /   o In the current implementation, bit manipulation(few), floating point and integer multiplication / 
+   /     division instructions are non-pipelined. They take a "non_pipelined" aborting trap to flush
+   /     the pipeline, followed by "no-fetch" cycles until the next redirect (which, if the long-latency
+   /     instruction commits, will be a second issue of the instruction).
+   /   o The data required during second issue can be passed to the commit stage using /orig_inst scope
+   /   o It does not matter whether registers are marked pending, but we do.
+   /   o TODO: Currently, I believe our fixed-latency memory has lower latency than any non-pipelined instruction, but
+   /     without this, we must handle conflicts between 2nd-issue loads (and long-latency pipelined?) and non-pipelined. Non-pipelined
+   /     instructions are already held in /hold_inst, so I think this should be straight-forward.
+   /   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
+   /     for such instructions
+   / 
+   / Handling loads and long-latency instructions:
+   /    
+   /   o For any instruction that requires second issue, some of its attributes (such as
+   /     destination register, raw value, rs1/rs2/rd) depending on where they are consumed
+   /     need to be retained. $ANY construct is used to make this logic generic and use-dependent. 
+   /   o In case of loads, the /orig_load_inst scope is used to hook up the 
+   /     mem pipeline to the CPU pipeline in first pipestage (of CPU) to reserve slot for the load 
+   /     flowing from mem to CPU in the second issue.
+   /   o For non-pipelined instructions such as mul-div, the /hold_inst scope retains the values
+   /     till the second issue.
+   /   o Both the scopes are merged into /orig_inst scope depending on which instruction the second
+   /     issue belongs to.
+   /
+   / Bypass:
+   /
+   /    Register bypass is provided if one instruction's result is not written to the
+   /    register file in time for the next instruction's read. An additional bypass is
+   /    provided for each additional cycle between read and write.
+   /
+   / Memory:
+   /
+   /    The program is stored in its own instruction memory (for simplicity).
+   /    Data memory is separate.
+   /
    
-   /// Futures:
-   ///
-   /// TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
-   ///       /fetch_instr reflects the instruction fetched from i-memory (1st issue), and /commit_instr reflects the
-   ///       instruction that will be committed (2nd issue). The difference is long-latency instructions which commit
-   ///       in place of the fetch instruction. There have been several subtle bugs where the fetch
-   ///       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
-   ///       avoid them.
-   ///
-   /// TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
-   ///       already have the raw instruction bits to inject. The replay mechanism can be separated from
-   ///       redirects.
-   ///
-   /// TODO: Once Makerchip supports multifile editing, split this up.
-   ///       WARP should be a library, and each CPU uses this library to create a CPU.
-   ///       Stages should be defined using a generic mechanism (just defining m5_*_STAGE constants).
-   ///       Redirects should be defined using a generic mechanism to define each redirect, then
-   ///       instantiate the logic (including PC logic).
-   ///       IMem, RF should be m5+ macros.
-   ///       Should create generic instruction definition macros (like the RISC-V ones, but generic).
+   / Futures:
+   /
+   / TODO: It might be cleaner to split /instr into two scopes: /fetch_instr and /commit_instr, where
+   /       /fetch_instr reflects the instruction fetched from i-memory (1st issue), and /commit_instr reflects the
+   /       instruction that will be committed (2nd issue). The difference is long-latency instructions which commit
+   /       in place of the fetch instruction. There have been several subtle bugs where the fetch
+   /       instruction leaks into the commit instruction (esp. reg. bypass), and this would help to
+   /       avoid them.
+   /
+   / TODO: Replays can be injected later in the pipeline - at the end of fetch. Unlike redirect, we
+   /       already have the raw instruction bits to inject. The replay mechanism can be separated from
+   /       redirects.
+   /
+   / TODO: Once Makerchip supports multifile editing, split this up.
+   /       WARP should be a library, and each CPU uses this library to create a CPU.
+   /       Stages should be defined using a generic mechanism (just defining m5_*_STAGE constants).
+   /       Redirects should be defined using a generic mechanism to define each redirect, then
+   /       instantiate the logic (including PC logic).
+   /       IMem, RF should be m5+ macros.
+   /       Should create generic instruction definition macros (like the RISC-V ones, but generic).
 
 
-   /// ============
-   /// Mini-CPU ISA
-   /// ============
+   / ============
+   / Mini-CPU ISA
+   / ============
    
-   /// A dirt-simple CPU for educational purposes.
+   / A dirt-simple CPU for educational purposes.
 
-   /// What's interesting about this CPU?
-   ///   o It's super small.
-   ///   o It's easy to play with an learn from.
-   ///   o Instructions are short, kind-of-readable strings, so no assembler is needed.
-   ///     They would map directly to a denser (~17-bit) encoding if desired.
-   ///   o The only instruction formats are op, load, and store.
-   ///   o Branch/Jump: There is no special format for control-flow instructions. Any
-   ///     instruction can write the PC (relative or absolute). A conditional branch
-   ///     will typically utilize a condition operation that provides a branch target or
-   ///     zero. The condition can be predicted as per traditional branch prediction
-   ///     (though there is no branch predictor in this example as it stands).
+   / What's interesting about this CPU?
+   /   o It's super small.
+   /   o It's easy to play with an learn from.
+   /   o Instructions are short, kind-of-readable strings, so no assembler is needed.
+   /     They would map directly to a denser (~17-bit) encoding if desired.
+   /   o The only instruction formats are op, load, and store.
+   /   o Branch/Jump: There is no special format for control-flow instructions. Any
+   /     instruction can write the PC (relative or absolute). A conditional branch
+   /     will typically utilize a condition operation that provides a branch target or
+   /     zero. The condition can be predicted as per traditional branch prediction
+   /     (though there is no branch predictor in this example as it stands).
 
-   /// ISA:
-   ///
-   /// Instructions are 5-character strings: "D=1o2"
-   ///
-   /// =: Appears in every instruction (just for readability).
-   /// D, 2, 1: "a" - "h" for register values;
-   ///          "0" - "7" for immediate constants (sources, or "0" for unused dest);
-   ///          "P" for absolute dest PC (jump);
-   ///          "p" for relative dest PC (branch), PC = PC + 1 + result(signed).
-   ///
-   /// o: operator
-   ///   Op: (D = 1 o 2) (Eg: "c=a+b"):
-   ///     +, -, *, /: Arithmetic. *, / are unsigned.
-   ///     =, !, <, >, [, ]: Compare (D = (1 o r) ? all-1s : 0) (] is >=, [ is <=)
-   ///        (On booleans these are XNOR, XOR, !1&2, 1&!2, !1|2, 1|!2)
-   ///     &, |: Bitwise
-   ///        (Can be used on booleans as well as vectors.)
-   ///     (There are no operators for NAND and NOR and unary !.)
-   ///     ~ : Extended constant (D = {1[2:0], 2[2:0]})
-   ///     , : Combine (D = {1[11:6], 2[5:0]})
-   ///     ? : Conditional (D = 2 ? `0 : 1)
-   ///   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
-   ///     ) : Load
-   ///   Store (Eg: "0=a;b") ([2] = 1):
-   ///     ( : Store
-   ///
-   /// A full-width immediate load sequence, to load octal 2017 is:
-   ///   a=2~0
-   ///   b=1~7
-   ///   a=a,b
+   / ISA:
+   /
+   / Instructions are 5-character strings: "D=1o2"
+   /
+   / =: Appears in every instruction (just for readability).
+   / D, 2, 1: "a" - "h" for register values;
+   /          "0" - "7" for immediate constants (sources, or "0" for unused dest);
+   /          "P" for absolute dest PC (jump);
+   /          "p" for relative dest PC (branch), PC = PC + 1 + result(signed).
+   /
+   / o: operator
+   /   Op: (D = 1 o 2) (Eg: "c=a+b"):
+   /     +, -, *, /: Arithmetic. *, / are unsigned.
+   /     =, !, <, >, [, ]: Compare (D = (1 o r) ? all-1s : 0) (] is >=, [ is <=)
+   /        (On booleans these are XNOR, XOR, !1&2, 1&!2, !1|2, 1|!2)
+   /     &, |: Bitwise
+   /        (Can be used on booleans as well as vectors.)
+   /     (There are no operators for NAND and NOR and unary !.)
+   /     ~ : Extended constant (D = {1[2:0], 2[2:0]})
+   /     , : Combine (D = {1[11:6], 2[5:0]})
+   /     ? : Conditional (D = 2 ? `0 : 1)
+   /   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
+   /     ) : Load
+   /   Store (Eg: "0=a;b") ([2] = 1):
+   /     ( : Store
+   /
+   / A full-width immediate load sequence, to load octal 2017 is:
+   /   a=2~0
+   /   b=1~7
+   /   a=a,b
 
-   /// A typical local conditional branch sequence is:
-   ///   a=0-6  // offset
-   ///   c=c-1  // decrementing loop counter
-   ///   p=a?c  // branch by a (to PC+1-6) if c is non-negative (MSB==0)
+   / A typical local conditional branch sequence is:
+   /   a=0-6  // offset
+   /   c=c-1  // decrementing loop counter
+   /   p=a?c  // branch by a (to PC+1-6) if c is non-negative (MSB==0)
 
 
 
-   /// ==========
-   /// RISC-V ISA
-   /// ==========
+   / ==========
+   / RISC-V ISA
+   / ==========
    
-   /// This design is a RISC-V (RV32IMF) implementation.
-   /// The ISA is characterized using M5 macros, and the microarchitecture is generated from this characterization, so
-   /// the ISA can be modified through M5 definitions.
-   /// Notes:
-   ///   o Unaligned load/store are handled by trapping, though no s/w is available to handle the trap.
-   /// The implementation is based on "The RISC-V Instruction Set Manual Vol. I: User-Level ISA," Version 2.2: https://riscv.org/specifications/
+   / This design is a RISC-V (RV32IMF) implementation.
+   / The ISA is characterized using M5 macros, and the microarchitecture is generated from this characterization, so
+   / the ISA can be modified through M5 definitions.
+   / Notes:
+   /   o Unaligned load/store are handled by trapping, though no s/w is available to handle the trap.
+   / The implementation is based on "The RISC-V Instruction Set Manual Vol. I: User-Level ISA," Version 2.2: https://riscv.org/specifications/
 
-   
-   
-   /// ======
-   /// MIPS I
-   /// ======
-   
-   /// WIP.
-   /// Unlike RISC-V, this does not use M5 to characterize the ISA.
-   /// Not implemented:
-   ///   o FPU
-   ///   o Mult/Div and HI/LO regs
-   ///   o Branch/Load delay slots
-   /// No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
-   /// not to provide a production-worthy MIPS I design.
    
    
-   /// =====
-   /// Power
-   /// =====
+   / ======
+   / MIPS I
+   / ======
    
-   /// WIP. 
-   /// Unlike RISC-V, this does not use M5 to characterize the ISA.
-   /// No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
-   /// not to provide a production-worthy Power design.
+   / WIP.
+   / Unlike RISC-V, this does not use M5 to characterize the ISA.
+   / Not implemented:
+   /   o FPU
+   /   o Mult/Div and HI/LO regs
+   /   o Branch/Load delay slots
+   / No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
+   / not to provide a production-worthy MIPS I design.
    
    
-   /// =========
-   /// DUMMY ISA
-   /// =========
+   / =====
+   / Power
+   / =====
+   
+   / WIP. 
+   / Unlike RISC-V, this does not use M5 to characterize the ISA.
+   / No compliance testing has been done. This code is intended to demonstrate the flexibility of TL-Verilog,
+   / not to provide a production-worthy Power design.
+   
+   
+   / =========
+   / DUMMY ISA
+   / =========
 
-   /// This "ISA" can be selected to produce diagrams of the CPU without the ISA details.
-   /// It is also useful as a starting point and reference for other ISAs, as it illustrates which signals are required.
+   / This "ISA" can be selected to produce diagrams of the CPU without the ISA details.
+   / It is also useful as a starting point and reference for other ISAs, as it illustrates which signals are required.
 
 
 
-   /// =========
-   /// Libraries
-   /// =========
+   / =========
+   / Libraries
+   / =========
    
 
 
 
-   /// =============
-   /// Configuration
-   /// =============
+   / =============
+   / Configuration
+   / =============
    
-   /// For passing configuration via the command line.
+   / For passing configuration via the command line.
    if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
-
-   /// For a while, remain backward-compatible with M4 parameterization.
+   
+   / For a while, remain backward-compatible with M4 parameterization.
    macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_var(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
    import_m4_params(PROG_NAME, ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
                     BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
@@ -300,20 +304,20 @@
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
                     DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
    
-   /// TODO: A convenient hack for local development that can be removed.
+   / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/abbf797ae99cfc6c9510ffdacf3e43aecac0f07c/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/1a3e2e75161e2aa7a0f30a71c575db0b6974688d/'])
    ])
-   /// This is where you configure the CPU.
-   /// Note that WARP-V has a configurator at warp-v.org.
+   / This is where you configure the CPU.
+   / Note that WARP-V has a configurator at warp-v.org.
    
-   /// default_var(..) allows external definition to take precedence.
+   / default_var(..) allows external definition to take precedence.
 
-   /// Default parameters for formal verification continuous integration testing.
-   /// FORMAL is only used within Makerchip in debug mode (for VIZ).
+   / Default parameters for formal verification continuous integration testing.
+   / FORMAL is only used within Makerchip in debug mode (for VIZ).
    default_var(FORMAL, 0)  // Uncomment to test formal verification in Makerchip.
    if_eq(m5_FORMAL, 1, [
       default_var(
@@ -324,7 +328,7 @@
       default_var(RISCV_FORMAL_ALTOPS, m5_EXT_M)
    ])
 
-   /// Machine:
+   / Machine:
    default_var(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
      ISA, RISCV,
@@ -333,14 +337,14 @@
      ['# Number of words in the data memory.'],
      DMEM_SIZE, 32)
    
-   /// --------------
-   /// For multi-core
-   /// --------------
+   / --------------
+   / For multi-core
+   / --------------
    default_var(
-     ['# Number of cores. Previously this was defined externally as m5_CORE_CNT (via m5_define_hier), so accept that too.'],
+     ['# Number of cores. Previously this was defined externally as m5_\CORE_CNT (via m5_\define_hier), so accept that too.'],
      NUM_CORES, m5_if_def(CORE_CNT, ['m5_CORE_CNT'], 1))
 
-   /// Only relevant, and only defined, if NUM_CORES > 1:
+   / Only relevant, and only defined, if NUM_CORES > 1:
 
    if(m5_NUM_CORES > 1, [
       default_var(
@@ -380,40 +384,40 @@
          NoC packet writes.'],
      cpu_blocked, 1'b0)
 
-   /// Define the implementation configuration, including pipeline depth and staging.
-   /// Define the following:
-   ///   Stages:
-   ///     NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
-   ///     FETCH_STAGE: Instruction fetch.
-   ///     DECODE_STAGE: Instruction decode.
-   ///     BRANCH_PRED_STAGE: Branch predict (taken/not-taken). Currently, we mispredict to a known branch target,
-   ///                        so branch prediction is only relevant if target is computed before taken/not-taken is known.
-   ///                        For other ISAs prediction is forced to fallthrough, and there is no pred-taken redirect.
-   ///     REG_RD_STAGE: Register file read.
-   ///     EXECUTE_STAGE: Operation execution.
-   ///     RESULT_STAGE: Select execution result.
-   ///     BRANCH_TARGET_CALC_STAGE: Calculate branch target (generally EXECUTE, but some designs
-   ///                               might produce offset from EXECUTE, then compute target).
-   ///     MEM_WR_STAGE: Memory write.
-   ///     REG_WR_STAGE: Register file write.
-   ///   Deltas (default to 0):
-   ///      DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
-   ///   Latencies (default to 0):
-   ///     LD_RETURN_ALIGN: Alignment of load return pseudo-instruction into |mem pipeline.
-   ///                         If |mem stages reflect nominal alignment w/ load instruction, this is the
-   ///                         nominal load latency.
-   ///   Deltas (default to 0):
-   ///      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
-   ///      EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
-   ///      EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
-   ///      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
-   ///      EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
-   ///      EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
-   ///      EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
-   ///   BRANCH_PRED: {fallthrough, two_bit, ...}
+   / Define the implementation configuration, including pipeline depth and staging.
+   / Define the following:
+   /   Stages:
+   /     NEXT_PC_STAGE: Determining fetch PC for the NEXT instruction (not this one).
+   /     FETCH_STAGE: Instruction fetch.
+   /     DECODE_STAGE: Instruction decode.
+   /     BRANCH_PRED_STAGE: Branch predict (taken/not-taken). Currently, we mispredict to a known branch target,
+   /                        so branch prediction is only relevant if target is computed before taken/not-taken is known.
+   /                        For other ISAs prediction is forced to fallthrough, and there is no pred-taken redirect.
+   /     REG_RD_STAGE: Register file read.
+   /     EXECUTE_STAGE: Operation execution.
+   /     RESULT_STAGE: Select execution result.
+   /     BRANCH_TARGET_CALC_STAGE: Calculate branch target (generally EXECUTE, but some designs
+   /                               might produce offset from EXECUTE, then compute target).
+   /     MEM_WR_STAGE: Memory write.
+   /     REG_WR_STAGE: Register file write.
+   /   Deltas (default to 0):
+   /      DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
+   /   Latencies (default to 0):
+   /     LD_RETURN_ALIGN: Alignment of load return pseudo-instruction into |mem pipeline.
+   /                         If |mem stages reflect nominal alignment w/ load instruction, this is the
+   /                         nominal load latency.
+   /   Deltas (default to 0):
+   /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
+   /      EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
+   /      EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
+   /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
+   /      EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
+   /      EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
+   /      EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
+   /   BRANCH_PRED: {fallthrough, two_bit, ...}
    case(STANDARD_CONFIG,
       ['1-stage'], [
-         /// No pipeline
+         / No pipeline
          default_var(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
@@ -428,7 +432,7 @@
          default_var(BRANCH_PRED, fallthrough)
       ],
       ['2-stage'], [
-         /// 2-stage pipeline.
+         / 2-stage pipeline.
          default_var(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
@@ -443,7 +447,7 @@
          default_var(BRANCH_PRED, two_bit)
       ],
       ['4-stage'], [
-         /// A reasonable 4-stage pipeline.
+         / A reasonable 4-stage pipeline.
          default_var(
             NEXT_PC_STAGE, 0,
             FETCH_STAGE, 0,
@@ -459,7 +463,7 @@
          default_var(BRANCH_PRED, two_bit)
       ],
       ['6-stage'], [
-         /// Deep pipeline
+         / Deep pipeline
          default_var(
             NEXT_PC_STAGE, 1,
             FETCH_STAGE, 1,
@@ -475,7 +479,7 @@
          default_var(BRANCH_PRED, two_bit)
       ])
    
-   /// Supply defaults for extra cycles.
+   / Supply defaults for extra cycles.
    default_var(
       DELAY_BRANCH_TARGET_CALC, 0,
       EXTRA_PRED_TAKEN_BUBBLE, 0,
@@ -486,32 +490,32 @@
       EXTRA_NON_PIPELINED_BUBBLE, 1,
       EXTRA_TRAP_BUBBLE, 1)
 
-   /// --------------------------
-   /// ISA-Specific Configuration
-   /// --------------------------
+   / --------------------------
+   / ISA-Specific Configuration
+   / --------------------------
    case(ISA, MINI, [
-      /// Mini-CPU Configuration:
-      /// Force predictor to fallthrough, since we can't predict early enough to help.
+      / Mini-CPU Configuration:
+      / Force predictor to fallthrough, since we can't predict early enough to help.
       var(BRANCH_PRED, fallthrough)
    ], RISCV, [
-      /// RISC-V Configuration:
+      / RISC-V Configuration:
 
-      /// ISA options:
+      / ISA options:
 
-      /// Currently supported uarch variants:
-      ///   RV32IM 2.0, w/ FA ISA extensions WIP.
+      / Currently supported uarch variants:
+      /   RV32IM 2.0, w/ FA ISA extensions WIP.
 
-      /// Machine width
+      / Machine width
       default_var(
         ['# Include visualization. (0/1)'],
         VIZ, 1,
         ['# Width of a "word". (32 for RV32X or 64 for RV64X)'],
         WORD_WIDTH, 32)
       define_vector(WORD, m5_WORD_WIDTH)
-      /// ISA extensions,  1, or 0 (following M5 boolean convention).
-      /// TODO. Currently formal checks are broken when EXT_F is set to 1.
-      /// TODO. Currently formal checks takes long time(~48 mins) when EXT_B is set to 1.
-      ///       Hence, its disabled at present.
+      / ISA extensions,  1, or 0 (following M5 boolean convention).
+      / TODO. Currently formal checks are broken when EXT_F is set to 1.
+      / TODO. Currently formal checks takes long time(~48 mins) when EXT_B is set to 1.
+      /       Hence, its disabled at present.
       default_var(
          EXT_I, 1,
          EXT_E, 0,
@@ -534,9 +538,9 @@
    ], MIPSI, [
    ], POWER, [
    ], [
-      /// Dummy "ISA".
+      / Dummy "ISA".
       var(DMEM_SIZE, 4)  // Override for narrow address.
-      /// Force predictor to fallthrough, since we can't predict early enough to help.
+      / Force predictor to fallthrough, since we can't predict early enough to help.
       var(BRANCH_PRED, ['fallthrough'])
    ])
    
@@ -544,61 +548,61 @@
    default_var(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
      PROG_NAME, m5_if_eq(m5_ISA, RISCV, m5_if_eq(m5_EXT_F, 1, fpu_test, m5_if_eq(m5_EXT_M, 1, divmul_test, m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
-   ///m5_if_eq(m5_EXT_F, 1, fpu_test, cnt10)
-   ///m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10)
+   /m5_if_eq(m5_EXT_F, 1, fpu_test, cnt10)
+   /m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10)
 
-   /// =====Done Defining Configuration=====
+   / =====Done Defining Configuration=====
    
    
    define_hier(DATA_MEM_WORDS, m5_DMEM_SIZE)
    
-   /// For multi-core only:
+   / For multi-core only:
    if(m5_NUM_CORES > 1, [
    
-      /// Define hierarchies based on parameters.
+      / Define hierarchies based on parameters.
       define_hier(CORE, m5_NUM_CORES)
       define_hier(VC, m5_NUM_VCS)
       define_hier(PRIO, m5_NUM_PRIOS)
 
-      /// RISC-V Only
+      / RISC-V Only
       if_eq(m5_ISA, ['RISCV'], [''], ['m5_errprint_nl(['Multi-core supported for RISC-V only.'])'])
       
-      /// Headere flit fields. 
+      / Headere flit fields. 
       define_vector_with_fields(FLIT, 32, UNUSED, m5_calc(m5_CORE_INDEX_CNT * 2 + m5_VC_INDEX_CNT), VC, m5_calc(m5_CORE_INDEX_CNT * 2), SRC, m5_CORE_INDEX_CNT, DEST, 0)
    ])
 
-   /// Characterize ISA and apply configuration.
+   / Characterize ISA and apply configuration.
    
-   /// Characterize the ISA, including:
-   /// NOMINAL_BRANCH_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
-   ///                                   can be available.
-   /// HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
-   /// Defaults:
+   / Characterize the ISA, including:
+   / NOMINAL_BRANCH_TARGET_CALC_STAGE: An expression that will evaluate to the earliest stage at which the branch target
+   /                                   can be available.
+   / HAS_INDIRECT_JUMP: (0/1) Does this ISA have indirect jumps.
+   / Defaults:
    var(HAS_INDIRECT_JUMP, 0)
    case(ISA, ['MINI'], [
-      /// Mini-CPU Characterization:
+      / Mini-CPU Characterization:
       var(NOMINAL_BRANCH_TARGET_CALC_STAGE, m5_EXECUTE_STAGE)
    ], ['RISCV'], [
-      /// RISC-V Characterization:
+      / RISC-V Characterization:
       var(NOMINAL_BRANCH_TARGET_CALC_STAGE, m5_DECODE_STAGE)
       var(HAS_INDIRECT_JUMP, 1)
    ], ['MIPSI'], [
-      /// MIPS I Characterization:
+      / MIPS I Characterization:
       var(NOMINAL_BRANCH_TARGET_CALC_STAGE, m5_DECODE_STAGE)
       var(HAS_INDIRECT_JUMP, 1)
    ], ['POWER'], [
    ], ['DUMMY'], [
-      /// DUMMY Characterization:
+      / DUMMY Characterization:
       var(NOMINAL_BRANCH_TARGET_CALC_STAGE, m5_DECODE_STAGE)
    ])
    
-   /// Calculated stages:
+   / Calculated stages:
    var(BRANCH_TARGET_CALC_STAGE, m5_calc(m5_NOMINAL_BRANCH_TARGET_CALC_STAGE + m5_DELAY_BRANCH_TARGET_CALC))
-   /// Calculated alignments:
+   / Calculated alignments:
    var(REG_BYPASS_STAGES,  m5_calc(m5_REG_WR_STAGE - m5_REG_RD_STAGE))
 
-   /// Latencies/bubbles calculated from stage parameters and extra bubbles:
-   /// (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
+   / Latencies/bubbles calculated from stage parameters and extra bubbles:
+   / (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
    vars(PRED_TAKEN_BUBBLES, m5_calc(m5_BRANCH_PRED_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_PRED_TAKEN_BUBBLE),
         REPLAY_BUBBLES,     m5_calc(m5_REG_RD_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_REPLAY_BUBBLE),
         JUMP_BUBBLES,       m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_JUMP_BUBBLE),
@@ -613,10 +617,10 @@
         NO_FETCH_BUBBLES, 0)
    
    var(stages_js, [''])
-   /// Define stages
-   ///   $1: VIZ left of stage in diagram
-   ///   $2: Stage name
-   ///   $3: Next $1
+   / Define stages
+   /   $1: VIZ left of stage in diagram
+   /   $2: Stage name
+   /   $3: Next $1
    macro(stages, ['m5_if_eq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_get($2_STAGE) - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
    stages(
       8.5, NEXT_PC,
@@ -634,21 +638,21 @@
 
    
    
-   /// Retiming experiment.
-   ///
-   /// The idea here, is to move all logic into @0 and see how well synthesis results compare vs. the timed model with
-   /// retiming enabled. In theory, synthesis should be able to produce identical results.
-   ///
-   /// Unfortunately, this modeling does not work because of the redirection logic. When timed @0, the $GoodPathMask would
-   /// need to be redistributed, with each bit in a different stage to enable $commit to be computed in @0. So, to make
-   /// this work, each bit of $GoodPathMask would have to become a separate signal, and each signal assignment would need
-   /// its own @stage scope, affected by RETIMING_EXPERIMENT. Since this is all generated by M5, it was too
-   /// complicated to justify the experiment.
-   ///
-   /// For now, the RETIMING_EXPERIMENT sets $commit to 1'b1, and produces results that make synthesis look good.
-   ///
-   /// This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
-   /// The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
+   / Retiming experiment.
+   /
+   / The idea here, is to move all logic into @0 and see how well synthesis results compare vs. the timed model with
+   / retiming enabled. In theory, synthesis should be able to produce identical results.
+   /
+   / Unfortunately, this modeling does not work because of the redirection logic. When timed @0, the $GoodPathMask would
+   / need to be redistributed, with each bit in a different stage to enable $commit to be computed in @0. So, to make
+   / this work, each bit of $GoodPathMask would have to become a separate signal, and each signal assignment would need
+   / its own @stage scope, affected by RETIMING_EXPERIMENT. Since this is all generated by M5, it was too
+   / complicated to justify the experiment.
+   /
+   / For now, the RETIMING_EXPERIMENT sets $commit to 1'b1, and produces results that make synthesis look good.
+   /
+   / This option moves all logic into stage 0 (after determining relative timing interactions based on their original configuration).
+   / The resulting SV is to be used for retiming experiments to see how well logic synthesis is able to retime the design.
    
    if_def(RETIMING_EXPERIMENT, [
       vars(NEXT_PC_STAGE, 0,
@@ -665,13 +669,13 @@
    
    
    
-   /// ========================
-   /// Check Legality of Config
-   /// ========================
+   / ========================
+   / Check Legality of Config
+   / ========================
    
-   /// (Not intended to be exhaustive.)
+   / (Not intended to be exhaustive.)
 
-   /// Check that expressions are ordered.
+   / Check that expressions are ordered.
    fn(ordered, ..., {
       if_eq(['$2'], [''], [''], {
          if(m5_get($1) > m5_get($2), {
@@ -680,44 +684,44 @@
          ordered(m5_shift($@))
       })
    })
-   /// TODO:; It should be NEXT_PC_STAGE-1, below.
+   / TODO:; It should be NEXT_PC_STAGE-1, below.
    ordered(NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE, REG_RD_STAGE,
            EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE)
 
-   /// Check reg bypass limit
+   / Check reg bypass limit
    if(m5_REG_BYPASS_STAGES > 3, ['m5_errprint(['Too many stages of register bypass (']m5_REG_BYPASS_STAGES[').'])'])
    
 
 
-   /// ==================
-   /// Default Parameters
-   /// ==================
-   /// These may be overridden by specific ISA.
+   / ==================
+   / Default Parameters
+   / ==================
+   / These may be overridden by specific ISA.
 
    var(BIG_ENDIAN, 0)
 
 
-   /// =======================
-   /// ISA-specific Parameters
-   /// =======================
+   / =======================
+   / ISA-specific Parameters
+   / =======================
 
-   /// Macros for ISA-specific code.
+   / Macros for ISA-specific code.
    
    var(isa, m5_translit(m5_ISA, ['A-Z'], ['a-z']))   // A lower-case version of ISA.
    
-   /// Instruction Memory macros are responsible for providing the instruction memory interface for fetch, as:
-   /// Inputs:
-   ///   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
-   /// Outputs:
-   ///   |fetch/instr?$fetch$raw[m5_INSTR_RANGE] (at or after @m5_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
+   / Instruction Memory macros are responsible for providing the instruction memory interface for fetch, as:
+   / Inputs:
+   /   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
+   / Outputs:
+   /   |fetch/instr?$fetch$raw[m5_INSTR_RANGE] (at or after @m5_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
    default_var(IMEM_MACRO_NAME, m5_isa['_imem'])
    
-   /// For each ISA, define:
-   ///   define_vector(INSTR, XX)   // (or, define_vector_with_fields(...)) Instruction vector.
-   ///   define_vector(ADDR, XX)    // An address.
-   ///   var(BITS_PER_ADDR, XX)     // Each memory address holds XX bits.
-   ///   define_vector(WORD, XX)    // Width of general-purpose registers.
-   ///   define_hier(REGS, XX)      // General-purpose register file.
+   / For each ISA, define:
+   /   define_vector(INSTR, XX)   // (or, define_vector_with_fields(...)) Instruction vector.
+   /   define_vector(ADDR, XX)    // An address.
+   /   var(BITS_PER_ADDR, XX)     // Each memory address holds XX bits.
+   /   define_vector(WORD, XX)    // Width of general-purpose registers.
+   /   define_hier(REGS, XX)      // General-purpose register file.
 
    case(ISA,
       ['MINI'], [
@@ -728,7 +732,7 @@
          define_hier(REGS, 8)   /// (Plural to avoid name conflict w/ SV "reg" keyword.)
       ],
       ['RISCV'], [
-         /// Definitions matching "The RISC-V Instruction Set Manual Vol. I: User-Level ISA", Version 2.2.
+         / Definitions matching "The RISC-V Instruction Set Manual Vol. I: User-Level ISA", Version 2.2.
 
          define_vector(INSTR, 32)
          define_vector(ADDR, 32)
@@ -757,7 +761,7 @@
    
    
    
-   /// Computed ISA uarch Parameters (based on ISA-specific parameters).
+   / Computed ISA uarch Parameters (based on ISA-specific parameters).
 
    var(ADDRS_PER_WORD, m5_calc(m5_WORD_CNT / m5_BITS_PER_ADDR))
    var(SUB_WORD_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_WORD - 1)))
@@ -765,14 +769,14 @@
    var(SUB_PC_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_INSTR - 1)))
    define_vector(PC, m5_ADDR_HIGH, m5_SUB_PC_BITS)
    var(FULL_PC, ['{$Pc, ']m5_SUB_PC_BITS[''b0}'])
-   define_hier(DATA_MEM_ADDRS, m5_calc(m5_DATA_MEM_WORDS_HIGH * m5_ADDRS_PER_WORD))  // Addressable data memory locations.
+   define_hier(DATA_MEM_ADDRS, m5_calc(m5_DATA_MEM_WORDS_HIGH * m5_ADDRS_PER_WORD))  /// Addressable data memory locations.
    var(INJECT_RETURNING_LD, m5_calc(m5_LD_RETURN_ALIGN > 0))
    var(PENDING_ENABLED, m5_INJECT_RETURNING_LD)
    
                                                     
-   /// ==============
-   /// VIZ Parameters                               
-   /// ==============
+   / ==============
+   / VIZ Parameters
+   / ==============
    
    
    var(/// Amount to shift mem left (to make room for FP regs).
@@ -780,57 +784,57 @@
 
 
    
-   /// =========
-   /// Redirects
-   /// =========
+   / =========
+   / Redirects
+   / =========
 
-   /// These macros characterize redirects, generate logic, and generate visualization.
+   / These macros characterize redirects, generate logic, and generate visualization.
    
-   /// Redirect processing is performed based on the following:
-   ///   o Redirects are currently provided in a strict order that is not parameterized.
-   ///   o Redirects on earlier instructions mask those of later instructions (using $GoodPathMask and
-   ///     prioritization within the redirect cycle).
-   ///   o A redirect may mask later redirect triggers on the same instruction, depending whether
-   ///     the redirect is aborting or non-aborting.
-   ///      o Non-aborting redirects do not mask later redirect triggers, so later non-aborting
-   ///        redirects have priority.
-   ///      o Aborting redirects mask later redirect triggers, so earlier aborting
-   ///        redirects have priority
+   / Redirect processing is performed based on the following:
+   /   o Redirects are currently provided in a strict order that is not parameterized.
+   /   o Redirects on earlier instructions mask those of later instructions (using $GoodPathMask and
+   /     prioritization within the redirect cycle).
+   /   o A redirect may mask later redirect triggers on the same instruction, depending whether
+   /     the redirect is aborting or non-aborting.
+   /      o Non-aborting redirects do not mask later redirect triggers, so later non-aborting
+   /        redirects have priority.
+   /      o Aborting redirects mask later redirect triggers, so earlier aborting
+   /        redirects have priority
    
-   /// TODO: It is possible to create a generic macro for a pipeline with redirects.
-   ///       The PC redirection would become $ANY redirection. Redirected transactions would come from subhierarchy of
-   ///       pipeline, eg: |fetch/branch_redir$pc (instead of |fetch$branch_target).
-   /// TODO: The code would be a little cleaner to create a multi-line macro body for redirect conditions, such as
-   ///     \TLV redirect_conditions()
-   ///        m5_\redirect_condition_logic
-   ///   which becomes:
-   ///     \TLV redirect_conditions()
-   ///        @2
-   ///           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Aborting trigger.
-   ///        @2
-   ///           $trigger2_redir = $trigger2 && !(1'b0 || $trigger1) && >>2$GoodPath[2];
-   ///        @3
-   ///           $trigger3_redir = $trigger3 && !(1'b0 || $trigger1) && >>3$GoodPath[3];
-   ///        ...
-   ///   This would replace m5_redir_cond (and m5_redirect_masking_triggers).
+   / TODO: It is possible to create a generic macro for a pipeline with redirects.
+   /       The PC redirection would become $ANY redirection. Redirected transactions would come from subhierarchy of
+   /       pipeline, eg: |fetch/branch_redir$pc (instead of |fetch$branch_target).
+   / TODO: The code would be a little cleaner to create a multi-line macro body for redirect conditions, such as
+   /     \TLV redirect_conditions()
+   /        m5_\redirect_condition_logic
+   /   which becomes:
+   /     \TLV redirect_conditions()
+   /        @2
+   /           $trigger1_redir = $trigger1 && >>2$GoodPath[2];  // Aborting trigger.
+   /        @2
+   /           $trigger2_redir = $trigger2 && !(1'b0 || $trigger1) && >>2$GoodPath[2];
+   /        @3
+   /           $trigger3_redir = $trigger3 && !(1'b0 || $trigger1) && >>3$GoodPath[3];
+   /        ...
+   /   This would replace m5_redir_cond (and m5_redirect_masking_triggers).
 
-   /// Redirects are described in the TLV code. Supporting macro definitions are here.
+   / Redirects are described in the TLV code. Supporting macro definitions are here.
 
-   /// m5_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
+   / m5_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
    var(NEGATIVE_ONE, -1)
    var(redirect_list, ['NEGATIVE_ONE'])  /// list fed to m5_ordered
    var(redirect_squash_terms, [''])      /// & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
-   var(redirect_shadow_terms, ['['']'])  /// & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
+   var(redirect_shadow_terms, [''])      /// & terms to apply to $RvfiGoodPathMask, each reflects the redirect shadow of a trigger that becomes visible (for formal verif only).
    var(redirect_pc_terms, [''])          /// ternary operator terms for redirecting PC (later-stage redirects must be first)
    var(abort_terms, ['1'b0'])            /// || terms for an instruction's abort condition
    macro(redirect_masking_triggers, ['1'b0']) /// || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
                                               /// Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
    var(redirect_viz, [''])                  /// JS code to provide parameters for visualization of the waterfall diagram.
    var(redirect_cell_viz, [''])             /// JS code to provide parameters for visualization of a cell of waterfall diagram.
-   /// Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
-   /// See redirection logic for more detail.
-   /// Create several defines with items per redirect condition.
-   var(NUM_REDIRECT_CONDITIONS, 0)  // Incremented for each condition.
+   / Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
+   / See redirection logic for more detail.
+   / Create several defines with items per redirect condition.
+   var(NUM_REDIRECT_CONDITIONS, 0)  /// Incremented for each condition.
    macro(process_redirect_conditions, [
       if_eq(['$@'], ['['']'], [''], [
          process_redirect_condition($1, m5_NUM_REDIRECT_CONDITIONS)
@@ -840,25 +844,25 @@
    ])
    var(MAX_REDIRECT_BUBBLES, m5_TRAP_BUBBLES)
 
-   /// Called by m5_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
-   /// to various definitions, initialized above.
-   /// Args:
-   ///   $1: name of define of number of bubble cycles (The same name can be used multiple times, but once per aborting redirect.)
-   ///   $2: condition signal of triggering instr. This condition must be explicitly masked by earlier
-   ///       trigger conditions that take priority.
-   ///   $3: target PC signal of triggering instruction
-   ///   $4: 1 for an aborting redirect (0 otherwise)
-   ///   $5: VIZ text  for redirect bullet
-   ///   $6: VIZ color for redirect bullet
-   ///   $7: VIZ bullet left
-   ///   $8: VIZ bullet top
-   ///   $9: 1 for bad-path redirects (used by RVFI only)
-   ///   $10: (opt) ['wait'] to freeze fetch until subsequent redirect
+   / Called by m5_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
+   / to various definitions, initialized above.
+   / Args:
+   /   $1: name of define of number of bubble cycles (The same name can be used multiple times, but once per aborting redirect.)
+   /   $2: condition signal of triggering instr. This condition must be explicitly masked by earlier
+   /       trigger conditions that take priority.
+   /   $3: target PC signal of triggering instruction
+   /   $4: 1 for an aborting redirect (0 otherwise)
+   /   $5: VIZ text  for redirect bullet
+   /   $6: VIZ color for redirect bullet
+   /   $7: VIZ bullet left
+   /   $8: VIZ bullet top
+   /   $9: 1 for bad-path redirects (used by RVFI only)
+   /   $10: (opt) ['wait'] to freeze fetch until subsequent redirect
    macro(process_redirect_condition, [
-      /// expression in @m5_NEXT_PC_STAGE asserting for the redirect condition.
-      /// = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
-      ///   of this instruction.
-      /// Params: $@ (m5_redirect_masking_triggers contains param use)
+      / expression in @m5_NEXT_PC_STAGE asserting for the redirect condition.
+      / = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
+      /   of this instruction.
+      / Params: $@ (m5_redirect_masking_triggers contains param use)
       macro(redir_cond,
             ['(>>']m5_get($1_BUBBLES)['$2 && !(']m5_eval(m5_redirect_masking_triggers())[') && $GoodPathMask'][m5_get($1_BUBBLES)][')'])
       append_var(redirect_list, [', $1_BUBBLES'])
@@ -869,7 +873,7 @@
       prepend_var(redirect_pc_terms,
                  m5_redir_cond($@)[' ? {>>']m5_get($1_BUBBLES)['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
       if(['$4'], [
-         ///m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
+         /m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
          append_var(abort_terms,
                     [' || $2'])
          append_macro(redirect_masking_triggers,
@@ -881,11 +885,11 @@
                 ['if (stage == ']m5_get($1_BUBBLES)[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_if_defined_as(EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
    ])
 
-   /// Specify and process redirect conditions.
-   /// TODO: Found a bug...
-   ///       Priority is naturally given to later triggers.
-   ///       Must explicitly mask earlier higher-priority triggers.
-   ///    
+   / Specify and process redirect conditions.
+   / TODO: Found a bug...
+   /       Priority is naturally given to later triggers.
+   /       Must explicitly mask earlier higher-priority triggers.
+   /    
 
    process_redirect_conditions(
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
@@ -899,65 +903,65 @@
       ['TRAP, $aborting_trap, $trap_target, 1, "AT", "#ff0080", 75.6, 7, 0'],
       ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080", 75.6, 12, 0'])
 
-   /// Ensure proper order.
-   /// TODO: It would be great to auto-sort.
-   /// TODO: JUMP timing is nominally DECODE for most uarch's (immediate jumps), but this ordering forces
-   ///       redirect to be no earlier than REPLAY (REG_RD).
+   / Ensure proper order.
+   / TODO: It would be great to auto-sort.
+   / TODO: JUMP timing is nominally DECODE for most uarch's (immediate jumps), but this ordering forces
+   /       redirect to be no earlier than REPLAY (REG_RD).
    ordered(m5_redirect_list)
 
 
-   /// A macro for generating a when condition for instruction logic (just for a bit of power savings). (We probably won't
-   /// bother using it, but it's available in any case.)
-   /// m5_prev_instr_valid_through(redirect_bubbles) is deasserted by redirects up to the given number of cycles on the previous instruction.
-   /// Since we can be looking back an arbitrary number of cycles, we'll force invalid if $reset.
+   / A macro for generating a when condition for instruction logic (just for a bit of power savings). (We probably won't
+   / bother using it, but it's available in any case.)
+   / m5_prev_instr_valid_through(redirect_bubbles) is deasserted by redirects up to the given number of cycles on the previous instruction.
+   / Since we can be looking back an arbitrary number of cycles, we'll force invalid if $reset.
    macro(prev_instr_valid_through,
          ['(! $reset && >>m5_calc(1 - $1)$next_good_path_mask[$1])'])
-   ///same as <<m5_calc($1)$GoodPathMask[$1]), but accessible 1 cycle earlier and without $reset term.
+   /same as <<m5_calc($1)$GoodPathMask[$1]), but accessible 1 cycle earlier and without $reset term.
 
    
-   /// ====
-   /// CSRs
-   /// ====
+   / ====
+   / CSRs
+   / ====
    
-   /// Macro to define a new CSR.
-   /// Eg: m5_define_csr(['mycsr'], ['12'b123'], ['12, NIBBLE_FIELD, 8, BYTE_FIELD'], ['12'b0'], ['12'hFFF'], 1)
-   ///  $1: CSR name (lowercase)
-   ///  $2: CSR index
-   ///  $3: CSR fields (as in m5_define_fields)
-   ///  $4: Reset value
-   ///  $5: Writable bits mask
-   ///  $6: 0, 1, RO indicating whether to allow side-effect writes.
-   ///      If 1, these signals in scope |fetch@m5_EXECUTE_STAGE must provide a write value:
-   ///         o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
-   ///         o $csr_<csr_name>_hw_wr_value: the value to write
-   ///         o $csr_<csr_name>_hw_wr_mask: mask of bits to write
-   ///        Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
-   ///        rare that a bit can be written by both hardware and software.
-   ///      If RO, the CSR is read-only and code can be simpler. The CSR signal must be provided:
-   ///         o $csr_<csr_name>: The read-only CSR value (used in |fetch@m5_EXECUTE_STAGE).
-   /// Variables set by this macro:
-   /// List of CSRs.
+   / Macro to define a new CSR.
+   / Eg: m5_define_csr(['mycsr'], ['12'b123'], ['12, NIBBLE_FIELD, 8, BYTE_FIELD'], ['12'b0'], ['12'hFFF'], 1)
+   /  $1: CSR name (lowercase)
+   /  $2: CSR index
+   /  $3: CSR fields (as in m5_define_fields)
+   /  $4: Reset value
+   /  $5: Writable bits mask
+   /  $6: 0, 1, RO indicating whether to allow side-effect writes.
+   /      If 1, these signals in scope |fetch@m5_EXECUTE_STAGE must provide a write value:
+   /         o $csr_<csr_name>_hw_wr: 1/0, 1 if a write is to occur (like hw_wr_mask == '0)
+   /         o $csr_<csr_name>_hw_wr_value: the value to write
+   /         o $csr_<csr_name>_hw_wr_mask: mask of bits to write
+   /        Side-effect writes take place prior to corresponding CSR software reads and writes, though it should be
+   /        rare that a bit can be written by both hardware and software.
+   /      If RO, the CSR is read-only and code can be simpler. The CSR signal must be provided:
+   /         o $csr_<csr_name>: The read-only CSR value (used in |fetch@m5_EXECUTE_STAGE).
+   / Variables set by this macro:
+   / List of CSRs.
    var(csrs, [''])
    var(num_csrs, 0)
-   /// Arguments given to this macro for each CSR.
-   /// Initial value of CSR read result expression, initialized to ternary default case (X).
+   / Arguments given to this macro for each CSR.
+   / Initial value of CSR read result expression, initialized to ternary default case (X).
    var(csrrx_rslt_expr, m5_WORD_CNT'bx)
-   /// Initial value of OR expression for whether CSR index is valid.
+   / Initial value of OR expression for whether CSR index is valid.
    var(valid_csr_expr, ['1'b0'])
-   /// VIZ initEach and renderEach JS code to define fabricjs objects for the CSRs.
+   / VIZ initEach and renderEach JS code to define fabricjs objects for the CSRs.
    var(csr_viz_init_each, [''])
    var(csr_viz_render_each, [''])
 
-   /// m5_define_csr(name, index (12-bit SV-value), fields (as in m5_define_vector), reset_value (SV-value), writable_mask (SV-value), side-effect_writes (bool))
-   /// Adds a CSR.
-   /// Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
+   / m5_define_csr(name, index (12-bit SV-value), fields (as in m5_define_vector), reset_value (SV-value), writable_mask (SV-value), side-effect_writes (bool))
+   / Adds a CSR.
+   / Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    macro(define_csr, [
         define_vector_with_fields(['CSR_']m5_uppercase(['$1']), $3)
         append_var(csrs, m5_if_eq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
         var(csr_$1_args, ['$@'])
         set(csrrx_rslt_expr, ['$is_csr_$1 ? {{']m5_calc(32 - m5_get(['CSR_']m5_uppercase(['$1'])['_CNT']))['{1'b0}}, $csr_$1} : ']m5_csrrx_rslt_expr)
         set(valid_csr_expr, m5_valid_csr_expr[' || $is_csr_$1'])
-        /// VIZ
+        / VIZ
         set(csr_viz_init_each, m5_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: 40 + 18 * ']m5_num_csrs[', left: 20, fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 40 + 18 * ']m5_num_csrs[', left: 30, fontSize: 14, fontFamily: "monospace"}); '])
         set(csr_viz_render_each, m5_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = ']m5_if_eq($6, 1, [''/instr$csr_$1_hw_wr'.asBool(false)'], ['val_$1 === old_val_$1'])['; let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").set({text: $1name + ": " + val_$1 + oldVal$1}); this.getInitObject("$1").set({fill: $1mod ? "blue" : "black"}); '])
         set(num_csrs, m5_calc(m5_num_csrs + 1))
@@ -965,9 +969,9 @@
    
    case(ISA, RISCV, [
       if_defined_as(NO_COUNTER_CSRS, 1, [''], [
-         /// TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
-         /// Define Counter CSRs
-         ///         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
+         / TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
+         / Define Counter CSRs
+         /         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
          define_csr(cycle,      12'hC00,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
          define_csr(cycleh,     12'hC80,    ['32, CYCLEH, 0'],              ['32'b0'],                     ['{32{1'b1}}'],                     1)
          define_csr(time,       12'hC01,    ['32, CYCLE, 0'],               ['32'b0'],                     ['{32{1'b1}}'],                     1)
@@ -981,11 +985,11 @@
          ])                                
       ])
       
-      /// For NoC support
+      / For NoC support
       if(m5_NUM_CORES > 1, [
-         /// As defined in: https://docs.google.com/document/d/1cDUv8cuYF2kha8r6DSv-8pwszsrSP3vXsTiAugRkI1k/edit?usp=sharing
-         /// TODO: Find appropriate indices.
-         ///            Name        Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
+         / As defined in: https://docs.google.com/document/d/1cDUv8cuYF2kha8r6DSv-8pwszsrSP3vXsTiAugRkI1k/edit?usp=sharing
+         / TODO: Find appropriate indices.
+         /            Name        Index       Fields                              Reset Value                    Writable Mask                       Side-Effect Writes
          define_csr(pktdest,    12'h800,    ['m5_CORE_INDEX_HIGH, DEST, 0'],    ['m5_CORE_INDEX_HIGH'b0'],     ['{m5_CORE_INDEX_HIGH{1'b1}}'],      0)
          define_csr(pktwrvc,    12'h801,    ['m5_VC_INDEX_HIGH, VC, 0'],        ['m5_VC_INDEX_HIGH'b0'],       ['{m5_VC_INDEX_HIGH{1'b1}}'],        0)
          define_csr(pktwr,      12'h802,    ['m5_WORD_HIGH, DATA, 0'],          ['m5_WORD_HIGH'b0'],           ['{m5_WORD_HIGH{1'b1}}'],            0)
@@ -998,88 +1002,88 @@
          define_csr(core,       12'h80d,    ['m5_CORE_INDEX_HIGH, CORE, 0'],    ['m5_CORE_INDEX_HIGH'b0'],     ['{m5_CORE_INDEX_HIGH{1'b1}}'],      RO)
          define_csr(pktinfo,    12'h80c,    ['m5_calc(m5_CORE_INDEX_HIGH + 3), SRC, 3, MID, 2, AVAIL, 1, COMP, 0'],
                                                                                 ['m5_calc(m5_CORE_INDEX_HIGH + 3)'b100'], ['m5_calc(m5_CORE_INDEX_HIGH + 3)'b0'], 1)
-         /// TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
+         / TODO: Unimplemented: pkthead, pktfree, pktmax, pktmin.
       ])
    ])
                                                                          
-   /// ==========================
-   /// ISA Code Generation Macros
-   /// ==========================
-   ///
+   / ==========================
+   / ISA Code Generation Macros
+   / ==========================
+   /
    
-   /// -------------------------------------------------
-   /// TODO: Here are some thoughts for providing generic instruction definitions that can be used across all ISAs, even outside of CPUs (and would improve upon RISC-V macros).
-   ///       None of this is implemented, just sketching.
-   ///
-   /// Define fields. Fields are extracted from instructions.
-   /// Fields have a name, an extraction spec, and a condition under which the field may be defined.
-   /// Extraction specs specify where the bits come from, and the select is a mutually-exclusive condition under which the extraction spec applies. E.g.:
-   ///
-   ///   m5_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'])
-   ///
-   /// defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}.
-   /// ($i_type || $j_type) is verified to assert for all instructions which define this field. If this string begins with "?" is is used as the when expression
-   /// for $my_instr_imm_field, otherwise, a generated instruction-granular condition is used.
-   ///
-   /// As an improvement, fields can be specified with different extraction specs for different instructions. E.g.:
-   ///
-   ///   m5_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'], ['i'], ['$b_type'], ['(31, 15), 2'b00'], ['b'])
-   ///
-   /// defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}, or, if $b_type, {$my_instr_instr[31:15], 2'b00}.
-   /// Also defined will be $my_instr_imm_i_field[18:0] and $my_instr_imm_b_field[18:0].
-   ///
-   /// Assembly instruction formats can be defined. E.g.:
-   ///
-   ///   m5_asm_format(['my_instr'], ['op_imm'], ['/?(.ovf)\s+ r(\d+)\s=\sr(\d+), (\d+)/, FLAG, ovf, D, rd, D, r1, D, imm'])  // WIP
-   ///
-   /// specifies a format that might be used to assemble an ADD instruction. E.g.:
-   ///
-   ///   m5_asm(['my_instr'], ['ADD.ovf r3 = r10, 304'])
-   ///
-   /// "FLAG" specifies a value that if present is a 1-bit, else 0-bit.
-   /// "D" specifies a decimal value.
-   /// Instructions are assembled based on field definitions and instruction definitions.
-   ///
-   /// Instructions are then defined. e.g.:
-   ///
-   ///   m5_define_instr(['my_instr'], ['JMP'], ['op_jump'], ['imm(18,5)'], ['r1'], ['imm(4,0)=xxx00'], ['11000101'])
-   ///
-   /// defines a JMP instruction.
-   /// The fields of the instruction, msb-to-lsb, are listed following the mnemonic and asm_format.
-   /// Fields containing only 01x chars are used to decode the instruction, producing $is_<mnemonic>_inst.
-   /// Fields containing "=" similarly, provided bits that are required of the instruction.
-   /// Fields can have a bit range, in which case fields by the same name will be joined appropriately.
-   /// Fields are verified to be defined in positions for which the field has a corresponding extraction spec.
-   /// The assembly type is verified to define exactly the necessary fields.
-   ///
-   /// Multiple instructions can share the same execution logic, producing a single result value.
-   /// To do this for JMP and RET, rather than ['JMP'] and ['RET'] args, provide, e.g., ['JMP:JUMP'], and ['RET:JUMP'].
-   /// A "JUMP" result will be selected for either instruction.
-   ///
-   /// ISA-specific versions of the above macros can be created that drop the first argument.
-   ///  
-   /// For CPU instructions, it would be a good idea to try to link this instruction description with
-   /// GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
-   /// --------------------------------------------------
+   / -------------------------------------------------
+   / TODO: Here are some thoughts for providing generic instruction definitions that can be used across all ISAs, even outside of CPUs (and would improve upon RISC-V macros).
+   /       None of this is implemented, just sketching.
+   /
+   / Define fields. Fields are extracted from instructions.
+   / Fields have a name, an extraction spec, and a condition under which the field may be defined.
+   / Extraction specs specify where the bits come from, and the select is a mutually-exclusive condition under which the extraction spec applies. E.g.:
+   /
+   /   m5_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'])
+   /
+   / defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}.
+   / ($i_type || $j_type) is verified to assert for all instructions which define this field. If this string begins with "?" is is used as the when expression
+   / for $my_instr_imm_field, otherwise, a generated instruction-granular condition is used.
+   /
+   / As an improvement, fields can be specified with different extraction specs for different instructions. E.g.:
+   /
+   /   m5_instr_field(['my_instr'], ['imm'], (18, 0), ['$i_type || $j_type'], ['(31, 18), (12, 8)'], ['i'], ['$b_type'], ['(31, 15), 2'b00'], ['b'])
+   /
+   / defines $my_instr_imm_field[18:0] that comes from {$my_instr_instr[31:18], $my_instr_instr[13:0]}, or, if $b_type, {$my_instr_instr[31:15], 2'b00}.
+   / Also defined will be $my_instr_imm_i_field[18:0] and $my_instr_imm_b_field[18:0].
+   /
+   / Assembly instruction formats can be defined. E.g.:
+   /
+   /   m5_asm_format(['my_instr'], ['op_imm'], ['/?(.ovf)\s+ r(\d+)\s=\sr(\d+), (\d+)/, FLAG, ovf, D, rd, D, r1, D, imm'])  // WIP
+   /
+   / specifies a format that might be used to assemble an ADD instruction. E.g.:
+   /
+   /   m5_asm(['my_instr'], ['ADD.ovf r3 = r10, 304'])
+   /
+   / "FLAG" specifies a value that if present is a 1-bit, else 0-bit.
+   / "D" specifies a decimal value.
+   / Instructions are assembled based on field definitions and instruction definitions.
+   /
+   / Instructions are then defined. e.g.:
+   /
+   /   m5_define_instr(['my_instr'], ['JMP'], ['op_jump'], ['imm(18,5)'], ['r1'], ['imm(4,0)=xxx00'], ['11000101'])
+   /
+   / defines a JMP instruction.
+   / The fields of the instruction, msb-to-lsb, are listed following the mnemonic and asm_format.
+   / Fields containing only 01x chars are used to decode the instruction, producing $is_<mnemonic>_inst.
+   / Fields containing "=" similarly, provided bits that are required of the instruction.
+   / Fields can have a bit range, in which case fields by the same name will be joined appropriately.
+   / Fields are verified to be defined in positions for which the field has a corresponding extraction spec.
+   / The assembly type is verified to define exactly the necessary fields.
+   /
+   / Multiple instructions can share the same execution logic, producing a single result value.
+   / To do this for JMP and RET, rather than ['JMP'] and ['RET'] args, provide, e.g., ['JMP:JUMP'], and ['RET:JUMP'].
+   / A "JUMP" result will be selected for either instruction.
+   /
+   / ISA-specific versions of the above macros can be created that drop the first argument.
+   /
+   / For CPU instructions, it would be a good idea to try to link this instruction description with
+   / GCC's (whatever that might be). Either output GCC compatible descriptions or convert GCC to what we do here
+   / --------------------------------------------------
    
    case(ISA, MINI, [
-      /// An out-of-place correction for the fact that in Mini-CPU, instruction
-      /// addresses are to different memory than data, and the memories have different widths.
+      / An out-of-place correction for the fact that in Mini-CPU, instruction
+      / addresses are to different memory than data, and the memories have different widths.
       define_vector(PC, 10, 0)
       
    ], RISCV, [
-      /// Included as tlv lib file.
+      / Included as tlv lib file.
    ], MIPSI, [
    ], POWER, [
    ], DUMMY, [
    ])
    
-   /// Macro initialization.
+   / Macro initialization.
    var(NUM_INSTRS, 0)
 
 
-   /// Define m5_module_def macro to be used in \SV context, providing the module definition, either inside makerchip,
-   /// or outside for formal.
+   / Define m5_module_def macro to be used in \SV context, providing the module definition, either inside makerchip,
+   / or outside for formal.
    macro(module_def, ['
       m5_if_eq(m5_FORMAL, 0,
          ['m5_makerchip_module'], ['
@@ -1110,19 +1114,19 @@
             output logic [31: 0] rvfi_mem_wdata);
          '])
    '])
-   /// For backward-compatibility, the old M4 version of this, used as an m4+ region.
+   / For backward-compatibility, the old M4 version of this, used as an m4+ region.
    eval(['m4_define(['m4_module_def'], ['\SV']m5_nl['   ']m5_defn(module_def))'])
 
-   /// Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
-   /// based on model config.
+   / Generate \SV content, including sv_include_url, include_url, and /* verilator lint... */
+   / based on model config.
    
    ~pragma_enable_verbose_checks()
    fn(sv_content, {
       if_eq(m5_ISA, RISCV, [
-         /// Functions to append to sv_out. Verilator lint pragmas and SV includes.
+         / Functions to append to sv_out. Verilator lint pragmas and SV includes.
          var(sv_out, [''])
          fn(verilator_lint, on_off, tag, [
-            /// TODO: Use m4_output_sv_line in place of show...
+            / TODO: Use m4_output_sv_line in place of show...
             append_var(sv_out, m5_nl['   ']['m4_show(['m5_if(m4_include_url_depth, ['m5_nl['   ']'])['/* verilator lint_']']']m5_on_off m5_tag['['[' */']'])'])
          ])
          fn(sv_inc, file, [
@@ -1132,19 +1136,19 @@
             append_var(sv_out, m5_nl['   ']['m4_include_lib(m5_warpv_includes']m5_quote(m5_file)[')'])
          ])
          
-         /// Heavy-handed lint_off's based on config.
-         /// TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
+         / Heavy-handed lint_off's based on config.
+         / TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
          if(m5_EXT_B || m5_EXT_F, m5_verilator_lint(off, WIDTH))
          if(m5_EXT_B, m5_verilator_lint(off, PINMISSING))
          if(m5_EXT_B, m5_verilator_lint(off, SELRANGE))
 
          if(m5_EXT_M, [
             if(m5_RISCV_FORMAL_ALTOPS, [
-               append_var(sv_out, m5_nl['   `define RISCV_FORMAL_ALTOPS']m5_nl)  // enable ALTOPS if compiling for formal verification of M extension
+               append_var(sv_out, m5_nl['   `define RISCV_FORMAL_ALTOPS']m5_nl)  /// enable ALTOPS if compiling for formal verification of M extension
             ])
             verilator_lint(off, WIDTH)
             verilator_lint(off, CASEINCOMPLETE)
-            /// TODO : Update links after merge to master!
+            / TODO : Update links after merge to master!
             sv_inc(['divmul/picorv32_pcpi_div.sv'])
             sv_inc(['divmul/picorv32_pcpi_fast_mul.sv'])
             verilator_lint(on, CASEINCOMPLETE)
@@ -1430,12 +1434,12 @@
             ORI t3, zero, 0          #     out = 0
          loop:
             ADD t3, t1, t3           #  -> out += cnt
-            SW t6, 0(t3)             #     store out at store_addr
+            SW t3, 0(t6)             #     store out at store_addr
             ADDI t1, t1, 1           #     cnt ++
             ADDI t6, t6, 4           #     store_addr++
             BLT t1, t2, loop         #  ^- branch back if cnt < 10
          # Result should be 0x2d.
-            LW t4, -0x4(t6)          #     load the final value into tmp
+            LW t6, -0x4(t4)          #     load the final value into tmp
             ADDI t5, zero, 0x2d      #     expected result (0x2d)
             BEQ t4, t5, pass         #     pass if as expected
          fail:
@@ -1495,15 +1499,15 @@
             ORI x10, zero, 0b10101010
             MUL x11, x8, x9
             ORI x6, zero, 0b0
-            SW x6, 0b0(x11)
+            SW x11, 0b0(x6)
             MUL x12, x9, x10
-            LW x4, 0b0(x6)
+            LW x6, 0b0(x4)
             ADDI x6, x6, 0b100
-            SW x6, 0b0(x12)
+            SW x12, 0b0(x6)
             MUL x13, x8, x10
             DIV x14, x11, x8
             DIV x15, x13, x10
-            LW x5, 0b0(x6)
+            LW x6, 0b0(x5)
             ADDI x4, zero, 0b101101
             BGE x8, x9, pass
          fail:
@@ -1530,10 +1534,10 @@
             FMV_W_X x1, x1
             FMV_W_X x2, x2
             FMV_W_X x3, x3
-            FSW zero, 0b000001000000(x1)
-            FSW zero, 0b000001000100(x2)
-            FLW x16, 0b000001000000(zero)
-            FLW x17, 0b000001000100(zero)
+            FSW x1, 0b000001000000(zero)
+            FSW x2, 0b000001000100(zero)
+            FLW zero, 0b000001000000(x16)
+            FLW zero, 0b000001000100(x17)
             FMADD_S x5, x1, x2, x3, rne
             FMSUB_S x6, x1, x2, x3, rne
             FNMSUB_S x7, x1, x2, x3, rne
@@ -1788,7 +1792,7 @@
 
 // Define all CSRs.
 \TLV riscv_csrs(csrs)
-   // TODO: This doesn't maintain alignment. Need an m5+foreach macro.
+   /// TODO: This doesn't maintain alignment. Need an m5+foreach macro.
    m4_foreach(['m4_csr'], csrs, ['
    m5+riscv_csr(m5_eval(m5_get(['csr_']m4_csr['_args'])))
    '])
@@ -1893,13 +1897,13 @@
 
    $rslt[m5_WORD_RANGE] =
          $second_issue_ld ? /orig_load_inst$ld_rslt : m5_if_eq_block(m5_EXT_M, 1, ['
-         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? |fetch/instr$divblock_rslt : 
-         ($second_issue_div_mul && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? |fetch/instr\m5_if_eq(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
+         ($second_issue_div_mul && >>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_div) ? $divblock_rslt :
+         ($second_issue_div_mul && >>m5_NON_PIPELINED_BUBBLES$stall_cnt_upper_mul) ? m5_if_eq(m5_RISCV_FORMAL_ALTOPS,1,>>m5_calc(3+m5_NON_PIPELINED_BUBBLES))$mulblock_rslt :
          ']) m5_if_eq_block(m5_EXT_F, 1, ['
-         ($fpu_second_issue_div_sqrt && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_fpu) ? |fetch/instr/fpu1$output_div_sqrt11 : 
+         ($fpu_second_issue_div_sqrt && >>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_fpu) ? /fpu1$output_div_sqrt11 :
          ']) m5_if_eq_block(m5_EXT_B, 1, ['
-         ($second_issue_clmul_crc && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_clmul) ? |fetch/instr$clmul_output : 
-         ($second_issue_clmul_crc && |fetch/instr>>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_crc) ? |fetch/instr$rvb_crc_output : 
+         ($second_issue_clmul_crc && >>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_clmul) ? $clmul_output :
+         ($second_issue_clmul_crc && >>m5_NON_PIPELINED_BUBBLES$stall_cnt_max_crc) ? $rvb_crc_output :
          '])
          m5_WORD_CNT'b0\m5_eval(m5_rslt_mux_expr);
    
@@ -2051,11 +2055,9 @@
          $reg[m5_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[m5_REGS_INDEX_RANGE] : /instr$raw_rs2[m5_REGS_INDEX_RANGE];
          
    // Condition signals must not themselves be conditioned (currently).
-   $dest_reg[m5_REGS_INDEX_RANGE] = m5_if(m5_EXT_M, ['$second_issue_div_mul ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$dest_reg :'])
-                                    m5_if(m5_EXT_B, ['$second_issue_clmul_crc ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$dest_reg :'])
-                                    $second_issue_ld ? |fetch/instr/orig_inst$dest_reg : $raw_rd[m5_REGS_INDEX_RANGE];
-   $dest_reg_valid = m5_if(m5_EXT_F, ['((! $fpu_type_instr) || $fpu_instr_with_int_dest) &&']) (($valid_decode && ! $is_s_type && ! $is_b_type) || $second_issue) &&
-                     | $dest_reg;   // r0 not valid.  TODO: Huh? What about FP? No formal failure?
+   $dest_reg[m5_REGS_INDEX_RANGE] = $second_issue ? /instr/orig_inst$dest_reg : $raw_rd[m5_REGS_INDEX_RANGE];
+   $dest_reg_valid = m5_if(m5_EXT_F, ['((! $fpu_type_instr) || $fpu_instr_with_int_dest) &&']) $valid_decode && ! $is_s_type && ! $is_b_type &&
+                     | $dest_reg;   // r0 not valid.
    
    m5+ifelse(m5_EXT_F, 1,
       \TLV
@@ -2074,9 +2076,8 @@
                             );
                   $reg[m5_FPU_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1 : (#src == 2) ? /instr$raw_rs2 : /instr$raw_rs3;
    
-               $dest_reg[m5_FPU_REGS_INDEX_RANGE] = /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$dest_reg :
-                                                 /instr$second_issue_ld ? /instr/orig_inst/fpu$dest_reg : /instr$raw_rd;
-               $dest_reg_valid = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_dest) && ((/instr$valid_decode && ! /instr$is_s_type && ! /instr$is_b_type) || /instr$second_issue);
+               $dest_reg[m5_FPU_REGS_INDEX_RANGE] = /instr$second_issue ? /instr/orig_inst/fpu$dest_reg : /instr$raw_rd;
+               $dest_reg_valid = (/instr$fpu_type_instr && ! /instr$fpu_instr_with_int_dest) && /instr$valid_decode && ! /instr$is_s_type && ! /instr$is_b_type;
       )
    
    // Actually load.
@@ -2119,8 +2120,8 @@
             $mulblk_valid = $multype_instr && $commit;
             /* verilator lint_off WIDTH */
             /* verilator lint_off CASEINCOMPLETE */   
-            m5+warpv_mul(|fetch/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
-            m5+warpv_div(|fetch/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
+            m5+warpv_mul(/instr,/mul1, $mulblock_rslt, $wrm, $waitm, $readym, $clk, $resetn, $mul_in1, $mul_in2, $instr_type_mul, $mulblk_valid)
+            m5+warpv_div(/instr,/div1, $divblock_rslt, $wrd, $waitd, $readyd, $clk, $resetn, $div_in1, $div_in2, $instr_type_div, >>1$div_stall)
             // for the division module, the valid signal must be asserted for the entire computation duration, hence >>1$div_stall is used for this purpose
             // for multiplication it is just a single cycle pulse to start operating
 
@@ -2568,7 +2569,7 @@
               $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
                             (4'h1 << $addr[1:0]);      // byte
 
-      // Swizzle bytes for load result (assuming natural alignment) and pass to /orig_load_inst scope
+      // Swizzle bytes for load result
       ?$second_issue_ld
          /orig_load_inst
             $spec_ld_cond = $spec_ld;
@@ -3281,7 +3282,7 @@
    // Relative to typical 1-cycle latency instructions.
 
    @m5_NEXT_PC_STAGE
-      $second_issue_div_mul = >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
+      $second_issue_div_mul = ! $reset && >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_div_mul_second_issue;
    @m5_EXECUTE_STAGE
       {$div_stall, $mul_stall, $stall_cnt[5:0]} =    $reset ? '0 :
                                                      $second_issue_div_mul ? '0 :
@@ -3472,7 +3473,7 @@
    
    m5_var(FPU_DIV_LATENCY, 26)  // Relative to typical 1-cycle latency instructions.
    @m5_NEXT_PC_STAGE
-      $fpu_second_issue_div_sqrt = >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_fpu_div_sqrt_second_issue;
+      $fpu_second_issue_div_sqrt = ! $reset && >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_fpu_div_sqrt_second_issue;
    @m5_EXECUTE_STAGE
       {$fpu_div_sqrt_stall, $fpu_stall_cnt[5:0]} =    $reset ? 7'b0 :
                                                    <<m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE)$fpu_second_issue_div_sqrt ? 7'b0 :
@@ -3499,7 +3500,7 @@
    m5_var(CLMUL_LATENCY, 5)
    m5_var(CRC_LATENCY, 5)
    @m5_NEXT_PC_STAGE
-      $second_issue_clmul_crc = >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_clmul_crc_second_issue;
+      $second_issue_clmul_crc = ! $reset && >>m5_NON_PIPELINED_BUBBLES$trigger_next_pc_clmul_crc_second_issue;
    @m5_EXECUTE_STAGE
       {$clmul_stall, $crc_stall, $clmul_crc_stall_cnt[5:0]} =  $reset ? '0 :
                                          $second_issue_clmul_crc ? '0 :
@@ -3521,9 +3522,10 @@
 //=========================//
 
 \TLV cpu(/_cpu)
-   // Generated logic
-   // Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
-   m5+call(m5_isa['_gen'])
+   /// Generated logic
+   /// Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
+   /// Avoid duplicate calls.
+   m5_if_var_ndef(OP5_00000_TYPE, ['m5+call(m5_isa['_gen'])'])
    // Instruction memory and fetch of $raw.
    m5+call(m5_IMEM_MACRO_NAME, m5_PROG_NAME)
 
@@ -3679,11 +3681,17 @@
             // A returning load clobbers the instruction.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            $second_issue_ld = /_cpu|mem/data>>m5_LD_RETURN_ALIGN$valid_ld && 1'b\m5_INJECT_RETURNING_LD;
+            $second_issue_ld = ! $reset && /_cpu|mem/data>>m5_LD_RETURN_ALIGN$valid_ld && 1'b\m5_INJECT_RETURNING_LD;
             $second_issue = ($second_issue_ld m5_if(m5_EXT_M, ['|| $second_issue_div_mul']) m5_if(m5_EXT_F, ['|| $fpu_second_issue_div_sqrt']) m5_if(m5_EXT_B, ['|| $second_issue_clmul_crc']));
+            // TODO: Can't get this assertion to work for both Verilator and Yosys. Verilator wants a clock and Yosys doesn't.
+            //\SV_plus
+            //   m4_assert(! $reset && $second_issue)  // $reset is factored in at the point of injection into this pipeline and that funnels into $second_issue.
+            //   m4_assert($second_issue_ld m5_if(m5_EXT_M, ['+ $second_issue_div_mul']) m5_if(m5_EXT_F, ['+ $fpu_second_issue_div_sqrt']) m5_if(m5_EXT_B, ['+ $second_issue_clmul_crc']) < 2)
+            $commit_second_issue = $second_issue;  // TODO: Updating this to have a speculative and non-speculative version.
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
             // This reduces significantly once $ANY acts on subscope.
+            // TODO: Should probably combine /orig_load_inst and /orig_inst.
             ?$second_issue_ld
                // This scope holds the original load for a returning load.
                /orig_load_inst
@@ -3700,15 +3708,15 @@
             ?$second_issue
                /orig_inst
                   // pull values from /orig_load_inst or /hold_inst depending on which second issue
-                  $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst$ANY;
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst$ANY;
                   /src[2:1]
-                     $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['|fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/src$ANY;
+                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/src$ANY;
                   m5+ifelse(m5_EXT_F, 1,
                      \TLV
                         /fpu
-                           $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/fpu$ANY;
+                           $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu$ANY;
                            ///src[3:1]
-                           //   $ANY = |fetch/instr$second_issue_ld ? |fetch/instr/orig_load_inst/fpu/src$ANY : m5_if(m5_EXT_M, ['|fetch/instr$second_issue_div_mul ? |fetch/instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr$fpu_second_issue_div_sqrt ? |fetch/instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['|fetch/instr$second_issue_clmul_crc ? |fetch/instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) |fetch/instr/orig_load_inst/fpu/src$ANY;
+                           //   $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu/src$ANY;
                      )
             // Next PC
             $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1;
@@ -3826,11 +3834,11 @@
             '])
             
             // Conditions that commit results.
-            $valid_dest_reg_valid = ($dest_reg_valid && $commit) || ($second_issue m5_if(m5_EXT_F, ['&&  (! >>m5_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
+            $commit_dest_reg = ($dest_reg_valid && $commit) || ($commit_second_issue m5_if(m5_EXT_F, ['&&  (! >>m5_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
             m5_if_eq_block(m5_EXT_F, 1, ['
             /fpu
-               $valid_dest_reg_valid = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$second_issue && /instr>>m5_LD_RETURN_ALIGN$is_flw_instr));
+               $commit_dest_reg = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$commit_second_issue && /instr>>m5_LD_RETURN_ALIGN$is_flw_instr));
             '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
@@ -3841,7 +3849,7 @@
          // =========
          // Reg Write
          // =========
-         m5+rf_wr(/regs, m5_REGS_RANGE, /instr$valid_dest_reg_valid, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+         m5+rf_wr(/regs, m5_REGS_RANGE, /instr$commit_dest_reg, /instr$dest_reg, /instr$rslt, /instr$reg_wr_pending)
 
          // ======
          // FPU RF
@@ -3850,7 +3858,7 @@
             \TLV
                /fpu
                   // TODO: $reg_wr_pending can go under /fpu?
-                  m5+rf_wr(/regs, m5_FPU_REGS_RANGE, /fpu$valid_dest_reg_valid, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
+                  m5+rf_wr(/regs, m5_FPU_REGS_RANGE, /fpu$commit_dest_reg, /fpu$dest_reg, /instr$rslt, /instr$reg_wr_pending)
             )
 
          @m5_REG_WR_STAGE
@@ -3867,9 +3875,9 @@
    // Pending has an additional read for the dest register as we need to replay for write-after-write
    // hazard as well as write-after-read. To replay for dest write with the same timing, we must also
    // bypass the dest reg's pending bit.
-   m5_if(m5_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$valid_dest_reg_valid && (/instr$GoodPathMask[1] || /instr>>1$second_issue);'])
-   m5_if(m5_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$valid_dest_reg_valid && (/instr$GoodPathMask[2] || /instr>>2$second_issue);'])
-   m5_if(m5_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$valid_dest_reg_valid && (/instr$GoodPathMask[3] || /instr>>3$second_issue);'])
+   m5_if(m5_REG_BYPASS_STAGES >= 1, ['$bypass_avail1 = >>1$commit_dest_reg && (/instr$GoodPathMask[1] || /instr>>1$commit_second_issue);'])
+   m5_if(m5_REG_BYPASS_STAGES >= 2, ['$bypass_avail2 = >>2$commit_dest_reg && (/instr$GoodPathMask[2] || /instr>>2$commit_second_issue);'])
+   m5_if(m5_REG_BYPASS_STAGES >= 3, ['$bypass_avail3 = >>3$commit_dest_reg && (/instr$GoodPathMask[3] || /instr>>3$commit_second_issue);'])
    /src[_src_range]
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
@@ -4560,7 +4568,7 @@
          },
          render() {
             // TODO: This is inefficient as is the same for every entry.
-            let mod = '/_top$valid_dest_reg_valid'.asBool(false) && ('/_top$dest_reg'.asInt(-1) == this.getIndex())
+            let mod = '/_top$commit_dest_reg'.asBool(false) && ('/_top$dest_reg'.asInt(-1) == this.getIndex())
             let rs_valid = []
             let read_valid = false
             for (let i = 1; i <= _num_srcs; i++) {
@@ -4781,13 +4789,15 @@
                      this.instr = this.getScope("pipe_ctrl_instr").context.getInstrIndex()
                      this.step = this.stage + this.instr  // step amount for $GoodPathMask
                      let second = '/instr$second_issue'.step(this.instr).asBool(false)
+                     let commit_second = '/instr$commit_second_issue'.step(this.instr).asBool(false)
                      this.goodPath = true
                      try {
                         mask = '/instr$GoodPathMask'.step(this.step).asInt(null)
                         this.goodPath = (mask === null) ? null : ((mask >> this.stage) & 1) != 0
                         return this.goodPath === null ? "transparent" :
                                this.goodPath ? this.getScope("pipe_ctrl").children.logic_diagram.context.color(this.getIndex()) :
-                               second        ? "rgb(184,137,57)" :
+                               commit_second ? "rgb(183,137,57)" :
+                               second        ? "rgb(155,132,92)" :   // bad-path second issue
                                                "gray"
                      } catch(e) {
                         return "darkgray"
@@ -5079,7 +5089,7 @@
          let src2_value = '/src[2]$unconditioned_reg_value'.asInt()
          let src3_value = 0
          let dest_reg = '$dest_reg'.asInt(0)
-         let valid_dest_reg_valid = '$valid_dest_reg_valid'.asBool(false)
+         let valid_dest_reg_valid = '$commit_dest_reg'.asBool(false)
          let valid_dest_fpu_reg_valid = false
          m5_if_eq_block(m5_EXT_F, 1, ['
          fpu_rs1_valid = '/fpu/src[1]$unconditioned_is_reg'.asBool()
@@ -5092,7 +5102,7 @@
          if (fpu_rs1_valid) {src1_value = '/fpu/src[1]$unconditioned_reg_value'.asInt()}
          if (fpu_rs2_valid) {src2_value = '/fpu/src[2]$unconditioned_reg_value'.asInt()}
          if (fpu_rs3_valid) {src3_value = '/fpu/src[3]$unconditioned_reg_value'.asInt()}
-         valid_dest_fpu_reg_valid = '/fpu$valid_dest_reg_valid'.asBool(false)
+         valid_dest_fpu_reg_valid = '/fpu$commit_dest_reg'.asBool(false)
          '])
          let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
          // rd Arrow
@@ -6093,11 +6103,11 @@
             // Block CPU |fetch pipeline if blocked.
             m5_var(cpu_blocked, m5_cpu_blocked || /core|egress_in/instr<<m5_EXECUTE_STAGE$pkt_wr_blocked || /core|ingress_out<<m5_EXECUTE_STAGE$pktrd_blocked)
             m5+cpu(/core)
-            //m5+dummy_noc(/core)
+            ///m5+dummy_noc(/core)
             m5+noc_cpu_buffers(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
             m5+noc_insertion_ring(/core, m5_calc(m5_MAX_PACKET_SIZE + 1))
             m5+warpv_makerchip_tb()
-         //m5+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
+         ///m5+simple_ring(/core, |noc_in, @1, |noc_out, @1, /top<>0$reset, |rg, /flit)
          m5+makerchip_pass_fail(/core[*])
          /m5_CORE_HIER
             // TODO: This should be part of the \TLV cpu macro, but there is a bug that \viz_alpha must be the last definition of each hierarchy.
@@ -6111,7 +6121,7 @@
       \TLV
          // Single Core.
          
-         // m5+warpv() (but inlined to reduce macro depth)
+         /// m5+warpv() (but inlined to reduce macro depth)
          m5+cpu(/top)
          m5_if_eq_block(m5_FORMAL, 1, ['
          m5+formal()
