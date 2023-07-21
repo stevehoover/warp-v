@@ -20,6 +20,9 @@ pip3 install sandpiper-saas
 # To use Makerchip for editing.
 pip3 install makerchip-app
 
+# Installs for riscv-formal (in addition to apt installs below and (cd formal && make env)).
+python3 -m pip install Verilog_VCD click
+
 echo -e "\e[0Ksection_end:`date +%s`:init-pip\r\e[0K"
 
 # Installations for Ubuntu.
@@ -30,8 +33,8 @@ if which apt > /dev/null; then
   # Required by yosys.
   $APT_GET build-essential clang bison flex \
 	    libreadline-dev gawk tcl-dev libffi-dev git \
-	    graphviz xdot pkg-config python3 libboost-system-dev \
-	    libboost-python-dev libboost-filesystem-dev zlib1g-dev
+	    graphviz xdot pkg-config python3 zlib1g-dev
+  # Removed:  libboost-system-dev libboost-python-dev libboost-filesystem-dev
   # To avoid a bug with `gitk` and `git gui` that results from our use of special unicode
   # character in warp-v.tlv (for visualization):
   $APT_GET unifont

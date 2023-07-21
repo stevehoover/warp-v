@@ -53,7 +53,7 @@ if [ $? -eq 1 ]; then
   cd yosys && \
   comment 'Capture the commit ID' && \
   (git rev-parse HEAD > ../../env/yosys_commit_id.txt) && \
-  make config-clang && \
+  make config-gcc && \
   make && \
   echo "pwd of env_build/yosys: $PWD" && \
   mv yosys* ../../env/bin && \
@@ -78,7 +78,7 @@ echo -e "\e[0Ksection_start:`date +%s`:make-env-symbiyosys[collapsed=true]\r\e[0
 
 check_previous_build "SymbiYosys"
 if [ $? -eq 1 ]; then
-  git clone https://github.com/cliffordwolf/SymbiYosys.git SymbiYosys && \
+  git clone git@github.com:YosysHQ/sby.git SymbiYosys && \
   cd SymbiYosys && \
   comment 'Capture the commit ID' && \
   (git rev-parse HEAD > ../../env/SymbiYosys_commit_id.txt) && \

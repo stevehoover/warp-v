@@ -39,9 +39,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 `define TLV_LATCH(in, out, clk) \
 always @ (in, clk) begin        \
   if (clk === 1'b1)             \
-    out <= in;                  \
+    out = in;                   \
   else if (clk === 1'bx)        \
-    out <= 'x;                  \
+    out = 'x;                   \
 end
 `else
 `define TLV_LATCH(in, out, clk) always @ (in, clk) if (clk == 1'b1) out <= in;
@@ -52,9 +52,9 @@ end
 `define TLV_BLATCH(out, in, clk) \
 always @ (in, clk) begin         \
   if (!clk === 1'b1)             \
-    out <= in;                   \
+    out = in;                    \
   else if (!clk === 1'bx)        \
-    out <= 'x;                   \
+    out = 'x;                    \
 end
 `else
 `define TLV_BLATCH(out, in, clk) always @ (in, clk) if (!clk == 1'b1) out <= in;

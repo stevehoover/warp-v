@@ -32,7 +32,7 @@ module clk_gate (output logic gated_clk, input logic free_clk, func_en, pwr_en, 
    logic clk_en;
    logic latched_clk_en  /*verilator clock_enable*/;
    always_comb clk_en = func_en & (pwr_en | gating_override);
-   always_latch if (~free_clk) latched_clk_en <= clk_en;
+   always_latch if (~free_clk) latched_clk_en = clk_en;
              // latched_clk_en <= (~free_clk) ? clk_en : latched_clk_en;
    always_comb gated_clk = latched_clk_en & free_clk;
 endmodule
