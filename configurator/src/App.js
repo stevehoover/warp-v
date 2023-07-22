@@ -117,33 +117,33 @@ const initialProgramText = `# /=====================\\
 # Store incremental results in memory locations 0..9. (1, 3, 6, 10, ...)
 #
 # Regs:
-# t1: cnt
-# t2: ten
-# t3: out
-# t4: tmp
-# t5: offset
-# t6: store addr
+# t0: cnt
+# a2: ten
+# a0: out
+# t1: final value
+# a1: expected result
+# t2: store addr
 reset:
-   ORI t6, zero, 0          #     store_addr = 0
-   ORI t1, zero, 1          #     cnt = 1
-   ORI t2, zero, 10         #     ten = 10
-   ORI t3, zero, 0          #     out = 0
+   ORI t2, zero, 0          #     store_addr = 0
+   ORI t0, zero, 1          #     cnt = 1
+   ORI a2, zero, 10         #     ten = 10
+   ORI a0, zero, 0          #     out = 0
 loop:
-   ADD t3, t1, t3           #  -> out += cnt
-   SW t6, 0(t3)             #     store out at store_addr
-   ADDI t1, t1, 1           #     cnt ++
-   ADDI t6, t6, 4           #     store_addr++
-   BLT t1, t2, loop         #  ^- branch back if cnt < 10
+   ADD a0, t0, a0           #  -> out += cnt
+   SW a0, 0(t2)             #     store out at store_addr
+   ADDI t0, t0, 1           #     cnt++
+   ADDI t2, t2, 4           #     store_addr++
+   BLT t0, a2, loop         #  ^- branch back if cnt < 10
 # Result should be 0x2d.
-   LW t4, -4(t6)            #     load the final value into tmp
-   ADDI t5, zero, 0x2d      #     expected result (0x2d)
-   BEQ t4, t5, pass         #     pass if as expected
+   LW t1, -4(t2)            #     load the final value
+   ADDI a1, zero, 0x2d      #     expected result (0x2d)
+   BEQ t1, a1, pass         #     pass if as expected
 
    # Branch to one of these to report pass/fail to the default testbench.
 fail:
-   ADD t5, t5, zero         #     nop fail
+   ADD a1, a1, zero         #     nop fail
 pass:
-   ADD t4, t4, zero         #     nop pass
+   ADD t1, t1, zero         #     nop pass
 `
 
 export default App;

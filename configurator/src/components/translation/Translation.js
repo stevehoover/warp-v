@@ -83,7 +83,7 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${prog
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
          ${programText.split("\n").join("\n         ")}
       '])\n   })` : ``}
-m5+module_def()
+m4+module_def()
 \\TLV
    m5+warpv_top()
 \\SV
