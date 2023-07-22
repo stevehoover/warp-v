@@ -9,7 +9,7 @@ export const ConfigurationParameters = [
         defaultValue: 1,
         jsonKey: "cores",
         type: Int,
-        min: 0,
+        min: 1,
         validator: (input) => input >= 0,
         configurationCategory: "CPU",
         description: "Number of cores"
