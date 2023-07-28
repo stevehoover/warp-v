@@ -27,6 +27,7 @@ function MobileNavContent(props) {
             >
                 <Stack spacing='0' divider={<StackDivider borderColor='whiteAlpha.200'/>}>
                     {links.map((link, index) => (
+                        {/* TODO: This results in a warning about <li> within <li>. */}
                         <NavItemTransition key={index}>
                             <NavLink.Mobile href={link.href}>{link.label}</NavLink.Mobile>
                         </NavItemTransition>

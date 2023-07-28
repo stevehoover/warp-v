@@ -132,17 +132,16 @@
    /   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
    /     for such instructions
    / 
-   / Handling loads and long-latency instructions:
+   / Instruction flow for loads and long-latency instructions:
    /    
-   /   o For any instruction that requires second issue, some of its attributes (such as
-   /     destination register, raw value, rs1/rs2/rd) depending on where they are consumed
-   /     need to be retained. $ANY construct is used to make this logic generic and use-dependent. 
-   /   o In case of loads, the /orig_load_inst scope is used to hook up the 
-   /     mem pipeline to the CPU pipeline in first pipestage (of CPU) to reserve slot for the load 
-   /     flowing from mem to CPU in the second issue.
-   /   o For non-pipelined instructions such as mul-div, the /hold_inst scope retains the values
-   /     till the second issue.
-   /   o Both the scopes are merged into /orig_inst scope depending on which instruction the second
+   /   o For any instruction that requires second issue, some of its fields (such as
+   /     destination register, raw value, rs1/rs2/rd) need to be available to
+   /     the second issue. $ANY construct is used to make this logic generic and use-dependent. 
+   /   o In case of loads, the memory feeds the original instruction to its second issue in
+   /     /instr/orig_load_inst scope. The early warning comes in m5_NEXT_PC_STAGE to redirect the
+   /     PC, and the instruction follows by m5_DECODE_STAGE.
+   /   o For non-pipelined instructions such as mul-div, the /instr/hold_inst scope retains the instruction.
+   /   o Both the scopes are merged into /instr/orig_inst scope depending on which instruction the second
    /     issue belongs to.
    /
    / Bypass:
@@ -186,7 +185,7 @@
    / A dirt-simple CPU for educational purposes.
 
    / What's interesting about this CPU?
-   /   o It's super small.
+   /   o The code and ISA are super small.
    /   o It's easy to play with an learn from.
    /   o Instructions are short, kind-of-readable strings, so no assembler is needed.
    /     They would map directly to a denser (~17-bit) encoding if desired.
@@ -298,11 +297,11 @@
    / For a while, remain backward-compatible with M4 parameterization.
    macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_var(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
    import_m4_params(PROG_NAME, ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
-                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
+                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_MEM_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
                     EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
-                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL)
+                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, UETRV_PCORE)
    
    / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
@@ -337,6 +336,10 @@
      ['# Number of words in the data memory.'],
      DMEM_SIZE, 32)
    
+   default_var(
+      ['# 1 to enable Ali Imran's CPU implementation'],
+      UETRV_PCORE, 1)
+   
    / --------------
    / For multi-core
    / --------------
@@ -370,11 +373,13 @@
    default_var(
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m5_if(m5_IMPL, SRAM, HARDCODED_ARRAY),
-      ['# DMem style: SRAM, ARRAY, STUBBED'],
+      ['# DMem style: SRAM, ARRAY, STUBBED, '],
       DMEM_STYLE, m5_if(m5_IMPL, SRAM, ARRAY),
       ['# RF style: ARRAY, STUBBED'],
       RF_STYLE, ARRAY)
-
+   /Does memory produce replays. Should be based on selected memory.
+   default_var(MEM_REPLAYS, m5_UETRV_PCORE)
+   
    default_var(
      ['# A hook for a software-controlled reset. None by default.'],
      soft_reset, 1'b0,
@@ -383,6 +388,7 @@
          Currently, this is envisioned for CSR writes that cannot be processed, such as
          NoC packet writes.'],
      cpu_blocked, 1'b0)
+   
 
    / Define the implementation configuration, including pipeline depth and staging.
    / Define the following:
@@ -402,13 +408,10 @@
    /     REG_WR_STAGE: Register file write.
    /   Deltas (default to 0):
    /      DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
-   /   Latencies (default to 0):
-   /     LD_RETURN_ALIGN: Alignment of load return pseudo-instruction into |mem pipeline.
-   /                         If |mem stages reflect nominal alignment w/ load instruction, this is the
-   /                         nominal load latency.
    /   Deltas (default to 0):
    /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
    /      EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
+   /      EXTRA_MEM_REPLAY_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for mem instruction replays.
    /      EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
    /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
    /      EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
@@ -484,6 +487,7 @@
       DELAY_BRANCH_TARGET_CALC, 0,
       EXTRA_PRED_TAKEN_BUBBLE, 0,
       EXTRA_REPLAY_BUBBLE, 0,
+      EXTRA_MEM_REPLAY_BUBBLE, 0,
       EXTRA_JUMP_BUBBLE, 0,
       EXTRA_BRANCH_BUBBLE, 0,
       EXTRA_INDIRECT_JUMP_BUBBLE, 0,
@@ -605,6 +609,7 @@
    / (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
    vars(PRED_TAKEN_BUBBLES, m5_calc(m5_BRANCH_PRED_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_PRED_TAKEN_BUBBLE),
         REPLAY_BUBBLES,     m5_calc(m5_REG_RD_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_REPLAY_BUBBLE),
+        MEM_REPLAY_BUBBLES, m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_MEM_REPLAY_BUBBLE),
         JUMP_BUBBLES,       m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_JUMP_BUBBLE),
         BRANCH_BUBBLES,     m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_BRANCH_BUBBLE),
         INDIRECT_JUMP_BUBBLES, m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_INDIRECT_JUMP_BUBBLE),
@@ -709,7 +714,8 @@
    
    var(isa, m5_translit(m5_ISA, ['A-Z'], ['a-z']))   // A lower-case version of ISA.
    
-   / Instruction Memory macros are responsible for providing the instruction memory interface for fetch, as:
+   / Instruction Memory macros are responsible for providing the instruction memory
+   / interface for fetch, as:
    / Inputs:
    /   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
    / Outputs:
@@ -896,6 +902,7 @@
       ['NO_FETCH, $NoFetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
       m5_if_eq(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
       ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 0'],
+      m5_if(m5_MEM_REPLAYS, ['['MEM_REPLAY, $mem_replay, $Pc, 1, "M", "#60c060", 62, 53, 0'],'])
       ['JUMP, $jump, $jump_target, 0, "Jp", "purple", 61, 11, 0'],
       ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "Br", "blue", 70, 20, 0'],
       m5_if_eq(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
@@ -1389,7 +1396,7 @@
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
-            $second_issue ? /orig_inst$ld_value :  // (Only loads are issued twice.)
+            $second_issue ? /orig_inst$ld_data :  // (Only loads are issued twice.)
             $st ? /src[1]$value :
             $op_full ? $op_full_rslt :
             $op_compare ? {12{$compare_rslt}} :
@@ -2549,53 +2556,28 @@
    @_exe_stage
       m5+riscv_csr_logic()
       
-      // Memory inputs.
+      // Memory redirects.
       ?$valid_exe
          $unnatural_addr_trap = ($ld_st_word && ($addr[1:0] != 2'b00)) || ($ld_st_half && $addr[0]);
+      
+      // Memory inputs
       $ld_st_cond = $ld_st && $valid_exe;
       ?$ld_st_cond
          $addr[m5_ADDR_RANGE] = m5_if(m5_EXT_F, ['($is_fsw_instr ? /src[1]$reg_value : /src[1]$reg_value)'],['/src[1]$reg_value']) + ($ld ? $raw_i_imm : $raw_s_imm);
          
-         // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
+      // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
       ?$st_cond
          // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
          $st_reg_value[m5_WORD_RANGE] = m5_if(m5_EXT_F, ['$is_fsw_instr ? /fpu/src[2]$reg_value :'])
                                                   /src[2]$reg_value;
-         $st_value[m5_WORD_RANGE] =
-              $ld_st_word ? $st_reg_value :            // word
-              $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
-                            {4{$st_reg_value[7:0]}};   // byte
-         $st_mask[3:0] =
-              $ld_st_word ? 4'hf :                     // word
-              $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
-                            (4'h1 << $addr[1:0]);      // byte
-
-      // Swizzle bytes for load result
+         m5+swizzle_4_store_bytes()
       ?$second_issue_ld
          /orig_load_inst
             $spec_ld_cond = $spec_ld;
             ?$spec_ld_cond
-               // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
-               $sign_bit =
-                  ! $raw_funct3[2] && (  // Signed && ...
-                     $ld_st_word ? $ld_value[31] :
-                     $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
-                                   (($addr[1:0] == 2'b00) ? $ld_value[7] :
-                                    ($addr[1:0] == 2'b01) ? $ld_value[15] :
-                                    ($addr[1:0] == 2'b10) ? $ld_value[23] :
-                                                            $ld_value[31]
-                                   )
-                  );
-               {$ld_rslt[m5_WORD_RANGE], $ld_mask[3:0]} =
-                    $ld_st_word ? {$ld_value, 4'b1111} :
-                    $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? {$ld_value[31:16], 4'b1100} :
-                                                               {$ld_value[15:0] , 4'b0011}} :
-                                  {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? {$ld_value[7:0]  , 4'b0001} :
-                                                    ($addr[1:0] == 2'b01) ? {$ld_value[15:8] , 4'b0010} :
-                                                    ($addr[1:0] == 2'b10) ? {$ld_value[23:16], 4'b0100} :
-                                                                            {$ld_value[31:24], 4'b1000}};
-               `BOGUS_USE($ld_mask) // It's only for formal verification.
+               m5+sign_extend_4_load_bytes(! $raw_funct3[2])
+      
       // ISA-specific trap conditions:
       // I can't see in the spec which of these is to commit results. I've made choices that make riscv-formal happy.
       $non_aborting_isa_trap = ($branch && $taken && $misaligned_pc) ||
@@ -2889,43 +2871,15 @@
       ?$ld_st_cond
          $addr[m5_ADDR_RANGE] = /src[1]$reg_value + $imm_value;
          
-         // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
+      // Hardware assumes natural alignment. Otherwise, trap, and handle in s/w (though no s/w provided).
       $st_cond = $st && $valid_exe;
       ?$st_cond
          // Provide a value to store, naturally-aligned to memory, that will work regardless of the lower $addr bits.
          $st_reg_value[m5_WORD_RANGE] = /src[2]$reg_value;
-         $st_value[m5_WORD_RANGE] =
-              $ld_st_word ? $st_reg_value :            // word
-              $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
-                            {4{$st_reg_value[7:0]}};   // byte
-         $st_mask[3:0] =
-              $ld_st_word ? 4'hf :                     // word
-              $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
-                            (4'h1 << $addr[1:0]);      // byte
-      // Swizzle bytes for load result (assuming natural alignment).
+         m5+swizzle_4_store_bytes()
       ?$second_issue
          /orig_inst
-            // (Verilator didn't like indexing $ld_value by signal math, so we do these the long way.)
-            $sign_bit =
-               ! ($is_lbu || $is_lhu) && (  // Signed && ...
-                  $ld_st_word ? $ld_value[31] :
-                  $ld_st_half ? ($addr[1] ? $ld_value[31] : $ld_value[15]) :
-                                (($addr[1:0] == 2'b00) ? $ld_value[7] :
-                                 ($addr[1:0] == 2'b01) ? $ld_value[15] :
-                                 ($addr[1:0] == 2'b10) ? $ld_value[23] :
-                                                         $ld_value[31]
-                                )
-               );
-            $ld_rslt[m5_WORD_RANGE] =
-                 $ld_st_word ? $ld_value :
-                 $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? $ld_value[31:16] :
-                                                            $ld_value[15:0] } :
-                               {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? $ld_value[7:0]   :
-                                                 ($addr[1:0] == 2'b01) ? $ld_value[15:8]  :
-                                                 ($addr[1:0] == 2'b10) ? $ld_value[23:16] :
-                                                                         $ld_value[31:24]};
-      
-      
+            m5+sign_extend_4_load_bytes(!($is_lbu || $is_lhu))
       // ISA-specific trap conditions:
       $non_aborting_isa_trap = $is_break || $is_syscall;
       $aborting_isa_trap =     ($ld_st && $unnatural_addr_trap);
@@ -3018,7 +2972,7 @@
    @_rslt_stage
       ?$dest_valid
          $rslt[11:0] =
-            $second_issue ? /orig_inst$ld_value :
+            $second_issue ? /orig_inst$ld_data :
             $st ? /src[1]$value :
             $op_full ? $op_full_rslt :
             $op_compare ? {12{$compare_rslt}} :
@@ -3083,7 +3037,7 @@
       $aborting_isa_trap = 1'b0;
    @_rslt_stage
       $rslt[m5_WORD_RANGE] =
-         $second_issue ? /orig_inst$ld_value :
+         $second_issue ? /orig_inst$ld_data :
          $st ? /src[1]$value :
          $exe_rslt;
          
@@ -3096,32 +3050,71 @@
 
 
 
-///=========================///
-///                         ///
-///   MEMORY COMPONENT(S)   ///
-///                         ///
-///=========================///
+/**
+=========================
+                         
+   MEMORY COMPONENT(S)   
+                         
+=========================
 
-/// A memory component provides a word-wide memory striped in m5_ADDRS_PER_WORD independent banks to provide
-/// address-granular write. The access protocol is asynchronous and out-of-order, accepting
-/// a read or write (load or store) each cycle, where stores are visible to loads on the following cycle.
-/// Relative to |fetch/instr:
-/// On $valid_st, stores the data $st_value at $addr, masked by $st_mask.
-/// On $spec_ld, loads the word at $addr (ignoring intra-word bits).
-/// The returned load result can be accessed from /_cpu|mem/data<<m5_ALIGNMENT_VALUE$ANY as $ld_value and $ld
-/// (along w/ everything else in the input instruction).
+A memory component provides a word-wide memory striped in m5_ADDRS_PER_WORD independent banks to provide
+address-granular write. The access protocol is asynchronous and out-of-order, accepting
+a read or write (load or store) each cycle, where stores are visible to loads on the following cycle.
 
-/// A fake memory with fixed latency.
-/// The memory is placed in the fetch pipeline.
-/// TODO: (/_cpu, @_mem, @_align)
-\TLV fixed_latency_fake_memory(/_cpu, _ALIGNMENT_VALUE)
+The memory may force a replay if it cannot process the memory operation. (Note that the CPU forces a
+replay for pending destinations, so all outstanding loads will have unique destination registers
+(excluding x0 (prefetches)). This handles write-after-write of load destination registers.)
+
+The memory returns an early indication that the data is being returned by m5_NEXT_PC_STAGE to generate
+a second-issue load, and the data (and associated control) must be returned by m5_DECODE_STAGE to
+prepare to write the register file.
+TODO: Test whether we do a reg write for 2nd-issue of x0-dest loads.
+
+TODO: Currently, there is no backpressure mechanism, but one may need to be added to
+address possible conflicts between long-latency second-issue instructions and second-issue loads.
+
+On $valid_st, the memory stores $st_value at $addr, masked by $st_mask.
+On $spec_ld, the memory loads the word at $addr. (Intra-word lsbs of $addr are ignored.)
+$second_issue_ld is the early indication, followed, perhaps later, by $ld_data along with
+the entire original instruction.
+
+Parameters:
+   m5_LD_RETURN_ALIGN specifies the alignment of /inst and /orig/instr for fixed-latency memories.
+
+Inputs:
+   |fetch
+      /instr
+         @m5_DECODE_STAGE
+            $spec_ld: The instruction is a load, but may not retire.
+         @m5_EXECUTE_STAGE
+            $valid_ld: (optional) Load commits.
+            $valid_st: Good-path store.
+            $st_value[m5_WORD_RANGE]: The value to store.
+            $addr[m5_DATA_MEM_WORDS_INDEX_MAX + m5_SUB_WORD_BITS : m5_SUB_WORD_BITS]: The word address.
+            $st_mask[m5_calc(m5_ADDRS_PER_WORD-1):0]
+Outputs:
+   |fetch
+      /instr
+         @m5_EXECUTE_STAGE  # Of the original instruction.
+            $mem_replay: A replay triggered by the memory.
+         @m5_NEXT_PC_STAGE  # Of the second-issue.
+            $second_issue_ld: Issue the "second-issue load".
+         @m5_DECODE_STAGE
+            ?$second_issue_ld
+               /orig_load_inst
+                  $ANY: The original instruction (notably: $ld_mask and $ld_rslt).
+                  $ld_data[m5_WORD_RANGE]: The loaded value.
+**/
+\TLV dmem(/_cpu)
    // This macro assumes little-endian.
-   m5_if(m5_BIG_ENDIAN, ['m5_errprint(['Error: fixed_latency_fake_memory macro only supports little-endian memory.'])'])
+   m5_if(m5_BIG_ENDIAN, ['m5_errprint(['Error: dmem macro only supports little-endian memory.'])'])
    |fetch
       /instr
          // ====
          // Load
          // ====
+         @m5_EXECUTE_STAGE
+            m5_if(m5_UETRV_PCORE, ['$mem_replay = 1'b0;'])
          @m5_MEM_WR_STAGE
             /* DMEM_STYLE: m5_DMEM_STYLE */
             m5+ifelse(m5_DMEM_STYLE, STUBBED,
@@ -3168,9 +3161,11 @@
                   *dmem_wea0  = !(| *dmem_wea); // Active low write
                   *dmem_ena   = !$valid_st;  // Active low enable
                   >>1$ld_data[m5_WORD_RANGE]  = *dmem_doutb;
-               ,
+               ,  /// Default to ARRAY.
                \TLV
-                  // Array. Required for VIZ.
+                  // A simple array memory with fixed latency.
+                  // The memory is placed in the fetch pipeline.
+                  // Required for VIZ.
                   /bank[m5_calc(m5_ADDRS_PER_WORD-1):0]
                      $ANY = /instr$ANY; // Find signal from outside of /bank.
                      /mem[m5_DATA_MEM_WORDS_RANGE]
@@ -3197,26 +3192,67 @@
                   // build the concatination.
                   $ld_data[m5_WORD_RANGE] = {m5_repeat(m5_ADDRS_PER_WORD, ['m5_if_eq(m5_LoopCnt, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_LoopCnt - 1)]$ld_data'])};
                )
-   // Return loads in |mem pipeline. We just hook up the |mem pipeline to the |fetch pipeline w/ the
-   // right alignment.
-   |mem
-      /data
-         // This becomes a one-liner once $ANY acts on subscopes.
-         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - _ALIGNMENT_VALUE)
-            $ANY = /_cpu|fetch/instr>>_ALIGNMENT_VALUE$ANY;
-            /src[2:1]
-               $ANY = /_cpu|fetch/instr/src>>_ALIGNMENT_VALUE$ANY;
-            m5+ifelse(m5_EXT_F, 1,
-               \TLV
-                  /fpu
-                     $ANY = /_cpu|fetch/instr/fpu>>_ALIGNMENT_VALUE$ANY;
-                     ///src[2:1]
-                     //   $ANY = /_cpu|fetch/instr/fpu/src>>_ALIGNMENT_VALUE$ANY;
-               )
-         // For consistency with other memories, assign $ld_value in @m5_MEM_WR_STAGE+1. 
-         @m5_calc(m5_strip_prefix(['@m5_MEM_WR_STAGE']) - _ALIGNMENT_VALUE + 1)
-            $ld_value[m5_WORD_RANGE] = /_cpu|fetch/instr>>_ALIGNMENT_VALUE$ld_data;
+            
+   |fetch
+      /instr
+         @m5_NEXT_PC_STAGE
+            // A returning load clobbers the instruction.
+            // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
+            //  it is non-speculative. Both could easily be fixed.)
+            // TODO: It looks like we're assuming natural alignment of |mem w/ |fetch of second issue??
+            $second_issue_ld = ! $reset && /instr>>m5_LD_RETURN_ALIGN$valid_ld && 1'b\m5_INJECT_RETURNING_LD;
+         @m5_DECODE_STAGE
+            // This reduces significantly once $ANY acts on subscope.
+            // TODO: Should probably combine /orig_load_inst and /orig_inst.
+            ?$second_issue_ld
+               // This scope holds the original load for a returning load.
+               /orig_load_inst
+                  $ANY = /instr>>m5_LD_RETURN_ALIGN$ANY;
+                  /src[2:1]
+                     $ANY = /instr/src>>m5_LD_RETURN_ALIGN$ANY;
+                  m5+ifelse(m5_EXT_F, 1,
+                     \TLV
+                        /fpu
+                           $ANY = /instr/fpu>>m5_LD_RETURN_ALIGN$ANY;
+                           ///src[2:1]
+                           //   $ANY = /instr/fpu/src>>m5_LD_RETURN_ALIGN$ANY;
+                     )
 
+/// For ISAs with 4-byte words and byte-granular loads/stores.
+///
+/// Compute $st_value and $st_mask for the memory.
+\TLV swizzle_4_store_bytes()
+   $st_value[m5_WORD_RANGE] =
+        $ld_st_word ? $st_reg_value :            // word
+        $ld_st_half ? {2{$st_reg_value[15:0]}} : // half
+                      {4{$st_reg_value[7:0]}};   // byte
+   $st_mask[3:0] =
+        $ld_st_word ? 4'hf :                     // word
+        $ld_st_half ? ($addr[1] ? 4'hc : 4'h3) : // half
+                      (4'h1 << $addr[1:0]);      // byte
+//
+// Compute the sign-extended $ld_rslt.
+\TLV sign_extend_4_load_bytes($_signed)
+   // (Verilator didn't like indexing $ld_data by signal math, so we do these the long way.)
+   $sign_bit =
+      ($_signed) && (
+         $ld_st_word ? $ld_data[31] :
+         $ld_st_half ? ($addr[1] ? $ld_data[31] : $ld_data[15]) :
+                       (($addr[1:0] == 2'b00) ? $ld_data[7] :
+                        ($addr[1:0] == 2'b01) ? $ld_data[15] :
+                        ($addr[1:0] == 2'b10) ? $ld_data[23] :
+                                                $ld_data[31]
+                       )
+      );
+   {$ld_rslt[m5_WORD_RANGE], $ld_mask[3:0]} =
+        $ld_st_word ? {$ld_data, 4'b1111} :
+        $ld_st_half ? {{16{$sign_bit}}, $addr[1] ? {$ld_data[31:16], 4'b1100} :
+                                                   {$ld_data[15:0] , 4'b0011}} :
+                      {{24{$sign_bit}}, ($addr[1:0] == 2'b00) ? {$ld_data[7:0]  , 4'b0001} :
+                                        ($addr[1:0] == 2'b01) ? {$ld_data[15:8] , 4'b0010} :
+                                        ($addr[1:0] == 2'b10) ? {$ld_data[23:16], 4'b0100} :
+                                                                {$ld_data[31:24], 4'b1000}};
+   `BOGUS_USE($ld_mask) // It's only for RISC-V formal verification.
 
 
 
@@ -3680,10 +3716,6 @@
                )
             
             
-            // A returning load clobbers the instruction.
-            // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
-            //  it is non-speculative. Both could easily be fixed.)
-            $second_issue_ld = ! $reset && /_cpu|mem/data>>m5_LD_RETURN_ALIGN$valid_ld && 1'b\m5_INJECT_RETURNING_LD;
             $second_issue = ($second_issue_ld m5_if(m5_EXT_M, ['|| $second_issue_div_mul']) m5_if(m5_EXT_F, ['|| $fpu_second_issue_div_sqrt']) m5_if(m5_EXT_B, ['|| $second_issue_clmul_crc']));
             // TODO: Can't get this assertion to work for both Verilator and Yosys. Verilator wants a clock and Yosys doesn't.
             //\SV_plus
@@ -3692,34 +3724,6 @@
             $commit_second_issue = $second_issue;  // TODO: Updating this to have a speculative and non-speculative version.
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
-            // This reduces significantly once $ANY acts on subscope.
-            // TODO: Should probably combine /orig_load_inst and /orig_inst.
-            ?$second_issue_ld
-               // This scope holds the original load for a returning load.
-               /orig_load_inst
-                  $ANY = /_cpu|mem/data>>m5_LD_RETURN_ALIGN$ANY;
-                  /src[2:1]
-                     $ANY = /_cpu|mem/data/src>>m5_LD_RETURN_ALIGN$ANY;
-                  m5+ifelse(m5_EXT_F, 1,
-                     \TLV
-                        /fpu
-                           $ANY = /_cpu|mem/data/fpu>>m5_LD_RETURN_ALIGN$ANY;
-                           ///src[2:1]
-                           //   $ANY = /_cpu|mem/data/fpu/src>>m5_LD_RETURN_ALIGN$ANY;
-                     )
-            ?$second_issue
-               /orig_inst
-                  // pull values from /orig_load_inst or /hold_inst depending on which second issue
-                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst$ANY;
-                  /src[2:1]
-                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/src$ANY;
-                  m5+ifelse(m5_EXT_F, 1,
-                     \TLV
-                        /fpu
-                           $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu$ANY;
-                           ///src[3:1]
-                           //   $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu/src$ANY;
-                     )
             // Next PC
             $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1;
             // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
@@ -3738,6 +3742,20 @@
             // DECODE
             // ======
 
+            ?$second_issue
+               /orig_inst
+                  // pull values from /orig_load_inst or /hold_inst depending on which second issue
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst$ANY;
+                  /src[2:1]
+                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/src$ANY;
+                  m5+ifelse(m5_EXT_F, 1,
+                     \TLV
+                        /fpu
+                           $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu$ANY;
+                           ///src[3:1]
+                           //   $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu/src$ANY;
+                     )
+            
             // Decode of the fetched instruction
             $valid_decode = $fetch;  // Always decode if we fetch.
             $valid_decode_branch = $valid_decode && $branch;
@@ -3745,7 +3763,7 @@
             //$split_ld = $spec_ld && 1'b\m5_INJECT_RETURNING_LD;
             // Instantiate the program.
             m5+call(m5_isa['_decode'])
-         // Instantiate the program.
+         // Instantiate the branch predictor.
          m5+call(['branch_pred_']m5_BRANCH_PRED)
          
          @m5_REG_RD_STAGE
@@ -3836,16 +3854,16 @@
             '])
             
             // Conditions that commit results.
-            $commit_dest_reg = ($dest_reg_valid && $commit) || ($commit_second_issue m5_if(m5_EXT_F, ['&&  (! >>m5_LD_RETURN_ALIGN$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
+            $commit_dest_reg = ($dest_reg_valid && $commit) || ($commit_second_issue m5_if(m5_EXT_F, ['&&  (! /orig_load_inst$is_flw_instr) && (! $fpu_second_issue_div_sqrt)']) );
 
             m5_if_eq_block(m5_EXT_F, 1, ['
             /fpu
-               $commit_dest_reg = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$commit_second_issue && /instr>>m5_LD_RETURN_ALIGN$is_flw_instr));
+               $commit_dest_reg = ($dest_reg_valid && /instr$commit) || (/instr$fpu_second_issue_div_sqrt || (/instr$commit_second_issue && /instr/orig_load_inst$is_flw_instr));
             '])
             $valid_ld = $ld && $commit;
             $valid_st = $st && $commit;
 
-   m5+fixed_latency_fake_memory(/_cpu, 0)
+   m5+dmem(/_cpu)
    |fetch
       /instr
          // =========
@@ -4018,7 +4036,7 @@
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[m5_ADDR_MAX:2], 2'b0} : 0;
             *rvfi_mem_rmask   = /original$ld ? /orig_load_inst$ld_mask : 0;
             *rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
-            *rvfi_mem_rdata   = /original$ld ? /orig_load_inst$ld_value : 0;
+            *rvfi_mem_rdata   = /original$ld ? /orig_load_inst$ld_data : 0;
             *rvfi_mem_wdata   = $valid_st ? $st_value : 0;
 
             `BOGUS_USE(/src[2]$dummy)
