@@ -126,9 +126,8 @@
    /     instruction commits, will be a second issue of the instruction).
    /   o The data required during second issue can be passed to the commit stage using /orig_inst scope
    /   o It does not matter whether registers are marked pending, but we do.
-   /   o TODO: Currently, I believe our fixed-latency memory has lower latency than any non-pipelined instruction, but
-   /     without this, we must handle conflicts between 2nd-issue loads (and long-latency pipelined?) and non-pipelined. Non-pipelined
-   /     instructions are already held in /hold_inst, so I think this should be straight-forward.
+   /   o We must handle conflicts between second-issue loads (and long-latency pipelined?) and non-pipelined.
+   /     Loads are given highest priority, and second-issue of non-pipelined instructions can be held up.
    /   o \TLV m_extension() can serve as a reference implementation for correctly stalling the pipeline
    /     for such instructions
    / 
@@ -746,6 +745,8 @@
          define_vector(WORD, 32)
          define_hier(REGS, m5_if(m5_EXT_E, 16, 32), 1)
          define_hier(FPU_REGS, 32, 0)   /// (though, the hierarchy is called /regs, not /fpu_regs)
+         
+         var(ANY_NON_PIPELINED_INSTRS, m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B))
       ],
       ['MIPSI'], [
          define_vector_with_fields(INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
@@ -2229,6 +2230,7 @@
       m5_if_eq(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
       // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
       // TODO: This becomes a one-liner once $ANY acts on subscope.
+      // TODO: Use the recirculation condition to instead condition the clock.
       /hold_inst
          $ANY = 1'b0 m5_if(m5_EXT_M, [' || (|fetch/instr$mulblk_valid || (|fetch/instr$div_stall && |fetch/instr$commit))']) m5_if(m5_EXT_F, [' || (|fetch/instr$fpu_div_sqrt_stall && |fetch/instr$commit)']) m5_if(m5_EXT_B, [' || ((|fetch/instr$clmul_stall || |fetch/instr$crc_stall) && |fetch/instr$commit)']) ? |fetch/instr$ANY : >>1$ANY;
          /src[2:1]
@@ -3070,8 +3072,8 @@ a second-issue load, and the data (and associated control) must be returned by m
 prepare to write the register file.
 TODO: Test whether we do a reg write for 2nd-issue of x0-dest loads.
 
-TODO: Currently, there is no backpressure mechanism, but one may need to be added to
-address possible conflicts between long-latency second-issue instructions and second-issue loads.
+Second-issue loads are given priority over other second-issue instructions, so when the memory
+says to second-issue them, we do.
 
 On $valid_st, the memory stores $st_value at $addr, masked by $st_mask.
 On $spec_ld, the memory loads the word at $addr. (Intra-word lsbs of $addr are ignored.)
@@ -3196,14 +3198,12 @@ Outputs:
    |fetch
       /instr
          @m5_NEXT_PC_STAGE
-            // A returning load clobbers the instruction.
+            // A returning load clobbers the instruction. Done here with fixed latency.
             // (Could do this with lower latency. Right now it goes through memory pipeline $ANY, and
             //  it is non-speculative. Both could easily be fixed.)
-            // TODO: It looks like we're assuming natural alignment of |mem w/ |fetch of second issue??
             $second_issue_ld = ! $reset && /instr>>m5_LD_RETURN_ALIGN$valid_ld && 1'b\m5_INJECT_RETURNING_LD;
          @m5_DECODE_STAGE
             // This reduces significantly once $ANY acts on subscope.
-            // TODO: Should probably combine /orig_load_inst and /orig_inst.
             ?$second_issue_ld
                // This scope holds the original load for a returning load.
                /orig_load_inst
@@ -3716,7 +3716,14 @@ Outputs:
                )
             
             
-            $second_issue = ($second_issue_ld m5_if(m5_EXT_M, ['|| $second_issue_div_mul']) m5_if(m5_EXT_F, ['|| $fpu_second_issue_div_sqrt']) m5_if(m5_EXT_B, ['|| $second_issue_clmul_crc']));
+            m5+ifelse(m5_ANY_NON_PIPELINED_INSTRS, 1,
+               \TLV
+                  // Determine second-issue non-pipelined instructions. Second-issue loads takes priority. $second_issue_non_pipelined_ready is held while we second-issue loads.
+                  $second_issue_non_pipelined_ready = 1'b0\m5_if(m5_EXT_M, [' || $second_issue_div_mul'])m5_if(m5_EXT_F, [' || $fpu_second_issue_div_sqrt'])m5_if(m5_EXT_B, [' || $second_issue_clmul_crc']) ||
+                                                      (>>1$second_issue_non_pipelined_ready && >>1$second_issue_ld);
+                  $second_issue_non_pipelined = $second_issue_non_pipelined_ready && ! $second_issue_ld;
+               )
+            $second_issue = ($second_issue_ld m5_if(m5_ANY_NON_PIPELINED_INSTRS, ['|| $second_issue_non_pipelined_ready']));
             // TODO: Can't get this assertion to work for both Verilator and Yosys. Verilator wants a clock and Yosys doesn't.
             //\SV_plus
             //   m4_assert(! $reset && $second_issue)  // $reset is factored in at the point of injection into this pipeline and that funnels into $second_issue.
@@ -3745,15 +3752,15 @@ Outputs:
             ?$second_issue
                /orig_inst
                   // pull values from /orig_load_inst or /hold_inst depending on which second issue
-                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst$ANY;
+                  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst$ANY m5_if(m5_ANY_NON_PIPELINED_INSTRS, [': /instr$second_issue_non_pipelined ? /instr/hold_inst>>m5_NON_PIPELINED_BUBBLES$ANY ']): /instr/orig_load_inst$ANY;
                   /src[2:1]
-                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_F, ['/instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/src$ANY;
+                     $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/src$ANY m5_if(m5_ANY_NON_PIPELINED_INSTRS, [': /instr$second_issue_non_pipelined ? /instr/hold_inst/src>>m5_NON_PIPELINED_BUBBLES$ANY ']): /instr/orig_load_inst/src$ANY;
                   m5+ifelse(m5_EXT_F, 1,
                      \TLV
                         /fpu
-                           $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu$ANY;
-                           ///src[3:1]
-                           //   $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu/src$ANY : m5_if(m5_EXT_M, ['/instr$second_issue_div_mul ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr$fpu_second_issue_div_sqrt ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY : m5_if(m5_EXT_B, ['/instr$second_issue_clmul_crc ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY :']) /instr/orig_load_inst/fpu/src$ANY;
+                           $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu$ANY m5_if(m5_ANY_NON_PIPELINED_INSTRS, [': /instr$second_issue_non_pipelined ? /instr/hold_inst/fpu>>m5_NON_PIPELINED_BUBBLES$ANY ']): /instr/orig_load_inst/fpu$ANY;
+                           //src[3:1]
+                           //  $ANY = /instr$second_issue_ld ? /instr/orig_load_inst/fpu/src$ANY m5_if(m5_ANY_NON_PIPELINED_INSTRS, [': /instr$second_issue_non_pipelined ? /instr/hold_inst/fpu/src>>m5_NON_PIPELINED_BUBBLES$ANY ']): /instr/orig_load_inst/fpu/src$ANY;
                      )
             
             // Decode of the fetched instruction
