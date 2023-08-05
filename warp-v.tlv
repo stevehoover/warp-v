@@ -373,7 +373,7 @@
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m5_if(m5_IMPL, SRAM, HARDCODED_ARRAY),
       ['# DMem style: SRAM, ARRAY, STUBBED, RANDOM'],
-      DMEM_STYLE, m5_if(m5_IMPL, SRAM, ARRAY),
+      DMEM_STYLE, m5_if(m5_IMPL, SRAM, RANDOM),
       ['# RF style: ARRAY, STUBBED'],
       RF_STYLE, ARRAY)
    default_var(
@@ -1912,7 +1912,7 @@
       \TLV
          ?$second_issue
             $non_pipelined_rslt[m5_WORD_RANGE] =
-                  >>1$second_issue_ld ? >>1$non_pipelined_rslt :   // Second-issue loads get priority over non-pipelined, so hold the non-pipelined result if second-issue load.
+                  >>1$second_issue_ld && >>1$second_issue_non_pipelined_ready ? >>1$non_pipelined_rslt :   // Second-issue loads get priority over non-pipelined, so hold the non-pipelined result if there was a collision.
                   m5_if_eq_block(m5_EXT_M, 1, ['
                   $second_issue_div_ready          ? >>m5_DIV_LATENCY$divblock_rslt :
                   $second_issue_mul_ready          ? >>m5_MUL_LATENCY$mulblock_rslt :
@@ -3247,14 +3247,13 @@ Outputs:
             \TLV
                // RANDOM memory.
                // A memory with RANDOM latency used to verify the CPU core.
-               // When a load is received, the load data is filled into a "load buffer" at the next
-               // sequential address and a random address is chosen from which to read the load buffer.
+               // When a load is received, the load data is filled into a "load buffer" at a random
+               // address. If the load would write to an occupied entry, the load is replayed.
+               // The buffer is read every cycle from an incrementing address.
                // If the entry is non-empty, the load data is returned.
-               // On cycles that do not receive load data, the load buffer read address is incremented
-               // and read from.
                
                /// The size of the load buffer. (Could make this a global config.)
-               m5_define_hier(LOAD_BUFFER, 10)
+               m5_define_hier(LOAD_BUFFER, 4)
                m5_set(LOAD_SCOPE, /_cpu|ld_buff_out/instr)
                |fetch
                   @m5_EXECUTE_STAGE
@@ -3265,11 +3264,16 @@ Outputs:
                      // Write on load.
                      $LdBuffWrAddr[m5_LOAD_BUFFER_INDEX_RANGE] <=
                           /instr$reset    ? m5_LOAD_BUFFER_INDEX_HIGH'b0 :
-                          // on write, increment with wrap
-                          /instr$valid_ld ? (
-                             $LdBuffWrAddr == m5_LOAD_BUFFER_MAX ? m5_LOAD_BUFFER_INDEX_HIGH'b0 :
-                                                                   $LdBuffWrAddr + m5_LOAD_BUFFER_INDEX_HIGH'b1
-                          ) :               $RETAIN;
+                          // use a random write address, keeping it within range
+                                            $rand_wr_addr\m5_if(2 ** m5_LOAD_BUFFER_INDEX_HIGH != m5_LOAD_BUFFER_HIGH, [' % m5_LOAD_BUFFER_HIGH']);
+                     // A random write address.
+                     m5+ifelse(m5_FORMAL, 1,
+                        \TLV
+                           `BOGUS_USE($$rand_wr_addr[m5_LOAD_BUFFER_INDEX_RANGE])  /// Dangling (random) input.
+                        ,
+                        \TLV
+                           m4_rand($rand_wr_addr, m5_LOAD_BUFFER_INDEX_MAX, 0)   // Explicit synthesizable random.
+                        )
                      /buffer[m5_LOAD_BUFFER_RANGE]
                         /instr
                            <<1$ANY = |fetch/instr$reset ? '0 :
@@ -3304,18 +3308,9 @@ Outputs:
                               // This has a minimum additional latency of 1 vs. ARRAY.
                   @m5_EXECUTE_STAGE
                      $reset = /_cpu|fetch/instr<>0$reset;
-                     // A random read address.
-                     m5+ifelse(m5_FORMAL, 1,
-                        \TLV
-                           `BOGUS_USE($$rand_rd_addr[m5_LOAD_BUFFER_INDEX_RANGE])  /// Dangling (random) input.
-                        ,
-                        \TLV
-                           m4_rand($rand_rd_addr, m5_LOAD_BUFFER_INDEX_MAX, 0)   // Explicit synthesizable random.
-                        )
-                     // Use random (if making forward progress) or incrementing address.
+                     // Constantly increment read address.
                      $LdBuffRdAddr[m5_LOAD_BUFFER_INDEX_RANGE] <=
                           $reset ? m5_LOAD_BUFFER_INDEX_HIGH'b0 :
-                          /_cpu|fetch/instr<>0$valid_ld ? ($rand_rd_addr % m5_LOAD_BUFFER_HIGH) :  // random, in range
                           // else, increment with wrap
                           $LdBuffRdAddr == m5_LOAD_BUFFER_MAX ? m5_LOAD_BUFFER_INDEX_HIGH'b0 :
                                             $LdBuffRdAddr + m5_LOAD_BUFFER_INDEX_HIGH'b1;
