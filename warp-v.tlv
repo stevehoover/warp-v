@@ -216,10 +216,10 @@
    /     ~ : Extended constant (D = {1[2:0], 2[2:0]})
    /     , : Combine (D = {1[11:6], 2[5:0]})
    /     ? : Conditional (D = 2 ? `0 : 1)
-   /   Load (Eg: "c=a:b") (D = [1 + 2] (typically 1 would be an immediate offset):
-   /     ) : Load
-   /   Store (Eg: "0=a;b") ([2] = 1):
-   /     ( : Store
+   /   Load (Eg: "c=a{b") (D = [1 + 2] (typically 1 would be an immediate offset):
+   /     { : Load
+   /   Store (Eg: "0=a}b") ([2] = 1):
+   /     } : Store
    /
    / A full-width immediate load sequence, to load octal 2017 is:
    /   a=2~0
@@ -330,7 +330,7 @@
    / Machine:
    default_var(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
-     ISA, MIPSI,
+     ISA, RISCV,
      ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
      STANDARD_CONFIG, 4-stage,
      ['# Number of words in the data memory.'],
@@ -524,7 +524,7 @@
       default_var(
          EXT_I, 1,
          EXT_E, 0,
-         EXT_M, 1,
+         EXT_M, 0,
          EXT_A, 0,
          EXT_F, 0,
          EXT_D, 0,
@@ -1253,11 +1253,10 @@
          "d=d+b", //  -> out += cnt
          "b=b+1", //     cnt ++
          "g=g+1", //     store_addr++
-         
-         "0=d;g",  //    store out at store_addr,
+         "0=d}g", //     store out at store_addr,
          "e=c-b", //     tmp = nine - cnt
          "p=f?e", //     branch back if tmp >= 0
-         "e=0)c", //     load the final value into tmp
+         "e=0{c", //     load the final value into tmp
          "P=0-1"  //     TERMINATE by jumping to -1
       }; 
 
@@ -1338,8 +1337,8 @@
       // Conditional
       $conditional = $char == "?";
       // Memory
-      $ld = $char == ")";
-      $st = $char == "(";
+      $ld = $char == "{";
+      $st = $char == "}";
       // Opcode classes:
       $arith = $add || $sub || $mul || $div;
       $compare = $eq || $ne || $lt || $gt || $le || $ge;
@@ -3711,7 +3710,7 @@ Outputs:
    /// Generated logic
    /// Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
    /// Avoid duplicate calls.
-   m5+ifelse(m5_if_var_ndef(OP5_00000_TYPE), 0,
+   m5+ifelse(m5_if_var_ndef(OP5_00000_TYPE, 1, 0), 1,
       \TLV
          m5+call(m5_isa['_gen'])
       )
