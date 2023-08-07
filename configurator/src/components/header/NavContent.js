@@ -26,8 +26,8 @@ function MobileNavContent(props) {
                 animate={isOpen ? 'enter' : 'exit'}
             >
                 <Stack spacing='0' divider={<StackDivider borderColor='whiteAlpha.200'/>}>
+                    {/* TODO: This results in a warning about <li> within <li>. */}
                     {links.map((link, index) => (
-                        {/* TODO: This results in a warning about <li> within <li>. */}
                         <NavItemTransition key={index}>
                             <NavLink.Mobile href={link.href}>{link.label}</NavLink.Mobile>
                         </NavItemTransition>
