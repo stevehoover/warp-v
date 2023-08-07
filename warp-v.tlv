@@ -300,7 +300,7 @@
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
                     EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
-                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, UETRV_PCORE)
+                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, NO_COUNTER_CSRS, UETRV_PCORE)
    
    / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
@@ -317,6 +317,7 @@
    / Default parameters for formal verification continuous integration testing.
    / FORMAL is only used within Makerchip in debug mode (for VIZ).
    default_var(FORMAL, 0)  // Uncomment to test formal verification in Makerchip.
+   default_var(NO_COUNTER_CSRS, m5_FORMAL)  // This can avoid new (and uninteresting) states for formal, I think.
    if_eq(m5_FORMAL, 1, [
       default_var(
          ISA, RISCV,
@@ -329,7 +330,7 @@
    / Machine:
    default_var(
      ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
-     ISA, RISCV,
+     ISA, MIPSI,
      ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
      STANDARD_CONFIG, 4-stage,
      ['# Number of words in the data memory.'],
@@ -523,7 +524,7 @@
       default_var(
          EXT_I, 1,
          EXT_E, 0,
-         EXT_M, 0,
+         EXT_M, 1,
          EXT_A, 0,
          EXT_F, 0,
          EXT_D, 0,
@@ -543,10 +544,17 @@
    ], POWER, [
    ], [
       / Dummy "ISA".
-      var(DMEM_SIZE, 4)  // Override for narrow address.
+      var(DMEM_SIZE, 4)  /// Override for narrow address.
       / Force predictor to fallthrough, since we can't predict early enough to help.
       var(BRANCH_PRED, ['fallthrough'])
    ])
+   
+   / For non-RISC-V ISAs, we still want these defined.
+   default_var(
+      EXT_M, 0,
+      EXT_F, 0,
+      EXT_B, 0)
+
    
    default_var(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
    default_var(
@@ -747,8 +755,6 @@
          define_vector(WORD, 32)
          define_hier(REGS, m5_if(m5_EXT_E, 16, 32), 1)
          define_hier(FPU_REGS, 32, 0)   /// (though, the hierarchy is called /regs, not /fpu_regs)
-         
-         var(ANY_NON_PIPELINED_INSTRS, m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B))
       ],
       ['MIPSI'], [
          define_vector_with_fields(INSTR, 32, OPCODE, 26, RS, 21, RT, 16, RD, 11, SHAMT, 6, FUNCT, 0)
@@ -766,6 +772,8 @@
          define_vector(WORD, 2)
          define_hier(REGS, 8)
       ])
+         
+   var(ANY_NON_PIPELINED_INSTRS, m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B))
    
    
    
@@ -1134,9 +1142,9 @@
    
    ~pragma_enable_verbose_checks()
    fn(sv_content, {
+      var(sv_out, [''])
       if_eq(m5_ISA, RISCV, [
          / Functions to append to sv_out. Verilator lint pragmas and SV includes.
-         var(sv_out, [''])
          fn(verilator_lint, on_off, tag, [
             / TODO: Use m4_output_sv_line in place of show...
             append_var(sv_out, m5_nl['   ']['m4_show(['m5_if(m4_include_url_depth, ['m5_nl['   ']'])['/* verilator lint_']']']m5_on_off m5_tag['['[' */']'])'])
@@ -1193,10 +1201,10 @@
 
    m5_eval(m5_sv_content())
 
-// A default testbench for all ISAs.
-// Pass when the assembler label "pass" is reached if defined. O.w. end of program.
-// Fail at the cycle limit or when the label "fail" is reached.
-// Requires m5+makerchip_pass_fail(..).
+/// A default testbench for all ISAs.
+/// Pass when the assembler label "pass" is reached if defined. O.w. end of program.
+/// Fail at the cycle limit or when the label "fail" is reached.
+/// Requires m5+makerchip_pass_fail(..).
 \TLV default_makerchip_tb()
    |fetch
       /instr
@@ -2694,7 +2702,7 @@
    ?$valid_decode
 
       // Extract fields of $raw (instruction) into $raw_<field>[x:0].
-      m5_into_fields(['m5_INSTR'], ['$raw'])
+      m5_into_fields(INSTR, ['$raw'])
       $raw_immediate[15:0] = $raw[15:0];
       $raw_address[25:0] = $raw[25:0];
       
@@ -3703,7 +3711,10 @@ Outputs:
    /// Generated logic
    /// Instantiate the _gen macro for the right ISA. (This approach is required for an m5-defined name.)
    /// Avoid duplicate calls.
-   m5_if_var_ndef(OP5_00000_TYPE, ['m5+call(m5_isa['_gen'])'])
+   m5+ifelse(m5_if_var_ndef(OP5_00000_TYPE), 0,
+      \TLV
+         m5+call(m5_isa['_gen'])
+      )
    // Instruction memory and fetch of $raw.
    m5+call(m5_IMEM_MACRO_NAME, m5_PROG_NAME)
 
@@ -4197,11 +4208,11 @@ Outputs:
 
             `BOGUS_USE(/src[2]$dummy)
 
-// Ingress/Egress packet buffers between the CPU and NoC.
-// Packet buffers are m5+vc_flop_fifo_v2(...)s. See m5+vc_flop_fifo_v2 definition in tlv_flow_lib package
-//   and instantiations below for interface.
-// A header flit is inserted containing {src, dest}.
-// NoC must provide |egress_out interface and |ingress_in m5+vc_flop_fifo_v2(...) interface.
+/// Ingress/Egress packet buffers between the CPU and NoC.
+/// Packet buffers are m5+vc_flop_fifo_v2(...)s. See m5+vc_flop_fifo_v2 definition in tlv_flow_lib package
+///   and instantiations below for interface.
+/// A header flit is inserted containing {src, dest}.
+/// NoC must provide |egress_out interface and |ingress_in m5+vc_flop_fifo_v2(...) interface.
 \TLV noc_cpu_buffers(/_cpu, #depth)
    // Egress FIFO.
 
@@ -4347,52 +4358,52 @@ Outputs:
 // MOVE OUT
 
 
-// Register insertion ring.
-//
-// See diagram here: https://docs.google.com/drawings/d/1VS_oaNYgT3p4b64nGSAjs5FKSvs_-s8OTfTY4gQjX6o/edit?usp=sharing
-//
-// This macro provides a ring with support for multi-flit packets. It is unable to utilize the m5+simple_ring macro because flits
-// pulled from the ring to the insertion FIFO are pulled prior to the ring flit mux, whereas the ring macros
-// pull the output flit after. This difference implies that the other ring macros support local loopback, whereas
-// this one does not; packets will loopback around the ring.
-//
-// This ring does not support multiple VCs.
-//
-// Packets are contiguous on the ring without gaps.
-// Once a packet is completely loaded into the insertion FIFO, it can be injected contiguously into
-// the ring between packets on the ring, at which time it essentially becomes part of the ring, so the
-// ring expands to absorb it. Any valid flits from the ring are absorbed into the insertion FIFO during
-// insertion. The ring shrinks by absorbing idle slots as the FIFO drains. Only once the FIFO is empty
-// can it be filled with a new insertion packet.
-//
-// Support for multiple-VCs could be added in a few ways, including:
-//   o via a credit mechanism
-//   o VC-specific ring slots
-//   o per-VC insertion FIFOs (or ring-ingress FIFOs plus one insertion buffer) providing source
-//     buffering; packets make a full circuit around the ring and back to their source to ensure
-//     draining or preservation of the insertion FIFO.
-//
-// For traffic from node, FIFO permits only one packet from node at a time, and fully buffers.
-// Head packet and control info are not included.
-//
-// Control information, except head/tail, is provided in a header flit. As such, there is no support for data
-// lagging 1 cycle behind control info. Control info and the decision for accepting packets based on it are
-// up to the caller, but must include $dest.
-//
-// Flits traverse the ring from index 0 to N-1 continuing back to 0, until they reach
-// their destination.
-//
-// The interface matches simple_ring_v2(..) with the following modifications.
-//
-// Input interface:
-//   - $tail is required in /_flit
-//   - Additional arg for #_depth: FIFO depth; at least max packet size, including header flit
-//   - Removal of >>_data_delay arg
-//   - Removal of $_avail_expr arg
-//   - /_flit (/_trans) arg is not optional
-//   - Calling context must provide /_hop|_name/arriving?$valid@0$acceptable. E.g.:
-//          {..., $dest} = $head ? $data[..];
-//          $acceptable = $dest
+/// Register insertion ring.
+///
+/// See diagram here: https://docs.google.com/drawings/d/1VS_oaNYgT3p4b64nGSAjs5FKSvs_-s8OTfTY4gQjX6o/edit?usp=sharing
+///
+/// This macro provides a ring with support for multi-flit packets. It is unable to utilize the m5+simple_ring macro because flits
+/// pulled from the ring to the insertion FIFO are pulled prior to the ring flit mux, whereas the ring macros
+/// pull the output flit after. This difference implies that the other ring macros support local loopback, whereas
+/// this one does not; packets will loopback around the ring.
+///
+/// This ring does not support multiple VCs.
+///
+/// Packets are contiguous on the ring without gaps.
+/// Once a packet is completely loaded into the insertion FIFO, it can be injected contiguously into
+/// the ring between packets on the ring, at which time it essentially becomes part of the ring, so the
+/// ring expands to absorb it. Any valid flits from the ring are absorbed into the insertion FIFO during
+/// insertion. The ring shrinks by absorbing idle slots as the FIFO drains. Only once the FIFO is empty
+/// can it be filled with a new insertion packet.
+///
+/// Support for multiple-VCs could be added in a few ways, including:
+///   o via a credit mechanism
+///   o VC-specific ring slots
+///   o per-VC insertion FIFOs (or ring-ingress FIFOs plus one insertion buffer) providing source
+///     buffering; packets make a full circuit around the ring and back to their source to ensure
+///     draining or preservation of the insertion FIFO.
+///
+/// For traffic from node, FIFO permits only one packet from node at a time, and fully buffers.
+/// Head packet and control info are not included.
+///
+/// Control information, except head/tail, is provided in a header flit. As such, there is no support for data
+/// lagging 1 cycle behind control info. Control info and the decision for accepting packets based on it are
+/// up to the caller, but must include $dest.
+///
+/// Flits traverse the ring from index 0 to N-1 continuing back to 0, until they reach
+/// their destination.
+///
+/// The interface matches simple_ring_v2(..) with the following modifications.
+///
+/// Input interface:
+///   - $tail is required in /_flit
+///   - Additional arg for #_depth: FIFO depth; at least max packet size, including header flit
+///   - Removal of >>_data_delay arg
+///   - Removal of $_avail_expr arg
+///   - /_flit (/_trans) arg is not optional
+///   - Calling context must provide /_hop|_name/arriving?$valid@0$acceptable. E.g.:
+///          {..., $dest} = $head ? $data[..];
+///          $acceptable = $dest
 \TLV insertion_ring(/_hop, |_in, @_in, |_out, @_out, $_reset, |_name, /_flit, #_hop_dist, #_depth)
    m4_push(in_delay, m4_defaulted_arg(#_in_delay, 0))
    m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
