@@ -296,7 +296,7 @@
    / For a while, remain backward-compatible with M4 parameterization.
    macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_var(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
    import_m4_params(PROG_NAME, ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
-                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_MEM_REPLAY_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
+                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_MEM_REPLAY_BUBBLE, EXTRA_MORE_TO_DO_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
                     EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
@@ -374,7 +374,7 @@
       ['# IMem style: SRAM, HARDCODED_ARRAY, STUBBED, EXTERN'],
       IMEM_STYLE, m5_if(m5_IMPL, SRAM, HARDCODED_ARRAY),
       ['# DMem style: SRAM, ARRAY, STUBBED, RANDOM'],
-      DMEM_STYLE, m5_if(m5_IMPL, SRAM, RANDOM),
+      DMEM_STYLE, m5_if(m5_IMPL, SRAM, ARRAY),
       ['# RF style: ARRAY, STUBBED'],
       RF_STYLE, ARRAY)
    default_var(
@@ -410,11 +410,11 @@
    /   Deltas (default to 0):
    /      DELAY_BRANCH_TARGET_CALC: 1 to delay branch target calculation 1 stage from its nominal (ISA-specific) stage.
    /   Deltas (default to 0):
+   /      EXTRA_MORE_TO_DO_BUBBLE: 0 or 1. 0 aligns PC_MUX with DECODE.
    /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with BRANCH_TARGET_CALC.
    /      EXTRA_REPLAY_BUBBLE:     0 or 1. 0 aligns PC_MUX with RD_REG for replays.
    /      EXTRA_MEM_REPLAY_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for mem instruction replays.
    /      EXTRA_JUMP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for jumps.
-   /      EXTRA_PRED_TAKEN_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for pred_taken.
    /      EXTRA_INDIRECT_JUMP_BUBBLE: 0 or 1. 0 aligns PC_MUX with EXECUTE for indirect_jump.
    /      EXTRA_BRANCH_BUBBLE:     0 or 1. 0 aligns PC_MUX with EXECUTE for branches.
    /      EXTRA_TRAP_BUBBLE:       0 or 1. 0 aligns PC_MUX with EXECUTE for traps.
@@ -486,6 +486,7 @@
    / Supply defaults for extra cycles.
    default_var(
       DELAY_BRANCH_TARGET_CALC, 0,
+      EXTRA_MORE_TO_DO_BUBBLE, 0,
       EXTRA_PRED_TAKEN_BUBBLE, 0,
       EXTRA_REPLAY_BUBBLE, 0,
       EXTRA_MEM_REPLAY_BUBBLE, 0,
@@ -615,7 +616,8 @@
 
    / Latencies/bubbles calculated from stage parameters and extra bubbles:
    / (zero bubbles minimum if triggered in next_pc; minimum bubbles = computed-stage - next_pc-stage)
-   vars(PRED_TAKEN_BUBBLES, m5_calc(m5_BRANCH_PRED_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_PRED_TAKEN_BUBBLE),
+   vars(MORE_TO_DO_BUBBLES, m5_calc(m5_DECODE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_MORE_TO_DO_BUBBLE),
+        PRED_TAKEN_BUBBLES, m5_calc(m5_BRANCH_PRED_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_PRED_TAKEN_BUBBLE),
         REPLAY_BUBBLES,     m5_calc(m5_REG_RD_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_REPLAY_BUBBLE),
         MEM_REPLAY_BUBBLES, m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_MEM_REPLAY_BUBBLE),
         JUMP_BUBBLES,       m5_calc(m5_EXECUTE_STAGE - m5_NEXT_PC_STAGE + m5_EXTRA_JUMP_BUBBLE),
@@ -911,7 +913,8 @@
    process_redirect_conditions(
       ['NO_FETCH, $no_fetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
-      m5_if_eq(m5_BRANCH_PRED, fallthrough, [''], ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
+      m5_if(m5_EXT_C, ['['MORE_TO_DO, $more_to_do, $more_to_do_pc, 0, "16b", "#d0f000", 26, 51, 0'],'])
+      m5_if_neq(m5_BRANCH_PRED, fallthrough, ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
       ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 1'],
       m5_if(m5_MEM_REPLAYS, ['['MEM_REPLAY, $mem_replay, $Pc, 1, "M", "#60c060", 62, 53, 1'],'])
       ['JUMP, $jump, $jump_target, 0, "Jp", "purple", 61, 11, 0'],
@@ -1944,7 +1947,10 @@
    })
 
 \TLV riscv_decode()
-   /// TODO: ?$valid_<stage> conditioning should be replaced by use of m5_prev_instr_valid_through(..).
+
+   // if C_EXT is enabled
+   m5_if(m5_EXT_C, ['m5+c_ext_decode()'])
+   
    ?$valid_decode
       // =================================
 
@@ -3699,6 +3705,16 @@ Outputs:
    m5_var(CRC_LATENCY, 5)
 
 
+//==================//
+//      RISC-V      //
+//  "C" Extension   //
+//==================//
+
+\TLV c_ext_decode()
+   $more_to_do = $valid_decode && 1'b0;
+   $more_to_do_pc[31:2] = 30'b0;
+
+
 //=========================//
 //                         //
 //        THE CPU          //
@@ -3763,6 +3779,8 @@ Outputs:
             // Redirects include (earliest to latest):
             //   o Returning load: (aborting) A returning load clobbers an instruction and takes its slot, resulting in a
             //                     one-cycle redirect to repeat the clobbered instruction.
+            //   o More-to-do: This is currently specific to RISC-V C-ext. When the first instruction in the 32-bit fetch
+            //                 unit is a 16-bit instruction this redirect fetches the second 16-bit instruction.
             //   o Predict-taken branch: A predicted-taken branch must determine the target before it can redirect the PC.
             //                           (This might be followed up by a mispredition.)
             //   o Replay: (aborting) Replay the same instruction (because a source register is pending (awaiting a long-latency/2nd issuing instruction))
