@@ -330,7 +330,7 @@
    / Machine:
    default_var(
      ['# ISA (MINI, RISCV, MIPSI, [TODO: POWER,] DUMMY, etc.)'],
-     ISA, DUMMY,
+     ISA, RISCV,
      ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
      STANDARD_CONFIG, 4-stage,
      ['# Number of words in the data memory.'],
