@@ -307,7 +307,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/7f4dde871495434ee4a27b15606b27d6d8c971e4/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/74e617bacf0a0421b748cfe0d71072b4192f743c/'])
    ])
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
@@ -329,8 +329,8 @@
 
    / Machine:
    default_var(
-     ['# ISA (MINI, RISCV, MIPSI, POWER, DUMMY, etc.)'],
-     ISA, RISCV,
+     ['# ISA (MINI, RISCV, MIPSI, [TODO: POWER,] DUMMY, etc.)'],
+     ISA, DUMMY,
      ['# A standard configuration that provides default values. (1-stage, 2-stage, 4-stage, 6-stage, none (and define individual parameters))'],
      STANDARD_CONFIG, 4-stage,
      ['# Number of words in the data memory.'],
@@ -483,6 +483,10 @@
          default_var(BRANCH_PRED, two_bit)
       ])
    
+   / More-to-do replay default.
+   default_var(
+      MORE_TO_DO_SUPPORTED, 0)
+   
    / Supply defaults for extra cycles.
    default_var(
       DELAY_BRANCH_TARGET_CALC, 0,
@@ -539,6 +543,10 @@
          EXT_V, 0,
          EXT_N, 0)
 
+      if(m5_EXT_C, {
+         set(MORE_TO_DO_SUPPORTED, 1)
+      })
+      
       default_var(['# For the time[h] CSR register, after this many cycles, time increments.'],
                   CYCLES_PER_TIME_UNIT, 1000000000)
    ], MIPSI, [
@@ -728,7 +736,7 @@
    / Instruction Memory macros are responsible for providing the instruction memory
    / interface for fetch, as:
    / Inputs:
-   /   |fetch@m5_FETCH$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]
+   /   |fetch@m5_FETCH$Pc[..]
    / Outputs:
    /   |fetch/instr?$fetch$raw[m5_INSTR_RANGE] (at or after @m5_FETCH_STAGE--at for retiming experiment; +1 for fast array read)
    default_var(IMEM_MACRO_NAME, m5_isa['_imem'])
@@ -784,10 +792,14 @@
 
    var(ADDRS_PER_WORD, m5_calc(m5_WORD_CNT / m5_BITS_PER_ADDR))
    var(SUB_WORD_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_WORD - 1)))
-   var(ADDRS_PER_INSTR, m5_calc(m5_INSTR_CNT / m5_BITS_PER_ADDR))
-   var(SUB_PC_BITS, m5_binary_width(m5_calc(m5_ADDRS_PER_INSTR - 1)))
-   define_vector(PC, m5_ADDR_HIGH, m5_SUB_PC_BITS)
-   var(FULL_PC, ['{$Pc, ']m5_SUB_PC_BITS[''b0}'])
+   if_eq(m5_ISA, MINI, [
+      / MINI IMem had different width than DMem.
+      var(ADDRS_PER_INSTR, 1)
+   ], [
+      var(ADDRS_PER_INSTR, m5_calc(m5_INSTR_CNT / m5_BITS_PER_ADDR))
+   ])
+   / PC is assumed to point to an address with the same granularity as memory, even though instructions may be wider.
+   define_vector(PC, m5_ADDR_HIGH, 0)
    define_hier(DATA_MEM_ADDRS, m5_calc(m5_DATA_MEM_WORDS_HIGH * m5_ADDRS_PER_WORD))  /// Addressable data memory locations.
    var(INJECT_RETURNING_LD, m5_calc(m5_LD_RETURN_ALIGN > 0))
    var(PENDING_ENABLED, m5_INJECT_RETURNING_LD)
@@ -913,7 +925,7 @@
    process_redirect_conditions(
       ['NO_FETCH, $no_fetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
       ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
-      m5_if(m5_EXT_C, ['['MORE_TO_DO, $more_to_do, $more_to_do_pc, 0, "16b", "#d0f000", 26, 51, 0'],'])
+      m5_if(m5_MORE_TO_DO_SUPPORTED, ['['MORE_TO_DO, $more_to_do, $more_to_do_pc, 0, "16b", "#d0f000", 26, 51, 0'],'])
       m5_if_neq(m5_BRANCH_PRED, fallthrough, ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
       ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 1'],
       m5_if(m5_MEM_REPLAYS, ['['MEM_REPLAY, $mem_replay, $Pc, 1, "M", "#60c060", 62, 53, 1'],'])
@@ -1212,8 +1224,8 @@
    |fetch
       /instr
          @m5_MEM_WR_STAGE
-            $passed = ! $reset && ($Pc == m5_if_var_def(label_pass_addr, ['m5_label_pass_addr'], ['(m5_NUM_INSTRS - 1)'])) && $good_path;
-            $failed = *cyc_cnt > 200 m5_if_var_def(label_fail_addr, [' || (($Pc == m5_label_fail_addr) && $good_path)']);
+            $passed = ! $reset && ($Pc == m5_if_var_def(label_pass_byte_addr, ['m5_label_pass_byte_addr'], ['((m5_NUM_INSTRS - 1) * m5_ADDRS_PER_INSTR)'])) && $good_path;
+            $failed = *cyc_cnt > 200 m5_if_var_def(label_fail_byte_addr, [' || (($Pc == m5_label_fail_byte_addr) && $good_path)']);
 
 
 
@@ -1765,7 +1777,7 @@
             /instr
                @m5_FETCH_STAGE
                   ?$fetch
-                     $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+                     $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(2 + m5_binary_width(m5_NUM_INSTRS-1) - 1):2]\];
       )
 
 // Logic for a single CSR.
@@ -2321,9 +2333,9 @@
          //       This would reduce code below and probably improve implementation.
          
          $lui_rslt[m5_WORD_RANGE]   = {$raw_u_imm[31:12], 12'b0};
-         $auipc_rslt[m5_WORD_RANGE] = m5_FULL_PC + $raw_u_imm;
-         $jal_rslt[m5_WORD_RANGE]   = m5_FULL_PC + 4;
-         $jalr_rslt[m5_WORD_RANGE]  = m5_FULL_PC + 4;
+         $auipc_rslt[m5_WORD_RANGE] = $Pc + $raw_u_imm;
+         $jal_rslt[m5_WORD_RANGE]   = $Pc + 4;
+         $jalr_rslt[m5_WORD_RANGE]  = $Pc + 4;
          // Load instructions. If returning ld is enabled, load instructions write no meaningful result, so we use zeros.
          m5+ifelse(m5_INJECT_RETURNING_LD, 1,
             \TLV
@@ -2686,7 +2698,7 @@
       /instr
          @m5_FETCH_STAGE
             ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(2 + m5_binary_width(m5_NUM_INSTRS-1) - 1):2]\];
 
 \TLV mipsi_gen()
    // No M5-generated code for MIPS I.
@@ -2840,9 +2852,9 @@
       // TODO: Branch delay slot not implemented.
       // (PC is an instruction address, not a byte address.)
       ?$valid_decode_branch
-         $branch_target[m5_PC_RANGE] = $pc_inc + $imm_value[29:0];
+         $branch_target[m5_PC_RANGE] = $pc_inc + {$imm_value[29:0], 2'b0};
       ?$decode_valid_jump  // (JAL, not JALR)
-         $jump_target[m5_PC_RANGE] = {$Pc[m5_PC_MAX:28], $raw_address[25:0]};
+         $jump_target[m5_PC_RANGE] = {$Pc[m5_PC_MAX:28], $raw_address[25:0], 2'b0};
    @_exe_stage
       // Execution.
       $valid_exe = $valid_decode; // Execute if we decoded.
@@ -2904,7 +2916,7 @@
                  ({32{$is_logical}} & $logical_rslt) |
                  ({32{$is_shift}}   & $shift_rslt) |
                  ({32{$is_lui}}     & $lui_rslt) |
-                 ({32{$branch_or_jump}} & {$pc_inc, 2'b0});   // (no delay slot)
+                 ({32{$branch_or_jump}} & $pc_inc);   // (no delay slot)
          
          
          
@@ -2972,7 +2984,7 @@
       /instr
          @m5_FETCH_STAGE
             ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(2 + m5_binary_width(m5_NUM_INSTRS-1) - 1):2]\];
 
 \TLV power_gen()
    // No M5-generated code for POWER.
@@ -3030,7 +3042,7 @@
    // TODO: Depends on $rslt. Check timing.
    @m5_BRANCH_TARGET_CALC_STAGE
       ?$branch
-         $branch_target[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1 + $rslt[m5_PC_RANGE];
+         $branch_target[m5_PC_RANGE] = $Pc + m5_PC_CNT'd4 + $rslt[m5_PC_RANGE];
 
 
 //============================//
@@ -3090,7 +3102,7 @@
       // Jump (Dest = "P") and Branch (Dest = "p") Targets.
       $jump_target[m5_PC_RANGE] = $rslt[m5_PC_RANGE];
    @m5_BRANCH_TARGET_CALC_STAGE
-      $branch_target[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1 + /instr$raw[m5_PC_CNT-1:0]; // $raw represents immediate field
+      $branch_target[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1 + /instr$raw[m5_PC_RANGE]; // $raw represents immediate field
          
 
 
@@ -3890,7 +3902,7 @@ Outputs:
             // Recirculate returning load or the div_mul_result from /orig_inst scope
             
             // Next PC
-            $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'b1;
+            $pc_inc[m5_PC_RANGE] = $Pc + m5_PC_CNT'd\m5_ADDRS_PER_INSTR;
             // Current parsing does not allow concatenated state on left-hand-side, so, first, a non-state expression.
             m5+redirect_conditions()
             // TODO: Remove $next_no_fetch.
@@ -3990,10 +4002,10 @@ Outputs:
             ?$valid_decode_branch
                $branch_redir_pc[m5_PC_RANGE] =
                   // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
-                  m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $Pc + m5_PC_CNT'b1 :'])
+                  m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $pc_inc :'])
                   $branch_target;
 
-            $trap_target[m5_PC_RANGE] = $replay_trap ? $Pc : {m5_PC_CNT{1'b1}};  // TODO: What should this be? Using ones to terminate test for now.
+            $trap_target[m5_PC_RANGE] = $replay_trap ? $Pc : {{m5_calc(m5_PC_CNT - 2){1'b1}}, 2'b0};  // TODO: What should this be? Using ones to terminate test for now.
             
             // Determine whether the instruction should commit it's result.
             //
@@ -4074,7 +4086,7 @@ Outputs:
       $is_reg_condition = $is_reg && /instr$valid_decode;  // Note: $is_reg can be set for RISC-V sr0.
       ?$is_reg_condition
          $rf_value[m5_WORD_RANGE] =
-              m5_if_eq(m5_RF_STYLE, STUBBED, ['{/instr$Pc[31:2], /instr$Pc[31:30]}'], /instr/regs[$reg]>>m5_REG_BYPASS_STAGES$value);
+              m5_if_eq(m5_RF_STYLE, STUBBED, ['{2{/instr$Pc[17:2]}}'], /instr/regs[$reg]>>m5_REG_BYPASS_STAGES$value);
          /* verilator lint_off WIDTH */  // TODO: Disabling WIDTH to work around what we think is https://github.com/verilator/verilator/issues/1613, when --fmtPackAll is in use.
          {$reg_value[m5_WORD_RANGE], $pending} =
             m5_if_eq(m5_ISA['']_rf, ['RISCV'], ['($reg == m5_REGS_INDEX_CNT'b0) ? {m5_WORD_CNT'b0, 1'b0} :  // Read r0 as 0 (not pending).'])
@@ -4208,15 +4220,15 @@ Outputs:
                *rvfi_rs2_rdata   = /src[2]$is_reg ? /src[2]$reg_value : m5_WORD_CNT'b0;
                *rvfi_rd_addr     = $dest_reg_valid ? $dest_reg : 5'b0;  /// (/instr$dest_reg_valid && ! $abort) ? $wr_reg : 5'b0;
                *rvfi_rd_wdata    = (| *rvfi_rd_addr) ? /instr$rslt : 32'b0;
-               *rvfi_pc_rdata    = {$pc[31:2], 2'b00};
+               *rvfi_pc_rdata    = $pc;
             *rvfi_pc_wdata    = {$reset          ? m5_PC_CNT'b0 :
-                                 $second_issue   ? /orig_inst$pc + 1'b1 :
+                                 $second_issue   ? /orig_inst$pc + 32'd4 :
                                  /original$trap  ? /original$trap_target :
                                  $jump           ? $jump_target :
                                  $mispred_branch ? ($taken ? $branch_target[m5_PC_RANGE] : $pc + m5_PC_CNT'b1) :
                                  m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[m5_PC_RANGE] :'])
                                  $indirect_jump  ? $indirect_jump_target :
-                                 $pc[31:2] +1'b1, 2'b00};
+                                                   $pc + 32'd4;
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[m5_ADDR_MAX:2], 2'b0} : 0;
             *rvfi_mem_rmask   = /original$ld ? /orig_load_inst$ld_mask : 0;
             *rvfi_mem_wmask   = $valid_st ? $st_mask : 0;
@@ -4638,7 +4650,7 @@ Outputs:
             },
             render() {
                // Highlight instruction.
-               let pc = '['']|_top/instr$pc'.asInt(-1)
+               let pc = '['']|_top/instr$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
                 this.highlighted_addr = pc
                 instance = this.getContext().children[pc]
                 if (typeof instance !== "undefined") {
@@ -4647,7 +4659,7 @@ Outputs:
                    instance.initObjects.instr_asm_box.set({fill: color})
                 }
                 // Highlight 2nd issue instruction.
-                let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1)
+                let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
                 this.highlighted_addr2 = pc2
                 instance2 = this.getContext().children[pc2]
                 if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
@@ -5173,7 +5185,7 @@ Outputs:
          //
          // PC instr_mem pointer
          //
-         let pc = '$Pc'.asInt(-1)
+         let pc = '$Pc'.asInt(-1) / m5_ADDRS_PER_INSTR
          let commit = '$commit'.asBool(false)
          let color = !commit                ? "gray" :
                                               "blue"
@@ -5186,7 +5198,7 @@ Outputs:
             opacity: commit ? 1 : 0.5
          })
          if ('$second_issue'.asBool(false)) {
-            let second_issue_pc = '/orig_inst$pc'.asInt(-1)
+            let second_issue_pc = '/orig_inst$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
             objects.second_issue_pointer = new fabric.Text("👉🏿", {
                top: 60 + 18 * pc,
                left: 335,
