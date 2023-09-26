@@ -2325,7 +2325,7 @@
             );
       ?$indirect_jump  // (JALR)
          $indirect_jump_full_target[31:0] = /src[1]$reg_value + $raw_i_imm;
-         $indirect_jump_target[m5_PC_RANGE] = $indirect_jump_full_target[m5_PC_RANGE];
+         $indirect_jump_target[m5_PC_RANGE] = {$indirect_jump_full_target[31:1], 1'b0};
          $misaligned_indirect_jump_target = $indirect_jump_full_target[1];
       ?$valid_exe
          // Compute each individual instruction result, combined per-instruction by a macro.
@@ -4221,12 +4221,12 @@ Outputs:
                *rvfi_rd_addr     = $dest_reg_valid ? $dest_reg : 5'b0;  /// (/instr$dest_reg_valid && ! $abort) ? $wr_reg : 5'b0;
                *rvfi_rd_wdata    = (| *rvfi_rd_addr) ? /instr$rslt : 32'b0;
                *rvfi_pc_rdata    = $pc;
-            *rvfi_pc_wdata    = {$reset          ? m5_PC_CNT'b0 :
+            *rvfi_pc_wdata    =  $reset          ? m5_PC_CNT'b0 :
                                  $second_issue   ? /orig_inst$pc + 32'd4 :
                                  /original$trap  ? /original$trap_target :
                                  $jump           ? $jump_target :
-                                 $mispred_branch ? ($taken ? $branch_target[m5_PC_RANGE] : $pc + m5_PC_CNT'b1) :
-                                 m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target[m5_PC_RANGE] :'])
+                                 $mispred_branch ? ($taken ? $branch_target : $pc + 32'd4) :
+                                 m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target :'])
                                  $indirect_jump  ? $indirect_jump_target :
                                                    $pc + 32'd4;
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[m5_ADDR_MAX:2], 2'b0} : 0;
@@ -5451,7 +5451,7 @@ Outputs:
                }, 500)
             }, 500)
          }
-         let res_value = '$rslt'.asInt().toString(16)
+         let res_value = '$rslt'.asInt(NaN).toString(16)
          objects.result_viz = new fabric.Text(res_value, {
             top: 76,
             left: 780,
