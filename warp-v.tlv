@@ -322,6 +322,7 @@
       default_var(
          ISA, RISCV,
          EXT_M, 1,
+         EXT_C, 1,
          VIZ, 1,
          STANDARD_CONFIG, 4-stage)
       default_var(RISCV_FORMAL_ALTOPS, m5_EXT_M)
@@ -1122,6 +1123,9 @@
    macro(module_def, ['
       m5_if_eq(m5_FORMAL, 0,
          ['m5_makerchip_module'], ['
+         m5_if(m5_EXT_C, ['`ifndef RISCV_FORMAL_COMPRESSED'], ['`ifdef RISCV_FORMAL_COMPRESSED'])
+         m5_if(m5_EXT_C, ['  `error "RISCV_FORMAL_COMPRESSED is not set, but C-extensions are supported."'], ['  `error "RISCV_FORMAL_COMPRESSED is set, but C-extensions are not supported."'])
+         `endif
          module warpv(input logic clk,
             input logic reset,
             output logic failed,
@@ -1279,10 +1283,9 @@
    // Instantiate the program.
    m5+call(['mini_']_prog_name['_prog'])
    |fetch
-      /instr
-         @m5_FETCH_STAGE
-            ?$fetch
-               $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
+      @m5_FETCH_STAGE
+         ?$fetch
+            $fetch_word[m5_INSTR_RANGE] = *instrs\[/instr$Pc[m5_calc(m5_PC_MIN + m5_binary_width(m5_NUM_INSTRS-1) - 1):m5_PC_MIN]\];
 
 \TLV mini_gen()
    // No M5-generated code for mini.
@@ -1675,7 +1678,7 @@
    m5_asm(ORI, zero, zero, 0b0)
    
 // Provides the instruction memory and fetch logic, producing.
-//   $raw
+//   |fetch$fetch_word
 //   *instrs[]
 //   *instr_strs[]
 \TLV riscv_imem(_prog_name)
@@ -1692,43 +1695,41 @@
    
          // No instruction memory.
          |fetch
-            /instr
-               @m5_FETCH_STAGE
-                  ?$fetch
-                     `BOGUS_USE($$raw[m5_INSTR_RANGE])
+            @m5_FETCH_STAGE
+               ?$fetch
+                  `BOGUS_USE($$fetch_word[m5_INSTR_RANGE])
       , m5_IMEM_STYLE, SRAM,
       \TLV
          |fetch
-            /instr
-               @m5_FETCH_STAGE
-                  // For SRAM
-                  // --------
-                  m5_default_var(IMEM_SIZE, 1024)
-                  m5_define_hier(IMEM_SRAM, m5_IMEM_SIZE)
-                  \SV_plus
-                    sram #(
-                      .NB_COL(4),                           // Specify number of columns (number of bytes)
-                      .COL_WIDTH(8),                        // Specify column width (byte width, typically 8 or 9)
-                      .RAM_DEPTH(m5_IMEM_SRAM_CNT),         // Specify RAM depth (number of entries)
-                      .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
-                      .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
-                    ) imem (
-                      .addra($Pc[m5_IMEM_SRAM_INDEX_MAX+2:m5_IMEM_SRAM_INDEX_MIN+2]),  // Port A address bus, width determined from RAM_DEPTH
-                      .addrb(m5_IMEM_SRAM_INDEX_CNT'b0),         // Port B address bus, width determined from RAM_DEPTH
-                      .dina(32'b0),                         // Port A RAM input data, width determined from NB_COL*COL_WIDTH
-                      .dinb(32'b0),                         // Port B RAM input data, width determined from NB_COL*COL_WIDTH
-                      .clka(clk),                           // Clock
-                      .wea(4'b0),                           // Port A write enable, width determined from NB_COL
-                      .web(4'b0),                           // Port B write enable, width determined from NB_COL
-                      .ena(1'b1),                           // Port A RAM Enable, for additional power savings, disable port when not in use
-                      .enb(1'b0),                           // Port B RAM Enable, for additional power savings, disable port when not in use
-                      .rsta(1'b0),                          // Port A output reset (does not affect memory contents)
-                      .rstb(1'b0),                          // Port B output reset (does not affect memory contents)
-                      .regcea(1'b1),                        // Port A output register enable
-                      .regceb(1'b0),                        // Port B output register enable
-                      .douta(>>1$$raw[m5_INSTR_RANGE]),        // Port A RAM output data, width determined from NB_COL*COL_WIDTH
-                      .doutb()                              // Port B RAM output data, width determined from NB_COL*COL_WIDTH
-                    );
+            @m5_FETCH_STAGE
+               // For SRAM
+               // --------
+               m5_default_var(IMEM_SIZE, 1024)
+               m5_define_hier(IMEM_SRAM, m5_IMEM_SIZE)
+               \SV_plus
+                 sram #(
+                   .NB_COL(4),                           // Specify number of columns (number of bytes)
+                   .COL_WIDTH(8),                        // Specify column width (byte width, typically 8 or 9)
+                   .RAM_DEPTH(m5_IMEM_SRAM_CNT),         // Specify RAM depth (number of entries)
+                   .RAM_PERFORMANCE("LOW_LATENCY"),      // Select "HIGH_PERFORMANCE" or "LOW_LATENCY" 
+                   .INIT_FILE("")                        // Specify name/location of RAM initialization file if using one (leave blank if not)
+                 ) imem (
+                   .addra(/instr$Pc[m5_IMEM_SRAM_INDEX_MAX+2:m5_IMEM_SRAM_INDEX_MIN+2]),  // Port A address bus, width determined from RAM_DEPTH
+                   .addrb(m5_IMEM_SRAM_INDEX_CNT'b0),       // Port B address bus, width determined from RAM_DEPTH
+                   .dina(32'b0),                            // Port A RAM input data, width determined from NB_COL*COL_WIDTH
+                   .dinb(32'b0),                            // Port B RAM input data, width determined from NB_COL*COL_WIDTH
+                   .clka(clk),                              // Clock
+                   .wea(4'b0),                              // Port A write enable, width determined from NB_COL
+                   .web(4'b0),                              // Port B write enable, width determined from NB_COL
+                   .ena(1'b1),                              // Port A RAM Enable, for additional power savings, disable port when not in use
+                   .enb(1'b0),                              // Port B RAM Enable, for additional power savings, disable port when not in use
+                   .rsta(1'b0),                             // Port A output reset (does not affect memory contents)
+                   .rstb(1'b0),                             // Port B output reset (does not affect memory contents)
+                   .regcea(1'b1),                           // Port A output register enable
+                   .regceb(1'b0),                           // Port B output register enable
+                   .douta(>>1$$fetch_word[m5_INSTR_RANGE]), // Port A RAM output data, width determined from NB_COL*COL_WIDTH
+                   .doutb()                                 // Port B RAM output data, width determined from NB_COL*COL_WIDTH
+                 );
       , m5_IMEM_STYLE, EXTERN,
       \TLV
          |fetch
@@ -1736,15 +1737,14 @@
                @m5_FETCH_STAGE
                   ?$fetch
                      *imem_addr = $next_pc;
-               @m5_calc(m5_FETCH_STAGE + 1)
-                  ?$fetch
-                     $raw[m5_INSTR_RANGE] = *imem_data;
+            @m5_calc(m5_FETCH_STAGE + 1)
+               ?$fetch
+                  $fetch_word[m5_INSTR_RANGE] = *imem_data;
       , m5_IMEM_STYLE, STUBBED,
       \TLV
          |fetch
-            /instr
-               @m5_DECODE_STAGE
-                  $raw[m5_INSTR_RANGE] = {$Pc, $Pc[31:30]};
+            @m5_DECODE_STAGE
+               $fetch_word[m5_INSTR_RANGE] = {/instr$Pc, /instr$Pc[31:30]};
       ,
       \TLV
          // Default to HARDCODED_ARRAY
@@ -1774,10 +1774,9 @@
                         $instr[m5_INSTR_RANGE] = *instrs[instr_mem];
                         $instr_str[40*8-1:0] = *instr_strs[instr_mem];
                )
-            /instr
-               @m5_FETCH_STAGE
-                  ?$fetch
-                     $raw[m5_INSTR_RANGE] = *instrs\[$Pc[m5_calc(2 + m5_binary_width(m5_NUM_INSTRS-1) - 1):2]\];
+            @m5_FETCH_STAGE
+               ?$fetch
+                  $fetch_word[m5_INSTR_RANGE] = *instrs\[/instr$Pc[m5_calc(2 + m5_binary_width(m5_NUM_INSTRS-1) - 1):2]\];
       )
 
 // Logic for a single CSR.
@@ -1959,10 +1958,6 @@
    })
 
 \TLV riscv_decode()
-
-   // if C_EXT is enabled
-   m5_if(m5_EXT_C, ['m5+c_ext_decode()'])
-   
    ?$valid_decode
       // =================================
 
@@ -2077,7 +2072,7 @@
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
       $illegal_itype_with_funct7 = ( $is_srli_srai_instr m5_if_eq(m5_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
-      $illegal = $illegal_itype_with_funct7 ||
+      $illegal = $illegal_itype_with_funct7 ||m5_if(m4_MORE_TO_DO_SUPPORTED, [' $illegal_compressed ||'])
                  (1'b1\m5_illegal_instr_expr) ||
                  ($raw[1:0] != 2'b11); // All legal instructions have opcode[1:0] == 2'b11. We ignore these bits in decode logic.
       $conditional_branch = $is_b_type;
@@ -3723,9 +3718,49 @@ Outputs:
 //==================//
 
 \TLV c_ext_decode()
-   $more_to_do = $valid_decode && 1'b0;
-   $more_to_do_pc[31:2] = 30'b0;
-
+   $cinstr[15:0] = $Pc[1] ? |fetch$fetch_word[31:16] : |fetch$fetch_word[15:0];
+   $is_compressed = $Pc[1] || ($cinstr[1:0] != 2'b11);
+   $more_to_do = ! $Pc[1] && $is_compressed;
+   $more_to_do_pc[31:0] = /instr$Pc + 32'b10;
+   
+   // Peculiar decode fields.
+   $csub_xor_or_and_func3[2:0] =
+      ( $cinstr[6:5] == 2'b00 ) ? 3'b000 :
+      ( $cinstr[6:5] == 2'b01 ) ? 3'b100 :
+      ( $cinstr[6:5] == 2'b10 ) ? 3'b110 :
+                                  3'b111;
+   $cmatch = 1'b1;
+   {$instr[31:0], $matched_cinstr} =
+          //                                                                             funct7/imm                                     rs2/imm                  rs1/imm                           funct3/imm              rd/imm                                       opcode
+          //CR: funct4, rd/1, rs2, op => funct7, rs2, rs1, funct3, rd, op
+          $cinstr[15:13] == 3'b100 && $cinstr[1:0] == 2'b10 ?                            {7'b0000000,                                   $cinstr[6:2],            $cinstr[11:7] & {5{$cinstr[12]}}, 3'b000,                 $cinstr[11:7],                               5'b01100, 2'b11, $cmatch} :  //CMV0-4, CADD0-4
+          //CA: funct6, rd/1', funct2, rs2', op => funct7, rs2,rs1,funct3,rd, op
+          $cinstr[15:10] == 6'b100_0_11 && $cinstr[1:0] == 2'b01 ?                       {{1'b0, $cinstr[6:5] == 2'b00, 5'b00000},     {2'b01, $cinstr[4:2]},    {2'b01, $cinstr[9:7]}, $csub_xor_or_and_func3,            {2'b01, $cinstr[9:7]},                       5'b01100, 2'b11, $cmatch} :  //CSUB,CXOR,COR,CAND
+          //CI: funct3, imm1, rd/rs1, imm3, op => imm, rs1, funct3, rd, op
+          $cinstr[15:13] == 3'b000 && $cinstr[1:0] == 2'b00 ?                            {{2'b0, $cinstr[10:7], $cinstr[12:11], $cinstr[5], $cinstr[6] ,2'b0},   5'b00010,                         3'b000,                 {2'b01, $cinstr[4:2]},                       5'b00100, 2'b11, $cmatch} :  //CADDI4SPN0-7
+          $cinstr[15:13] == 3'b010 && $cinstr[1:0] == 2'b01 ?                            {{{6{$cinstr[12]}}, $cinstr[12]},              $cinstr[6:2],            5'b00000,                         3'b000,                 $cinstr[11:7],                               5'b00100, 2'b11, $cmatch} :  //CLI
+          $cinstr[15:13] == 3'b000 && $cinstr[1:0] == 2'b01 ?                            {{{6{$cinstr[12]}}, $cinstr[12]},              $cinstr[6:2],            $cinstr[11:7],                    3'b000,                 $cinstr[11:7],                               5'b00100, 2'b11, $cmatch} :  //CADDI
+          $cinstr[15:13] == 3'b100 && $cinstr[11:10] == 2'b00 && $cinstr[1:0] == 2'b01 ? {{1'b0, $cinstr[10], 4'b0000, $cinstr[12]},    $cinstr[6:2],            {2'b01, $cinstr[9:7]},            3'b101,                 {2'b01, $cinstr[9:7]},                       5'b00100, 2'b11, $cmatch} :  //CSRLI, CSRAI
+          $cinstr[15:13] == 3'b100 && $cinstr[11:10] == 2'b10 && $cinstr[1:0] == 2'b01 ? {{{6{$cinstr[12]}}, $cinstr[12]},              $cinstr[6:2],            {2'b01, $cinstr[9:7]},            3'b111,                 {2'b01, $cinstr[9:7]},                       5'b00100, 2'b11, $cmatch} :  //CANDI
+          $cinstr[15:13] == 3'b000 && $cinstr[1:0] == 2'b10 ?                            {{6'b000000, $cinstr[12]},                     $cinstr[6:2],            $cinstr[11:7],                    3'b001,                 $cinstr[11:7],                               5'b00100, 2'b11, $cmatch} :  //CSLLI
+        // TODO: WIDTH MISMATCH:
+        //$cinstr[15:13] == 3'b100 && $cinstr[6:0] == 7'b00_000_10 ?                     {{3'b0, $cinstr[3:2], $cinstr[12]},            {$cinstr[6:4], 2'd0},    $cinstr[11:7],                    3'b000,                 {4'b00000, $cinstr[12]},                     5'b11001, 2'b11, $cmatch} :  //CJR0-4, CJALR0-4
+          //CSS:funct3, imm6, rs2, op  => imm, rs2, rs1, funct3, imm, op
+          //CIW:funct3, imm8, rd' op  => imm, rs1, funct3, rd, op
+          //CL: funct3, imm3, rs1', imm2, rd', op  => imm, rs1, funct3, rd, op
+          $cinstr[15:13] == 3'b010 && $cinstr[1:0] == 2'b00 ?                            {{5'b0, $cinstr[5], $cinstr[12:10], $cinstr[6], 2'd0},                  {2'b01, $cinstr[9:7]},            3'b010,                 {2'b01, $cinstr[4:2]},                       5'b00000, 2'b11, $cmatch} :  //CLW
+          //CS: funct3, imm3, rs1', imm2, r2' op  => imm, rs2,rs1,funct3,imm,op
+          $cinstr[15:13] == 3'b110 && $cinstr[1:0] == 2'b00 ?                            {{5'b0, $cinstr[5], $cinstr[12]},              {2'b01, $cinstr[4:2]},   {2'b01, $cinstr[9:7]},            3'b010,                 {$cinstr[11:10], $cinstr[6], 2'd0},          5'b01000, 2'b11, $cmatch} :  //CSW
+          //CB: funct3, offset, rs1', offset, op  => imm, rs2,rs1,funct3,imm,op
+          $cinstr[15:14] == 2'b11 && $cinstr[1:0] == 2'b01 ?                             {{{4{$cinstr[12]}}, $cinstr[6:5], $cinstr[2]}, 5'b00000,                {2'b01, $cinstr[9:7]},            {2'b00, $cinstr[13]},   {$cinstr[11:10], $cinstr[4:3], $cinstr[12]}, 5'b11000, 2'b11, $cmatch} :  //CBEQZ,CBNEZ
+          //CJ: funct3, jump-target, op  => imm, rd, op
+          $cinstr[15:13] == 3'b001 && $cinstr[1:0] == 2'b01 ?                            {{$cinstr[12], $cinstr[8], $cinstr[10:9], $cinstr[6], $cinstr[7], $cinstr[2], $cinstr[11], $cinstr[5:3], {9{$cinstr[12]}}, 5'b00001},                                          5'b11011, 2'b11, $cmatch} :  //CJAL
+          $cinstr[15:13] == 3'b101 && $cinstr[1:0] == 2'b01 ?                            {{$cinstr[12], $cinstr[8], $cinstr[10:9], $cinstr[6], $cinstr[7], $cinstr[2], $cinstr[11], $cinstr[5:3], {9{$cinstr[12]}}, 5'b00000},                                          5'b11011, 2'b11, $cmatch} :  //CJ
+                                                                                         {32'bx, 1'b0};
+   
+   $illegal_compressed = ! $matched_instr;  // (Some C-ext illegals are caught based on the instruction they map to.)
+   
+   $raw[31:0] = $is_compressed ? $instr : |fetch$fetch_word;
 
 //=========================//
 //                         //
@@ -3750,19 +3785,22 @@ Outputs:
    // \=========/
 
    |fetch
+      // Provide a longer reset to cover the pipeline depth.
+      @m5_stage_calc(@m5_NEXT_PC_STAGE<<1)
+         $soft_reset = (m5_soft_reset) || *reset;
+         $Cnt[7:0] <= $soft_reset   ? 8'b0 :       // reset
+                      $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
+                                      $Cnt + 8'b1; // increment
+         $reset = $soft_reset || $Cnt < m5_calc(m5_LD_RETURN_ALIGN + m5_MAX_REDIRECT_BUBBLES + 3);
+      @m5_FETCH_STAGE
+         $fetch = ! $reset && ! /instr$no_fetch;
+         /// (m5_IMEM_MACRO_NAME instantiation produces ?$fetch$raw.)
       /instr
-         
-         
-         // Provide a longer reset to cover the pipeline depth.
          @m5_stage_calc(@m5_NEXT_PC_STAGE<<1)
-            $soft_reset = (m5_soft_reset) || *reset;
-            $Cnt[7:0] <= $soft_reset   ? 8'b0 :       // reset
-                         $Cnt == 8'hFF ? 8'hFF :      // max out to avoid wrapping
-                                         $Cnt + 8'b1; // increment
-            $reset = $soft_reset || $Cnt < m5_calc(m5_LD_RETURN_ALIGN + m5_MAX_REDIRECT_BUBBLES + 3);
+            $reset = |fetch$reset;
          @m5_FETCH_STAGE
-            $fetch = ! $reset && ! $no_fetch;
-            /// (m5_IMEM_MACRO_NAME instantiation produces ?$fetch$raw.)
+            $fetch = |fetch$fetch;
+         
          @m5_NEXT_PC_STAGE
             
             // ========
@@ -3939,6 +3977,18 @@ Outputs:
             // Decode of the fetched instruction
             $valid_decode = $fetch;  // Always decode if we fetch.
             $valid_decode_branch = $valid_decode && $branch;
+            
+            ?$valid_decode
+               m5+ifelse(m5_MORE_TO_DO_SUPPORTED, 1,
+                  \TLV
+                     // Implement C-ext decode.
+                     m5+c_ext_decode()
+                  ,
+                  \TLV
+                     // Directly connect the fetch word to the instruction.
+                     $raw[m5_INSTR_RANGE] = |fetch$fetch_word;
+                  )
+            
             // A load that will return later.
             //$split_ld = $spec_ld && 1'b\m5_INJECT_RETURNING_LD;
             // Instantiate the program.
