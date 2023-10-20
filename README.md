@@ -44,7 +44,7 @@ cd warp-v
 
 - Install edalize with sandpiper support
  
-```git clone https://github.com/shariethernet/edalize.git```
+```git clone https://github.com/shariethernet/my_edalize.git```
 
 ``` cd edalize```
 
