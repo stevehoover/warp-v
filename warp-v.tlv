@@ -2072,7 +2072,7 @@
       $is_srli_srai_instr = $is_srli_instr || $is_srai_instr;
       // Some I-type instructions have a funct7 field rather than immediate bits, so these must factor into the illegal instruction expression explicitly.
       $illegal_itype_with_funct7 = ( $is_srli_srai_instr m5_if_eq(m5_WORD_CNT, 64, ['|| $is_srliw_sraiw_instr']) ) && | {$raw_funct7[6], $raw_funct7[4:0]};
-      $illegal = $illegal_itype_with_funct7 ||m5_if(m4_MORE_TO_DO_SUPPORTED, [' $illegal_compressed ||'])
+      $illegal = $illegal_itype_with_funct7 ||m5_if(m5_MORE_TO_DO_SUPPORTED, [' $illegal_compressed ||'])
                  (1'b1\m5_illegal_instr_expr) ||
                  ($raw[1:0] != 2'b11); // All legal instructions have opcode[1:0] == 2'b11. We ignore these bits in decode logic.
       $conditional_branch = $is_b_type;
@@ -3049,10 +3049,9 @@
 \TLV dummy_imem()
    // Dummy IMem contains 2 dummy instructions.
    |fetch
-      /instr
-         @m5_FETCH_STAGE
-            ?$fetch
-               $raw[m5_INSTR_RANGE] = $Pc[m5_PC_MIN:m5_PC_MIN] == 1'b0 ? 2'b01 : 2'b10;
+      @m5_FETCH_STAGE
+         ?$fetch
+            $fetch_word[m5_INSTR_RANGE] = /instr$Pc[m5_PC_MIN:m5_PC_MIN] == 1'b0 ? 2'b01 : 2'b10;
 
 \TLV dummy_gen()
    // No M5-generated code for dummy.
