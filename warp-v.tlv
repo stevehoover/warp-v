@@ -5028,7 +5028,7 @@ Outputs:
                      let color =
                         !this.commit ? "gray" :
                                        "blue"
-                     let pc = '/instr$pc'.step(step).asInt()
+                     let pc = '/instr$pc'.step(step).asInt() / m5_ADDRS_PER_INSTR
                      let instr_str = m5_if_eq(m5_FORMAL, 1, "           " + '/instr$mnemonic', m5_IMEM_STYLE, EXTERN, "           " + '/instr$mnemonic', '|fetch/instr_mem[pc]$instr_str').step(step).asString("<UNKNOWN>")
                      this.getObjects().instr.set({
                         text: instr_str,
