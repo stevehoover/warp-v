@@ -23,7 +23,8 @@ function App() {
                 "--fmtNoSource",
                 "--noDirectiveComments"
             ],
-            customProgramEnabled: false
+            customProgramEnabled: false,
+            customInstructionsEnabled: false
         },
         needsPipelineInit: true
     })
@@ -152,5 +153,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "cfa66adb2df9ba549c1b92930da5a40b15fa7c82"
+export const warpVLatestSupportedCommit = "2bd28077b7526d460f4615e687ab71e074a35f5a"
 export const warpVLatestVersionCommit = "master"

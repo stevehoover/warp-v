@@ -1,5 +1,5 @@
 import React from "react";
-import {Box, Checkbox, Text, Textarea} from "@chakra-ui/react";
+import {Box, Checkbox, Text, Textarea, Stack} from "@chakra-ui/react";
 
 export function EnterProgramForm({
                                      configuratorGlobalSettings,
@@ -9,7 +9,8 @@ export function EnterProgramForm({
                                  }) {
     return <>
         <Box>
-            <Checkbox mb={5} value={configuratorGlobalSettings.generalSettings.customProgramEnabled}
+            <Stack direction="column">
+            <Checkbox value={configuratorGlobalSettings.generalSettings.customProgramEnabled}
                       isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                       onChange={e => setConfiguratorGlobalSettings({
                           ...configuratorGlobalSettings,
@@ -18,6 +19,17 @@ export function EnterProgramForm({
                               customProgramEnabled: e.target.checked
                           }
                       })}>Enable custom program</Checkbox>
+            <Checkbox mb={5} value={configuratorGlobalSettings.generalSettings.customInstructionsEnabled}
+                    isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
+                    onChange={e => setConfiguratorGlobalSettings({
+                        ...configuratorGlobalSettings,
+                        generalSettings: {
+                            ...configuratorGlobalSettings.generalSettings,
+                            customInstructionsEnabled: e.target.checked
+                        }
+                    })}>Include template for custom instructions</Checkbox>
+            </Stack>
+
 
             <Text mb={2}>
                 Here, you can provide your own assembly program that will be hardcoded into the instruction memory

@@ -19,6 +19,7 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
                 ...configuratorGlobalSettings,
                 generalSettings: {
                     ...configuratorGlobalSettings.generalSettings,
+                    customInstructionsEnabled: true,
                     customProgramEnabled: true,
                     isa: value
                 }
@@ -29,6 +30,7 @@ export function GeneralSettingsForm({configuratorGlobalSettings, setConfigurator
                 generalSettings: {
                     ...configuratorGlobalSettings.generalSettings,
                     isa: value,
+                    customInstructionsEnabled: false,
                     customProgramEnabled: false,
                     isaExtensions: []
                 },
