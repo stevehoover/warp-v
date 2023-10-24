@@ -6400,6 +6400,47 @@ Outputs:
          '])
       )
 
+
+// For adding custom instructions to WARP-V.
+
+// Helper
+\TLV warpv_custom_instructions_exe_logic(_exe_logic)
+   |fetch
+      /instr
+         @m5_EXECUTE_STAGE
+            ?$valid_exe
+               m5+_exe_logic()
+
+// Helper. Recursive macros for instruction definitions.
+\TLV warpv_define_custom_instruction(_instr_params)
+   \SV_plus
+      m5_instr(_instr_params)
+
+// Helper
+\TLV warpv_define_custom_instructions()
+   m5+ifelse(m5_calc($# > 1), 1,
+      \TLV
+         m5+warpv_define_custom_instruction(['$1'])
+         m5+warpv_define_custom_instructions(m5_shift($@))
+      )
+
+// Instantiates WARP-V with arguments that define additional instructions.
+// Arguments:
+//   $1-$(n-1): A string of arguments for the m5-instr macro (see https://github.com/stevehoover/warp-v_includes/blob/master/risc-v_defs.tlv).
+//   $n: EXECUTE_STAGE \TLV logic to compute instruction results. Instruction FOO must produce $foo_rslt[31:0].
+\TLV warpv_with_custom_instructions()
+   // RISC-V definitions.
+   m5+riscv_gen()
+   
+   m5+warpv_define_custom_instructions($@)
+   
+   // The RISC-V hardware.
+   m5+warpv_top()
+   
+   m5+warpv_custom_instructions_exe_logic(m5_argn($#, $@))
+
+
+
 \SV
    m5_module_def()
 \TLV //disabled_main()
