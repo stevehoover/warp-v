@@ -50,12 +50,12 @@ export function CoreDetailsComponent({
         else if (selectedFile === "tlv") {
             openInMakerchip(
                 replaceImports(tlvForJson)
-                    .replace("\\TLV_version", "\\m4_TLV_version"),
+                    .replace("\\TLV_version", "\\m5_TLV_version"),
                 setMakerchipOpening,
                 setDiscloureAndUrl
             )
         } else if (selectedFile === "rtl") {
-            const modifiedSVToOpen = `\\m4_TLV_version 1d: tl-x.org
+            const modifiedSVToOpen = `\\m5_TLV_version 1d: tl-x.org
 \\SV
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
             // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be download when compiled.

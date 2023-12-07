@@ -11,3 +11,5 @@ complete
 
 # SandPiper(TM) SaaS Edition output directory
 /out
+/m4_include_url_file*
+/sv_url_inc

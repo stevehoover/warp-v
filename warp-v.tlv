@@ -300,7 +300,8 @@
                     EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
                     EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
                     REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
-                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, NO_COUNTER_CSRS, UETRV_PCORE)
+                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, NO_COUNTER_CSRS, UETRV_PCORE,
+                    IMPLEMENT_REG0)
    
    / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
@@ -340,6 +341,10 @@
    default_var(
       ['# 1 to enable Ali Imran's CPU implementation'],
       UETRV_PCORE, 0)
+   
+   / Forces reg index 0 to be implemented, even if it is an unused, always-zero, register (RISCV & MIPSI).
+   default_var(
+      IMPLEMENT_REG0, 0)
    
    / --------------
    / For multi-core
@@ -764,7 +769,7 @@
          define_vector(ADDR, 32)
          var(BITS_PER_ADDR, 8)  /// 8 for byte addressing.
          define_vector(WORD, 32)
-         define_hier(REGS, m5_if(m5_EXT_E, 16, 32), 1)
+         define_hier(REGS, m5_if(m5_EXT_E, 16, 32), m5_if(m5_IMPLEMENT_REG0, 0, 1))
          define_hier(FPU_REGS, 32, 0)   /// (though, the hierarchy is called /regs, not /fpu_regs)
       ],
       ['MIPSI'], [
@@ -772,7 +777,7 @@
          define_vector(ADDR, 32)
          var(BITS_PER_ADDR, 8)  /// 8 for byte addressing.
          define_vector(WORD, 32)
-         define_hier(REGS, 32, 1)
+         define_hier(REGS, 32, m5_if(m5_IMPLEMENT_REG0, 0, 1))
       ],
       ['POWER'], [
       ],
@@ -3757,7 +3762,7 @@ Outputs:
           $cinstr[15:13] == 3'b101 && $cinstr[1:0] == 2'b01 ?                            {{$cinstr[12], $cinstr[8], $cinstr[10:9], $cinstr[6], $cinstr[7], $cinstr[2], $cinstr[11], $cinstr[5:3], {9{$cinstr[12]}}, 5'b00000},                                          5'b11011, 2'b11, $cmatch} :  //CJ
                                                                                          {32'bx, 1'b0};
    
-   $illegal_compressed = ! $matched_instr;  // (Some C-ext illegals are caught based on the instruction they map to.)
+   $illegal_compressed = ! $matched_cinstr;  // (Some C-ext illegals are caught based on the instruction they map to.)
    
    $raw[31:0] = $is_compressed ? $instr : |fetch$fetch_word;
 

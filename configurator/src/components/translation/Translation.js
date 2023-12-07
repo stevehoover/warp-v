@@ -73,7 +73,7 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
         verilatorConfig.delete("/* verilator lint_off WIDTH */")
     }
     const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
-    return `\\m4_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
+    return `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
    Copyright ${new Date().getFullYear()} Redwood EDA, LLC
