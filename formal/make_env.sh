@@ -49,7 +49,7 @@ echo -e "\e[0Ksection_start:`date +%s`:make-env-yosys[collapsed=true]\r\e[0KInst
 
 check_previous_build "yosys"
 if [ $? -eq 1 ]; then
-  git clone https://github.com/cliffordwolf/yosys.git && \
+  git clone https://github.com/YosysHQ/yosys.git && \
   cd yosys && \
   comment 'Capture the commit ID' && \
   (git rev-parse HEAD > ../../env/yosys_commit_id.txt) && \
@@ -78,7 +78,7 @@ echo -e "\e[0Ksection_start:`date +%s`:make-env-symbiyosys[collapsed=true]\r\e[0
 
 check_previous_build "SymbiYosys"
 if [ $? -eq 1 ]; then
-  git clone git@github.com:YosysHQ/sby.git SymbiYosys && \
+  git clone https://github.com/YosysHQ/sby.git SymbiYosys && \
   cd SymbiYosys && \
   comment 'Capture the commit ID' && \
   (git rev-parse HEAD > ../../env/SymbiYosys_commit_id.txt) && \
