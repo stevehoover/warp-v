@@ -56,7 +56,7 @@ if [ $? -eq 1 ]; then
   make config-gcc && \
   make && \
   echo "pwd of env_build/yosys: $PWD" && \
-  mv yosys* ../../env/bin && \
+  mv yosys* ../../env && \
   mv share/* ../../env/share && \
   touch PASSED
   STATUS[yosys]=$?

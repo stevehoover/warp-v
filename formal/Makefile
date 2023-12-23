@@ -2,10 +2,10 @@
 
 SHELL=/bin/bash
 
-export PATH:=$(shell pwd)/env/bin:$(PATH)
+export PATH:=$(shell pwd)/env/bin:$(shell pwd)/env:$(PATH)
 NPROC?=$(shell nproc)
 
-.PHONY: all clean compile verif env riscv-formal
+.PHONY: all clean compile verif env riscv-formal clean_env
 
 
 # Agree to SandPiper ToS.
@@ -20,7 +20,7 @@ out/warp-v_formal.sv: ../warp-v.tlv
 	mkdir out
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
 	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
-	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
+	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
 env: env/PASSED
 
@@ -57,3 +57,7 @@ all: verif
 
 clean:
 	rm -rf out checks
+
+clean_env: clean
+	rm -rf env env_build
+	
