@@ -308,7 +308,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/74e617bacf0a0421b748cfe0d71072b4192f743c/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/450357b4993fa480e7fca57dc346e39cba21b6bc/'])
    ])
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
@@ -528,26 +528,13 @@
         ['# Width of a "word". (32 for RV32X or 64 for RV64X)'],
         WORD_WIDTH, 32)
       define_vector(WORD, m5_WORD_WIDTH)
-      / ISA extensions,  1, or 0 (following M5 boolean convention).
+
+      nullify(m4_include_lib(m5_warpv_includes['risc-v_defs.tlv']))
+      / Note that the above include defaults EXT_* (EXT_I == 1, others == 0).
+      
       / TODO. Currently formal checks are broken when EXT_F is set to 1.
       / TODO. Currently formal checks takes long time(~48 mins) when EXT_B is set to 1.
       /       Hence, its disabled at present.
-      default_var(
-         EXT_I, 1,
-         EXT_E, 0,
-         EXT_M, 0,
-         EXT_A, 0,
-         EXT_F, 0,
-         EXT_D, 0,
-         EXT_Q, 0,
-         EXT_L, 0,
-         EXT_C, 0,
-         EXT_B, 0,
-         EXT_J, 0,
-         EXT_T, 0,
-         EXT_P, 0,
-         EXT_V, 0,
-         EXT_N, 0)
 
       if(m5_EXT_C, {
          set(MORE_TO_DO_SUPPORTED, 1)
@@ -1221,7 +1208,6 @@
    ~pragma_disable_verbose_checks()
 \SV
    m5_if(m5_NUM_CORES > 1, ['m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_flow_lib/db17b2200d717b870a419613d2ab4445a1300152/pipeflow_lib.tlv'])'])
-   m5_if_eq(m5_ISA, RISCV, ['m4_include_lib(m5_warpv_includes['risc-v_defs.tlv'])'])
 
    m5_eval(m5_sv_content())
 
@@ -1453,9 +1439,9 @@
 \m5
    TLV_fn(riscv_cnt10_prog, {
       ~assemble(['
-         # /=====================\
-         # | Count to 10 Program |
-         # \=====================/
+         # /==================\
+         # | Sum 1..9 Program |
+         # \==================/
          #
          # Default program for RV32I test
          # Add 1,2,3,...,9 (in that order).
