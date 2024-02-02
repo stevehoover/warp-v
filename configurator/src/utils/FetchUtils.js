@@ -52,7 +52,7 @@ export function openInMakerchip(source, setMakerchipOpening, setDisclosureAndUrl
     const formBody = new URLSearchParams();
     formBody.append("source", source);
     fetch(
-        "https://makerchip.com/project/public",
+        "https://warp-v.makerchip.com/project/public",
         {
             method: 'POST',
             body: formBody,
