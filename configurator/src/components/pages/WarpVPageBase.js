@@ -46,7 +46,7 @@ export function WarpVPageBase({
             setTlvForJson(null)
         } else {
             const macros = translateJsonToM4Macros(coreJson)
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings)
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings.target_plat )
             setMacrosForJson(tlv.split("\n"))
 
             const task = setTimeout(() => {
@@ -238,7 +238,7 @@ export function WarpVPageBase({
         if (validateForm(true)) {
             setMakerchipOpening(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings.target_plat);
             openInMakerchip(tlv, setMakerchipOpening, setDisclosureAndUrl)
         }
     }
@@ -252,7 +252,7 @@ export function WarpVPageBase({
             })
             setDownloadingCode(true)
             const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings.target_plat);
             getSVForTlv(tlv, sv => {
                 downloadOrCopyFile(false, 'verilog.sv', sv);
                 setDownloadingCode(false)
