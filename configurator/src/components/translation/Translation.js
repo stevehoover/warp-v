@@ -61,13 +61,7 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
         verilatorConfig.delete("/* verilator lint_off WIDTH */")
     }
     let formattingSettings;
-    if (target_plat === '1st-CLaaS') {
-        formattingSettings = ['--debugSigs', '--noline'];
-    }
-    else
-    {
-        formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
-    }
+    formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
     let boilerplate_1st_ClaaS = `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\m5
    / -----------------------------------------------------------------------------
@@ -153,7 +147,11 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
    m4_ifelse_block(m5_XILINX, 0, , ['
       m4_include_lib(m5_flow_lib/xilinx_macros.tlv)
    '])
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/1b92316df68256f6f0dfa242041a6669456e8e63/warp-v.tlv'])
+   m4_include_lib(['${settings.warpVVersion}'])
+${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
+         ${programText.split("\n").join("\n         ")}
+      '])\n   })` : ``}
+
 \\m5
    define_csr(['claasrsp'], 12'hC00, ['32, VAL, 0'], ['32'b0'], ['{32{1'b1}}'], 0)
 
@@ -382,38 +380,37 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
 \\SV
    endmodule
 
-    `
-    let boilerplate_warpv = `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
+   `
+   let boilerplate_warpv = `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
-    /*
-    Copyright ${new Date().getFullYear()} Redwood EDA, LLC
-    
-    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-    
-    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-    
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-    */
+   /*
+   Copyright ${new Date().getFullYear()} Redwood EDA, LLC
+   
+   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+   
+   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+   
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+   */
 \\m5
    use(m5-1.0)
 
 ${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${programName})`] : []).concat(definitions).join("\n   ") : ""}
 \\SV
-    // Include WARP-V.
-    ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
-    m4_include_lib(['${settings.warpVVersion}'])
+   // Include WARP-V.
+   ${verilatorConfig.size === 0 ? "" : [...verilatorConfig].join("\n   ")}
+   m4_include_lib(['${settings.warpVVersion}'])
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
-            ${programText.split("\n").join("\n         ")}
-        '])\n   })` : ``}
+         ${programText.split("\n").join("\n         ")}
+      '])\n   })` : ``}
 m4+module_def()
 \\TLV
    ${settings.customInstructionsEnabled ? customInstructionTemplate : "m5+warpv_top()"}
 \\SV
-    endmodule
+   endmodule
 `
     if (target_plat === '1st-CLaaS') {
-        return boilerplate_1st_ClaaS
-        
+        return boilerplate_1st_ClaaS    
     } else {
         return boilerplate_warpv
     }
