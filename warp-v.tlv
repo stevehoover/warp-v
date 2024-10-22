@@ -1220,7 +1220,7 @@
       /instr
          @m5_MEM_WR_STAGE
             $passed = ! $reset && ($Pc == m5_if_var_def(label_pass_byte_addr, ['m5_label_pass_byte_addr'], ['((m5_NUM_INSTRS - 1) * m5_ADDRS_PER_INSTR)'])) && $good_path;
-            $failed = !clk || m5_if_var_def(label_fail_byte_addr, [' || (($Pc == m5_label_fail_byte_addr) && $good_path)']);
+            $failed = m5_if_var_def(label_fail_byte_addr, [' || (($Pc == m5_label_fail_byte_addr) && $good_path)']);
 
 
 
@@ -6327,7 +6327,7 @@ Outputs:
       @m5_MEM_WR_STAGE
          // Assert these to end simulation (before Makerchip cycle limit).
          *passed = & /top/_hier|fetch/instr>>m5_REG_WR_STAGE$passed;
-         *failed = | /top/_hier|fetch/instr>>m5_REG_WR_STAGE$failed;
+         *failed = !clk || ( /top/_hier|fetch/instr>>m5_REG_WR_STAGE$failed );
 
 
 /// Instantiate the chosen testbench, based on m5_isa, m5_PROG_NAME, and/or m5_TESTBENCH_NAME.
