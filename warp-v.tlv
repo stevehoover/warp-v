@@ -1220,7 +1220,7 @@
       /instr
          @m5_MEM_WR_STAGE
             $passed = ! $reset && ($Pc == m5_if_var_def(label_pass_byte_addr, ['m5_label_pass_byte_addr'], ['((m5_NUM_INSTRS - 1) * m5_ADDRS_PER_INSTR)'])) && $good_path;
-            $failed = m5_if_var_def(label_fail_byte_addr, [' || (($Pc == m5_label_fail_byte_addr) && $good_path)']);
+            $failed = 1'b0 || m5_if_var_def(label_fail_byte_addr, [' || (($Pc == m5_label_fail_byte_addr) && $good_path)']);
 
 
 
