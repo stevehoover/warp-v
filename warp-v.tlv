@@ -308,7 +308,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/3213781fdd22be60e1f34c2c81a300424973879f/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ce92833434fdec8f1bcbc2fea96ab89687396353/'])
    ])
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
@@ -1469,7 +1469,6 @@
             LW t1, -4(t2)            #     load the final value
             ADDI a1, zero, 0x2d      #     expected result (0x2d)
             BEQ t1, a1, pass         #     pass if as expected
-
             # Branch to one of these to report pass/fail to the default testbench.
          fail:
             ADD a1, a1, zero         #     nop fail
@@ -1752,9 +1751,9 @@
             m5_repeat(m5_NUM_INSTRS, ['assign instrs[m5_LoopCnt] = m5_eval(m5_eval(m5_get(['instr']m5_LoopCnt))); '])
             ///m4_forloop(['m5_\instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(m5_eval(m5_get(['instr']m5_instr_ind))); '])
             
-            // String representations of the instructions for debug.
-            m5_repeat(m5_NUM_INSTRS, ['assign instr_strs[m5_LoopCnt] = "m5_eval(['m5_get(['instr_str']m5_LoopCnt)'])"; '])
-            ///m4_forloop(['m5_\instr_ind'], 0, m5_NUM_INSTRS, ['assign instr_strs[m5_instr_ind] = "m5_eval(['m5_get(['instr_str']m5_instr_ind)'])"; '])
+            // String representations of the instructions for debug, complicated by the need for "\" before "%".
+            m5_repeat(m5_NUM_INSTRS,
+                      ['assign instr_strs[m5_LoopCnt] = "m5_for_each_regex(m5_eval(['m5_get(['instr_str']m5_LoopCnt)']), ['\([^%]*\)\(%?\)'], (pre, percent), ['m5_pre\m5_if_eq(m5_percent, ['%'], ['\%'])'])"; '])
             assign instr_strs[m5_NUM_INSTRS] = "END                                     ";
          
          |fetch
@@ -5026,7 +5025,6 @@ Outputs:
                         fill: color,
                      })
                   } catch(e) {
-                     debugger
                      instr_text.set({text: "<NOT FOUND>", fill: "darkgray"})
                   }
                   return []
@@ -5264,6 +5262,14 @@ Outputs:
          //
          // Instruction with values.
          //
+         let toSigned32 = function(sig) {
+            val = sig.asInt(NaN)
+            if(val >= 2**31) {val = val - 2**32}
+            return val
+         }
+         let regStr = (valid, regNumSig, regSig) => {
+            return valid ? `${regNumSig.asInt(NaN)} (${toSigned32(regSig)})` : `X`
+         }
          m5_if_eq_block(m5_ISA, ['MINI'], ['
             let str = '$dest_char'.asString("?")
             str += "(" + ('$dest_valid'.asBool(false) ? '$rslt'.asInt(NaN) : "---") + ")\n ="
@@ -5273,47 +5279,41 @@ Outputs:
             str += '/src[2]$char'.asString("?")
             str += "(" + ('/src[2]$valid'.asBool(false) ? '/src[2]$value'.asInt(NaN) : "--") + ")"
          '], m5_ISA, ['RISCV'], ['
-            let regStr = (type_char, valid, regNum, regValue) => {
-               return type_char + (valid ? `${regNum} (${regValue})` : `X`)
-            }
             let srcStr = (src) => {
                let ret = ""
                if ((src < 3) &&
                    '/src[src]$unconditioned_is_reg'.asBool(false)) {
-                  ret += `\n      ${regStr("x", true, '/src[src]$unconditioned_reg'.asInt(NaN),     '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                  ret += `\n      x${regStr(true, '/src[src]$unconditioned_reg',     '/src[src]$unconditioned_reg_value')}`
                }
                m5_if_eq_block(m5_EXT_F, 1, ['
                if ('/fpu/src[src]$unconditioned_is_reg'.asBool(false)) {
-                  ret += `\n      ${regStr("f", true, '/fpu/src[src]$unconditioned_reg'.asInt(NaN), '/fpu/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                  ret += `\n      f${regStr(true, '/fpu/src[src]$unconditioned_reg', '/fpu/src[src]$unconditioned_reg_value')}`
                }
                '])
                return ret
             }
             let dest_reg_valid = '$dest_reg_valid'.asBool(false)
-            let str = `${regStr("x", dest_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+            let str = `x${regStr(dest_reg_valid, '$raw_rd', '$rslt')}\n`
             m5_if_eq_block(m5_EXT_F, 1, ['
             let dest_fpu_reg_valid = '/fpu$dest_reg_valid'.asBool(false)
             if (dest_fpu_reg_valid) {
-               str = `${regStr("f", dest_fpu_reg_valid, '$raw_rd'.asInt(NaN), '$rslt'.asInt(NaN))}\n`
+               str = `f${regStr(dest_fpu_reg_valid, '$raw_rd', '$rslt')}\n`
             }
             '])
             str += `  = ${'$mnemonic'.asString("?")}${srcStr(1)}${srcStr(2)}${srcStr(3)}`
             if ('$imm_valid'.asBool()) {
-               str += `\n      i[${'$imm_value'.asInt(NaN)}]`
+               str += `\n      i[${toSigned32('$imm_value')}]`
             }
          '], m5_ISA, ['MIPSI'], ['
             // TODO: Almost same as RISC-V. Avoid cut-n-paste.
-            let regStr = (valid, regNum, regValue) => {
-               return valid ? `x${regNum} (${regValue})` : `xX`
-            }
             let srcStr = (src) => {
                return '/src[src]$unconditioned_is_reg'.asBool(false)
-                          ? `\n      ${regStr(true, '/src[src]$unconditioned_reg'.asInt(NaN), '/src[src]$unconditioned_reg_value'.asInt(NaN))}`
+                          ? `\n      x${regStr(true, '/src[src]$unconditioned_reg', '/src[src]$unconditioned_reg_value')}`
                           : ""
             }
-            let str = `${regStr(dest_reg_valid, '$wr_reg'.asInt(NaN), '$rslt'.asInt(NaN))}\n` +
+            let str = `x${regStr(dest_reg_valid, '$wr_reg', '$rslt')}\n` +
                       `  = ${'$raw_opcode'.asInt()}${srcStr(1)}${srcStr(2)}\n` +
-                      ('$imm_valid' ? `i[${'$imm_value'.asInt(NaN)}]` : "")
+                      ('$imm_valid' ? `i[${toSigned32('$imm_value')}]` : "")
          '], ['
          '])
          // srcX Arrow function
