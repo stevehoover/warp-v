@@ -4926,9 +4926,7 @@ Outputs:
                   stageCnt++
                }
                m5_stages_js
-               for (stage in stages) {
-                  stage = parseInt(stage)
-                  s = stages[stage]
+               stages.forEach((s, stage) => {
                   ret[`stage${stage}`] = new fabric.Rect({
                        left: s.left, top: 0, width: s.right - s.left, height: 62,
                        fill: this.color(stage)
@@ -4939,7 +4937,7 @@ Outputs:
                        left: (s.left + s.right) / 2, top: 64,
                        fontSize: 2, fontWeight: 800, fontFamily: "mono"
                   })
-               }
+               })
                // Layer in stage labels.
                Object.assign(ret, labels)
                
@@ -5739,7 +5737,7 @@ Outputs:
             }
             let rvfiLeft = 50
             let pos = 0
-            for (sigName in this.sigs) {
+            for (const sigName of this.sigs) {
                let top = 29 + 10 * pos
                let obj = new fabric.Group([
                   // Signal name.
@@ -5788,7 +5786,7 @@ Outputs:
             } catch(e) {
                console.log("Signals not found.")
             }
-            for (sigName in this.sigs) {
+            for (const sigName of this.sigs) {
                let rvfi = this.sigVal(`_root.checker_inst.rvfi_${sigName}`)
                this.sigs[sigName].rvfi = rvfi
                let spec = this.sigVal(`_root.checker_inst.spec_${sigName}`)
