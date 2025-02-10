@@ -93,6 +93,18 @@ export const ConfigurationParameters = [
     },
     {
         macroType: "var",
+        readableName: "Target Platform",
+        verilogName: "TARGET_PLATFORM",
+        defaultValue: "None",
+        jsonKey: "target_plat",
+        type: RadioParameter,
+        possibleValues: ["1st-CLaaS", "Tinytapeout"],
+        validator: (input, setting) => setting.possibleValues.includes(input),
+        description: "Target platform consists of FPGA (included in 1st-CLaaS) and ASIC (included in Tinytapeout)",
+        configurationCategory: "CPU"
+    },
+    {
+        macroType: "var",
         readableName: "EXTRA_REPLAY_BUBBLE",
         verilogName: "EXTRA_REPLAY_BUBBLE",
         defaultValue: 0,
