@@ -308,7 +308,7 @@
    if(m5_local, [
       var(warpv_includes, ['./warp-v_includes/'])
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/ce92833434fdec8f1bcbc2fea96ab89687396353/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/42af452089ec54db835bd996f3900f5d7635d653/'])
    ])
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
