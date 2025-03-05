@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use Warp-V in your work, please cite it using the following metadata."
+title: "Warp-V: A TL-Verilog RISC-V Core Generator"
+authors:
+  - family-names: "Hoover"
+    given-names: "Steven"
+    orcid: "0000-0001-5844-2889"
+    affiliation: "Redwood EDA, LLC"
+contributors:
+  - family-names: "Hadnagy"
+    given-names: "Akos"
+  - family-names: "Ratzman"
+    given-names: "Adam"
+date-released: "2021-04-21"
+repository-code: "https://github.com/stevehoover/warp-v"
+url: "https://warp-v.org"
+abstract: >
+  Warp-V is an open-source, parameterized RISC-V core generator written in TL-Verilog.
+  It was developed for exploring and demonstrating transaction-level design methodology.
+keywords:
+  - TL-Verilog
+  - RISC-V
+  - Hardware Design
+  - Open-source
+  - Computer Architecture
+license: "BSD-3-Clause"  # Update if your repository uses a different license
