@@ -1,15 +1,22 @@
-import React from "react";
-import {Box, Checkbox, Text, Textarea, Stack} from "@chakra-ui/react";
+import React, { useEffect } from "react";
+import { Box, Checkbox, Text, Textarea, Stack } from "@chakra-ui/react";
 
 export function EnterProgramForm({
-                                     configuratorGlobalSettings,
-                                     setConfiguratorGlobalSettings,
-                                     programText,
-                                     setProgramText
-                                 }) {
-    return <>
-        <Box>
-            <Stack direction="column">
+  configuratorGlobalSettings,
+  setConfiguratorGlobalSettings,
+  programText,
+  setProgramText,
+  receivedAsmCode,
+}) {
+  useEffect(() => {
+    // Use receivedAsmCode as needed, e.g., set it to the programText state
+    setProgramText(receivedAsmCode);
+  }, [receivedAsmCode, setProgramText]);
+
+  return (
+    <>
+      <Box>
+        <Stack direction="column">
             <Checkbox value={configuratorGlobalSettings.generalSettings.customProgramEnabled}
                       isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                       onChange={e => setConfiguratorGlobalSettings({
@@ -28,21 +35,20 @@ export function EnterProgramForm({
                             customInstructionsEnabled: e.target.checked
                         }
                     })}>Include template for custom instructions</Checkbox>
-            </Stack>
+        </Stack>
 
-
-            <Text mb={2}>
-                Here, you can provide your own assembly program that will be hardcoded into the instruction memory
-                of
-                your core.
-                The syntax roughly mimics that defined by the RISC-V ISA, but not exactly.
-            </Text>
-            <Textarea rows={programText.split("\n").length}
-                      isDisabled={!configuratorGlobalSettings.generalSettings.customProgramEnabled}
-                      value={programText}
-                      onChange={e => setProgramText(e.target.value)}
-                      fontFamily="'Courier New', monospace"
-            />
-        </Box>
-    </>
+<Text mb={2}>
+  Here, you can provide your own assembly program that will be hardcoded into the instruction memory of your
+  core. The syntax roughly mimics that defined by the RISC-V ISA, but not exactly.
+</Text>
+<Textarea
+  rows={programText.split("\n").length}
+  isDisabled={!configuratorGlobalSettings.generalSettings.customProgramEnabled}
+  value={programText}
+  onChange={(e) => setProgramText(e.target.value)}
+  fontFamily="'Courier New', monospace"
+/>
+</Box>
+</>
+);
 }
