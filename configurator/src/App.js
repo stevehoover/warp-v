@@ -20,8 +20,7 @@ function App() {
                 "--inlineGen",
                 "--bestsv",
                 "--noline",
-                "--fmtNoSource",
-                "--noDirectiveComments"
+                "--fmtNoSource"
             ],
             customProgramEnabled: false,
             customInstructionsEnabled: false

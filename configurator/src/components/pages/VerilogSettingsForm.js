@@ -69,8 +69,8 @@ export function VerilogSettingsForm({generalSettings, onFormattingChange, onVers
                         possible.</Checkbox>
                     <Checkbox value="--fmtUseGenerate">Use the generate/endgenerate keywords that are
                         optional in SystemVerilog.</Checkbox>
-                    <Checkbox value="--noDirectiveComments">For strict adherence to the Verilog specification, do
-                        not output comments on `line and `include lines.</Checkbox>
+                    <Checkbox value="--directiveComments">Though not compliant to the Verilog specification,
+                        allow output line comments after `line and `include directives.</Checkbox>
                     <Checkbox value="--inlineGen" style={{visibility: 'hidden'}}>Produce generated content
                         inline in the primary output file rather than in a separate file.</Checkbox>
                     {/*<Checkbox value='--fmtStripUniquifiers'>Eliminate the use of uniquifiers in HDL
