@@ -34,7 +34,7 @@
    /debug_level(max)
    use(m5-1.0)
 \SV
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/tlv_lib/db48b4c22c4846c900b3fa307e87d9744424d916/fundamentals_lib.tlv'])
+   m4_include_lib(['https://raw.githubusercontent.com/TL-X-org/tlv_lib/3543cfd9d7ef9ae3b1e5750614583959a672084d/fundamentals_lib.tlv'])
 \m5
    / A highly-parameterized CPU generator, configurable for:
    /   o An ISA of your choice, where the following ISAs are currently defined herein:
