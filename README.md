@@ -5,9 +5,9 @@
 
 # Overview
 
-WARP-V is an open-source CPU core generator written in [TL-Verilog](https://tl-x.org) with support for RISC-V and MIPS I. It is a demonstration and exploration vehicle for the flexibility that is possible using the emerging "transaction-level design" methodology. It can implement a single-stage, low-power microcontroller or a mid-range 7-stage CPU. Even the instruction-set architectures (ISAs) is configurable. WARP-V is an evolving library of CPU components as well as various compositions of them. It is driven by a community interested in transforming the silicon industry through open-source hardware and revolutionary design methodology.
+WARP-V is an open-source CPU core generator written in [TL-Verilog](https://tl-x.org) with support for RISC-V and MIPS I. It is a demonstration and exploration vehicle for the flexibility that is possible using the emerging "transaction-level design" methodology. It can implement a single-stage, low-power microcontroller or a mid-range 7-stage CPU. Even the instruction-set architecture (ISA) is configurable. WARP-V is an evolving library of CPU components as well as various compositions of them. It is driven by a community interested in transforming the silicon industry through open-source hardware and revolutionary design methodology.
 
-WARP-V includes CPU core logic only with no current support for virtual memory, caches, or IOs. RISC-V implementations are formally verified using open-source tools in continuous integration testing. They have been [formally verified also by Axiomise](https://semiwiki.com/eda/302631-accelerating-exhaustive-and-complete-verification-of-risc-v-processors/).
+WARP-V includes CPU core logic only with no current support for virtual memory, caches, or I/Os. RISC-V implementations are formally verified using open-source tools in continuous integration testing. They have been [formally verified also by Axiomise](https://semiwiki.com/eda/302631-accelerating-exhaustive-and-complete-verification-of-risc-v-processors/).
 
 
 # Links
@@ -60,17 +60,17 @@ cd warp-v
 
 ```pip install fusesoc```
 
-- Add warpv to fusesoc core library
+- Add WARP-V to fusesoc core library
 
 ```fusesoc library add warpv .```
 
-- Build warp-v with Fusesoc (default configuration)
+- Build WARP-V with Fusesoc (default configuration)
 
 ```fusesoc run --target=sandpiper warpv```
 
-Warp-v can be configured according to your requirement by setting the `mxdef:` in `warp-v.core` 
+WARP-V can be configured according to your requirement by setting the `mxdef:` in `warp-v.core` 
 
-Note: In the the .core files use [] wherever you intend to use (). As Fusesoc parsers donot support (), the [] acts as a place holder and gets replaced by () later on.
+Note: In the the `.core` files use `[]` wherever you intend to use `()`. As Fusesoc parsers do not support `()`, the `[]` acts as a place holder and gets replaced by `()` later on.
 
 # Features
 
@@ -83,13 +83,13 @@ Note: In the the .core files use [] wherever you intend to use (). As Fusesoc pa
     - An assembler for hard-coded test programs
     - Formal verification in CI (continuous integration testing)
     - Implementation characterized on AWS data-center FPGAs
-  - A small code base (single < 3K-line file (heavily-commented) implements all WARP-V variants, assembler, tests, formal verification harness, and Xilinx implementation)
+  - A small code base (single < 3K-line file (heavily-commented) that implements all WARP-V variants, assembler, tests, formal verification harness, and Xilinx implementation)
 
 
 
 # Revolutionary Modeling Methodology
 
-As an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank" target="_blank" atom_fix="_">TL-Verilog language spec</a>, WARP-V intentionally pushes the limits of code construction using an M4-based flow. While TL-Verilog documentation and tools are fairly mature, the M4 layer intended only for research.an undocumented proof-of-concept framework (even when old-school Verilog features might suffice). If you've come here to learn about TL-Verilog for RISC-V design, you'd be better served to study [the cores developed in the Microprocessor for You in Thirty Hours Workshop](https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md).
+As an exploration vehicle for capabilities that are not yet defined in the <a href="http://tl-x.org/" target="_blank" target="_blank" atom_fix="_">TL-Verilog language spec</a>, WARP-V intentionally pushes the limits of code construction using an M4-based flow. While TL-Verilog documentation and tools are fairly mature, the M4 layer is intended only for research - an undocumented proof-of-concept framework (even when old-school Verilog features might suffice). If you've come here to learn about TL-Verilog for RISC-V design, you'd be better served to study [the cores developed in the Microprocessor for You in Thirty Hours Workshop](https://github.com/stevehoover/RISC-V_MYTH_Workshop/blob/master/student_projects.md).
 
 WARP-V uses bleeding-edge modeling methodology that provides an unprecedented level of flexibility without sacrificing gate-level control. To understand WARP-V and how to utilize it, it helps to first gain an appreciation for this methodology, which involves two layers:
 
@@ -139,7 +139,7 @@ Constructing an ISA from scratch would require heavy use of M4 and could be a ta
 
 ## RISC-V Infrastructure
 
-For RISC-V development (even if you are developing your own RISC-V core without using WARP-V itself) this repository has some useful infrastructure. It supports formal verification using <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank" target="_blank" atom_fix="_">riscv-formal</a> run in [continuous integration testing](#ci). So, you always know if your core is compliant.
+For RISC-V development (even if you are developing your own RISC-V core without using WARP-V itself), this repository has some useful infrastructure. It supports formal verification using <a href="https://github.com/cliffordwolf/riscv-formal" target="_blank" target="_blank" atom_fix="_">riscv-formal</a> run in [continuous integration testing](#ci). So, you always know if your core is compliant.
 
 ## In the Cloud
 
@@ -157,9 +157,8 @@ You can find help in the <a href="https://gitter.im/librecores/warp-v" target="_
 
 A few pointers for exploring WARP-V in Makerchip:
 
-  - Learn TL-Verilog and Makerchip first, following tutorials and other resources, at <a href="http://www.makerchip.com/" target="_blank" atom_fix="_">makerchip.com</a>.
-  there are several courses available for building your own RISC-V CPU similar to WARP-V, but less parameterized, available via the menus.
-  - This link will <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">Open the latest WARP-V in Makerchip</a>.
+  - Learn TL-Verilog and Makerchip first, following tutorials and other resources, at <a href="http://www.makerchip.com/" target="_blank" atom_fix="_">makerchip.com</a>. There are several courses available for building your own RISC-V CPU similar to WARP-V, but less parameterized, available via the menus.
+  - This link will <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">open the latest WARP-V in Makerchip</a>.
   - Reverse-engineer the WARP-V design at the TL-Verilog level, not by reading WARP-V source code. Configure WARP-V at [warp-v.org](https://warp-v.org) as you choose, compile, and explore the model in the "Nav-TLV" pane.
   - You can then correlate this back to the source code by clicking Nav-TLV line numbers. This highlights the corresponding source code line.
 
@@ -212,7 +211,7 @@ TODO: Add implementation data here.
 
 ## Retiming Experiments
 
-We utilized the pipeline flexibility of TL-Verilog and WARP-V's pipeline parameterization to experiment with Vivado's ability to retime logic optimally. This showed that it is not necessary to precisely partition the CPU pipeline logic among pipeline stages in order to get good quality results. However, when tools must retime logic, runtime can be significantly impacted. Here is [more detail](doc/retiming.md).
+We utilized the pipeline flexibility of TL-Verilog and WARP-V's pipeline parameterization to experiment with Vivado's ability to retime logic optimally. This showed that it is not necessary to precisely partition the CPU pipeline logic among pipeline stages in order to get good quality results. However, when tools must retime logic, runtime can be significantly impacted. [More details](doc/retiming.md).
 
 
 # Known Hardware Implementations
