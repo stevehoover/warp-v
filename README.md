@@ -70,7 +70,7 @@ cd warp-v
 
 WARP-V can be configured according to your requirement by setting the `mxdef:` in `warp-v.core` 
 
-Note: In the the `.core` files use `[]` wherever you intend to use `()`. As Fusesoc parsers do not support `()`, the `[]` acts as a place holder and gets replaced by `()` later on.
+Note: In the `.core` files use `[]` wherever you intend to use `()`. As Fusesoc parsers do not support `()`, the `[]` acts as a place holder and gets replaced by `()` later on.
 
 # Features
 
