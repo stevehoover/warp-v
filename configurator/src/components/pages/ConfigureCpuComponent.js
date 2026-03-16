@@ -1,29 +1,59 @@
-import {Alert, AlertIcon, Box, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text} from "@chakra-ui/react";
-import {GeneralSettingsForm} from "../forms/GeneralSettingsForm";
-import {GenericSettingsFormComponent} from "../forms/GenericSettingsFormComponent";
-import {VerilogSettingsForm} from "./VerilogSettingsForm";
-import {EnterProgramForm} from "./EnterProgramForm";
-import React from "react";
-import {hazardsParams, pipelineParams} from "./HomePage";
+import React, { useState } from "react";
+import { Alert, AlertIcon, Box, Heading, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from "@chakra-ui/react";
+import { GeneralSettingsForm } from "../forms/GeneralSettingsForm";
+import { GenericSettingsFormComponent } from "../forms/GenericSettingsFormComponent";
+import { VerilogSettingsForm } from "./VerilogSettingsForm";
+import { EnterProgramForm } from "./EnterProgramForm";
+import { hazardsParams, pipelineParams } from "./HomePage";
 
 export function ConfigureCpuComponent({
-                                          configuratorGlobalSettings,
-                                          setConfiguratorGlobalSettings,
-                                          formErrors,
-                                          generalSettings,
-                                          onFormattingChange,
-                                          onVersionChange,
-                                          programText,
-                                          setProgramText,
-                                          settings,
-                                          userChangedStages,
-                                          userChangedStages1
-                                      }) {
-    return <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
+  configuratorGlobalSettings,
+  setConfiguratorGlobalSettings,
+  formErrors,
+  generalSettings,
+  onFormattingChange,
+  onVersionChange,
+  programText,
+  setProgramText,
+  settings,
+  userChangedStages,
+  userChangedStages1,
+}) {
+  const [receivedAsmCode, setReceivedAsmCode] = useState("");
 
-        <Heading size="lg" mb={4}>Configure your CPU now</Heading>
-        <Tabs borderWidth={1} borderRadius="lg" p={3} isFitted>
-            <TabList className="tab-list">
+  const receiveAsmCode = (event) => {
+    // Check the origin of the event
+    // Add your origin check here if needed
+
+    // Access the asm code array from the compiler
+    var asmCodeArray = event.data.asmCode;
+
+    // Check if asmCodeArray is defined and is an array
+    if (asmCodeArray && Array.isArray(asmCodeArray)) {
+        // Convert the array of objects into a string
+        var asmCodeString = asmCodeArray.map(instruction => instruction.text).join('\n');
+
+        // Use the asm code string as needed, e.g., display in the code editor
+        console.log("ASM code sent from parent window to warp-v");
+        
+        // Update the state with the received ASM code (if you're using React state)
+        setReceivedAsmCode(asmCodeString);
+    } else {
+        console.warn("Invalid asmCodeArray:", asmCodeArray);
+    }
+};
+
+// Listen for messages
+window.addEventListener("message", receiveAsmCode);
+
+
+  return (
+    <Box mt={5} mb={15} mx="auto" maxW="100vh" pb={10} borderBottomWidth={2}>
+      <Heading size="lg" mb={4}>
+        Configure your CPU now
+      </Heading>
+      <Tabs borderWidth={1} borderRadius="lg" p={3} isFitted>
+        <TabList className="tab-list">
                 <Tab>General</Tab>
                 <Tab>Multi-Core</Tab>
                 <Tab>Pipeline</Tab>
@@ -83,12 +113,16 @@ export function ConfigureCpuComponent({
                     />
                 </TabPanel>
                 <TabPanel>
-                    <EnterProgramForm configuratorGlobalSettings={configuratorGlobalSettings}
-                                      setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
-                                      programText={programText} setProgramText={setProgramText}
-                    />
-                </TabPanel>
-            </TabPanels>
-        </Tabs>
-    </Box>;
+            <EnterProgramForm
+              configuratorGlobalSettings={configuratorGlobalSettings}
+              setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+              programText={programText}
+              setProgramText={setProgramText}
+              receivedAsmCode={receivedAsmCode}
+            />
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+    </Box>
+  );
 }
