@@ -29,8 +29,7 @@ export function ConfigureCpuComponent({
                 <Tab>Pipeline</Tab>
                 <Tab>Components</Tab>
                 <Tab>Hazards</Tab>
-                <Tab>Memory</Tab>
-                <Tab>I/O</Tab>
+                <Tab>Target</Tab>
                 <Tab>Verilog</Tab>
                 <Tab>Program</Tab>
             </TabList>
@@ -70,11 +69,9 @@ export function ConfigureCpuComponent({
                                                   configurationParametersSubset={hazardsParams}/>
                 </TabPanel>
                 <TabPanel>
-                    <Text>WARP-V currently supports only the CPU core itself, with a small instruction memory and
-                        data memory.</Text>
-                </TabPanel>
-                <TabPanel>
-                    <Text>WARP-V does not currently provide any I/O components.</Text>
+                <GenericSettingsFormComponent configuratorGlobalSettings={configuratorGlobalSettings}
+                                                  setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
+                                                  configurationParametersSubset={["target_plat"]}/>
                 </TabPanel>
                 <TabPanel>
                     <VerilogSettingsForm generalSettings={generalSettings}
