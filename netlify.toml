@@ -1,0 +1,13 @@
+[build]
+  # Build from the React configurator subdirectory.
+  base = "configurator"
+  command = "yarn build"
+  # Publish path is relative to `base`, i.e. configurator/build.
+  publish = "build"
+
+[build.environment]
+  # CRA 4 / webpack 4 don't build on Netlify's default Node 22 runner.
+  # Pin to Node 18 (works with the --openssl-legacy-provider flag in package.json).
+  NODE_VERSION = "18"
+  # CRA treats build warnings as errors when CI=true (Netlify's default). Disable that.
+  CI = "false"
