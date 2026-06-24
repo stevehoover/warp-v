@@ -16,6 +16,7 @@ export function CoreDetailsComponent({
                                          selectedFile,
                                          setSelectedFile,
                                          setDiscloureAndUrl,
+                                         compileInMakerchip,
                                          ...rest
                                      }) {
     const [makerchipOpening, setMakerchipOpening] = useState(false)
@@ -45,29 +46,32 @@ export function CoreDetailsComponent({
         // .replaceAll(/`include "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
     }
 
-    function handleOpenInMakerchipClicked() {
-        if (selectedFile === "m4") openInMakerchip(macrosForJson.join("\n"), setMakerchipOpening, setDiscloureAndUrl)
-        else if (selectedFile === "tlv") {
-            openInMakerchip(
-                replaceImports(tlvForJson)
-                    .replace("\\TLV_version", "\\m5_TLV_version"),
-                setMakerchipOpening,
-                setDiscloureAndUrl
-            )
-        } else if (selectedFile === "rtl") {
+    // The TL-Verilog/Verilog source for the selected file, transformed so it is usable as Makerchip source code.
+    function getSourceForSelectedFile() {
+        if (selectedFile === "m4") return macrosForJson.join("\n")
+        if (selectedFile === "tlv") return replaceImports(tlvForJson).replace("\\TLV_version", "\\m5_TLV_version")
+        if (selectedFile === "rtl") {
             const modifiedSVToOpen = `\\m5_TLV_version 1d: tl-x.org
 \\SV
 ` + sVForJson.replaceAll(/`include ".+"\s+\/\/\s+From: "(.+)"/gm, `m4_sv_include_url(['$1']) // Originally: $&`)
-            // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be download when compiled.
-
-            openInMakerchip(replaceImports(modifiedSVToOpen), setMakerchipOpening, setDiscloureAndUrl)
+            // For the generated SV to be used as source code, we must revert the inclusion of files, so they will be downloaded when compiled.
+            return replaceImports(modifiedSVToOpen)
         }
+        return ""
+    }
+
+    function handleOpenInMakerchipClicked() {
+        openInMakerchip(getSourceForSelectedFile(), setMakerchipOpening, setDiscloureAndUrl)
+    }
+
+    function handleCompileAsSourceClicked() {
+        compileInMakerchip(getSourceForSelectedFile())
     }
 
     return <Box mx='auto' maxW='100vh' mb={30} {...rest}>
         <Box mb={3}>
-            <Heading size="lg">Core Details</Heading>
-            <Text mt={1}>Your CPU is constructed in the following steps.</Text>
+            <Heading size="lg">Explore details</Heading>
+            <Text mt={1}>Your CPU is constructed in the following steps. Select to view the corresponding file (for the current configuration) below.</Text>
         </Box>
 
         <HStack mb={10} flexWrap="wrap">
@@ -116,12 +120,15 @@ export function CoreDetailsComponent({
                 {selectedFile === 'configuration' && <Text mb={2}><b>Core Configuration</b></Text>}
                 {selectedFile === 'm4' && <Text mb={2}><b>{m4fileName}</b></Text>}
                 {selectedFile === 'tlv' && <Text mb={2}><b>{tlvFileName}</b></Text>}
-                {selectedFile === 'rtl' && <Text mb={2}><b>{systemVerilogFileName}</b></Text>}
+                {selectedFile === 'rtl' && <Text mb={2}><b>{systemVerilogFileName}</b> (selected above)</Text>}
+                <Text mb={2}> You can edit and maintain this, or any file above, as source code.</Text>
 
                 <HStack mb={3}>
-                    <Button colorScheme="teal" onClick={handleDownloadSelectedFileClicked}>Download File</Button>
-                    <Button colorScheme="blue" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
-                            isLoading={makerchipOpening}>Edit in Makerchip as Source</Button>
+                    <Button colorScheme="blue" onClick={handleCompileAsSourceClicked}
+                            isDisabled={!compileInMakerchip}>Compile as Source Above</Button>
+                    <Button colorScheme="teal" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
+                            isLoading={makerchipOpening}>Open as Source in New Makerchip Tab</Button>
+                    <Button colorScheme="blue" onClick={handleDownloadSelectedFileClicked}>Download</Button>
                     <Button colorScheme="teal" onClick={handleCopySelectedFileClicked}>Copy Code</Button>
                 </HStack>
 

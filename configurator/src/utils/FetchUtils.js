@@ -47,26 +47,40 @@ export function OpenInMakerchipModal({disclosure, url}) {
     </Modal>
 }
 
+function encodeBase64Url(str) {
+    try {
+        const bytes = new TextEncoder().encode(str);
+        // Handle large files by processing in chunks to avoid spread operator limits
+        const chunkSize = 32768;
+        let binary = '';
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const chunk = bytes.slice(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+        }
+        return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    } catch (error) {
+        console.error('Error encoding to base64url:', error);
+        throw new Error('File is too large to encode in URL. Please use a smaller file or try TLV instead.');
+    }
+}
+
 export function openInMakerchip(source, setMakerchipOpening, setDisclosureAndUrl) {
     setMakerchipOpening(true)
-    const formBody = new URLSearchParams();
-    formBody.append("source", source);
-    fetch(
-        "https://warp-v.makerchip.com/project/public",
-        {
-            method: 'POST',
-            body: formBody,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
+    try {
+        const encoded = encodeBase64Url(source);
+        const url = `https://beta.makerchip.com/ide#code=${encoded}`;
+        
+        // Check URL length (most browsers support at least 2MB, but warn if over 1MB)
+        if (url.length > 1000000) {
+            console.warn(`URL length is ${url.length} characters - this may be too large for some browsers`);
         }
-    )
-        .then(resp => resp.json())
-        .then(json => {
-            const url = json.url
-            openInNewTabOrFallBack(`https://warp-v.makerchip.com${url}`, "_blank", setDisclosureAndUrl)
-            setMakerchipOpening(false)
-        })
+        
+        openInNewTabOrFallBack(url, "_blank", setDisclosureAndUrl);
+    } catch (error) {
+        alert(error.message || 'Failed to open in Makerchip. The file may be too large.');
+    } finally {
+        setMakerchipOpening(false);
+    }
 }
 
 function openInNewTabOrFallBack(urlToRedirectTo, target, setDisclosureAndUrl) {

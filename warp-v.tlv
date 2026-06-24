@@ -5395,8 +5395,7 @@ Outputs:
          })
          //
          objects.fetch_instr_viz.animate({top: 50, left: 710}, {
-              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-              duration: 500
+              duration: 300
          })
          '])
          //
@@ -5416,19 +5415,13 @@ Outputs:
             visible: false
          })
          if (rs1_valid || fpu_rs1_valid) {
-            setTimeout(() => {
-               objects.src1_value_viz.set({left: 965 + (rs1_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
-                                           top: 17 * reg_addr1 + 96,
-                                           visible: true})
-               objects.src1_value_viz.animate({left: 830, top: 17 * 1 + 90}, {
-                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                    duration: 500
-               })
-               setTimeout(() => {
-                  objects.src1_value_viz.set({visible: false})
-                  this.global.canvas.renderAll.bind(this.global.canvas)()
-               }, 500)
-            }, 500)
+            objects.src1_value_viz.wait(300)
+               .thenSet({left: 965 + (rs1_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+                        top: 17 * reg_addr1 + 96,
+                        visible: true})
+               .thenAnimate({left: 830, top: 17 * 1 + 90}, {
+                           duration: 300})
+               .thenSet({visible: false})
          }
          objects.src2_value_viz = new fabric.Text(src2_value.toString(), {
             fill: color,
@@ -5439,33 +5432,21 @@ Outputs:
          })
          let src2_being_stored = '$valid_decode'.asBool(false) && '$st'.asBool(false) && commit; // Animate src2 value being stored.
          if (rs2_valid || fpu_rs2_valid) {
-               setTimeout(() => {
-               objects.src2_value_viz.set({left: 965 + (rs2_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
-                                           top: 17 * reg_addr2 + 96,
-                                           visible: true})
-               objects.src2_value_viz.set({visible: true})
-               objects.src2_value_viz.animate({left: 830, top: 17 * 2 + 90}, {
-                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                    duration: 500
-               })
-               setTimeout(() => {
-                  if (src2_being_stored) {
-                     // Animate src2 value being stored.
-                     objects.src2_value_viz.animate({left: 1165 + m5_VIZ_MEM_LEFT_ADJUST, top: 17 * ld_st_addr + 96}, {
-                        onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                        duration: 500
-                     })
-                     setTimeout(() => {
-                        objects.src2_value_viz.set({visible: false})
-                        this.global.canvas.renderAll.bind(this.global.canvas)()
-                     }, 500)
-                  } else {
-                     // Hide src2 value.
-                     objects.src2_value_viz.set({visible: false})
-                     this.global.canvas.renderAll.bind(this.global.canvas)()
-                  }
-               }, 500)
-            }, 500)
+            objects.src2_value_viz.wait(300)
+               .thenSet({left: 965 + (rs2_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+                        top: 17 * reg_addr2 + 96,
+                        visible: true})
+               .thenAnimate({left: 830, top: 17 * 2 + 90},
+                           {duration: 300})
+            if (src2_being_stored) {
+               // Animate src2 value being stored.
+               objects.src2_value_viz.thenAnimate({left: 1165 + m5_VIZ_MEM_LEFT_ADJUST, top: 17 * ld_st_addr + 96},
+                                                  {duration: 300})
+                  .thenSet({visible: false})
+            } else {
+               // Hide src2 value.
+               objects.src2_value_viz.thenSet({visible: false})
+            }
          }
          objects.src3_value_viz = new fabric.Text(src3_value.toString(), {
             fill: color,
@@ -5475,19 +5456,13 @@ Outputs:
             visible: false
          })
          if (fpu_rs3_valid) {
-            setTimeout(() => {
-               objects.src3_value_viz.set({left: 965 + (rs3_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
-                                           top: 17 * reg_addr + 96,
-                                           visible: true})
-               objects.src3_value_viz.animate({left: 830, top: 17 * 3 + 90}, {
-                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                    duration: 500
-               })
-               setTimeout(() => {
-                  objects.src3_value_viz.set({visible: false})
-                  this.global.canvas.renderAll.bind(this.global.canvas)()
-               }, 500)
-            }, 500)
+            objects.src3_value_viz.wait(300)
+            .thenSet({left: 965 + (rs3_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+                      top: 17 * reg_addr + 96,
+                      visible: true})
+            .thenAnimate({left: 830, top: 17 * 3 + 90}, {
+                          duration: 300})
+            .thenSet({visible: false})
          }
          let res_value = '$rslt'.asInt(NaN).toString(16)
          objects.result_viz = new fabric.Text(res_value, {
@@ -5500,17 +5475,11 @@ Outputs:
             visible: false
          })
          if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
-            setTimeout(() => {
-               objects.result_viz.set({visible: true})
-               objects.result_viz.animate({left: (valid_dest_fpu_reg_valid ? 965 + m5_VIZ_MEM_LEFT_ADJUST : 965), top: 17 * dest_reg + 90}, {
-                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                 duration: 500
-               })
-               setTimeout(() => {
-                  objects.result_viz.set({visible: false})
-                  this.global.canvas.renderAll.bind(this.global.canvas)()
-               }, 500)
-            }, 1000)
+            objects.result_viz.wait(600)
+               .thenSet({visible: true})
+               .thenAnimate({left: (valid_dest_fpu_reg_valid ? 965 + m5_VIZ_MEM_LEFT_ADJUST : 965), top: 17 * dest_reg + 90},
+                            {duration: 300})
+               .thenSet({visible: false})
          }
          return Object.values(objects)
       }
@@ -5983,7 +5952,6 @@ Outputs:
                 height: 20,
                 visible: false}
             )
-            context.global.canvas.add(transObj)
             this.global.transObj[uid] = transObj
          }
          this.getContext().preppedTrace = true
@@ -6059,8 +6027,7 @@ Outputs:
                   trans.set("left", m5_EGRESS_OUT_LEFT)
                   trans.set("opacity", 0)
                   trans.animate({top: m5_FIFO_IN_TOP + (core * m5_COREOFFSET), left: m5_FIFO_IN_LEFT, opacity: 1}, {
-                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                              duration: 500})
+                              duration: 300})
                } else {
                   console.log(`Transaction ${uid} not found.`)
                }*/ 
@@ -6089,8 +6056,7 @@ Outputs:
                   trans.set("left", m5_DEFLECTED_LEFT)
                   trans.set("opacity", 0)
                   trans.animate({top: m5_FIFO_IN_TOP + (core * m5_COREOFFSET), left: m5_FIFO_IN_LEFT, opacity: 1}, {
-                              onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                              duration: 500})
+                                 duration: 300})
                } else {
                   console.log(`Transaction ${uid} not found.`)
                }
@@ -6129,10 +6095,8 @@ Outputs:
                   trans.set("top", m5_ARRIVING_TOP + (this.getScope("core").index * m5_COREOFFSET))
                   trans.set("left", m5_ARRIVING_LEFT)
                   trans.set("opacity", 0)
-                  trans.animate({top: m5_INGRESS_IN_TOP + (core * m5_COREOFFSET), left: m5_INGRESS_IN_LEFT, opacity: 1}, {
-                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                 duration: 1000
-                                 })
+                  trans.animate({top: m5_INGRESS_IN_TOP + (core * m5_COREOFFSET), left: m5_INGRESS_IN_LEFT, opacity: 1},
+                                {duration: 600})
                }
                else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_deflected<>0$accepted'.asBool()) {
                   let core = (m5_NUM_CORES > 1) ? this.getScope("core").index : 0;
@@ -6140,8 +6104,7 @@ Outputs:
                   trans.set("left", m5_ARRIVING_LEFT)
                   trans.set("opacity", 0)
                   trans.animate({top: m5_DEFLECTED_TOP + (core * m5_COREOFFSET), left: m5_DEFLECTED_LEFT, opacity: 1}, {
-                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                 duration: 500
+                                 duration: 300
                                  })
                }
                else if ('/top/core|rg_continuing<>0$accepted'.asBool() && '/top/core|rg_not_deflected<>0$accepted'.asBool() && '/top/core|rg<>0$accepted'.asBool()) {
@@ -6150,8 +6113,7 @@ Outputs:
                   trans.set("left", m5_ARRIVING_LEFT)
                   trans.set("opacity", 0)
                   trans.animate({top: m5_RG_TOP + (core * m5_COREOFFSET), left: m5_RG_LEFT, opacity: 1}, {
-                                 onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                 duration: 500
+                                 duration: 300
                                  })
                } else {
                   console.log(`Transaction ${uid} not found.`)
@@ -6186,15 +6148,10 @@ Outputs:
                      //trans.set("top", m5_FIFO_OUT_TOP + (this.getScope("core").index * m5_COREOFFSET))
                      //trans.set("left", m5_FIFO_OUT_LEFT)
                      //trans.set("opacity", 0)
-                     trans.animate({top: m5_FIFO_OUT_TOP + (core * m5_COREOFFSET), left: m5_FIFO_OUT_LEFT, opacity: 1}, {
-                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                    duration: 500,
-                                    onComplete: () => {
-                                       trans.animate({top: m5_RG_TOP + (core * m5_COREOFFSET), left: m5_RG_LEFT, opacity: 1}, {
-                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
-                                       duration: 500})
-                                    }
-                                    })
+                     trans.animate({top: m5_FIFO_OUT_TOP + (core * m5_COREOFFSET), left: m5_FIFO_OUT_LEFT, opacity: 1},
+                                   {duration: 300})
+                        .thenAnimate({top: m5_RG_TOP + (core * m5_COREOFFSET), left: m5_RG_LEFT, opacity: 1},
+                                     {duration: 300})
                   } else {
                   //debugger
                   console.log(`Transaction ${uid} not found.`)
@@ -6222,15 +6179,12 @@ Outputs:
                   let core = (m5_NUM_CORES > 1) ? this.getScope("core").index : 0;
                      if(core != 2) {
                      trans.animate({top: m5_RG_TOP + (core * m5_COREOFFSET) + 50, left: m5_RG_LEFT, opacity: 1}, {
-                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                     duration: 500})
                        } else {
                        trans.animate({top: m5_RG_TOP + (core * m5_COREOFFSET) + 50, left: m5_RG_LEFT, opacity: 1}, {
-                                    onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                     duration: 500,
                                     onComplete: () => {
                                        trans.animate({top: m5_ARRIVING_TOP, left: m5_RG_LEFT, opacity: 1}, {
-                                       onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                        duration: 1500})
                                     }
                                     })
@@ -6271,11 +6225,9 @@ Outputs:
                            trans.set("opacity", 0)
                            this.global.transObj[counting] = entry;
                            trans.animate({top: m5_FIFO_IN_TOP + (core * m5_COREOFFSET), left: m5_FIFO_IN_LEFT, opacity: 1}, {
-                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                           duration: 500, 
                                           onComplete: () => {
                                              trans.animate({top: m5_ENTRY_START_TOP + (core * m5_COREOFFSET) + ((8) * m5_ENTRY_START_SPACE_TOP ), left: m5_ENTRY_START_LEFT, opacity: 1}, {
-                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                              duration: 500})
                                           }
                                           })
@@ -6287,11 +6239,9 @@ Outputs:
                            trans.set("left", m5_EGRESS_OUT_LEFT)
                            trans.set("opacity", 0)
                            trans.animate({top: m5_FIFO_IN_TOP + (core * m5_COREOFFSET), left: m5_FIFO_IN_LEFT, opacity: 1}, {
-                                          onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                           duration: 500, 
                                           onComplete: () => {
                                              trans.animate({top: m5_ENTRY_START_TOP + (core * m5_COREOFFSET) + ((left_att) * m5_ENTRY_START_SPACE_TOP ), left: m5_ENTRY_START_LEFT, opacity: 1}, {
-                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                              duration: 500})
                                           }
                                           })
@@ -6303,11 +6253,9 @@ Outputs:
                               trans.set("left", m5_EGRESS_OUT_LEFT)
                               trans.set("opacity", 0)
                               trans.animate({top: m5_FIFO_IN_TOP + (core * m5_COREOFFSET), left: m5_FIFO_IN_LEFT, opacity: 1}, {
-                                             onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                              duration: 500, 
                                              onComplete: () => {
                                                 trans.animate({top: m5_ENTRY_START_TOP + (core * m5_COREOFFSET) + ((8 - entry) * m5_ENTRY_START_SPACE_TOP ), left: m5_ENTRY_START_LEFT, opacity: 1}, {
-                                                onChange: this.global.canvas.renderAll.bind(this.global.canvas),
                                                 duration: 500})
                                              }
                                              })

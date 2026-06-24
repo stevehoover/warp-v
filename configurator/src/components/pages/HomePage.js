@@ -1,8 +1,6 @@
-import {Box, Button, Container, Heading, HStack, Image, Text} from '@chakra-ui/react';
+import {Box, Container, Heading, HStack, Image, Text} from '@chakra-ui/react';
 import React from 'react';
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
-import {CoreDetailsComponent} from "./CoreDetailsComponent";
-import {OpenInMakerchipModal} from "../../utils/FetchUtils";
 import {ConfigureCpuComponent} from "./ConfigureCpuComponent";
 
 export const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))

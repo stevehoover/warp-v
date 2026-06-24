@@ -32,7 +32,7 @@ function App() {
     const [tlvForJson, setTlvForJson] = useState()
     const [macrosForJson, setMacrosForJson] = useState()
     const [coreJson, setCoreJson] = useState(null)
-    const [configuratorCustomProgramName, setConfiguratorCustomProgramName] = useState("my_custom")
+    const [configuratorCustomProgramName] = useState("my_custom")
     const [programText, setProgramText] = useState(initialProgramText)
     const [formErrors, setFormErrors] = useState([]);
 

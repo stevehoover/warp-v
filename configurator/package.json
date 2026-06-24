@@ -2,6 +2,9 @@
   "name": "warpv-configurator-chakra",
   "version": "1.0.2",
   "private": false,
+  "resolutions": {
+    "postcss": "^7.0.36"
+  },
   "dependencies": {
     "@chakra-ui/icons": "^1.0.8",
     "@chakra-ui/react": "^1.0.0",
@@ -26,8 +29,8 @@
     "web-vitals": "^0.2.2"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "NODE_OPTIONS=--openssl-legacy-provider react-scripts start",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "publish:npm": "rm -rf dist && mkdir dist && babel src/components -d dist --copy-files"

@@ -1,8 +1,9 @@
-import React, {useEffect} from "react";
-import {Box, Button, Heading, HStack, Image, useToast} from "@chakra-ui/react";
+import React, {useEffect, useMemo, useState} from "react";
+import {Box, Button, Heading, HStack, useToast} from "@chakra-ui/react";
 import {getTLVCodeForDefinitions, translateJsonToM4Macros, translateParametersToJson} from "../translation/Translation";
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
-import {downloadOrCopyFile, openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
+import {openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
+import {MakerchipPlugin} from "../../utils/MakerchipPlugin";
 import useFetch from "../../utils/useFetch";
 
 export function WarpVPageBase({
@@ -38,6 +39,17 @@ export function WarpVPageBase({
                               }) {
     const makerchipFetch = useFetch("https://faas.makerchip.com")
     const toast = useToast()
+    const [makerchipPlugin, setMakerchipPlugin] = useState(null)
+
+    // Generate the TL-Verilog for the current configuration.
+    function generateTLV() {
+        const macros = translateJsonToM4Macros(coreJson);
+        return getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+    }
+
+    // Seed the embedded IDE with the configuration's TLV as soon as it's available (the IDE loads it once).
+    const coreJsonKey = JSON.stringify(coreJson)
+    const initialTLV = useMemo(() => coreJson ? generateTLV() : null, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!coreJson) return
@@ -45,8 +57,7 @@ export function WarpVPageBase({
             setMacrosForJson(null)
             setTlvForJson(null)
         } else {
-            const macros = translateJsonToM4Macros(coreJson)
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings)
+            const tlv = generateTLV()
             setMacrosForJson(tlv.split("\n"))
 
             const task = setTimeout(() => {
@@ -59,7 +70,7 @@ export function WarpVPageBase({
                 clearTimeout(task)
             }
         }
-    }, [JSON.stringify(coreJson)])
+    }, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
     function updateDefaultStagesForPipelineDepth(depth, newJson) {
         let valuesToSet;
@@ -161,9 +172,9 @@ export function WarpVPageBase({
         }
     }, [configuratorGlobalSettings.generalSettings, configuratorGlobalSettings.settings]);
 
-    function scrollToDetailsComponent() {
-        setSelectedFile("m4")
-        detailsComponentRef?.current?.scrollIntoView()
+    function compileInEmbeddedMakerchip(source) {
+        // Load the source into the embedded IDE editor; this also triggers compilation.
+        makerchipPlugin?.setCode(source, false)
     }
 
     async function getSVForTlv(tlv, callback) {
@@ -237,26 +248,13 @@ export function WarpVPageBase({
     function handleOpenInMakerchipButtonClicked() {
         if (validateForm(true)) {
             setMakerchipOpening(true)
-            const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
-            openInMakerchip(tlv, setMakerchipOpening, setDisclosureAndUrl)
+            openInMakerchip(generateTLV(), setMakerchipOpening, setDisclosureAndUrl)
         }
     }
 
-    function handleDownloadRTLVerilogButtonClicked() {
+    function handleCompileBelowClicked() {
         if (validateForm(true)) {
-            const json = validateForm(true)
-            if (json) setConfiguratorGlobalSettings({
-                ...configuratorGlobalSettings,
-                coreJson: json
-            })
-            setDownloadingCode(true)
-            const macros = translateJsonToM4Macros(coreJson);
-            const tlv = getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
-            getSVForTlv(tlv, sv => {
-                downloadOrCopyFile(false, 'verilog.sv', sv);
-                setDownloadingCode(false)
-            });
+            compileInEmbeddedMakerchip(generateTLV())
         }
     }
 
@@ -268,22 +266,19 @@ export function WarpVPageBase({
     return <>
         {children}
 
-        <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
-            <Heading size='lg' mb={4}>Get your code:</Heading>
-            <HStack mb={3}>
-                <Button type="button" colorScheme="blue" onClick={scrollToDetailsComponent}>View Below</Button>
-                <Box>
-                    <Button type='button' colorScheme="teal" onClick={handleDownloadRTLVerilogButtonClicked}
-                            isLoading={downloadingCode} isDisabled={downloadingCode}>Download
-                        Verilog</Button>
-                </Box>
-                <Button type='button' colorScheme='blue' onClick={handleOpenInMakerchipButtonClicked}
-                        isLoading={makerchipOpening} isDisabled={makerchipOpening}>Open in Makerchip IDE</Button>
-            </HStack>
+        <Box mt={5} mb={15} pb={10} borderBottomWidth={2}>
+            <Box mx='auto' maxW='100vh'>
+                <Heading size='lg' mb={4}>See it in action:</Heading>
+                <HStack mb={3}>
+                    <Button type='button' colorScheme='blue' onClick={handleCompileBelowClicked}
+                            isDisabled={!makerchipPlugin}>Load and Compile It Below</Button>
+                    <Button type='button' colorScheme='teal' onClick={handleOpenInMakerchipButtonClicked}
+                            isLoading={makerchipOpening} isDisabled={makerchipOpening}>Open It in a New Makerchip
+                        Tab</Button>
+                </HStack>
 
-            <Image src='makerchip-preview.png' w='350px'/>
-
-
+                <MakerchipPlugin onReady={setMakerchipPlugin} code={initialTLV} defaultPane='Viz' h='66vh'/>
+            </Box>
         </Box>
         {/* CoreDetailsComponent used to contain "generalSettings={configuratorGlobalSettings.generalSettings} settings={configuratorGlobalSettings.settings}", but this resulted in "generalSettings="[object Object]" settings="[object Object]"" and a warning from React: "Warning: React does not recognize the `generalSettings` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `generalsettings` instead. If you accidentally passed it from a parent component, remove it from the DOM element." */}
         <CoreDetailsComponent coreJson={coreJson}
@@ -293,6 +288,7 @@ export function WarpVPageBase({
                               selectedFile={selectedFile}
                               setSelectedFile={setSelectedFile}
                               setDiscloureAndUrl={setDisclosureAndUrl}
+                              compileInMakerchip={makerchipPlugin ? compileInEmbeddedMakerchip : null}
         />
 
         <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure}/>
