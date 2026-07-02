@@ -55,7 +55,7 @@ export function MakerchipPlugin({onReady, code, defaultPane, ...rest}) {
         if (startedRef.current || !hasCode) return;
         startedRef.current = true;
         loadPluginModule()
-            .then((IdePlugin) => new IdePlugin(containerId, {hasEditor: true, code: codeRef.current}))
+            .then((IdePlugin) => IdePlugin.create(containerId, {hasEditor: true, code: codeRef.current}))
             .then((instance) => {
                 if (defaultPane) {
                     // onReady fires once the IDE iframe is fully loaded (after the initial code load).
