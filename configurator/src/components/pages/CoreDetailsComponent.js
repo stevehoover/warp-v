@@ -68,13 +68,13 @@ export function CoreDetailsComponent({
         compileInMakerchip(getSourceForSelectedFile())
     }
 
-    return <Box mx='auto' maxW='100vh' mb={30} {...rest}>
+    return <Box mx='auto' maxW='1000px' mb={30} {...rest}>
         <Box mb={3}>
             <Heading size="lg">Explore details</Heading>
             <Text mt={1}>Your CPU is constructed in the following steps. Select to view the corresponding file (for the current configuration) below.</Text>
         </Box>
 
-        <HStack mb={10} flexWrap="wrap">
+        <HStack mb={10} flexWrap="wrap" maxW='800px' mx='auto'>
             <HStack mb={5} mx="auto">
                 <Link onClick={() => handleDisplayButtonClicked('m4')}>
                     <Text backgroundColor={selectedFile === "m4" ? "#CDCDCD" : null} borderWidth={1}
@@ -114,7 +114,7 @@ export function CoreDetailsComponent({
             </HStack>
         </HStack>
 
-        <Box maxW='100vh'>
+        <Box maxW='1000px'>
             {!selectedFile && <Text>No file selected</Text>}
             {selectedFile && <>
                 {selectedFile === 'configuration' && <Text mb={2}><b>Core Configuration</b></Text>}
@@ -123,7 +123,7 @@ export function CoreDetailsComponent({
                 {selectedFile === 'rtl' && <Text mb={2}><b>{systemVerilogFileName}</b> (selected above)</Text>}
                 <Text mb={2}> You can edit and maintain this, or any file above, as source code.</Text>
 
-                <HStack mb={3}>
+                <HStack mb={3} flexWrap="wrap">
                     <Button colorScheme="blue" onClick={handleCompileAsSourceClicked}
                             isDisabled={!compileInMakerchip}>Compile as Source Above</Button>
                     <Button colorScheme="teal" onClick={handleOpenInMakerchipClicked} isDisabled={makerchipOpening}
@@ -132,7 +132,7 @@ export function CoreDetailsComponent({
                     <Button colorScheme="teal" onClick={handleCopySelectedFileClicked}>Copy Code</Button>
                 </HStack>
 
-                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100vh" maxW="100%">
+                <Code as="pre" borderWidth={3} borderRadius={15} p={2} overflow="auto" w="100%">
                     {selectedFile === 'configuration' &&
                     <Text>Your configuration is determined by your core selections on the homepage.</Text>}
                     {selectedFile === 'm4' && macrosForJson.join("\n")/*.map((line, index) => <Text

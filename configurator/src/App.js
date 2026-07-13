@@ -1,4 +1,5 @@
-import React, {createRef, useState} from 'react';
+import React, {createRef, useEffect, useState} from 'react';
+import ReactDOM from 'react-dom';
 import {Box, ChakraProvider, theme, useDisclosure} from '@chakra-ui/react';
 import {Route, Switch} from 'react-router-dom';
 import HomePage from './components/pages/HomePage';
@@ -6,6 +7,7 @@ import {ConfigurationParameters} from "./components/translation/ConfigurationPar
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
+import {isFramed, onPaneEvent, postReady} from "./utils/PaneChannelClient";
 
 function App() {
     const [configuratorGlobalSettings, setConfiguratorGlobalSettings] = useState({
@@ -34,6 +36,9 @@ function App() {
     const [coreJson, setCoreJson] = useState(null)
     const [configuratorCustomProgramName] = useState("my_custom")
     const [programText, setProgramText] = useState(initialProgramText)
+    // Bumped when the program textarea loses focus, to trigger a SandPiper preview recompile.
+    // Program edits don't change coreJson, which otherwise gates the preview recompile.
+    const [programCommitKey, setProgramCommitKey] = useState(0)
     const [formErrors, setFormErrors] = useState([]);
 
     const [userChangedStages, setUserChangedStages] = useState([])
@@ -44,6 +49,32 @@ function App() {
     const [selectedFile, setSelectedFile] = useState("m4")
     const openInMakerchipDisclosure = useDisclosure()
     const [openInMakerchipUrl, setOpenInMakerchipUrl] = useState()
+    const [pendingBuild, setPendingBuild] = useState(null)
+
+    // When loaded as a Makerchip pane, listen for a `sourceAsm` event (e.g. from a Compiler
+    // Explorer pane): enable the custom program, load the delivered assembly, and — if the
+    // sender requested a build — flag a pending build that WarpVPageBase runs in the host IDE.
+    useEffect(() => {
+        if (!isFramed()) return undefined
+        const off = onPaneEvent("sourceAsm", (payload) => {
+            const asm = typeof payload?.asmText === "string" ? payload.asmText : ""
+            // This handler runs from a raw postMessage callback (outside React's synthetic-event
+            // system), so in React 17 each setState would trigger a separate render. Without
+            // batching, the preview effect fires after the customProgramEnabled update but before
+            // setProgramText, baking the stale (default) program into the m4 preview. Batch them
+            // so a single render carries both the enabled flag and the delivered program.
+            ReactDOM.unstable_batchedUpdates(() => {
+                setConfiguratorGlobalSettings(prev => ({
+                    ...prev,
+                    generalSettings: {...prev.generalSettings, customProgramEnabled: true}
+                }))
+                setProgramText(asm)
+                if (payload?.build) setPendingBuild({asm})
+            })
+        })
+        postReady()
+        return off
+    }, [])
 
     function getInitialSettings() {
         const settings = {
@@ -89,11 +120,15 @@ function App() {
                                        setDownloadingCode={setDownloadingCode}
                                        setMakerchipOpening={setMakerchipOpening}
                                        setOpenInMakerchipUrl={setOpenInMakerchipUrl}
+                                       pendingBuild={pendingBuild}
+                                       setPendingBuild={setPendingBuild}
+                                       programCommitKey={programCommitKey}
                         >
                             <HomePage configuratorGlobalSettings={configuratorGlobalSettings}
                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                       programText={programText}
                                       setProgramText={setProgramText}
+                                      onProgramBlur={() => setProgramCommitKey(k => k + 1)}
                                       userChangedStages={userChangedStages}
                                       setUserChangedStages={setUserChangedStages}
                                       formErrors={formErrors}

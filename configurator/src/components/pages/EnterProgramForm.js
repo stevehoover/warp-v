@@ -5,12 +5,13 @@ export function EnterProgramForm({
                                      configuratorGlobalSettings,
                                      setConfiguratorGlobalSettings,
                                      programText,
-                                     setProgramText
+                                     setProgramText,
+                                     onProgramBlur
                                  }) {
     return <>
         <Box>
             <Stack direction="column">
-            <Checkbox value={configuratorGlobalSettings.generalSettings.customProgramEnabled}
+            <Checkbox isChecked={configuratorGlobalSettings.generalSettings.customProgramEnabled}
                       isDisabled={configuratorGlobalSettings.generalSettings.isa === "MIPSI"}
                       onChange={e => setConfiguratorGlobalSettings({
                           ...configuratorGlobalSettings,
@@ -41,6 +42,7 @@ export function EnterProgramForm({
                       isDisabled={!configuratorGlobalSettings.generalSettings.customProgramEnabled}
                       value={programText}
                       onChange={e => setProgramText(e.target.value)}
+                      onBlur={onProgramBlur}
                       fontFamily="'Courier New', monospace"
             />
         </Box>

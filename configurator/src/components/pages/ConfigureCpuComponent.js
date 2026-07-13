@@ -15,11 +15,12 @@ export function ConfigureCpuComponent({
                                           onVersionChange,
                                           programText,
                                           setProgramText,
+                                          onProgramBlur,
                                           settings,
                                           userChangedStages,
                                           userChangedStages1
                                       }) {
-    return <Box mt={5} mb={15} mx='auto' maxW='100vh' pb={10} borderBottomWidth={2}>
+    return <Box mt={5} mb={15} mx='auto' maxW='1000px' pb={10} borderBottomWidth={2}>
 
         <Heading size="lg" mb={4}>Configure your CPU now</Heading>
         <Tabs borderWidth={1} borderRadius="lg" p={3} isFitted>
@@ -86,6 +87,7 @@ export function ConfigureCpuComponent({
                     <EnterProgramForm configuratorGlobalSettings={configuratorGlobalSettings}
                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
                                       programText={programText} setProgramText={setProgramText}
+                                      onProgramBlur={onProgramBlur}
                     />
                 </TabPanel>
             </TabPanels>

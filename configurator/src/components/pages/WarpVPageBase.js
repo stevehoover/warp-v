@@ -4,6 +4,7 @@ import {getTLVCodeForDefinitions, translateJsonToM4Macros, translateParametersTo
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
 import {openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
 import {MakerchipPlugin} from "../../utils/MakerchipPlugin";
+import {callIde, isFramed} from "../../utils/PaneChannelClient";
 import useFetch from "../../utils/useFetch";
 
 export function WarpVPageBase({
@@ -35,21 +36,48 @@ export function WarpVPageBase({
                                   formErrors,
                                   setMakerchipOpening,
                                   setDownloadingCode,
-                                  setOpenInMakerchipUrl
+                                  setOpenInMakerchipUrl,
+                                  pendingBuild,
+                                  setPendingBuild,
+                                  programCommitKey
                               }) {
     const makerchipFetch = useFetch("https://faas.makerchip.com")
     const toast = useToast()
     const [makerchipPlugin, setMakerchipPlugin] = useState(null)
+    // In pane mode we compile in the HOST Makerchip IDE (via the `compile` RPC) rather than an
+    // embedded IDE, so the "See it in action" embedded Makerchip is hidden.
+    const framed = isFramed()
 
-    // Generate the TL-Verilog for the current configuration.
+    // Generate the TL-Verilog for the current configuration. The core JSON is derived
+    // synchronously from the current settings rather than the stored `coreJson` state, which
+    // lags a render behind (it is produced from an effect / validateForm via setCoreJson).
+    // Deriving it here lets callers that generate in the same tick they change settings (e.g.
+    // "Load and Compile It Below" and "Open in Makerchip", which call validateForm() then
+    // generateTLV()) emit TLV for the current configuration.
     function generateTLV() {
-        const macros = translateJsonToM4Macros(coreJson);
+        const json = {general: configuratorGlobalSettings.generalSettings, pipeline: configuratorGlobalSettings.settings}
+        const macros = translateJsonToM4Macros(json);
         return getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
     }
 
     // Seed the embedded IDE with the configuration's TLV as soon as it's available (the IDE loads it once).
     const coreJsonKey = JSON.stringify(coreJson)
     const initialTLV = useMemo(() => coreJson ? generateTLV() : null, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Pane mode: once a `sourceAsm` delivery has flagged a pending build AND coreJson has
+    // regenerated to reflect the enabled custom program, generate the TLV and compile it in the
+    // host IDE. generateTLV() now reads the current settings and programText directly, so no
+    // stale-state workaround is needed.
+    useEffect(() => {
+        if (!pendingBuild || !framed) return
+        if (!coreJson || !coreJson.general?.customProgramEnabled) return
+        if (!configuratorGlobalSettings.generalSettings.customProgramEnabled) return
+        setPendingBuild(null)
+        callIde("setCode", generateTLV()).catch(err => {
+            toast({title: "Host compile failed", description: String(err?.message ?? err), status: "error"})
+            console.error(err)
+        })
+    }, [pendingBuild, framed, coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!coreJson) return
@@ -70,7 +98,7 @@ export function WarpVPageBase({
                 clearTimeout(task)
             }
         }
-    }, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
+    }, [coreJsonKey, programCommitKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
     function updateDefaultStagesForPipelineDepth(depth, newJson) {
         let valuesToSet;
@@ -266,8 +294,8 @@ export function WarpVPageBase({
     return <>
         {children}
 
-        <Box mt={5} mb={15} pb={10} borderBottomWidth={2}>
-            <Box mx='auto' maxW='100vh'>
+        <Box mt={5} mb={15} pb={10} borderBottomWidth={2} display={framed ? "none" : undefined}>
+            <Box mx='auto' maxW='1000px'>
                 <Heading size='lg' mb={4}>See it in action:</Heading>
                 <HStack mb={3}>
                     <Button type='button' colorScheme='blue' onClick={handleCompileBelowClicked}
@@ -277,11 +305,11 @@ export function WarpVPageBase({
                         Tab</Button>
                 </HStack>
 
-                <MakerchipPlugin onReady={setMakerchipPlugin} code={initialTLV} defaultPane='Viz' h='66vh'/>
+                {!framed && <MakerchipPlugin onReady={setMakerchipPlugin} code={initialTLV} defaultPane='Viz' h='66vh'/>}
             </Box>
         </Box>
         {/* CoreDetailsComponent used to contain "generalSettings={configuratorGlobalSettings.generalSettings} settings={configuratorGlobalSettings.settings}", but this resulted in "generalSettings="[object Object]" settings="[object Object]"" and a warning from React: "Warning: React does not recognize the `generalSettings` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `generalsettings` instead. If you accidentally passed it from a parent component, remove it from the DOM element." */}
-        <CoreDetailsComponent coreJson={coreJson}
+        {!framed && <CoreDetailsComponent coreJson={coreJson}
                               tlvForJson={tlvForJson}
                               macrosForJson={macrosForJson}
                               sVForJson={sVForJson}
@@ -289,7 +317,7 @@ export function WarpVPageBase({
                               setSelectedFile={setSelectedFile}
                               setDiscloureAndUrl={setDisclosureAndUrl}
                               compileInMakerchip={makerchipPlugin ? compileInEmbeddedMakerchip : null}
-        />
+        />}
 
         <OpenInMakerchipModal url={openInMakerchipUrl} disclosure={openInMakerchipDisclosure}/>
     </>

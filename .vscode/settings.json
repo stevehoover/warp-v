@@ -1,0 +1,7 @@
+{
+  // C/C++ is not developed in this repo (only incidental godbolt samples and
+  // generated formal-verification output under formal/). Disabling the cpptools
+  // engine here stops it from enumerating the multi-hundred-MB generated trees.
+  // https://github.com/microsoft/vscode-cpptools/wiki/Optimizing-your-configuration
+  "C_Cpp.intelliSenseEngine": "disabled"
+}
