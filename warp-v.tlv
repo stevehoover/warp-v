@@ -306,10 +306,13 @@
    / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
    if(m5_local, [
-      var(warpv_includes, ['./warp-v_includes/'])
+      var(warpv_includes, ['./'])   /// or ['./warp-v_includes/']
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/17f103c33d73490e82847bbe67a6c4f0a6eb991d/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/0059292/'])
    ])
+   / TEMP (remove after validating 4-column source VIZ): simulated ce_source_viz_data from the configurator.
+   /var(ce_source_viz_data, ['eyJzb3VyY2VfY29kZSI6ImludCBtYWluKCkge1xuICBpbnQgc3VtID0gMDtcbiAgaW50IGk7XG4gIGZvciAoaSA9IDE7IGkgPCAxMDsgaSsrKSB7XG4gICAgc3VtICs9IGk7XG4gIH1cbiAgc3RvcmUoc3VtKTtcbiAgaW50IHggPSBsb2FkKCk7XG4gIGlmICh4ID09IDB4MmQpIHBhc3MoKTtcbiAgcmV0dXJuIDA7XG59IiwiYXNtX2xpbmVzIjpbIk9SSSB0MiwgemVybywgMCIsIk9SSSB0MCwgemVybywgMSIsIk9SSSBhMiwgemVybywgMTAiLCJPUkkgYTAsIHplcm8sIDAiLCJBREQgYTAsIHQwLCBhMCIsIlNXIGEwLCAwKHQyKSIsIkFEREkgdDAsIHQwLCAxIiwiQURESSB0MiwgdDIsIDQiLCJCTFQgdDAsIGEyLCBsb29wIiwiTFcgdDEsIC00KHQyKSIsIkFEREkgYTEsIHplcm8sIDB4MmQiLCJCRVEgdDEsIGExLCBwYXNzIiwiQUREIGExLCBhMSwgemVybyIsIkFERCB0MSwgdDEsIHplcm8iXSwiYXNtX2xpbmVfdG9fc291cmNlX2xpbmUiOlsyLDIsNCw1LDUsNyw0LDQsNCw4LDksOSw5LDldfQ=='])
+   
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
    
@@ -4665,87 +4668,218 @@ Outputs:
 \TLV dummy_viz_logic()
    // dummy
    
+\m5
+   // Compute geometry for the four-column VIZ block and the register/memory/decode cluster
+   // that sits to its right. Assigns (and exports to cpu_viz scope) the Imem*, Asm*, Src*, and
+   // Viz* vars consumed by instruction_in_memory, assembly_viz, source_code_viz, the instruction
+   // decode box, and cpu_viz:
+   //  - Imem* : Instr. Memory component (proc-asm + binary columns) sizes/offsets, shared pad/
+   //            title/line metrics, per-column pixel widths, and its parent-frame placement.
+   //  - Asm*  : Assembly (unprocessed-asm) component box size and placement.
+   //  - Src*  : Source Code component box width and placement.
+   //  - Viz*  : VizRightShift/VizClusterShift, the horizontal shift applied to the register/
+   //            memory/decode cluster (and its connective arrows) so it clears the block.
+   // Columns, left->right: [source] [unprocessed-asm] processed-asm binary; text in each column
+   // is right-justified to the column's right edge. Called at instantiation time, after program
+   // assembly sets NUM_ASM_LINES/VIZ_ASM_COLS/ASM_MAX_COLS.
+   fn(compute_imem_geometry, {
+      // All geometry values are computed as scoped (fn-local) vars, then the subset consumed
+      // outside this fn is exported into the calling (cpu_viz) scope via m5_on_return (see the
+      // export block below). This escapes one scope level so the child viz macros that cpu_viz
+      // instantiates see them by dynamic scoping, without m5_universal_var's global-namespace
+      // pollution. ImemCw: monospace char width * 10 (~8.4px @ 14pt). ImemGap: inter-column gap (px).
+      var(ImemCw, 84)
+      var(ImemGap, 20)
+      var(ImemPadL, 16)
+      var(ImemPadR, 16)
+      var(ImemTitleH, 40)
+      var(ImemLineH, 20)
+      // Per-instruction proc/bin row stacking pitch (matches the /instr_mem[*] layout top).
+      var(ImemRowPitch, 18)
+      var(ImemBinChars, 32)
+      var(ImemProcChars, 40)
+      var(ImemUnproc, m5_if_var_def(VIZ_ASM_COLS, ['m5_VIZ_ASM_COLS'], 0))
+      var(ImemSource, m5_if_var_def(ce_source_viz_data, 1, 0))
+      // Widest unprocessed-asm line (chars). ASM_MAX_COLS is published by m5_assemble.
+      var(ImemUnprocChars, m5_if(m5_ImemUnproc, m5_ASM_MAX_COLS, 0))
+      // Source column width (chars) - a VIZ layout choice (not an input configuration).
+      var(ImemSourceChars, 40)
+      // Pixel column widths.
+      var(ImemBinW, m5_calc(m5_ImemBinChars * m5_ImemCw / 10))
+      var(ImemProcW, m5_calc(m5_ImemProcChars * m5_ImemCw / 10))
+      var(ImemUnprocW, m5_calc(m5_ImemUnprocChars * m5_ImemCw / 10))
+      var(ImemSourceW, m5_calc(m5_ImemSourceChars * m5_ImemCw / 10))
+      // Instr. Memory COMPONENT box (local coords, origin 0,0): proc-asm + binary columns only.
+      var(ImemProcLeft, m5_ImemPadL)
+      var(ImemBinLeft, m5_calc(m5_ImemProcLeft + m5_ImemProcW + m5_ImemGap))
+      var(ImemVizWidth, m5_calc(m5_ImemBinLeft + m5_ImemBinW + m5_ImemPadR))
+      var(ImemVizHeight, m5_calc(m5_ImemTitleH + m5_NUM_INSTRS * m5_ImemRowPitch + m5_ImemPadR))
+      // Assembly COMPONENT box (local coords).
+      var(AsmBoxW, m5_calc(m5_ImemPadL + m5_ImemUnprocW + m5_ImemPadR))
+      var(AsmBoxH, m5_calc(m5_ImemTitleH + m5_NUM_ASM_LINES * m5_ImemLineH + m5_ImemPadR))
+      // Source-code COMPONENT box width (its height is sized to the data at render time).
+      var(SrcBoxW, m5_calc(m5_ImemPadL + m5_ImemSourceW + m5_ImemPadR))
+      // Component placement (parent coords). Four columns in a single horizontal row, L->R:
+      // Source Code | Assembly (unproc) | Instr. Memory (proc-asm | binary). Each placed via 'where'.
+      // (Y-overflow of the taller Source/Assembly boxes is acceptable for now.)
+      var(ImemRowTop, 10)
+      var(SrcWhereLeft, 10)
+      var(AsmWhereLeft, m5_if(m5_ImemSource, ['m5_calc(m5_SrcWhereLeft + m5_SrcBoxW + m5_ImemGap)'], ['10']))
+      var(ImemWhereLeft, m5_if(m5_ImemUnproc, ['m5_calc(m5_AsmWhereLeft + m5_AsmBoxW + m5_ImemGap)'], ['m5_AsmWhereLeft']))
+      // Right edge of the four-column block, and the horizontal shift applied to the register/
+      // memory/decode group so it clears that block. (Legacy clearance was a hardcoded 605; the
+      // four-column block is wider, so this is now derived from the block's actual right edge.)
+      var(ImemBlockRight, m5_calc(m5_ImemWhereLeft + m5_ImemVizWidth))
+      var(VizRightShift, m5_calc(m5_ImemBlockRight + m5_ImemGap - 103))
+      // Delta by which the register/memory/decode cluster moved vs its legacy position (which
+      // used a hardcoded 605 clearance). Added to the decode-box connective arrows / value
+      // animations, whose coords were absolute numbers tuned to the legacy +605 layout.
+      var(VizClusterShift, m5_calc(m5_VizRightShift - 605))
+      // Export the values consumed outside this fn into the caller's (cpu_viz's) scope. The
+      // values are captured here (as literals) and declared on return, so the child viz macros
+      // (instruction_in_memory, source_code_viz, assembly_viz, instruction, cpu_viz) see them.
+      on_return(var, ImemPadL, m5_ImemPadL)
+      on_return(var, ImemPadR, m5_ImemPadR)
+      on_return(var, ImemTitleH, m5_ImemTitleH)
+      on_return(var, ImemLineH, m5_ImemLineH)
+      on_return(var, ImemUnproc, m5_ImemUnproc)
+      on_return(var, ImemSource, m5_ImemSource)
+      on_return(var, ImemBinW, m5_ImemBinW)
+      on_return(var, ImemProcW, m5_ImemProcW)
+      on_return(var, ImemUnprocW, m5_ImemUnprocW)
+      on_return(var, ImemSourceW, m5_ImemSourceW)
+      on_return(var, ImemProcLeft, m5_ImemProcLeft)
+      on_return(var, ImemBinLeft, m5_ImemBinLeft)
+      on_return(var, ImemVizWidth, m5_ImemVizWidth)
+      on_return(var, ImemVizHeight, m5_ImemVizHeight)
+      on_return(var, AsmBoxW, m5_AsmBoxW)
+      on_return(var, AsmBoxH, m5_AsmBoxH)
+      on_return(var, SrcBoxW, m5_SrcBoxW)
+      on_return(var, ImemRowTop, m5_ImemRowTop)
+      on_return(var, SrcWhereLeft, m5_SrcWhereLeft)
+      on_return(var, AsmWhereLeft, m5_AsmWhereLeft)
+      on_return(var, ImemWhereLeft, m5_ImemWhereLeft)
+      on_return(var, VizRightShift, m5_VizRightShift)
+      on_return(var, VizClusterShift, m5_VizClusterShift)
+   })
 \TLV instruction_in_memory(|_top, _where_)
    /instr_mem[m5_calc(m5_NUM_INSTRS-1):0]
       \viz_js
           all: {
             box: {
-               width: 670,
-               height: 76 + 18 * m5_NUM_INSTRS,
+               left: 0,
+               top: 0,
+               width: m5_ImemVizWidth,
+               height: m5_ImemVizHeight,
                fill: "#208028",
                stroke: "white",
                strokeWidth: 0
             },
             init() {
-               let imem_header = new fabric.Text("🗃️ Instr. Memory", {
+               let objs = {}
+               objs.imem_header = new fabric.Text("🗃️ Instr. Memory", {
                   top: 10,
-                  left: 250,
+                  left: m5_calc(m5_ImemVizWidth / 2),
+                  originX: "center",
                   fontSize: 20,
                   fontWeight: 800,
                   fontFamily: "monospace",
                   fill: "black"
                })
-               return {imem_header}
+               return objs
             },
             render() {
-               // Highlight instruction.
+               // Highlight the fetched instruction's row (proc-asm + binary boxes).
                let pc = '['']|_top/instr$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
-                this.highlighted_addr = pc
-                instance = this.getContext().children[pc]
-                if (typeof instance !== "undefined") {
-                   let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
-                   instance.initObjects.instr_binary_box.set({fill: color})
-                   instance.initObjects.instr_asm_box.set({fill: color})
-                }
-                // Highlight 2nd issue instruction.
-                let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
-                this.highlighted_addr2 = pc2
-                instance2 = this.getContext().children[pc2]
-                if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
-                   let color = "#ffd0b0"
-                   instance2.initObjects.instr_binary_box.set({fill: color})
-                   instance2.initObjects.instr_asm_box.set({fill: color})
-                }
+               this.highlighted_addr = pc
+               let instance = this.getContext().children[pc]
+               if (typeof instance !== "undefined") {
+                  let color = '['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0"
+                  instance.initObjects.instr_binary_box.set({fill: color})
+                  instance.initObjects.instr_asm_box.set({fill: color})
+               }
+               // Highlight the 2nd-issue instruction's row.
+               let pc2 = '['']|_top/instr/orig_inst$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
+               this.highlighted_addr2 = pc2
+               let instance2 = this.getContext().children[pc2]
+               if ('['']|_top/instr$second_issue'.asBool(false) && typeof instance2 !== "undefined") {
+                  instance2.initObjects.instr_binary_box.set({fill: "#ffd0b0"})
+                  instance2.initObjects.instr_asm_box.set({fill: "#ffd0b0"})
+               }
             },
             unrender() {
-               //debbuger
-               // Unhighlight instruction.
                let instance = this.getContext().children[this.highlighted_addr]
-                if (typeof instance != "undefined") {
-                   instance.initObjects.instr_binary_box.set({fill: "white"})
-                   instance.initObjects.instr_asm_box.set({fill: "white"})
-                }
-                // Unhighlight 2nd issue instruction.
-                let instance2 = this.getContext().children[this.highlighted_addr2]
-                if (typeof instance2 != "undefined") {
-                   instance2.initObjects.instr_binary_box.set({fill: "white"})
-                   instance2.initObjects.instr_asm_box.set({fill: "white"})
-                }
+               if (typeof instance != "undefined") {
+                  instance.initObjects.instr_binary_box.set({fill: "white"})
+                  instance.initObjects.instr_asm_box.set({fill: "white"})
+               }
+               let instance2 = this.getContext().children[this.highlighted_addr2]
+               if (typeof instance2 != "undefined") {
+                  instance2.initObjects.instr_binary_box.set({fill: "white"})
+                  instance2.initObjects.instr_asm_box.set({fill: "white"})
+               }
             },
           },
           box: {strokeWidth: 0},
-          where: {_where_},
-          where0: {left: 30, top: 50},
+          where: {left: m5_ImemWhereLeft, top: m5_ImemRowTop},
+          where0: {left: m5_ImemProcLeft, top: m5_ImemTitleH},
           layout: {top: 18}, //scope's instance stacked vertically
           init() {
+            m5_if_eq(m5_ISA, ['RISCV'], ['
+            // RISCV: processed-asm and binary columns. The child Group is placed with its left edge at
+            // where0.left (= proc_left), so object lefts here are RELATIVE to proc_left.
+            let instr_asm_box = new fabric.Rect({
+               left: 0,
+               top: 0,
+               fill: "white",
+               width: m5_ImemProcW,
+               height: 14
+            })
+            let instr_binary_box = new fabric.Rect({
+               left: m5_calc(m5_ImemBinLeft - m5_ImemProcLeft),
+               top: 0,
+               fill: "white",
+               width: m5_ImemBinW,
+               height: 14
+            })
+            let instr_str = new fabric.Text("", {
+               left: 0,
+               top: 0,
+               width: m5_ImemProcW,
+               textAlign: "right",
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            let instr_binary_str = new fabric.Text("", {
+               left: m5_calc(m5_ImemBinLeft - m5_ImemProcLeft),
+               top: 0,
+               width: m5_ImemBinW,
+               textAlign: "right",
+               fontSize: 14,
+               fontFamily: "monospace"
+            })
+            return {instr_asm_box, instr_binary_box, instr_str, instr_binary_str}
+            '], ['
+            // Non-RISCV: legacy single-text layout.
             let instr_str = new fabric.Text("" , {
-               left: 10,
+               left: 40,
                fontSize: 14,
                fontFamily: "monospace"
             })
             let instr_asm_box = new fabric.Rect({
-               left: 0,
+               left: 30,
                fill: "white",
                width: 280,
                height: 14
             })
             let instr_binary_box = new fabric.Rect({
-               left: 330,
+               left: 360,
                fill: "white",
                width: 280,
                height: 14
             })
             return {instr_asm_box, instr_binary_box, instr_str}
+            '])
           },
           m5_if_eq(m5_IMEM_STYLE, EXTERN, [''], ['
           render() {
@@ -4753,7 +4887,8 @@ Outputs:
             m5_if_eq_block(m5_ISA, ['MINI'], ['
                let instr_str = '$instr'.goTo(0).asString("?")
             '], m5_ISA, ['RISCV'], ['
-               let instr_str = '$instr'.asBinaryStr(NaN) + "      " + '$instr_str'.asString("?")
+               this.getObjects().instr_binary_str.set({text: '$instr'.asBinaryStr(NaN)})
+               let instr_str = '$instr_str'.asString("?")
             '], m5_ISA, ['MIPSI'], ['
                let instr_str = '$instr'.asBinaryStr("?")
             '], ['
@@ -4764,6 +4899,140 @@ Outputs:
           '])
           
    
+\TLV assembly_viz(|_top, _where)
+   // Standalone Assembly listing component (single instance, own /asm_lst scope). Highlights the
+   // source/asm line of the currently-fetched (or 2nd-issue) instruction. Placed via 'where'.
+   /asm_lst
+      \viz_js
+         box: {left: 0, top: 0, strokeWidth: 0},
+         init() {
+            let objs = {}
+            objs.asm_panel = new fabric.Rect({
+               top: 0,
+               left: 0,
+               width: m5_AsmBoxW,
+               height: m5_AsmBoxH,
+               fill: "white",
+               stroke: "#208028",
+               strokeWidth: 2
+            })
+            objs.asm_header = new fabric.Text("📝 Assembly", {
+               top: 8,
+               left: m5_calc(m5_AsmBoxW / 2),
+               originX: "center",
+               fontSize: 18,
+               fontWeight: 800,
+               fontFamily: "monospace",
+               fill: "black"
+            })
+            // Moving highlight rect (created before asm_text so it sits behind it).
+            objs.asm_highlight = new fabric.Rect({
+               top: m5_ImemTitleH,
+               left: m5_ImemPadL,
+               width: m5_ImemUnprocW,
+               height: m5_ImemLineH,
+               fill: "white",
+               visible: false
+            })
+            let unprocLines = [m5_repeat(m5_NUM_ASM_LINES, ['"m5_for_each_regex(m5_eval(['m5_get(['instr_asm_line']m5_LoopCnt)']), ['\([^\\"]*\)\([\\"]?\)'], (pre, spec), ['m5_pre\m5_if_eq(m5_spec, [''], [''], ['\']m5_spec)'])", '])]
+            objs.asm_text = new fabric.Text(unprocLines.join("\n"), {
+               top: m5_ImemTitleH,
+               left: m5_ImemPadL,
+               width: m5_ImemUnprocW,
+               textAlign: "left",
+               fontSize: 14,
+               lineHeight: 18 / 14,
+               fontFamily: "monospace",
+               fill: "black"
+            })
+            return objs
+         },
+         where: {_where},
+         render() {
+            let srcLineForInstr = [m5_repeat(m5_NUM_INSTRS, ['m5_get(['instr_src_line']m5_LoopCnt), '])]
+            let hl = this.getObjects().asm_highlight
+            hl.set({visible: false})
+            let txt = this.getObjects().asm_text
+            let pitch = (txt.height > 0) ? txt.height / m5_NUM_ASM_LINES : m5_ImemLineH
+            let secondIssue = '['']|_top/instr$second_issue'.asBool(false)
+            let pc = (secondIssue ? '['']|_top/instr/orig_inst$pc'.asInt(-1) : '['']|_top/instr$pc'.asInt(-1)) / m5_ADDRS_PER_INSTR
+            let color = secondIssue ? "#ffd0b0" : ('['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0")
+            let line = srcLineForInstr[pc]
+            if (pc >= 0 && typeof line !== "undefined") {
+               hl.set({top: txt.top + line * pitch, height: pitch, fill: color, visible: true})
+            }
+         }
+
+\TLV source_code_viz(|_top, _where)
+   // Standalone Source Code component (single instance, own /src_lst scope). Highlights the source
+   // line mapped from the currently-fetched (or 2nd-issue) instruction. Placed via 'where'.
+   /src_lst
+      \viz_js
+         box: {left: 0, top: 0, strokeWidth: 0},
+         init() {
+            let objs = {}
+            try {
+               let srcData = JSON.parse(atob("m5_ce_source_viz_data"))
+               // Instruction-index -> 1-based source line (from the configurator).
+               this.imemSrcMap = srcData.asm_line_to_source_line || []
+               let srcLines = (srcData.source_code || "").split("\n")
+               this.imemNumSrcLines = srcLines.length
+               objs.source_panel = new fabric.Rect({
+                  top: 0,
+                  left: 0,
+                  width: m5_SrcBoxW,
+                  height: m5_ImemTitleH + srcLines.length * m5_ImemLineH + m5_ImemPadR,
+                  fill: "white",
+                  stroke: "#208028",
+                  strokeWidth: 2
+               })
+               objs.source_header = new fabric.Text("📄 Program", {
+                  top: 8,
+                  left: m5_calc(m5_SrcBoxW / 2),
+                  originX: "center",
+                  fontSize: 18,
+                  fontWeight: 800,
+                  fontFamily: "monospace",
+                  fill: "black"
+               })
+               // Moving highlight rect (created before source_code so it sits behind it).
+               objs.source_highlight = new fabric.Rect({
+                  top: m5_ImemTitleH,
+                  left: m5_ImemPadL,
+                  width: m5_ImemSourceW,
+                  height: m5_ImemLineH,
+                  fill: "white",
+                  visible: false
+               })
+               objs.source_code = new fabric.Text(srcData.source_code || "", {
+                  top: m5_ImemTitleH,
+                  left: m5_ImemPadL,
+                  width: m5_ImemSourceW,
+                  textAlign: "left",
+                  fontSize: 14,
+                  lineHeight: 18 / 14,
+                  fontFamily: "monospace",
+                  fill: "black"
+               })
+            } catch (e) {}
+            return objs
+         },
+         where: {_where},
+         render() {
+            let hl = this.getObjects().source_highlight
+            if (!hl || !this.imemSrcMap) {return}
+            hl.set({visible: false})
+            let sc = this.getObjects().source_code
+            let pitch = (sc.height > 0) ? sc.height / this.imemNumSrcLines : m5_ImemLineH
+            let secondIssue = '['']|_top/instr$second_issue'.asBool(false)
+            let pc = (secondIssue ? '['']|_top/instr/orig_inst$pc'.asInt(-1) : '['']|_top/instr$pc'.asInt(-1)) / m5_ADDRS_PER_INSTR
+            let color = secondIssue ? "#ffd0b0" : ('['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0")
+            let sLine = this.imemSrcMap[pc]
+            if (pc >= 0 && typeof sLine === "number" && sLine >= 1) {
+               hl.set({top: sc.top + (sLine - 1) * pitch, height: pitch, fill: color, visible: true})
+            }
+         }
+
 \TLV registers(/_top, _name, _heading, _sig_prefix, _num_srcs, _where_)
    // /regs or /fpu_regs
    /src[*]
@@ -5198,7 +5467,7 @@ Outputs:
          //debugger
          let decode_header = new fabric.Text("⚙️ Instruction", {
             top: 15,
-            left: 103 + 605 + 20 -6,
+            left: 103 + m5_VizRightShift + 20 -6,
             fill: "maroon",
             fontSize: 18,
             fontWeight: 800,
@@ -5206,7 +5475,7 @@ Outputs:
          })
          let decode_box = new fabric.Rect({
             top: 10,
-            left: 103 + 605 -6,
+            left: 103 + m5_VizRightShift -6,
             fill: "#f8f0e8",
             width: 230,
             height: 160,
@@ -5225,9 +5494,23 @@ Outputs:
          let commit = '$commit'.asBool(false)
          let color = !commit                ? "gray" :
                                               "blue"
+         // Instr. Memory fetched-row anchors (parent frame; /instr content maps as parent = C + 10).
+         let imemRowTop = m5_calc(m5_ImemRowTop + m5_ImemTitleH) + 18 * pc  // fetched row top
+         let imemProcX  = m5_calc(m5_ImemWhereLeft + m5_ImemProcLeft - 10)  // proc-asm column left
+         let imemBinX   = m5_calc(m5_ImemWhereLeft + m5_ImemBinLeft - 10)   // binary column left
+         let imemBinRightX = m5_calc(m5_ImemWhereLeft + m5_ImemBinLeft + m5_ImemBinW - 10)  // binary box right edge
+         // PC hand just left of each column, pointing in (geometry-derived, so it follows either column order).
          objects.pc_pointer = new fabric.Text("👉", {
-            top: 60 + 18 * pc,
-            left: 335,
+            top: imemRowTop - 2,
+            left: imemProcX - 30,
+            fill: color,
+            fontSize: 14,
+            fontFamily: "monospace",
+            opacity: commit ? 1 : 0.5
+         })
+         objects.pc_pointer_bin = new fabric.Text("👉", {
+            top: imemRowTop - 2,
+            left: imemBinX - 22,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -5236,8 +5519,8 @@ Outputs:
          if ('$second_issue'.asBool(false)) {
             let second_issue_pc = '/orig_inst$pc'.asInt(-1) / m5_ADDRS_PER_INSTR
             objects.second_issue_pointer = new fabric.Text("👉🏿", {
-               top: 60 + 18 * pc,
-               left: 335,
+               top: m5_calc(m5_ImemRowTop + m5_ImemTitleH - 2) + 18 * second_issue_pc,
+               left: imemProcX - 30,
                fill: color,
                fontSize: 14,
                fontFamily: "monospace",
@@ -5317,13 +5600,13 @@ Outputs:
          // srcX Arrow function
          newSrcArrow = function(name, fp, addr, valid, pos) {
             if (valid) {
-               objects[name + "_arrow"] = new fabric.Line([965 + (fp ? m5_VIZ_MEM_LEFT_ADJUST : 0), 17 * addr + 96, 830, 96 + 18 * pos], {
+               objects[name + "_arrow"] = new fabric.Line([965 + m5_VizClusterShift + (fp ? m5_VIZ_MEM_LEFT_ADJUST : 0), 17 * addr + 96, 830 + m5_VizClusterShift, 96 + 18 * pos], {
                   stroke: "#b0c8df",
                   strokeWidth: 2
                })
             }
          }
-         objects.pc_arrow = new fabric.Line([10+620, 18 * pc + 66, 86+620, -8+66], {
+         objects.pc_arrow = new fabric.Line([imemBinRightX, imemRowTop + 7, 86+620 + m5_VizClusterShift, -8+66], {
             stroke: "#b0c8df",
             strokeWidth: 2
          })
@@ -5361,7 +5644,7 @@ Outputs:
          let the_dest_reg = valid_dest_fpu_reg_valid ? dest_fpu_reg : dest_reg
          // rd Arrow
          let second_issue = '$second_issue'.asBool()
-         objects.rd_arrow = new fabric.Line([780, 76, (valid_dest_fpu_reg_valid ? 965 + m5_VIZ_MEM_LEFT_ADJUST : 965), 17 * the_dest_reg + 96], {
+         objects.rd_arrow = new fabric.Line([780 + m5_VizClusterShift, 76, (valid_dest_fpu_reg_valid ? 965 + m5_VizClusterShift + m5_VIZ_MEM_LEFT_ADJUST : 965 + m5_VizClusterShift), 17 * the_dest_reg + 96], {
             stroke: '$second_issue'.asBool() ? "#c03050" : commit ? "#a0dfff" : "#d0d0d0",
             strokeWidth: 3,
             visible: valid_dest_reg_valid || valid_dest_fpu_reg_valid
@@ -5369,7 +5652,7 @@ Outputs:
          // load arrow
          let ld_st_addr = ('$addr'.asInt() / 4)
          let ld_valid = '$valid_ld'.asBool(false)
-         objects.ld_arrow = new fabric.Line([1165 + m5_VIZ_MEM_LEFT_ADJUST, (17 * ld_st_addr) + 96, 1105 + (valid_dest_fpu_reg_valid ? m5_VIZ_MEM_LEFT_ADJUST : 0), 96 + 17 * the_dest_reg], {
+         objects.ld_arrow = new fabric.Line([1165 + m5_VizClusterShift + m5_VIZ_MEM_LEFT_ADJUST, (17 * ld_st_addr) + 96, 1105 + m5_VizClusterShift + (valid_dest_fpu_reg_valid ? m5_VIZ_MEM_LEFT_ADJUST : 0), 96 + 17 * the_dest_reg], {
             stroke: "#c03050",
             strokeWidth: 3,
             visible: ld_valid
@@ -5377,7 +5660,7 @@ Outputs:
          // store arrow
          let st_valid = '$valid_st'.asBool()
          objects.st_arrow = new fabric.Line(
-            [830, 132, 1165 + m5_VIZ_MEM_LEFT_ADJUST, 17 * ld_st_addr + 96], {
+            [830 + m5_VizClusterShift, 132, 1165 + m5_VizClusterShift + m5_VIZ_MEM_LEFT_ADJUST, 17 * ld_st_addr + 96], {
             stroke: "#a0dfff",
             strokeWidth: 3,
             visible: st_valid
@@ -5387,21 +5670,21 @@ Outputs:
          let $instr_str = '|fetch/instr_mem[pc]$instr_str'  // pc could be invalid, so make sure this isn't null.
          let instr_string = $instr_str ? $instr_str.asString("?") : "?"
          objects.fetch_instr_viz = new fabric.Text(instr_string, {
-                  top: 18 * pc + 60,
-                  left: 361,
+                  top: imemRowTop,
+                  left: imemProcX,
                   fill: color,
                   fontSize: 14,
                   fontFamily: "monospace"
          })
          //
-         objects.fetch_instr_viz.animate({top: 50, left: 710}, {
+         objects.fetch_instr_viz.animate({top: 50, left: m5_calc(710 + m5_VizClusterShift)}, {
               duration: 300
          })
          '])
          //
          objects.instr_with_values = new fabric.Text(str, {
             top: 70,
-            left: 730,
+            left: 730 + m5_VizClusterShift,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace"
@@ -5416,10 +5699,10 @@ Outputs:
          })
          if (rs1_valid || fpu_rs1_valid) {
             objects.src1_value_viz.wait(300)
-               .thenSet({left: 965 + (rs1_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+               .thenSet({left: 965 + m5_VizClusterShift + (rs1_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
                         top: 17 * reg_addr1 + 96,
                         visible: true})
-               .thenAnimate({left: 830, top: 17 * 1 + 90}, {
+               .thenAnimate({left: 830 + m5_VizClusterShift, top: 17 * 1 + 90}, {
                            duration: 300})
                .thenSet({visible: false})
          }
@@ -5433,14 +5716,14 @@ Outputs:
          let src2_being_stored = '$valid_decode'.asBool(false) && '$st'.asBool(false) && commit; // Animate src2 value being stored.
          if (rs2_valid || fpu_rs2_valid) {
             objects.src2_value_viz.wait(300)
-               .thenSet({left: 965 + (rs2_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+               .thenSet({left: 965 + m5_VizClusterShift + (rs2_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
                         top: 17 * reg_addr2 + 96,
                         visible: true})
-               .thenAnimate({left: 830, top: 17 * 2 + 90},
+               .thenAnimate({left: 830 + m5_VizClusterShift, top: 17 * 2 + 90},
                            {duration: 300})
             if (src2_being_stored) {
                // Animate src2 value being stored.
-               objects.src2_value_viz.thenAnimate({left: 1165 + m5_VIZ_MEM_LEFT_ADJUST, top: 17 * ld_st_addr + 96},
+               objects.src2_value_viz.thenAnimate({left: 1165 + m5_VizClusterShift + m5_VIZ_MEM_LEFT_ADJUST, top: 17 * ld_st_addr + 96},
                                                   {duration: 300})
                   .thenSet({visible: false})
             } else {
@@ -5457,17 +5740,17 @@ Outputs:
          })
          if (fpu_rs3_valid) {
             objects.src3_value_viz.wait(300)
-            .thenSet({left: 965 + (rs3_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
+            .thenSet({left: 965 + m5_VizClusterShift + (rs3_valid ? 0 : m5_VIZ_MEM_LEFT_ADJUST),
                       top: 17 * reg_addr + 96,
                       visible: true})
-            .thenAnimate({left: 830, top: 17 * 3 + 90}, {
+            .thenAnimate({left: 830 + m5_VizClusterShift, top: 17 * 3 + 90}, {
                           duration: 300})
             .thenSet({visible: false})
          }
          let res_value = '$rslt'.asInt(NaN).toString(16)
          objects.result_viz = new fabric.Text(res_value, {
             top: 76,
-            left: 780,
+            left: 780 + m5_VizClusterShift,
             fill: color,
             fontSize: 14,
             fontFamily: "monospace",
@@ -5477,7 +5760,7 @@ Outputs:
          if ((valid_dest_reg_valid || valid_dest_fpu_reg_valid) && commit) {
             objects.result_viz.wait(600)
                .thenSet({visible: true})
-               .thenAnimate({left: (valid_dest_fpu_reg_valid ? 965 + m5_VIZ_MEM_LEFT_ADJUST : 965), top: 17 * dest_reg + 90},
+               .thenAnimate({left: (valid_dest_fpu_reg_valid ? 965 + m5_VizClusterShift + m5_VIZ_MEM_LEFT_ADJUST : 965 + m5_VizClusterShift), top: 17 * dest_reg + 90},
                             {duration: 300})
                .thenSet({visible: false})
          }
@@ -5635,24 +5918,27 @@ Outputs:
    m5_var(COREOFFSET, 750)
    m5_var(ALL_TOP, -1000)
    m5_var(ALL_LEFT, -500)
+   m5_compute_imem_geometry()
    m5+call(m5_isa['_viz_logic'])
    /_des_pipe
       @m5_VIZ_STAGE
          m5+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
-         m5_if(m5_FORMAL, [''], ['m5+instruction_in_memory(/_des_pipe, ['left: 10, top: 10'])'])
+         m5_if(m5_FORMAL, [''], ['m5+instruction_in_memory(/_des_pipe, ['left: m5_ImemWhereLeft, top: m5_ImemRowTop'])'])
+         m5_if(m5_FORMAL, [''], ['m5_if(m5_ImemSource, ['m5+source_code_viz(/_des_pipe, ['left: m5_SrcWhereLeft, top: m5_ImemRowTop'])'])'])
+         m5_if(m5_FORMAL, [''], ['m5_if(m5_ImemUnproc, ['m5+assembly_viz(/_des_pipe, ['left: m5_AsmWhereLeft, top: m5_ImemRowTop'])'])'])
             
          /instr
             m5+instruction(['left: 10, top: 0'])
-            m5+registers(/instr, int, Int RF, , 2, ['left: 350 + 605, top: 10'])
-            m5+register_csr(/regcsr, ['left: 103 + 605, top: 190'])
-            m5+pipeline_control_viz(/pipe_ctrl, ['left: 103 + 605, top: 265 + 18 * m5_num_csrs, width: 220, height: 330'])
+            m5+registers(/instr, int, Int RF, , 2, ['left: 350 + m5_VizRightShift, top: 10'])
+            m5+register_csr(/regcsr, ['left: 103 + m5_VizRightShift, top: 190'])
+            m5+pipeline_control_viz(/pipe_ctrl, ['left: 103 + m5_VizRightShift, top: 265 + 18 * m5_num_csrs, width: 220, height: 330'])
             m5+ifelse(m5_EXT_F, 1,
                \TLV
                   /fpu
-                     m5+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 350 + 605 + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
+                     m5+registers(/fpu, fp, FP RF, fpu_, 3, ['left: 350 + m5_VizRightShift + m5_VIZ_MEM_LEFT_ADJUST, top: 10'])
                )
-            m5+memory_viz(/bank[m5_calc(m5_ADDRS_PER_WORD-1):0] , /mem[m5_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + 605) -10 + m5_if(m5_EXT_F, ['m5_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
+            m5+memory_viz(/bank[m5_calc(m5_ADDRS_PER_WORD-1):0] , /mem[m5_DATA_MEM_WORDS_RANGE], ['left: 10 + (550 + m5_VizRightShift) -10 + m5_if(m5_EXT_F, ['m5_VIZ_MEM_LEFT_ADJUST'], 0), top: 10'])
    m5_if_eq_block(m5_FORMAL, 1, ['
    m5+riscv_formal_viz(['rvfi_testbench'], ['left: 450, top: 50, width: 150, height: 130'])
    '])
