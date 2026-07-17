@@ -4702,7 +4702,7 @@ Outputs:
       var(ImemSource, m5_if_var_def(ce_source_viz_data, 1, 0))
       // Widest unprocessed-asm line (chars). ASM_MAX_COLS is published by m5_assemble.
       var(ImemUnprocChars, m5_if(m5_ImemUnproc, m5_ASM_MAX_COLS, 0))
-      // Source column width (chars) - a VIZ layout choice (not an input configuration).
+      // Source column width (chars)
       var(ImemSourceChars, 40)
       // Pixel column widths.
       var(ImemBinW, m5_calc(m5_ImemBinChars * m5_ImemCw / 10))

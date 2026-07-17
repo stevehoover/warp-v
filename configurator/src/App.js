@@ -50,6 +50,10 @@ function App() {
     const openInMakerchipDisclosure = useDisclosure()
     const [openInMakerchipUrl, setOpenInMakerchipUrl] = useState()
     const [pendingBuild, setPendingBuild] = useState(null)
+    // Static PC-tracking data delivered alongside the asm (source text + asm-row -> source-line
+    // map), forwarded into the generated TLV so a VIZ widget can highlight the executing source
+    // and asm line each cycle. Null unless a `sourceAsm` delivery carried it.
+    const [ceMeta, setCeMeta] = useState(null)
 
     // When loaded as a Makerchip pane, listen for a `sourceAsm` event (e.g. from a Compiler
     // Explorer pane): enable the custom program, load the delivered assembly, and — if the
@@ -58,6 +62,13 @@ function App() {
         if (!isFramed()) return undefined
         const off = onPaneEvent("sourceAsm", (payload) => {
             const asm = typeof payload?.asmText === "string" ? payload.asmText : ""
+            const asmRows = Array.isArray(payload?.asm) ? payload.asm : []
+            const meta = {
+                source_code: typeof payload?.sourceText === "string" ? payload.sourceText : "",
+                asm_lines: asmRows.map(r => (typeof r?.text === "string" ? r.text : "")),
+                // Per asm row, the 1-based source line it came from (or null for label/blank rows).
+                asm_line_to_source_line: asmRows.map(r => (typeof r?.line === "number" ? r.line : null)),
+            }
             // This handler runs from a raw postMessage callback (outside React's synthetic-event
             // system), so in React 17 each setState would trigger a separate render. Without
             // batching, the preview effect fires after the customProgramEnabled update but before
@@ -69,6 +80,7 @@ function App() {
                     generalSettings: {...prev.generalSettings, customProgramEnabled: true}
                 }))
                 setProgramText(asm)
+                setCeMeta(meta)
                 if (payload?.build) setPendingBuild({asm})
             })
         })
@@ -123,6 +135,7 @@ function App() {
                                        pendingBuild={pendingBuild}
                                        setPendingBuild={setPendingBuild}
                                        programCommitKey={programCommitKey}
+                                       ceMeta={ceMeta}
                         >
                             <HomePage configuratorGlobalSettings={configuratorGlobalSettings}
                                       setConfiguratorGlobalSettings={setConfiguratorGlobalSettings}
@@ -187,5 +200,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "92b113bd2f10191b1de69d51a8719ef1710aeb37"
+export const warpVLatestSupportedCommit = "58691a6"
 export const warpVLatestVersionCommit = "master"

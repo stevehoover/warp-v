@@ -54,7 +54,7 @@ let customInstructionTemplate = `// Instantiate WARP-V with custom instructions.
          $baddi_rslt[31:0] = {24'b0, /src[1]$reg_value[7:0] + $raw_i_imm[7:0]};
       )`;
 
-export function getTLVCodeForDefinitions(definitions, programName, programText, isa, settings) {
+export function getTLVCodeForDefinitions(definitions, programName, programText, isa, settings, ceMeta) {
     //console.log(settings)
     const verilatorConfig = new Set()
     // These are now handled in warp-v itself:
@@ -73,6 +73,7 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
         verilatorConfig.delete("/* verilator lint_off WIDTH */")
     }
     const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
+    const ceVizData = buildCeSourceViz(ceMeta, settings, isa)
     return `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
@@ -94,11 +95,41 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${prog
    m4_include_lib(['${settings.warpVVersion}'])
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
          ${programText.split("\n").join("\n         ")}
-      '])\n   })` : ``}
+      '])\n   })` : ``}${ceVizData}
 m4+module_def()
 \\TLV
    ${settings.customInstructionsEnabled ? customInstructionTemplate : "m5+warpv_top()"}
 \\SV
    endmodule
 `
+}
+
+// Emit the Compiler Explorer source-tracking DATA as TL-Verilog appended to the generated
+// design. `ceMeta` carries the static data delivered by the Compiler Explorer pane:
+// `source_code`, `asm_lines`, and `asm_line_to_source_line` (per asm row, the 1-based source
+// line, or null). The data is consumed by WARP-V's "Instr. Memory" VIZ
+// (`m5+instruction_in_memory` in warp-v.tlv), which renders the source-code column and
+// highlights the committed instruction's source line each cycle.
+// Returns the `\m5 var(ce_source_viz_data, ...)` string (base64-encoded to sidestep M5 consuming
+// the commas/parens in the source/asm text), injected before `m4+module_def()` so M5 defines it
+// before use. Returns "" when there's no CE data (non-RISCV, no custom program, etc.).
+function buildCeSourceViz(ceMeta, settings, isa) {
+    if (!ceMeta || !settings.customProgramEnabled || isa.toUpperCase() !== "RISCV") return ""
+    const json = JSON.stringify({
+        source_code: ceMeta.source_code || "",
+        asm_lines: ceMeta.asm_lines || [],
+        asm_line_to_source_line: ceMeta.asm_line_to_source_line || [],
+    })
+    const b64 = (typeof btoa === "function")
+        ? btoa(unescape(encodeURIComponent(json)))
+        : Buffer.from(json, "utf-8").toString("base64")
+    const lines = [
+        `// Compiler Explorer source-tracking DATA (passed through the configurator). Consumed by`,
+        `// WARP-V's "Instr. Memory" VIZ (m5+instruction_in_memory), which renders the source-code`,
+        `// column and highlights the committed instruction's source line each cycle. base64 keeps`,
+        `// M5 from consuming the commas/parens in the source/asm text.`,
+        `\\m5`,
+        `   var(ce_source_viz_data, ['${b64}'])`,
+    ]
+    return "\n" + lines.join("\n")
 }

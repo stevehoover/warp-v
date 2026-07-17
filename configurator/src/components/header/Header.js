@@ -1,9 +1,14 @@
 import { Box, Flex, useColorModeValue, useColorModeValue as mode, VisuallyHidden } from '@chakra-ui/react';
 import { Logo } from './Logo';
 import { NavContent } from './NavContent';
+import { isFramed } from '../../utils/PaneChannelClient';
 import React from 'react';
 
 export function Header() {
+  const logo = <>
+    <VisuallyHidden>Redwood EDA, LLC</VisuallyHidden>
+    <Logo h='6' iconColor={useColorModeValue('blue.600', 'blue.200')} />
+  </>;
   return <Box mt={2} as='header' height='16' bg={mode('white', 'gray.800')} position='relative'>
     <Box
       height='100%'
@@ -19,10 +24,9 @@ export function Header() {
         align='center'
         height='100%'
       >
-        <Box as='a' href='/' rel='home'>
-          <VisuallyHidden>Redwood EDA, LLC</VisuallyHidden>
-          <Logo h='6' iconColor={useColorModeValue('blue.600', 'blue.200')} />
-        </Box>
+        {isFramed()
+          ? <Box>{logo}</Box>
+          : <Box as='a' href='/' rel='home'>{logo}</Box>}
         <NavContent.Desktop ml={10} display={{ base: 'none', md: 'flex' }} />
         <NavContent.Mobile display={{ base: 'flex', md: 'none' }} />
       </Flex>

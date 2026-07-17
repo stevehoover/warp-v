@@ -39,7 +39,8 @@ export function WarpVPageBase({
                                   setOpenInMakerchipUrl,
                                   pendingBuild,
                                   setPendingBuild,
-                                  programCommitKey
+                                  programCommitKey,
+                                  ceMeta
                               }) {
     const makerchipFetch = useFetch("https://faas.makerchip.com")
     const toast = useToast()
@@ -57,7 +58,7 @@ export function WarpVPageBase({
     function generateTLV() {
         const json = {general: configuratorGlobalSettings.generalSettings, pipeline: configuratorGlobalSettings.settings}
         const macros = translateJsonToM4Macros(json);
-        return getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings);
+        return getTLVCodeForDefinitions(macros, configuratorCustomProgramName, programText, configuratorGlobalSettings.generalSettings.isa, configuratorGlobalSettings.generalSettings, ceMeta);
     }
 
     // Seed the embedded IDE with the configuration's TLV as soon as it's available (the IDE loads it once).

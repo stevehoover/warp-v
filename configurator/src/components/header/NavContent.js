@@ -4,12 +4,20 @@ import {HiOutlineMenu, HiX} from 'react-icons/hi';
 import {NavLink} from './NavLink';
 import {NavItemTransition, NavListTransition} from './Transition';
 import {ColorModeSwitcher} from '../../ColorModeSwitcher';
+import {isFramed} from '../../utils/PaneChannelClient';
 
 const links = [
     {label: 'Home', href: '/'},
     {label: 'WARP-V Github', href: 'https://github.com/stevehoover/warp-v', target: "_blank"},
     {label: 'Redwood EDA, LLC', href: 'https://redwoodeda.com', target: "_blank"},
 ];
+
+// When embedded as a Makerchip pane, links that navigate within the frame would replace the
+// configurator itself. Drop same-frame links (e.g. "Home") and force external links to open in
+// a new window.
+function visibleLinks() {
+    return isFramed() ? links.filter(link => link.target === "_blank") : links;
+}
 
 function MobileNavContent(props) {
     const {isOpen, onToggle} = useDisclosure();
@@ -27,9 +35,9 @@ function MobileNavContent(props) {
             >
                 <Stack spacing='0' divider={<StackDivider borderColor='whiteAlpha.200'/>}>
                     {/* TODO: This results in a warning about <li> within <li>. */}
-                    {links.map((link, index) => (
+                    {visibleLinks().map((link, index) => (
                         <NavItemTransition key={index}>
-                            <NavLink.Mobile href={link.href}>{link.label}</NavLink.Mobile>
+                            <NavLink.Mobile href={link.href} target={link.target}>{link.label}</NavLink.Mobile>
                         </NavItemTransition>
                     ))}
                 </Stack>

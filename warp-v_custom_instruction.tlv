@@ -2,7 +2,7 @@
 \SV
    // An illustration of WARP-V with custom instructions.
 
-   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/2652a1c33bcc4640f94063d6f1d5be6da6f28f88/warp-v.tlv'])
+   m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/58691a6/warp-v.tlv'])
 \m5
    / A test program.
    var(PROG_NAME, my_custom)
