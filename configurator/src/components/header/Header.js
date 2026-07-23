@@ -25,10 +25,10 @@ export function Header() {
         height='100%'
       >
         {isFramed()
-          ? <Box>{logo}</Box>
+          ? <Box as='a' href='https://warp-v.org' target='_blank' rel='noopener noreferrer'>{logo}</Box>
           : <Box as='a' href='/' rel='home'>{logo}</Box>}
         <NavContent.Desktop ml={10} display={{ base: 'none', md: 'flex' }} />
-        <NavContent.Mobile display={{ base: 'flex', md: 'none' }} />
+        <NavContent.Mobile display='flex' />
       </Flex>
     </Box>
   </Box>;

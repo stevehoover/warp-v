@@ -56,9 +56,11 @@ function DesktopNavContent(props) {
             ))*/}
         </HStack>
 
-        <Box ml="auto" mr={15}>
-            <ColorModeSwitcher/>
-        </Box>
+        {/* When framed as a Makerchip pane, colour mode is inherited from the IDE, so hide the toggle. */}
+        {!isFramed() &&
+            <Box ml="auto" mr={15}>
+                <ColorModeSwitcher/>
+            </Box>}
     </>
 }
 

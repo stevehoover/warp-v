@@ -1,7 +1,6 @@
 import {Box, Icon, Image, Link} from "@chakra-ui/react";
 import * as React from "react";
 import {MdOpenInNew} from "react-icons/all";
-import {isFramed} from "../../utils/PaneChannelClient";
 
 export function Footer() {
     return <>
@@ -10,10 +9,10 @@ export function Footer() {
                 Dig deeper or report bugs in the github repository <Icon as={MdOpenInNew}/>
             </FooterLink>
 
-            {!isFramed() && <FooterLink to="https://www.redwoodeda.com">
+            <FooterLink to="https://www.redwoodeda.com">
 
-                Courtesy of<Image mb={7} display="inline" src="rwedaLogo2.svg" w="110px"/> <Icon as={MdOpenInNew}/>
-            </FooterLink>}
+                Courtesy of<Image verticalAlign="middle" display="inline" src="rwedaLogo2.svg" w="110px"/> <Icon as={MdOpenInNew}/>
+            </FooterLink>
         </Box>
     </>
 }

@@ -1,13 +1,34 @@
 import React, {createRef, useEffect, useState} from 'react';
 import ReactDOM from 'react-dom';
-import {Box, ChakraProvider, theme, useDisclosure} from '@chakra-ui/react';
+import {Box, ChakraProvider, theme, useColorMode, useDisclosure} from '@chakra-ui/react';
 import {Route, Switch} from 'react-router-dom';
 import HomePage from './components/pages/HomePage';
 import {ConfigurationParameters} from "./components/translation/ConfigurationParameters";
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
-import {isFramed, onPaneEvent, postReady} from "./utils/PaneChannelClient";
+import {callIde, isFramed, onPaneEvent, postReady} from "./utils/PaneChannelClient";
+
+// When loaded as a Makerchip pane, follow the host IDE's dark/light mode. One-way: the pane
+// mirrors the IDE and never pushes its color mode back. Reads the initial theme from the
+// `getContext` RPC and then tracks live `theme` broadcasts. Rendered inside ChakraProvider so
+// it can drive Chakra's color mode.
+function PaneThemeSync() {
+    const {setColorMode} = useColorMode()
+    useEffect(() => {
+        if (!isFramed()) return undefined
+        const off = onPaneEvent("theme", (payload) => {
+            if (payload && typeof payload.dark === "boolean") setColorMode(payload.dark ? "dark" : "light")
+        })
+        callIde("getContext")
+            .then(ctx => {
+                if (ctx?.theme && typeof ctx.theme.dark === "boolean") setColorMode(ctx.theme.dark ? "dark" : "light")
+            })
+            .catch(() => {})
+        return off
+    }, [setColorMode])
+    return null
+}
 
 function App() {
     const [configuratorGlobalSettings, setConfiguratorGlobalSettings] = useState({
@@ -97,6 +118,7 @@ function App() {
     }
 
     return <ChakraProvider theme={theme}>
+        <PaneThemeSync/>
         <Box minHeight='480px'>
             {<Header/>}
 
