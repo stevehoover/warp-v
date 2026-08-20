@@ -74,6 +74,9 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     }
     const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
     const ceVizData = buildCeSourceViz(ceMeta, settings, isa)
+    // In the Compiler Explorer flow, the program is compiled C/C++; invoke its `main` via a crt0
+    // preamble (see m5_assemble Entry arg in risc-v_defs.tlv). Hand-written programs define `reset:`.
+    const entryArg = ceMeta ? ", main" : ""
     return `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
@@ -95,7 +98,7 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${prog
    m4_include_lib(['${settings.warpVVersion}'])
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
          ${programText.split("\n").join("\n         ")}
-      '])\n   })` : ``}${ceVizData}
+      ']${entryArg})\n   })` : ``}${ceVizData}
 m4+module_def()
 \\TLV
    ${settings.customInstructionsEnabled ? customInstructionTemplate : "m5+warpv_top()"}

@@ -308,10 +308,8 @@
    if(m5_local, [
       var(warpv_includes, ['./'])   /// or ['./warp-v_includes/']
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/0059292/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/e880ca3/'])
    ])
-   / TEMP (remove after validating 4-column source VIZ): simulated ce_source_viz_data from the configurator.
-   /var(ce_source_viz_data, ['eyJzb3VyY2VfY29kZSI6ImludCBtYWluKCkge1xuICBpbnQgc3VtID0gMDtcbiAgaW50IGk7XG4gIGZvciAoaSA9IDE7IGkgPCAxMDsgaSsrKSB7XG4gICAgc3VtICs9IGk7XG4gIH1cbiAgc3RvcmUoc3VtKTtcbiAgaW50IHggPSBsb2FkKCk7XG4gIGlmICh4ID09IDB4MmQpIHBhc3MoKTtcbiAgcmV0dXJuIDA7XG59IiwiYXNtX2xpbmVzIjpbIk9SSSB0MiwgemVybywgMCIsIk9SSSB0MCwgemVybywgMSIsIk9SSSBhMiwgemVybywgMTAiLCJPUkkgYTAsIHplcm8sIDAiLCJBREQgYTAsIHQwLCBhMCIsIlNXIGEwLCAwKHQyKSIsIkFEREkgdDAsIHQwLCAxIiwiQURESSB0MiwgdDIsIDQiLCJCTFQgdDAsIGEyLCBsb29wIiwiTFcgdDEsIC00KHQyKSIsIkFEREkgYTEsIHplcm8sIDB4MmQiLCJCRVEgdDEsIGExLCBwYXNzIiwiQUREIGExLCBhMSwgemVybyIsIkFERCB0MSwgdDEsIHplcm8iXSwiYXNtX2xpbmVfdG9fc291cmNlX2xpbmUiOlsyLDIsNCw1LDUsNyw0LDQsNCw4LDksOSw5LDldfQ=='])
    
    / This is where you configure the CPU.
    / Note that WARP-V has a configurator at warp-v.org.
@@ -5027,7 +5025,9 @@ Outputs:
             let secondIssue = '['']|_top/instr$second_issue'.asBool(false)
             let pc = (secondIssue ? '['']|_top/instr/orig_inst$pc'.asInt(-1) : '['']|_top/instr$pc'.asInt(-1)) / m5_ADDRS_PER_INSTR
             let color = secondIssue ? "#ffd0b0" : ('['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0")
-            let sLine = this.imemSrcMap[pc]
+            // imemSrcMap is indexed per user instruction; a crt0 preamble (m5_assemble Entry) prepends
+            // instructions, so subtract its length to realign. crt0 instructions map to no source line.
+            let sLine = this.imemSrcMap[pc - m5_if_var_def(ENTRY_PREAMBLE_INSTRS, ['m5_ENTRY_PREAMBLE_INSTRS'], 0)]
             if (pc >= 0 && typeof sLine === "number" && sLine >= 1) {
                hl.set({top: sc.top + (sLine - 1) * pitch, height: pitch, fill: color, visible: true})
             }

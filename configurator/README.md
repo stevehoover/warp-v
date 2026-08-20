@@ -34,19 +34,21 @@ Requires [Node.js](https://nodejs.org/) and [Yarn](https://yarnpkg.com/).
 
 ```sh
 yarn         # install dependencies (run once)
-yarn start   # start the dev server at http://localhost:3000
+yarn start   # start the dev server at http://localhost:3009
 ```
 
 The page reloads on edits, and lint errors appear in the console.
 
 > **Note:** the `start` and `build` scripts set `NODE_OPTIONS=--openssl-legacy-provider` for
-> compatibility with newer Node versions.
+> compatibility with newer Node versions. The dev server port is pinned to `3009` via `.env`
+> (`PORT=3009`) to avoid clashing with other local dev servers that use the Create React App
+> default of `3000`.
 
 ## Scripts
 
 | Command | Description |
 | --- | --- |
-| `yarn start` | Run the app in development mode at [localhost:3000](http://localhost:3000). |
+| `yarn start` | Run the app in development mode at [localhost:3009](http://localhost:3009) (port pinned via `.env`). |
 | `yarn build` | Produce an optimized production build in `build/`. |
 | `yarn test` | Launch the test runner in interactive watch mode. |
 | `yarn eject` | Eject from Create React App (one-way; not normally needed). |
