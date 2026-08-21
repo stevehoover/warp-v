@@ -65,7 +65,7 @@ export function WarpVPageBase({
     const coreJsonKey = JSON.stringify(coreJson)
     const initialTLV = useMemo(() => coreJson ? generateTLV() : null, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Pane mode: once a `sourceAsm` delivery has flagged a pending build AND coreJson has
+    // Pane mode: once a `sourceAsm`/`build` delivery has flagged a pending build AND coreJson has
     // regenerated to reflect the enabled custom program, generate the TLV and compile it in the
     // host IDE. generateTLV() now reads the current settings and programText directly, so no
     // stale-state workaround is needed.
@@ -73,11 +73,20 @@ export function WarpVPageBase({
         if (!pendingBuild || !framed) return
         if (!coreJson || !coreJson.general?.customProgramEnabled) return
         if (!configuratorGlobalSettings.generalSettings.customProgramEnabled) return
+        // A `build` RPC caller (unlike a fire-and-forget `sourceAsm` bus delivery) may want the
+        // compile id back; it stashes a resolver on pendingBuild. loadCode loads the TLV into the
+        // host editor (preserving undo history) AND compiles it, returning {changeGeneration,
+        // compileId}; we relay the compile id to that resolver. The host only does the compile-id
+        // round-trip when waitForCompileId is set, so we ask for it only when a resolver is waiting.
+        const resolve = pendingBuild.resolve
         setPendingBuild(null)
-        callIde("setCode", generateTLV()).catch(err => {
-            toast({title: "Host compile failed", description: String(err?.message ?? err), status: "error"})
-            console.error(err)
-        })
+        callIde("loadCode", generateTLV(), {waitForCompileId: !!resolve})
+            .then(result => { if (resolve) resolve(result?.compileId ?? null) })
+            .catch(err => {
+                toast({title: "Host compile failed", description: String(err?.message ?? err), status: "error"})
+                console.error(err)
+                if (resolve) resolve(null)
+            })
     }, [pendingBuild, framed, coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {

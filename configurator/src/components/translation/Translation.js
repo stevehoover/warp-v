@@ -74,9 +74,11 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     }
     const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
     const ceVizData = buildCeSourceViz(ceMeta, settings, isa)
-    // In the Compiler Explorer flow, the program is compiled C/C++; invoke its `main` via a crt0
-    // preamble (see m5_assemble Entry arg in risc-v_defs.tlv). Hand-written programs define `reset:`.
-    const entryArg = ceMeta ? ", main" : ""
+    // Compiler Explorer flow: run the compiled program's entry point via a crt0 preamble (see the
+    // m5_assemble Entry arg in risc-v_defs.tlv). The CE pane detects the entry symbol (language-
+    // specific, e.g. `main`, or Fortran's `MAIN__`) and sends it as `entry`; fall back to `main`
+    // for older CE panes that don't. Hand-written programs have no entry and define `reset:`.
+    const entryArg = ceMeta ? `, ${ceMeta.entry || "main"}` : ""
     return `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*

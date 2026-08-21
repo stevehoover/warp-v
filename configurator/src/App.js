@@ -7,7 +7,26 @@ import {ConfigurationParameters} from "./components/translation/ConfigurationPar
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
-import {callIde, isFramed, onPaneEvent, postReady} from "./utils/PaneChannelClient";
+import {callIde, isFramed, onPaneEvent, postReady, registerPaneMethod} from "./utils/PaneChannelClient";
+
+// Extract the delivered assembly text and PC-tracking metadata from a `sourceAsm`/`build`
+// payload (as sent by a Compiler Explorer pane).
+function deliveredFromPayload(payload) {
+    const asm = typeof payload?.asmText === "string" ? payload.asmText : ""
+    const asmRows = Array.isArray(payload?.asm) ? payload.asm : []
+    return {
+        asm,
+        meta: {
+            source_code: typeof payload?.sourceText === "string" ? payload.sourceText : "",
+            asm_lines: asmRows.map(r => (typeof r?.text === "string" ? r.text : "")),
+            // Per asm row, the 1-based source line it came from (or null for label/blank rows).
+            asm_line_to_source_line: asmRows.map(r => (typeof r?.line === "number" ? r.line : null)),
+            // Entry-point label the CE pane detected (language-specific, e.g. `main` or Fortran's
+            // `MAIN__`); drives the crt0 preamble. Null/absent for older CE panes.
+            entry: typeof payload?.entry === "string" ? payload.entry : null,
+        },
+    }
+}
 
 // When loaded as a Makerchip pane, follow the host IDE's dark/light mode. One-way: the pane
 // mirrors the IDE and never pushes its color mode back. Reads the initial theme from the
@@ -76,25 +95,25 @@ function App() {
     // and asm line each cycle. Null unless a `sourceAsm` delivery carried it.
     const [ceMeta, setCeMeta] = useState(null)
 
-    // When loaded as a Makerchip pane, listen for a `sourceAsm` event (e.g. from a Compiler
-    // Explorer pane): enable the custom program, load the delivered assembly, and — if the
-    // sender requested a build — flag a pending build that WarpVPageBase runs in the host IDE.
+    // When loaded as a Makerchip pane, accept a delivered program (assembly + PC-tracking
+    // metadata) from a Compiler Explorer pane, two ways:
+    //   - the `sourceAsm` bus event (fire-and-forget), and
+    //   - the `build` inbound RPC, whose caller can additionally get the resulting host compile id
+    //     back (so an AI/extension can await/poll the compilation it triggered).
+    // Both enable the custom program and load the delivered assembly; if a build is requested they
+    // flag a pending build that WarpVPageBase runs in the host IDE.
     useEffect(() => {
         if (!isFramed()) return undefined
-        const off = onPaneEvent("sourceAsm", (payload) => {
-            const asm = typeof payload?.asmText === "string" ? payload.asmText : ""
-            const asmRows = Array.isArray(payload?.asm) ? payload.asm : []
-            const meta = {
-                source_code: typeof payload?.sourceText === "string" ? payload.sourceText : "",
-                asm_lines: asmRows.map(r => (typeof r?.text === "string" ? r.text : "")),
-                // Per asm row, the 1-based source line it came from (or null for label/blank rows).
-                asm_line_to_source_line: asmRows.map(r => (typeof r?.line === "number" ? r.line : null)),
-            }
-            // This handler runs from a raw postMessage callback (outside React's synthetic-event
-            // system), so in React 17 each setState would trigger a separate render. Without
-            // batching, the preview effect fires after the customProgramEnabled update but before
-            // setProgramText, baking the stale (default) program into the m4 preview. Batch them
-            // so a single render carries both the enabled flag and the delivered program.
+
+        // Apply a delivered payload's program to state. `build` (when non-null) requests a build,
+        // optionally carrying a resolver that WarpVPageBase settles with the host compile id.
+        const applyDelivered = (payload, build) => {
+            const {asm, meta} = deliveredFromPayload(payload)
+            // This runs from a raw postMessage callback (outside React's synthetic-event system),
+            // so in React 17 each setState would trigger a separate render. Without batching, the
+            // preview effect fires after the customProgramEnabled update but before setProgramText,
+            // baking the stale (default) program into the m4 preview. Batch them so a single render
+            // carries both the enabled flag and the delivered program.
             ReactDOM.unstable_batchedUpdates(() => {
                 setConfiguratorGlobalSettings(prev => ({
                     ...prev,
@@ -102,11 +121,26 @@ function App() {
                 }))
                 setProgramText(asm)
                 setCeMeta(meta)
-                if (payload?.build) setPendingBuild({asm})
+                if (build) setPendingBuild({asm, resolve: build.resolve ?? null})
             })
+        }
+
+        const off = onPaneEvent("sourceAsm", (payload) => {
+            applyDelivered(payload, payload?.build ? {} : null)
         })
+
+        // `build(payload, waitForCompileId)`: like a `sourceAsm` build, but if waitForCompileId the
+        // returned promise resolves with the host compile id (WarpVPageBase relays it); otherwise
+        // it resolves immediately (fire-and-forget, avoiding the host round-trip).
+        const offBuild = registerPaneMethod("build", (payload, waitForCompileId) =>
+            new Promise((resolve) => {
+                applyDelivered(payload, {resolve: waitForCompileId ? resolve : null})
+                if (!waitForCompileId) resolve(null)
+            })
+        )
+
         postReady()
-        return off
+        return () => { off(); offBuild() }
     }, [])
 
     function getInitialSettings() {
@@ -222,5 +256,5 @@ export function getWarpVFileForCommit(version) {
     return `https://raw.githubusercontent.com/stevehoover/warp-v/${version}/warp-v.tlv`
 }
 
-export const warpVLatestSupportedCommit = "58691a6"
+export const warpVLatestSupportedCommit = "2b5a6728d1051a4f3970c6fee30beb56ebf9893e"
 export const warpVLatestVersionCommit = "master"
