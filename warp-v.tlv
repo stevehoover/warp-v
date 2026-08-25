@@ -308,7 +308,7 @@
    if(m5_local, [
       var(warpv_includes, ['./'])   /// or ['./warp-v_includes/']
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/e880ca3/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/205216ab10985ad3f54f7f39800f89ac4be97aee/'])
    ])
    
    / This is where you configure the CPU.
@@ -4667,75 +4667,75 @@ Outputs:
    // dummy
    
 \m5
-   // Compute geometry for the four-column VIZ block and the register/memory/decode cluster
-   // that sits to its right. Assigns (and exports to cpu_viz scope) the Imem*, Asm*, Src*, and
-   // Viz* vars consumed by instruction_in_memory, assembly_viz, source_code_viz, the instruction
-   // decode box, and cpu_viz:
-   //  - Imem* : Instr. Memory component (proc-asm + binary columns) sizes/offsets, shared pad/
-   //            title/line metrics, per-column pixel widths, and its parent-frame placement.
-   //  - Asm*  : Assembly (unprocessed-asm) component box size and placement.
-   //  - Src*  : Source Code component box width and placement.
-   //  - Viz*  : VizRightShift/VizClusterShift, the horizontal shift applied to the register/
-   //            memory/decode cluster (and its connective arrows) so it clears the block.
-   // Columns, left->right: [source] [unprocessed-asm] processed-asm binary; text in each column
-   // is right-justified to the column's right edge. Called at instantiation time, after program
-   // assembly sets NUM_ASM_LINES/VIZ_ASM_COLS/ASM_MAX_COLS.
+   / Compute geometry for the four-column VIZ block and the register/memory/decode cluster
+   / that sits to its right. Assigns (and exports to cpu_viz scope) the Imem*, Asm*, Src*, and
+   / Viz* vars consumed by instruction_in_memory, assembly_viz, source_code_viz, the instruction
+   / decode box, and cpu_viz:
+   /  - Imem* : Instr. Memory component (proc-asm + binary columns) sizes/offsets, shared pad/
+   /            title/line metrics, per-column pixel widths, and its parent-frame placement.
+   /  - Asm*  : Assembly (unprocessed-asm) component box size and placement.
+   /  - Src*  : Source Code component box width and placement.
+   /  - Viz*  : VizRightShift/VizClusterShift, the horizontal shift applied to the register/
+   /            memory/decode cluster (and its connective arrows) so it clears the block.
+   / Columns, left->right: [source] [unprocessed-asm] processed-asm binary; text in each column
+   / is right-justified to the column's right edge. Called at instantiation time, after program
+   / assembly sets NUM_ASM_LINES/VIZ_ASM_COLS/ASM_MAX_COLS.
    fn(compute_imem_geometry, {
-      // All geometry values are computed as scoped (fn-local) vars, then the subset consumed
-      // outside this fn is exported into the calling (cpu_viz) scope via m5_on_return (see the
-      // export block below). This escapes one scope level so the child viz macros that cpu_viz
-      // instantiates see them by dynamic scoping, without m5_universal_var's global-namespace
-      // pollution. ImemCw: monospace char width * 10 (~8.4px @ 14pt). ImemGap: inter-column gap (px).
+      / All geometry values are computed as scoped (fn-local) vars, then the subset consumed
+      / outside this fn is exported into the calling (cpu_viz) scope via m5_on_return (see the
+      / export block below). This escapes one scope level so the child viz macros that cpu_viz
+      / instantiates see them by dynamic scoping, without m5_universal_var's global-namespace
+      / pollution. ImemCw: monospace char width * 10 (~8.4px @ 14pt). ImemGap: inter-column gap (px).
       var(ImemCw, 84)
       var(ImemGap, 20)
       var(ImemPadL, 16)
       var(ImemPadR, 16)
       var(ImemTitleH, 40)
       var(ImemLineH, 20)
-      // Per-instruction proc/bin row stacking pitch (matches the /instr_mem[*] layout top).
+      / Per-instruction proc/bin row stacking pitch (matches the /instr_mem[*] layout top).
       var(ImemRowPitch, 18)
       var(ImemBinChars, 32)
       var(ImemProcChars, 40)
       var(ImemUnproc, m5_if_var_def(VIZ_ASM_COLS, ['m5_VIZ_ASM_COLS'], 0))
       var(ImemSource, m5_if_var_def(ce_source_viz_data, 1, 0))
-      // Widest unprocessed-asm line (chars). ASM_MAX_COLS is published by m5_assemble.
+      / Widest unprocessed-asm line (chars). ASM_MAX_COLS is published by m5-assemble.
       var(ImemUnprocChars, m5_if(m5_ImemUnproc, m5_ASM_MAX_COLS, 0))
-      // Source column width (chars)
+      / Source column width (chars)
       var(ImemSourceChars, 40)
-      // Pixel column widths.
+      / Pixel column widths.
       var(ImemBinW, m5_calc(m5_ImemBinChars * m5_ImemCw / 10))
       var(ImemProcW, m5_calc(m5_ImemProcChars * m5_ImemCw / 10))
       var(ImemUnprocW, m5_calc(m5_ImemUnprocChars * m5_ImemCw / 10))
       var(ImemSourceW, m5_calc(m5_ImemSourceChars * m5_ImemCw / 10))
-      // Instr. Memory COMPONENT box (local coords, origin 0,0): proc-asm + binary columns only.
+      / Instr. Memory COMPONENT box (local coords, origin 0,0): proc-asm + binary columns only.
       var(ImemProcLeft, m5_ImemPadL)
       var(ImemBinLeft, m5_calc(m5_ImemProcLeft + m5_ImemProcW + m5_ImemGap))
       var(ImemVizWidth, m5_calc(m5_ImemBinLeft + m5_ImemBinW + m5_ImemPadR))
       var(ImemVizHeight, m5_calc(m5_ImemTitleH + m5_NUM_INSTRS * m5_ImemRowPitch + m5_ImemPadR))
-      // Assembly COMPONENT box (local coords).
+      / Assembly COMPONENT box (local coords).
       var(AsmBoxW, m5_calc(m5_ImemPadL + m5_ImemUnprocW + m5_ImemPadR))
       var(AsmBoxH, m5_calc(m5_ImemTitleH + m5_NUM_ASM_LINES * m5_ImemLineH + m5_ImemPadR))
-      // Source-code COMPONENT box width (its height is sized to the data at render time).
+      / Source-code COMPONENT box width (its height is sized to the data at render time).
       var(SrcBoxW, m5_calc(m5_ImemPadL + m5_ImemSourceW + m5_ImemPadR))
-      // Component placement (parent coords). Four columns in a single horizontal row, L->R:
-      // Source Code | Assembly (unproc) | Instr. Memory (proc-asm | binary). Each placed via 'where'.
-      // (Y-overflow of the taller Source/Assembly boxes is acceptable for now.)
+      / Component placement (parent coords). Four columns in a single horizontal row, L->R:
+      / Source Code | Assembly (unproc) | Instr. Memory (proc-asm | binary). Each placed via 'where'.
+      / (Y-overflow of the taller Source/Assembly boxes is acceptable for now.)
       var(ImemRowTop, 10)
       var(SrcWhereLeft, 10)
       var(AsmWhereLeft, m5_if(m5_ImemSource, ['m5_calc(m5_SrcWhereLeft + m5_SrcBoxW + m5_ImemGap)'], ['10']))
       var(ImemWhereLeft, m5_if(m5_ImemUnproc, ['m5_calc(m5_AsmWhereLeft + m5_AsmBoxW + m5_ImemGap)'], ['m5_AsmWhereLeft']))
-      // Right edge of the four-column block, and the horizontal shift applied to the register/
-      // memory/decode group so it clears that block. (Legacy clearance was a hardcoded 605; the
-      // four-column block is wider, so this is now derived from the block's actual right edge.)
+      / Right edge of the four-column block, and the horizontal shift applied to the register/
+      / memory/decode group so it clears that block. (Legacy clearance was a hardcoded 605; the
+      / four-column block is wider, so this is now derived from the block's actual right edge.)
       var(ImemBlockRight, m5_calc(m5_ImemWhereLeft + m5_ImemVizWidth))
       var(VizRightShift, m5_calc(m5_ImemBlockRight + m5_ImemGap - 103))
-      // Delta by which the register/memory/decode cluster moved vs its legacy position (which
-      // used a hardcoded 605 clearance). Added to the decode-box connective arrows / value
-      // animations, whose coords were absolute numbers tuned to the legacy +605 layout.
+      / Delta by which the register/memory/decode cluster moved vs its legacy position (which
+      / used a hardcoded 605 clearance). Added to the decode-box connective arrows / value
+      / animations, whose coords were absolute numbers tuned to the legacy +605 layout.
       var(VizClusterShift, m5_calc(m5_VizRightShift - 605))
-      // Export the values consumed outside this fn into the caller's (cpu_viz's) scope. The
-      // values are captured here (as literals) and declared on return, so the child viz macros
-      // (instruction_in_memory, source_code_viz, assembly_viz, instruction, cpu_viz) see them.
+      / Export the values consumed outside this fn into the caller's (cpu_viz's) scope. The
+      / values are captured here (as literals) and declared on return, so the child viz macros
+      / (instruction_in_memory, source_code_viz, assembly_viz, instruction, cpu_viz) see them.
       on_return(var, ImemPadL, m5_ImemPadL)
       on_return(var, ImemPadR, m5_ImemPadR)
       on_return(var, ImemTitleH, m5_ImemTitleH)
@@ -5025,7 +5025,7 @@ Outputs:
             let secondIssue = '['']|_top/instr$second_issue'.asBool(false)
             let pc = (secondIssue ? '['']|_top/instr/orig_inst$pc'.asInt(-1) : '['']|_top/instr$pc'.asInt(-1)) / m5_ADDRS_PER_INSTR
             let color = secondIssue ? "#ffd0b0" : ('['']|_top/instr$commit'.asBool(false) ? "#b0ffff" : "#d0d0d0")
-            // imemSrcMap is indexed per user instruction; a crt0 preamble (m5_assemble Entry) prepends
+            // imemSrcMap is indexed per user instruction; a crt0 preamble (m5-assemble Entry) prepends
             // instructions, so subtract its length to realign. crt0 instructions map to no source line.
             let sLine = this.imemSrcMap[pc - m5_if_var_def(ENTRY_PREAMBLE_INSTRS, ['m5_ENTRY_PREAMBLE_INSTRS'], 0)]
             if (pc >= 0 && typeof sLine === "number" && sLine >= 1) {
