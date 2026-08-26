@@ -1,9 +1,10 @@
-import React, {createRef, useEffect, useState} from 'react';
+import React, {createRef, useEffect, useRef, useState} from 'react';
 import ReactDOM from 'react-dom';
 import {Box, ChakraProvider, theme, useColorMode, useDisclosure} from '@chakra-ui/react';
 import {Route, Switch} from 'react-router-dom';
 import HomePage from './components/pages/HomePage';
 import {ConfigurationParameters} from "./components/translation/ConfigurationParameters";
+import {getTLVCodeForDefinitions, translateJsonToM4Macros} from "./components/translation/Translation";
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
@@ -24,6 +25,9 @@ function deliveredFromPayload(payload) {
             // Entry-point label the CE pane detected (language-specific, e.g. `main` or Fortran's
             // `MAIN__`); drives the crt0 preamble. Null/absent for older CE panes.
             entry: typeof payload?.entry === "string" ? payload.entry : null,
+            // Producer language/compiler tag (e.g. `c`, `fortran`); selects a runtime shim in
+            // m5_assemble (self-serve: tags with no registered shim inject nothing). Null for older panes.
+            lang: typeof payload?.lang === "string" ? payload.lang : null,
         },
     }
 }
@@ -65,7 +69,8 @@ function App() {
                 "--fmtNoSource"
             ],
             customProgramEnabled: false,
-            customInstructionsEnabled: false
+            customInstructionsEnabled: false,
+            programEntry: ""
         },
         needsPipelineInit: true
     })
@@ -94,6 +99,11 @@ function App() {
     // map), forwarded into the generated TLV so a VIZ widget can highlight the executing source
     // and asm line each cycle. Null unless a `sourceAsm` delivery carried it.
     const [ceMeta, setCeMeta] = useState(null)
+
+    // Mirror the latest state so the pane-RPC handlers below (registered once at mount) can read
+    // fresh values, dodging stale closures. Updated on every render.
+    const liveStateRef = useRef(null)
+    liveStateRef.current = {configuratorGlobalSettings, programText, ceMeta, configuratorCustomProgramName}
 
     // When loaded as a Makerchip pane, accept a delivered program (assembly + PC-tracking
     // metadata) from a Compiler Explorer pane, two ways:
@@ -139,8 +149,88 @@ function App() {
             })
         )
 
+        // Read the current configuration. In addition to providing the actual configuration data
+        // this method may also be used to discover the shape of the configuration to provide
+        // to `setConfig`:
+        //   { general, pipeline, programText }
+        // where `general` is the top-of-form settings (warpVVersion, isa, depth, custom-program
+        // flags, ...), `pipeline` maps each ConfigurationParameter jsonKey to its value, and
+        // `programText` is the (assembly) program source.
+        const offGetConfig = registerPaneMethod("getConfig", () => {
+            const {configuratorGlobalSettings: cgs, programText: pt} = liveStateRef.current
+            return {general: cgs.generalSettings, pipeline: cgs.settings, programText: pt}
+        })
+
+        // Apply a partial configuration: { general?, pipeline?, programText? }. Objects are
+        // shallow-merged over current state; arrays and scalars replace. Pipeline values are
+        // validated with each parameter's own validator; unknown keys (either bucket) are rejected.
+        // Cross-field / general-value validity (e.g. stage ordering) is left to the WARP-V compile,
+        // matching the UI. Setting `general.depth` re-derives default pipeline stages (as in the
+        // UI), so to customise stages either omit depth or set it in a separate, earlier call.
+        // Returns { applied, rejected } describing what took effect.
+        const generalKeys = new Set([
+            "warpVVersion", "isa", "isaExtensions", "depth",
+            "formattingSettings", "customProgramEnabled", "customInstructionsEnabled", "programEntry"
+        ])
+        const offSetConfig = registerPaneMethod("setConfig", (patch) => {
+            if (!patch || typeof patch !== "object") {
+                return {error: "setConfig expects an object { general?, pipeline?, programText? }"}
+            }
+            const general = {}
+            const pipeline = {}
+            let programText
+            const rejected = {}
+            for (const [k, v] of Object.entries(patch.general || {})) {
+                if (generalKeys.has(k)) general[k] = v
+                else rejected["general." + k] = "unknown general setting"
+            }
+            for (const [k, v] of Object.entries(patch.pipeline || {})) {
+                const param = ConfigurationParameters.find(p => p.jsonKey === k)
+                if (!param) rejected["pipeline." + k] = "unknown pipeline parameter"
+                else if (param.validator && !param.validator(v, param)) rejected["pipeline." + k] = "failed validation"
+                else pipeline[k] = v
+            }
+            if (typeof patch.programText === "string") programText = patch.programText
+            else if (patch.programText !== undefined) rejected["programText"] = "must be a string"
+
+            ReactDOM.unstable_batchedUpdates(() => {
+                if (Object.keys(general).length || Object.keys(pipeline).length) {
+                    setConfiguratorGlobalSettings(prev => ({
+                        ...prev,
+                        generalSettings: {...prev.generalSettings, ...general},
+                        settings: {...prev.settings, ...pipeline}
+                    }))
+                }
+                if (programText !== undefined) {
+                    setProgramText(programText)
+                    // Program edits don't change coreJson, which otherwise gates the preview
+                    // recompile; bump the commit key to refresh the preview (as the textarea blur does).
+                    setProgramCommitKey(k => k + 1)
+                }
+            })
+
+            return {
+                applied: {
+                    general: Object.keys(general),
+                    pipeline: Object.keys(pipeline),
+                    programText: programText !== undefined
+                },
+                rejected
+            }
+        })
+
+        // Return the generated TLV for the current configuration (same source the configurator's
+        // preview/"Open in Makerchip" use). Throws (surfaced as an RPC error) if a pipeline value
+        // fails m4 translation.
+        const offGetTlv = registerPaneMethod("getTlv", () => {
+            const {configuratorGlobalSettings: cgs, programText: pt, ceMeta: meta, configuratorCustomProgramName: name} = liveStateRef.current
+            const gs = cgs.generalSettings
+            const macros = translateJsonToM4Macros({general: gs, pipeline: cgs.settings})
+            return getTLVCodeForDefinitions(macros, name, pt, gs.isa, gs, meta)
+        })
+
         postReady()
-        return () => { off(); offBuild() }
+        return () => { off(); offBuild(); offGetConfig(); offSetConfig(); offGetTlv() }
     }, [])
 
     function getInitialSettings() {

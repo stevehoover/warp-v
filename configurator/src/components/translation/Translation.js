@@ -78,7 +78,15 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     // m5_assemble Entry arg in risc-v_defs.tlv). The CE pane detects the entry symbol (language-
     // specific, e.g. `main`, or Fortran's `MAIN__`) and sends it as `entry`; fall back to `main`
     // for older CE panes that don't. Hand-written programs have no entry and define `reset:`.
-    const entryArg = ceMeta ? `, ${ceMeta.entry || "main"}` : ""
+    // An explicit entry override (the "Entry" field) wins over both — it names a non-`main` compute
+    // function whose integer return drives pass/fail (e.g. gfortran's `chk_`).
+    const entryOverride = (settings.programEntry || "").trim()
+    const entry = entryOverride || (ceMeta ? (ceMeta.entry || "main") : "")
+    // Producer language tag selects a runtime shim in m5_assemble (self-serve: unregistered tags inject
+    // nothing). ~assemble positional args are code, Entry, Runtime; Runtime requires Entry (the shim
+    // references crt0's pass/fail labels), so only emit it alongside an entry.
+    const runtime = ceMeta && typeof ceMeta.lang === "string" ? ceMeta.lang : ""
+    const asmArgs = entry ? `, ${entry}${runtime ? `, ${runtime}` : ""}` : ""
     return `\\m5_TLV_version 1d${formattingSettings.length > 0 ? ` ${formattingSettings.join(" ")}` : ""}: tl-x.org
 \\SV
    /*
@@ -100,7 +108,7 @@ ${definitions ? "   " + (settings.customProgramEnabled ? [`var(PROG_NAME, ${prog
    m4_include_lib(['${settings.warpVVersion}'])
 ${settings.customProgramEnabled ? `\\m5\n   TLV_fn(${isa.toLowerCase()}_${programName}_prog, {\n      ~assemble(['
          ${programText.split("\n").join("\n         ")}
-      ']${entryArg})\n   })` : ``}${ceVizData}
+      ']${asmArgs})\n   })` : ``}${ceVizData}
 m4+module_def()
 \\TLV
    ${settings.customInstructionsEnabled ? customInstructionTemplate : "m5+warpv_top()"}
