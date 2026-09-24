@@ -47,8 +47,8 @@ let customInstructionTemplate = `// Instantiate WARP-V with custom instructions.
    //   - their encoding (see similar in https://github.com/stevehoover/warp-v_includes/blob/master/risc-v_defs.tlv)
    //   - logic to assign their result value (see similar in https://github.com/stevehoover/warp-v/blob/master/warp-v.tlv).
    m5+warpv_with_custom_instructions(
-      ['R, 32, I, 01110, 000, 0000000, BADD'],
-      ['I, 32, I, 00110, 000, BADDI'],
+      ['R, 32, I, 01010, 000, 0000000, BADD'],
+      ['I, 32, I, 00010, 000, BADDI'],
       \\TLV
          $badd_rslt[31:0] = {24'b0, /src[1]$reg_value[7:0] + /src[2]$reg_value[7:0]};
          $baddi_rslt[31:0] = {24'b0, /src[1]$reg_value[7:0] + $raw_i_imm[7:0]};
