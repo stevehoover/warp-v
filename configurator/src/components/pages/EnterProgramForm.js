@@ -36,7 +36,7 @@ export function EnterProgramForm({
                 Here, you can provide your own assembly program that will be hardcoded into the instruction memory
                 of
                 your core.
-                The syntax roughly mimics that defined by the RISC-V ISA, but not exactly.
+                WARP-V's built-in assembler isn't perfect yet, but it gets the common cases right.
             </Text>
             <Textarea rows={programText.split("\n").length}
                       isDisabled={!configuratorGlobalSettings.generalSettings.customProgramEnabled}
