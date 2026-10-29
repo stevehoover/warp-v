@@ -4699,7 +4699,7 @@ Outputs:
       var(ImemUnproc, m5_if_var_def(VIZ_ASM_COLS, ['m5_VIZ_ASM_COLS'], 0))
       var(ImemSource, m5_if_var_def(ce_source_viz_data, 1, 0))
       / Widest unprocessed-asm line (chars). ASM_MAX_COLS is published by m5-assemble.
-      var(ImemUnprocChars, m5_if(m5_ImemUnproc, m5_ASM_MAX_COLS, 0))
+      var(ImemUnprocChars, m5_if(m5_ImemUnproc, ['m5_ASM_MAX_COLS'], 0))
       / Source column width (chars)
       var(ImemSourceChars, 40)
       / Pixel column widths.
@@ -4714,7 +4714,7 @@ Outputs:
       var(ImemVizHeight, m5_calc(m5_ImemTitleH + m5_NUM_INSTRS * m5_ImemRowPitch + m5_ImemPadR))
       / Assembly COMPONENT box (local coords).
       var(AsmBoxW, m5_calc(m5_ImemPadL + m5_ImemUnprocW + m5_ImemPadR))
-      var(AsmBoxH, m5_calc(m5_ImemTitleH + m5_NUM_ASM_LINES * m5_ImemLineH + m5_ImemPadR))
+      var(AsmBoxH, m5_if(m5_ImemUnproc, ['m5_calc(m5_ImemTitleH + m5_NUM_ASM_LINES * m5_ImemLineH + m5_ImemPadR)'], 0))
       / Source-code COMPONENT box width (its height is sized to the data at render time).
       var(SrcBoxW, m5_calc(m5_ImemPadL + m5_ImemSourceW + m5_ImemPadR))
       / Component placement (parent coords). Four columns in a single horizontal row, L->R:
