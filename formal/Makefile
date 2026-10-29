@@ -10,8 +10,11 @@ NPROC?=$(shell nproc)
 STANDARD_CONFIG?=4-stage
 # Compressed instruction support is incomplete (and fails formal), so it is disabled by default.
 EXT_C?=0
-# Include debug signals (TL-Verilog-named signals, for viewing traces). These contain forward references to arrays,
-# which Yosys 0.39+ rejects, so use DEBUG_SIGS=0 with newer Yosys.
+# Include debug signals: copies of signals under TL-Verilog names (in a "DEBUG_SIGS_GTKWAVE" scope). These do not
+# affect results. They exist so that counterexample traces can be viewed in Makerchip (waveform and VIZ), which
+# takes TL-Verilog signals from this scope. --debugSigsYosys is required with Yosys; it names pipeline scopes "P_<name>"
+# instead of "|<name>", which would break yosys-smtbmc. (It also applies (* keep *), which current Yosys doesn't need.)
+# These signals contain forward references to arrays, which Yosys 0.39+ rejects, so use DEBUG_SIGS=0 with newer Yosys.
 DEBUG_SIGS?=1
 
 # Build tools from source (make_env.sh) only if they are not already available (e.g. from OSS CAD Suite).

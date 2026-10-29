@@ -5997,7 +5997,7 @@ Outputs:
             }
             let rvfiLeft = 50
             let pos = 0
-            for (const sigName of this.sigs) {
+            for (const sigName in this.sigs) {
                let top = 29 + 10 * pos
                let obj = new fabric.Group([
                   // Signal name.
@@ -6046,7 +6046,7 @@ Outputs:
             } catch(e) {
                console.log("Signals not found.")
             }
-            for (const sigName of this.sigs) {
+            for (const sigName in this.sigs) {
                let rvfi = this.sigVal(`_root.checker_inst.rvfi_${sigName}`)
                this.sigs[sigName].rvfi = rvfi
                let spec = this.sigVal(`_root.checker_inst.spec_${sigName}`)
