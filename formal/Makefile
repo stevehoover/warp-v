@@ -27,6 +27,9 @@ ENV_DEP:=$(if $(shell command -v sby),,env)
 
 all: verif
 
+# Delete a target whose recipe fails, so it isn't mistaken for up-to-date (e.g. a partial SandPiper-SaaS result).
+.DELETE_ON_ERROR:
+
 # Agree to SandPiper ToS.
 tos_agree:
 	echo -e "\e[0Ksection_start:`date +%s`:tos-agree[collapsed=true]\r\e[0KAgreeing to sandpiper-saas TOS"

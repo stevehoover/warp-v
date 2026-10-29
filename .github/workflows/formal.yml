@@ -59,8 +59,15 @@ jobs:
       - name: Agree to SandPiper-SaaS terms of service
         run: make tos_agree
 
+      # The SandPiper-SaaS service occasionally returns an unreadable response ("Error while extracting response"), so retry.
       - name: Compile WARP-V (via SandPiper-SaaS)
-        run: make compile STANDARD_CONFIG=${{ matrix.config }}
+        run: |
+          for attempt in 1 2 3; do
+            make compile STANDARD_CONFIG=${{ matrix.config }} && exit 0
+            echo "Compile attempt $attempt failed."
+            sleep 15
+          done
+          exit 1
 
       - name: Run riscv-formal
         run: make verif STANDARD_CONFIG=${{ matrix.config }}
