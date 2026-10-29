@@ -193,7 +193,7 @@ RISC-V WARP-V cores have also been [formally verified by Axiomise](https://semiw
 
 [![Formal Verification](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml/badge.svg)](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml)
 
-GitHub Actions runs [formal verification](#formal-verification) (`.github/workflows/formal.yml`) for pushes and pull requests that modify `warp-v.tlv` or `formal/`. It verifies the RISC-V (RV32IM) 4-stage and 1-stage configurations. (Previously, Travis-CI was used until it introduced fees.)
+GitHub Actions runs [formal verification](#formal-verification) (`.github/workflows/formal.yml`) for pushes and pull requests that modify `warp-v.tlv` or `formal/`. It verifies the RISC-V (RV32IM) 4-stage and 1-stage configurations.
 
 ### CI Environment
 
