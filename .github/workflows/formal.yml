@@ -46,12 +46,10 @@ jobs:
       - name: Install SandPiper-SaaS
         run: pip install sandpiper-saas
 
-      # Pinned to Yosys 0.38. Yosys 0.39 and later (through at least 0.70) reject forward hierarchical references
-      # to arrays in generate blocks ("Insufficient number of array indices"), which SandPiper produces in its debug
-      # signals. (Unpinning would require "DEBUG_SIGS=0" for make, at the expense of trace readability.)
+      # Pinned for reproducibility. Update deliberately (and verify) to pick up newer tools.
       - uses: YosysHQ/setup-oss-cad-suite@v4
         with:
-          version: "2024-02-10"
+          version: "2026-10-29"
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Agree to SandPiper-SaaS terms of service

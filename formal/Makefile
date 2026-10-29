@@ -14,7 +14,6 @@ EXT_C?=0
 # affect results. They exist so that counterexample traces can be viewed in Makerchip (waveform and VIZ), which
 # takes TL-Verilog signals from this scope. --debugSigsYosys is required with Yosys; it names pipeline scopes "P_<name>"
 # instead of "|<name>", which would break yosys-smtbmc. (It also applies (* keep *), which current Yosys doesn't need.)
-# These signals contain forward references to arrays, which Yosys 0.39+ rejects, so use DEBUG_SIGS=0 with newer Yosys.
 DEBUG_SIGS?=1
 
 # Build tools from source (make_env.sh) only if they are not already available (e.g. from OSS CAD Suite).
@@ -41,8 +40,10 @@ out/warp-v_formal.sv: ../warp-v.tlv out/config
 	rm -rf out/warp-v_formal*.sv out/sv_url_inc
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
 	@# Note: Only fatal M5 errors result in a failing exit status. Non-fatal M5 "Error:"s may be reported (see out/sandpiper.log).
+	@# --fmtFlatSignals declares all signals (including arrays) at the top of the generated file. Otherwise, arrays may be
+	@# declared after hierarchical references to them (e.g. from debug signals), which Yosys 0.39+ rejects.
 	set -o pipefail; \
-	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
+	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --fmtFlatSignals $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
 	   --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
