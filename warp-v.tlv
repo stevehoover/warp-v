@@ -3224,7 +3224,27 @@ Outputs:
                   // A simple array memory with fixed or RANDOM latency.
                   // The memory is placed in the fetch pipeline.
                   // Required for VIZ.
+                  // =====
+                  // Store
+                  // =====
+
+                  // (Store precedes load so the generated array declaration precedes its use, as required by Yosys 0.39+.)
+                  // Array writes are not currently permitted to use assignment
+                  // syntax, so \always_comb is used, and this must be outside of
+                  // when conditions, so we need to use if. <<1 because no <= support
+                  // in this context. (This limitation will be lifted.)
                   /bank[m5_calc(m5_ADDRS_PER_WORD-1):0]
+                     \SV_plus
+                        always @ (posedge clk) begin
+                           if ($valid_st && $st_mask[#bank])
+                              /mem[$addr[m5_DATA_MEM_WORDS_INDEX_MAX + m5_SUB_WORD_BITS : m5_SUB_WORD_BITS]]<<0$$^Value[(m5_WORD_HIGH / m5_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (m5_WORD_HIGH / m5_ADDRS_PER_WORD) - 1: #bank * (m5_WORD_HIGH / m5_ADDRS_PER_WORD)];
+                        end
+
+                  // ====
+                  // Load
+                  // ====
+
+                  /bank[*]
                      $ANY = /instr$ANY; // Find signal from outside of /bank.
                      /mem[m5_DATA_MEM_WORDS_RANGE]
                      ?$spec_ld
@@ -3235,21 +3255,6 @@ Outputs:
                   // Unfortunately formal verification tools can't handle multiple packed dimensions produced by the expression above, so we
                   // build the concatination.
                   $ld_data[m5_WORD_RANGE] = {m5_repeat(m5_ADDRS_PER_WORD, ['m5_if_eq(m5_LoopCnt, 0, [''], [', '])/bank[m5_calc(m5_ADDRS_PER_WORD - m5_LoopCnt - 1)]$ld_data'])};
-
-                  // =====
-                  // Store
-                  // =====
-
-                  // Array writes are not currently permitted to use assignment
-                  // syntax, so \always_comb is used, and this must be outside of
-                  // when conditions, so we need to use if. <<1 because no <= support
-                  // in this context. (This limitation will be lifted.)
-                  /bank[*]
-                     \SV_plus
-                        always @ (posedge clk) begin
-                           if ($valid_st && $st_mask[#bank])
-                              /mem[$addr[m5_DATA_MEM_WORDS_INDEX_MAX + m5_SUB_WORD_BITS : m5_SUB_WORD_BITS]]<<0$$^Value[(m5_WORD_HIGH / m5_ADDRS_PER_WORD) - 1 : 0] <= $st_value[(#bank + 1) * (m5_WORD_HIGH / m5_ADDRS_PER_WORD) - 1: #bank * (m5_WORD_HIGH / m5_ADDRS_PER_WORD)];
-                        end
          m5+ifelse(m5_DMEM_STYLE, ARRAY,
             \TLV
                // Hmmm... nothing more to do for ARRAY memory.

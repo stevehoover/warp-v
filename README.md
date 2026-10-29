@@ -197,7 +197,7 @@ GitHub Actions runs [formal verification](#formal-verification) (`.github/workfl
 
 ### CI Environment
 
-CI installs tools using the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a> (pinned to a version with Yosys 0.38, since newer versions reject some SandPiper-generated code; see `.github/workflows/formal.yml`) and compiles `warp-v.tlv` using [SandPiper-SaaS](https://pypi.org/project/sandpiper-saas/).
+CI installs tools using the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a> (pinned to a version with Yosys 0.38, since newer versions reject SandPiper-generated debug signals; see `.github/workflows/formal.yml`) and compiles `warp-v.tlv` using [SandPiper-SaaS](https://pypi.org/project/sandpiper-saas/).
 
 ### CI Debug
 

@@ -10,6 +10,9 @@ NPROC?=$(shell nproc)
 STANDARD_CONFIG?=4-stage
 # Compressed instruction support is incomplete (and fails formal), so it is disabled by default.
 EXT_C?=0
+# Include debug signals (TL-Verilog-named signals, for viewing traces). These contain forward references to arrays,
+# which Yosys 0.39+ rejects, so use DEBUG_SIGS=0 with newer Yosys.
+DEBUG_SIGS?=1
 
 # Build tools from source (make_env.sh) only if they are not already available (e.g. from OSS CAD Suite).
 ENV_DEP:=$(if $(shell command -v sby),,env)
@@ -25,7 +28,7 @@ tos_agree:
 	echo -e "\e[0Ksection_end:`date +%s`:tos-agree\r\e[0K"
 
 # Record the configuration, rewriting out/config only when it changes, so that a configuration change triggers a rebuild.
-CONFIG_ID:=STANDARD_CONFIG=$(STANDARD_CONFIG) EXT_C=$(EXT_C)
+CONFIG_ID:=STANDARD_CONFIG=$(STANDARD_CONFIG) EXT_C=$(EXT_C) DEBUG_SIGS=$(DEBUG_SIGS)
 out/config: FORCE
 	@mkdir -p out
 	@[[ "$$(cat $@ 2>/dev/null)" == '$(CONFIG_ID)' ]] || echo '$(CONFIG_ID)' > $@
@@ -36,7 +39,7 @@ out/warp-v_formal.sv: ../warp-v.tlv out/config
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
 	@# sandpiper-saas exits successfully even if there are errors, so check its output for errors.
 	set -o pipefail; \
-	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys \
+	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
 	   --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
 	@if grep -qE '^(Error|ERROR|m4:)' out/sandpiper.log; then echo "Error: SandPiper compilation reported errors (see above)." 1>&2; rm -f $@; exit 1; fi
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1

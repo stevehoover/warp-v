@@ -18,8 +18,9 @@ make verif
 
 WARP-V uses riscv-formal for formal verification. The tools (Yosys, SymbiYosys, and solvers) are most easily
 obtained from the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a>
-(as is done in CI). Note that Yosys 0.39 and later reject some SandPiper-generated code
-(forward hierarchical references to arrays), so CI uses the `2024-02-10` OSS CAD Suite build (Yosys 0.38). If `sby` is not found on your `PATH`, the `Makefile` instead runs `make_env.sh` to
+(as is done in CI). Note that Yosys 0.39 and later reject SandPiper-generated debug signals
+(forward hierarchical references to arrays), so CI uses the `2024-02-10` OSS CAD Suite build (Yosys 0.38).
+With newer Yosys, use `make verif DEBUG_SIGS=0`. If `sby` is not found on your `PATH`, the `Makefile` instead runs `make_env.sh` to
 download and build the necessary tools in the manner described in this <a href="https://github.com/cliffordwolf/riscv-formal/blob/master/docs/quickstart.md" target="_blank" atom_fix="_">QuickStart Guide</a>.
 
 `warp-v.tlv` can be compiled with SandPiper(TM) SaaS Edition (running in the cloud) for formal verification using:
