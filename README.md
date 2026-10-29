@@ -191,15 +191,17 @@ RISC-V WARP-V cores have also been [formally verified by Axiomise](https://semiw
 <a name="ci"></a>
 # CI
 
-<a href="https://travis-ci.com/" target="_blank" atom_fix="_">Travis-CI</a> was used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank" target="_blank" atom_fix="_">WARP-V Travis CI</a>. CI ran formal verification tests. Due to the introduction of fees, CI has been disabled and currently has not been successfully restored elsewhere. So, prior to merging with the main/master branch, run [formal verification](#formal-verification) locally.
+[![Formal Verification](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml/badge.svg)](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml)
+
+GitHub Actions runs [formal verification](#formal-verification) (`.github/workflows/formal.yml`) for pushes and pull requests that modify `warp-v.tlv` or `formal/`. It verifies the RISC-V (RV32IM) 4-stage and 1-stage configurations. (Previously, Travis-CI was used until it introduced fees.)
 
 ### CI Environment
 
-CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank" target="_blank" atom_fix="_">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
+CI installs tools using the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a> (pinned to a version with Yosys 0.38, since newer versions reject some SandPiper-generated code; see `.github/workflows/formal.yml`) and compiles `warp-v.tlv` using [SandPiper-SaaS](https://pypi.org/project/sandpiper-saas/).
 
 ### CI Debug
 
-<a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank" target="_blank" atom_fix="_">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
+If a formal check fails, the job uploads an artifact containing the check logs and counterexample traces (`trace.vcd`). Download it from the workflow run's summary page. Failures can be reproduced locally as described in `formal/README.md`.
 
 
 

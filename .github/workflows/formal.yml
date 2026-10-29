@@ -1,0 +1,74 @@
+# Formal verification of WARP-V using riscv-formal.
+# See formal/README.md for running locally.
+
+name: Formal Verification
+
+on:
+  push:
+    paths:
+      - warp-v.tlv
+      - formal/**
+      - .gitmodules
+      - .github/workflows/formal.yml
+  pull_request:
+    paths:
+      - warp-v.tlv
+      - formal/**
+      - .gitmodules
+      - .github/workflows/formal.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  riscv-formal:
+    name: riscv-formal (${{ matrix.config }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [4-stage, 1-stage]
+    defaults:
+      run:
+        working-directory: formal
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Install SandPiper-SaaS
+        run: pip install sandpiper-saas
+
+      # Pinned to Yosys 0.38. Yosys 0.39 and later (through at least 0.70) reject SandPiper-generated forward
+      # hierarchical references to arrays in generate blocks ("Insufficient number of array indices").
+      - uses: YosysHQ/setup-oss-cad-suite@v4
+        with:
+          version: "2024-02-10"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Agree to SandPiper-SaaS terms of service
+        run: make tos_agree
+
+      - name: Compile WARP-V (via SandPiper-SaaS)
+        run: make compile STANDARD_CONFIG=${{ matrix.config }}
+
+      - name: Run riscv-formal
+        run: make verif STANDARD_CONFIG=${{ matrix.config }}
+
+      - name: Upload failure logs and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: riscv-formal-${{ matrix.config }}
+          path: |
+            formal/out/sandpiper.log
+            formal/out/checks/*/logfile.txt
+            formal/out/checks/*/engine_*/trace.vcd
+          if-no-files-found: ignore
