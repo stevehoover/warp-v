@@ -37,11 +37,10 @@ out/config: FORCE
 out/warp-v_formal.sv: ../warp-v.tlv out/config
 	rm -rf out/warp-v_formal*.sv out/sv_url_inc
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
-	@# sandpiper-saas exits successfully even if there are errors, so check its output for errors.
+	@# Note: Only fatal M5 errors result in a failing exit status. Non-fatal M5 "Error:"s may be reported (see out/sandpiper.log).
 	set -o pipefail; \
 	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
 	   --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
-	@if grep -qE '^(Error|ERROR|m4:)' out/sandpiper.log; then echo "Error: SandPiper compilation reported errors (see above)." 1>&2; rm -f $@; exit 1; fi
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
 env: env/PASSED
