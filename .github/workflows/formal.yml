@@ -72,6 +72,7 @@ jobs:
           name: riscv-formal-${{ matrix.config }}
           path: |
             formal/out/sandpiper.log
+            formal/out/warp-v_formal.m5out.tlv
             formal/out/checks/*/logfile.txt
             formal/out/checks/*/engine_*/trace.vcd
           if-no-files-found: ignore

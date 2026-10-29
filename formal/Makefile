@@ -41,14 +41,15 @@ out/config: FORCE
 
 # Run SandPiper-SaaS(TM).
 out/warp-v_formal.sv: ../warp-v.tlv out/config
-	rm -rf out/warp-v_formal*.sv out/sv_url_inc
+	rm -rf out/warp-v_formal*.sv out/warp-v_formal.m5out.tlv out/sv_url_inc
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
 	@# Note: Only fatal M5 errors result in a failing exit status. Non-fatal M5 "Error:"s may be reported (see out/sandpiper.log).
 	@# --fmtFlatSignals declares all signals (including arrays) at the top of the generated file. Otherwise, arrays may be
 	@# declared after hierarchical references to them (e.g. from debug signals), which Yosys 0.39+ rejects.
+	@# --m5out keeps the M5-preprocessed TL-Verilog: a self-contained, configured model, used to view traces in Makerchip.
 	set -o pipefail; \
 	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --fmtFlatSignals $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
-	   --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
+	   --m5out out/warp-v_formal.m5out.tlv --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
 # Download the OSS CAD Suite build for this platform into env/oss-cad-suite.
