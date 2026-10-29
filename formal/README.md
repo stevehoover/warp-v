@@ -16,10 +16,10 @@ git submodule, build the necessary environment locally, and run formal verificat
 make verif
 ```
 
-WARP-V uses riscv-formal for formal verification. The tools (Yosys, SymbiYosys, and solvers) are most easily
-obtained from the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a>
-(as is done in CI). If `sby` is not found on your `PATH`, the `Makefile` instead runs `make_env.sh` to
-download and build the necessary tools in the manner described in this <a href="https://github.com/cliffordwolf/riscv-formal/blob/master/docs/quickstart.md" target="_blank" atom_fix="_">QuickStart Guide</a>.
+WARP-V uses riscv-formal for formal verification. The tools (Yosys, SymbiYosys, and solvers) come from the prebuilt
+<a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a>. The build to use is pinned by
+`OSS_CAD_SUITE_VERSION` in the `Makefile` (and CI uses the same version). If `sby` is not found on your `PATH`, `make verif`
+downloads that build into `env/` (`make env`). To use your own installation, put it on your `PATH`.
 
 `warp-v.tlv` can be compiled with SandPiper(TM) SaaS Edition (running in the cloud) for formal verification using:
 

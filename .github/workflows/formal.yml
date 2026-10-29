@@ -46,10 +46,14 @@ jobs:
       - name: Install SandPiper-SaaS
         run: pip install sandpiper-saas
 
-      # Pinned for reproducibility. Update deliberately (and verify) to pick up newer tools.
+      # The OSS CAD Suite version is pinned in formal/Makefile (OSS_CAD_SUITE_VERSION).
+      - name: Get OSS CAD Suite version
+        id: oss_cad_suite
+        run: echo "version=$(make -s oss_cad_suite_version)" >> "$GITHUB_OUTPUT"
+
       - uses: YosysHQ/setup-oss-cad-suite@v4
         with:
-          version: "2026-10-29"
+          version: ${{ steps.oss_cad_suite.outputs.version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Agree to SandPiper-SaaS terms of service

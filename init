@@ -30,11 +30,8 @@ if which apt > /dev/null; then
 
   echo -e "\e[0Ksection_start:`date +%s`:init-apt[collapsed=true]\r\e[0KInstalling build dependencies via apt-get"
 
-  # Required by yosys.
-  $APT_GET build-essential clang bison flex \
-	    libreadline-dev gawk tcl-dev libffi-dev git \
-	    graphviz xdot pkg-config python3 zlib1g-dev
-  # Removed:  libboost-system-dev libboost-python-dev libboost-filesystem-dev
+  # For formal verification. (Tools come from OSS CAD Suite. See formal/README.md.)
+  $APT_GET git curl python3
   # To avoid a bug with `gitk` and `git gui` that results from our use of special unicode
   # character in warp-v.tlv (for visualization):
   $APT_GET unifont

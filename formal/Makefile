@@ -2,7 +2,11 @@
 
 SHELL=/bin/bash
 
-export PATH:=$(shell pwd)/env/bin:$(shell pwd)/env:$(PATH)
+# OSS CAD Suite build (Yosys, SymbiYosys, solvers) to use. CI uses this version as well.
+OSS_CAD_SUITE_VERSION?=2026-10-29
+
+# Prefer tools downloaded into env/ by "make env".
+export PATH:=$(CURDIR)/env/oss-cad-suite/bin:$(PATH)
 NPROC?=$(shell nproc)
 
 # The WARP-V configuration to verify. Override on the command line, e.g. "make verif STANDARD_CONFIG=1-stage".
@@ -11,15 +15,15 @@ STANDARD_CONFIG?=4-stage
 # Compressed instruction support is incomplete (and fails formal), so it is disabled by default.
 EXT_C?=0
 # Include debug signals: copies of signals under TL-Verilog names (in a "DEBUG_SIGS_GTKWAVE" scope). These do not
-# affect results. They exist so that counterexample traces can be viewed in Makerchip (waveform and VIZ), which
-# takes TL-Verilog signals from this scope. --debugSigsYosys is required with Yosys; it names pipeline scopes "P_<name>"
-# instead of "|<name>", which would break yosys-smtbmc. (It also applies (* keep *), which current Yosys doesn't need.)
+# affect results. They exist so that counterexample traces can be viewed in Makerchip (waveform), which
+# takes TL-Verilog signals from this scope. --debugSigsYosys is required for Yosys compatibility.
+# (It also applies (* keep *), which current Yosys doesn't need.)
 DEBUG_SIGS?=1
 
-# Build tools from source (make_env.sh) only if they are not already available (e.g. from OSS CAD Suite).
+# Download OSS CAD Suite (make env) only if the tools are not already available.
 ENV_DEP:=$(if $(shell command -v sby),,env)
 
-.PHONY: all clean compile verif results env riscv-formal clean_env tos_agree FORCE
+.PHONY: all clean compile verif results env oss_cad_suite_version riscv-formal clean_env tos_agree FORCE
 
 all: verif
 
@@ -47,12 +51,20 @@ out/warp-v_formal.sv: ../warp-v.tlv out/config
 	   --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
-env: env/PASSED
+# Download the OSS CAD Suite build for this platform into env/oss-cad-suite.
+OSS_CAD_SUITE_PLATFORM:=$(shell uname -s | tr A-Z a-z)-$(shell uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')
+OSS_CAD_SUITE_URL:=https://github.com/YosysHQ/oss-cad-suite-build/releases/download/$(OSS_CAD_SUITE_VERSION)/oss-cad-suite-$(OSS_CAD_SUITE_PLATFORM)-$(subst -,,$(OSS_CAD_SUITE_VERSION)).tgz
+env: env/oss-cad-suite/VERSION-$(OSS_CAD_SUITE_VERSION)
 
-# Use env/PASSED to indicate that the environment has been successfully built.
-env/PASSED:
-	@# Just update timestamp if that's all that's needed, or make_env.sh.
-	if [ -e env/PASSED ]; then touch env/PASSED; else ./make_env.sh; fi
+env/oss-cad-suite/VERSION-$(OSS_CAD_SUITE_VERSION):
+	rm -rf env/oss-cad-suite
+	mkdir -p env
+	set -o pipefail; curl -fL "$(OSS_CAD_SUITE_URL)" | tar -xz -C env
+	touch $@
+
+# Report the OSS CAD Suite version (for CI).
+oss_cad_suite_version:
+	@echo $(OSS_CAD_SUITE_VERSION)
 
 riscv-formal: riscv-formal/README.md
 
@@ -77,7 +89,7 @@ out/checks.cfg: checks.cfg depths/$(STANDARD_CONFIG).cfg out/config
 out/checks/makefile: out/checks.cfg out/genchecks.py out/warp-v_formal.sv riscv-formal/README.md
 	@# Should use this, but until Claire accepts pull request, we use a modified genchecks.py in /out.
 	@#python3 riscv-formal/checks/genchecks.py --basedir riscv-formal
-	cd out && RISCV_FORMAL_RELATIVE_PATH=../riscv-formal PYTHONPATH='$(CURDIR)/env/share/python3' python3 genchecks.py checks
+	cd out && RISCV_FORMAL_RELATIVE_PATH=../riscv-formal python3 genchecks.py checks
 
 verif: out/checks/makefile $(ENV_DEP)
 	echo -e "\e[0Ksection_start:`date +%s`:verif[collapsed=true]\r\e[0KVerification"
@@ -95,4 +107,4 @@ clean:
 	rm -rf out checks
 
 clean_env: clean
-	rm -rf env env_build
+	rm -rf env

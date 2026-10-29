@@ -5,9 +5,8 @@ complete
 /disasm.s
 /disasm.o
 
-# Environment directories built by make_env
+# OSS CAD Suite downloaded by "make env"
 /env
-/env_build
 
 # SandPiper(TM) SaaS Edition output directory
 /out
