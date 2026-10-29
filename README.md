@@ -203,6 +203,14 @@ CI installs tools using the prebuilt <a href="https://github.com/YosysHQ/oss-cad
 
 If a formal check fails, the job uploads an artifact containing the check logs and counterexample traces (`trace.vcd`). Download it from the workflow run's summary page. Failures can be reproduced locally as described in `formal/README.md`.
 
+Counterexample traces can be viewed in Makerchip, including WARP-V VIZ and RVFI VIZ (showing riscv-formal interface values with expected values in red):
+
+1. Open [Makerchip](https://makerchip.com/sandbox) in Chrome or Edge.
+2. Paste in `formal/formal_viz.tlv`, editing it to match the failing run: its `STANDARD_CONFIG` and `EXT_C`, and the commit ID in the `warp-v.tlv` URL. Compile.
+3. Use File > Waveforms > Open Waveform to open the `trace.vcd` (from the artifact or `formal/out/checks/<check>/engine_0/trace.vcd`). This disables simulation in favor of the trace. (File > Waveforms > Enable Simulation reverts.)
+
+Cycle numbering may be offset slightly from riscv-formal steps.
+
 
 
 # Data

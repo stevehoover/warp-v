@@ -42,7 +42,8 @@ The checks you want to run can be selected in `checks.cfg` (then rerun `make ver
 
 The results will appear in `out/checks/`. `make verif` reports a summary and fails if any checks do not pass.
 (`make results` reports the summary again.) Counterexample traces for failing checks are in
-`out/checks/<check>/engine_0/trace.vcd`.
+`out/checks/<check>/engine_0/trace.vcd`. These can be viewed in Makerchip VIZ using `formal_viz.tlv`
+(see "CI Debug" in the top-level `README.md`).
 
 ## Continuous Integration
 
