@@ -2,11 +2,33 @@
 
 SHELL=/bin/bash
 
-export PATH:=$(shell pwd)/env/bin:$(shell pwd)/env:$(PATH)
+# OSS CAD Suite build (Yosys, SymbiYosys, solvers) to use. CI uses this version as well.
+OSS_CAD_SUITE_VERSION?=2026-10-29
+
+# Prefer tools downloaded into env/ by "make env".
+export PATH:=$(CURDIR)/env/oss-cad-suite/bin:$(PATH)
 NPROC?=$(shell nproc)
 
-.PHONY: all clean compile verif env riscv-formal clean_env
+# The WARP-V configuration to verify. Override on the command line, e.g. "make verif STANDARD_CONFIG=1-stage".
+# Each STANDARD_CONFIG requires a corresponding depths/<STANDARD_CONFIG>.cfg.
+STANDARD_CONFIG?=4-stage
+# Compressed instruction support is incomplete (and fails formal), so it is disabled by default.
+EXT_C?=0
+# Include debug signals: copies of signals under TL-Verilog names (in a "DEBUG_SIGS_GTKWAVE" scope). These do not
+# affect results. They exist so that counterexample traces can be viewed in Makerchip (waveform), which
+# takes TL-Verilog signals from this scope. --debugSigsYosys is required for Yosys compatibility.
+# (It also applies (* keep *), which current Yosys doesn't need.)
+DEBUG_SIGS?=1
 
+# Download OSS CAD Suite (make env) only if the tools are not already available.
+ENV_DEP:=$(if $(shell command -v sby),,env)
+
+.PHONY: all clean compile verif results env oss_cad_suite_version riscv-formal clean_env tos_agree FORCE
+
+all: verif
+
+# Delete a target whose recipe fails, so it isn't mistaken for up-to-date (e.g. a partial SandPiper-SaaS result).
+.DELETE_ON_ERROR:
 
 # Agree to SandPiper ToS.
 tos_agree:
@@ -14,20 +36,39 @@ tos_agree:
 	yes | sandpiper-saas -h > /dev/null
 	echo -e "\e[0Ksection_end:`date +%s`:tos-agree\r\e[0K"
 
+# Record the configuration, rewriting out/config only when it changes, so that a configuration change triggers a rebuild.
+CONFIG_ID:=STANDARD_CONFIG=$(STANDARD_CONFIG) EXT_C=$(EXT_C) DEBUG_SIGS=$(DEBUG_SIGS)
+out/config: FORCE
+	@mkdir -p out
+	@[[ "$$(cat $@ 2>/dev/null)" == '$(CONFIG_ID)' ]] || echo '$(CONFIG_ID)' > $@
+
 # Run SandPiper-SaaS(TM).
-out/warp-v_formal.sv: ../warp-v.tlv
-	rm -rf out
-	mkdir out
+out/warp-v_formal.sv: ../warp-v.tlv out/config
+	rm -rf out/warp-v_formal*.sv out/warp-v_formal.m5out.tlv out/sv_url_inc
 	@# Note: Currently "--m5def FORMAL=1" only works as the final args due to https://gitlab.com/rweda/sandpiper-saas/-/issues/2
-	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
+	@# Note: Only fatal M5 errors result in a failing exit status. Non-fatal M5 "Error:"s may be reported (see out/sandpiper.log).
+	@# --fmtFlatSignals declares all signals (including arrays) at the top of the generated file. Otherwise, arrays may be
+	@# declared after hierarchical references to them (e.g. from debug signals), which Yosys 0.39+ rejects.
+	@# --m5out keeps the M5-preprocessed TL-Verilog: a self-contained, configured model, used to view traces in Makerchip.
+	set -o pipefail; \
+	sandpiper-saas -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --sv_url_inc --iArgs --fmtFlatSignals $(if $(filter 1,$(DEBUG_SIGS)),--debugSigsGtkwave --debugSigsYosys) \
+	   --m5out out/warp-v_formal.m5out.tlv --m5def STANDARD_CONFIG=$(STANDARD_CONFIG) --m5def EXT_C=$(EXT_C) --m5def FORMAL=1 2>&1 | tee out/sandpiper.log
 	#/home/steve/repos/mono/sandpiper/bin/sandpiper -i ../warp-v.tlv -o warp-v_formal.sv --outdir out --m5out out/warp-v_formal.m5out.tlv --iArgs --debugSigsGtkwave --debugSigsYosys --m5def FORMAL=1
 
-env: env/PASSED
+# Download the OSS CAD Suite build for this platform into env/oss-cad-suite.
+OSS_CAD_SUITE_PLATFORM:=$(shell uname -s | tr A-Z a-z)-$(shell uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')
+OSS_CAD_SUITE_URL:=https://github.com/YosysHQ/oss-cad-suite-build/releases/download/$(OSS_CAD_SUITE_VERSION)/oss-cad-suite-$(OSS_CAD_SUITE_PLATFORM)-$(subst -,,$(OSS_CAD_SUITE_VERSION)).tgz
+env: env/oss-cad-suite/VERSION-$(OSS_CAD_SUITE_VERSION)
 
-# Use env/PASSED to indicate that the environment has been successfully built.
-env/PASSED:
-	@# Just update timestamp if that's all that's needed, or make_env.sh.
-	if [ -e env/PASSED ]; then touch env/PASSED; else ./make_env.sh; fi
+env/oss-cad-suite/VERSION-$(OSS_CAD_SUITE_VERSION):
+	rm -rf env/oss-cad-suite
+	mkdir -p env
+	set -o pipefail; curl -fL "$(OSS_CAD_SUITE_URL)" | tar -xz -C env
+	touch $@
+
+# Report the OSS CAD Suite version (for CI).
+oss_cad_suite_version:
+	@echo $(OSS_CAD_SUITE_VERSION)
 
 riscv-formal: riscv-formal/README.md
 
@@ -39,25 +80,35 @@ riscv-formal/README.md:
 compile: out/warp-v_formal.sv
 
 out/genchecks.py: riscv-formal/checks/genchecks.py
+	@mkdir -p out
 	@# Claire rejected my pull request to add --basedir option, so we have a local copy of genchecks.py.
 	sed "s/\.\.\/\.\./{os.environ.get\('RISCV_FORMAL_RELATIVE_PATH'\)}/" riscv-formal/checks/genchecks.py > out/genchecks.py
 
-verif: checks.cfg out/warp-v_formal.sv out/genchecks.py env riscv-formal
-	@# Should use this, but until Claire accepts pull request, we make a modified genchecks.py in /out.
+# The riscv-formal configuration for this WARP-V configuration.
+out/checks.cfg: checks.cfg depths/$(STANDARD_CONFIG).cfg out/config
+	cat checks.cfg depths/$(STANDARD_CONFIG).cfg > $@
+	if (( $(EXT_C) )); then echo -e '\n[defines]\n`define RISCV_FORMAL_COMPRESSED' >> $@; fi
+
+# Generate the checks (in out/checks).
+out/checks/makefile: out/checks.cfg out/genchecks.py out/warp-v_formal.sv riscv-formal/README.md
+	@# Should use this, but until Claire accepts pull request, we use a modified genchecks.py in /out.
 	@#python3 riscv-formal/checks/genchecks.py --basedir riscv-formal
+	cd out && RISCV_FORMAL_RELATIVE_PATH=../riscv-formal python3 genchecks.py checks
+
+verif: out/checks/makefile $(ENV_DEP)
 	echo -e "\e[0Ksection_start:`date +%s`:verif[collapsed=true]\r\e[0KVerification"
 	yosys -V
-	bison --version
-	RISCV_FORMAL_RELATIVE_PATH=riscv-formal PYTHONPATH='$(CURDIR)/env/share/python3' python3 '$(CURDIR)/out/genchecks.py'
-
-	$(MAKE) -k -C checks -j$(NPROC)
+	@# Failing checks are reported by check_results.sh.
+	-$(MAKE) -k -C out/checks -j$(NPROC)
 	echo -e "\e[0Ksection_end:`date +%s`:verif\r\e[0K"
+	./check_results.sh out/checks
 
-all: verif
+# Report results of a previous "make verif".
+results:
+	./check_results.sh out/checks
 
 clean:
 	rm -rf out checks
 
 clean_env: clean
-	rm -rf env env_build
-	
+	rm -rf env

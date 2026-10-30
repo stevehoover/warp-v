@@ -191,15 +191,25 @@ RISC-V WARP-V cores have also been [formally verified by Axiomise](https://semiw
 <a name="ci"></a>
 # CI
 
-<a href="https://travis-ci.com/" target="_blank" atom_fix="_">Travis-CI</a> was used for continuous integration testing: <a href="https://travis-ci.com/stevehoover/warp-v" target="_blank" target="_blank" atom_fix="_">WARP-V Travis CI</a>. CI ran formal verification tests. Due to the introduction of fees, CI has been disabled and currently has not been successfully restored elsewhere. So, prior to merging with the main/master branch, run [formal verification](#formal-verification) locally.
+[![Formal Verification](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml/badge.svg)](https://github.com/stevehoover/warp-v/actions/workflows/formal.yml)
+
+GitHub Actions runs [formal verification](#formal-verification) (`.github/workflows/formal.yml`) for pushes and pull requests that modify `warp-v.tlv` or `formal/`. It verifies the RISC-V (RV32IM) 4-stage and 1-stage configurations.
 
 ### CI Environment
 
-CI uses the `formal/make_env.sh` script to built the necessary tools from source. The result of this build is cached between builds (per branch) using a <a href="https://docs.travis-ci.com/user/caching" target="_blank" target="_blank" atom_fix="_">caching feature of Travis-CI</a>. Caching is applied blindly, without regard to the availability of newer sources. CI scripts will check the latest sources against the ones from the cache and report differences near the end of the log. The cache can be cleared manually from the build page. Look under "More options" (upper-right).
+CI installs tools using the prebuilt <a href="https://github.com/YosysHQ/oss-cad-suite-build" target="_blank" atom_fix="_">OSS CAD Suite</a> (pinned by `OSS_CAD_SUITE_VERSION` in `formal/Makefile`) and compiles `warp-v.tlv` using [SandPiper-SaaS](https://pypi.org/project/sandpiper-saas/).
 
 ### CI Debug
 
-<a href="https://docs.travis-ci.com/user/running-build-in-debug-mode" target="_blank" target="_blank" atom_fix="_">Debugging Travis-CI failures</a> can be awkward. To simplify things, if a formal check fails, CI scripts attempt to upload the failure traces using https://transfer.sh/. Look for messages near the end of the log file containing links to the uploaded traces for download and debug.
+If a formal check fails, the job uploads an artifact containing the check logs and counterexample traces (`trace.vcd`). Download it from the workflow run's summary page. Failures can be reproduced locally as described in `formal/README.md`.
+
+Counterexample traces can be viewed in Makerchip, including WARP-V VIZ and RVFI VIZ (showing riscv-formal interface values with expected values in red). The artifact (or `formal/out/` locally) includes `warp-v_formal.m5out.tlv`, the M5-preprocessed model exactly as verified (configuration applied, libraries inlined).
+
+1. Open [Makerchip](https://makerchip.com/sandbox) in Chrome or Edge.
+2. Open or paste in `warp-v_formal.m5out.tlv`, and compile.
+3. Use File > Waveforms > Open Waveform to open the `trace.vcd` (from the artifact or `formal/out/checks/<check>/engine_0/trace.vcd`). This disables simulation in favor of the trace. (File > Waveforms > Enable Simulation reverts.)
+
+Cycle numbering may be offset slightly from riscv-formal steps.
 
 
 

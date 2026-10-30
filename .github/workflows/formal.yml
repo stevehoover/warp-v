@@ -1,0 +1,85 @@
+# Formal verification of WARP-V using riscv-formal.
+# See formal/README.md for running locally.
+
+name: Formal Verification
+
+on:
+  push:
+    paths:
+      - warp-v.tlv
+      - formal/**
+      - .gitmodules
+      - .github/workflows/formal.yml
+  pull_request:
+    paths:
+      - warp-v.tlv
+      - formal/**
+      - .gitmodules
+      - .github/workflows/formal.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  riscv-formal:
+    name: riscv-formal (${{ matrix.config }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [4-stage, 1-stage]
+    defaults:
+      run:
+        working-directory: formal
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.x"
+
+      - name: Install SandPiper-SaaS
+        run: pip install sandpiper-saas
+
+      # The OSS CAD Suite version is pinned in formal/Makefile (OSS_CAD_SUITE_VERSION).
+      - name: Get OSS CAD Suite version
+        id: oss_cad_suite
+        run: echo "version=$(make -s oss_cad_suite_version)" >> "$GITHUB_OUTPUT"
+
+      - uses: YosysHQ/setup-oss-cad-suite@v4
+        with:
+          version: ${{ steps.oss_cad_suite.outputs.version }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Agree to SandPiper-SaaS terms of service
+        run: make tos_agree
+
+      # The SandPiper-SaaS service occasionally returns an unreadable response ("Error while extracting response"), so retry.
+      - name: Compile WARP-V (via SandPiper-SaaS)
+        run: |
+          for attempt in 1 2 3; do
+            make compile STANDARD_CONFIG=${{ matrix.config }} && exit 0
+            echo "Compile attempt $attempt failed."
+            sleep 15
+          done
+          exit 1
+
+      - name: Run riscv-formal
+        run: make verif STANDARD_CONFIG=${{ matrix.config }}
+
+      - name: Upload failure logs and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: riscv-formal-${{ matrix.config }}
+          path: |
+            formal/out/sandpiper.log
+            formal/out/warp-v_formal.m5out.tlv
+            formal/out/checks/*/logfile.txt
+            formal/out/checks/*/engine_*/trace.vcd
+          if-no-files-found: ignore
