@@ -35,7 +35,8 @@
    // Include WARP-V.
    m4_include_lib(['https://raw.githubusercontent.com/stevehoover/warp-v/master/warp-v.tlv'])
   
-m4+module_def()
+\SV
+   m5_module_def()
 \TLV
    m5+warpv_top()
 \SV

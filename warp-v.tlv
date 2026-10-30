@@ -293,15 +293,21 @@
    / For passing configuration via the command line.
    if_def(CONFIG_EXPR, ['m5_CONFIG_EXPR'])
    
-   / For a while, remain backward-compatible with M4 parameterization.
-   macro(import_m4_params, ['m4_ifdef(m4_m4prefix(['$1']), ['m5_var(['$1'], m4_defn(m4_m4prefix(['$1'])))'])m5_if($# > 1, ['$0(m5_shift($@))'])'])  /// TODO
-   import_m4_params(PROG_NAME, ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
-                    BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_MEM_REPLAY_BUBBLE, EXTRA_MORE_TO_DO_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
-                    EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
-                    EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
-                    REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
-                    DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, NO_COUNTER_CSRS, UETRV_PCORE,
-                    IMPLEMENT_REG0)
+   / For a while, remain backward-compatible with M4 parameterization (M4_<param> definitions).
+   / TODO: Remove this backward compatibility.
+   for(Param, ['
+      PROG_NAME, ISA, EXT_F, EXT_E, EXT_M, EXT_B, NUM_CORES, NUM_VCS, NUM_PRIOS, MAX_PACKET_SIZE, soft_reset, cpu_blocked,
+      BRANCH_PRED, EXTRA_REPLAY_BUBBLE, EXTRA_MEM_REPLAY_BUBBLE, EXTRA_MORE_TO_DO_BUBBLE, EXTRA_PRED_TAKEN_BUBBLE, EXTRA_JUMP_BUBBLE,
+      EXTRA_BRANCH_BUBBLE, EXTRA_INDIRECT_JUMP_BUBBLE, EXTRA_NON_PIPELINED_BUBBLE,
+      EXTRA_TRAP_BUBBLE, NEXT_PC_STAGE, FETCH_STAGE, DECODE_STAGE, BRANCH_PRED_STAGE,
+      REG_RD_STAGE, EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE, LD_RETURN_ALIGN,
+      DMEM_STYLE, IMEM_STYLE, VIZ, FORMAL, NO_COUNTER_CSRS, UETRV_PCORE,
+      IMPLEMENT_REG0
+   '], [
+      if(m4_ifdef(m4_m4prefix(m5_Param), 1, 0), [
+         var(m5_Param, m4_defn(m4_m4prefix(m5_Param)))
+      ])
+   ])
    
    / TODO: A convenient hack for local development that can be removed.
    var(local, 0)
@@ -318,8 +324,8 @@
 
    / Default parameters for formal verification continuous integration testing.
    / FORMAL is only used within Makerchip in debug mode (for VIZ).
-   default_var(FORMAL, 0)  // Uncomment to test formal verification in Makerchip.
-   default_var(NO_COUNTER_CSRS, m5_FORMAL)  // This can avoid new (and uninteresting) states for formal, I think.
+   default_var(FORMAL, 0)  /// Set to 1 to test formal verification in Makerchip.
+   default_var(NO_COUNTER_CSRS, m5_FORMAL)  /// This can avoid new (and uninteresting) states for formal, I think.
    if_eq(m5_FORMAL, 1, [
       default_var(
          ISA, RISCV,
@@ -559,12 +565,10 @@
       EXT_B, 0)
 
    
-   default_var(VIZ, 0)   // Default to 0 unless already defaulted to 1, based on ISA.
+   default_var(VIZ, 0)   /// Default to 0 unless already defaulted to 1, based on ISA.
    default_var(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
      PROG_NAME, m5_if_eq(m5_ISA, RISCV, m5_if_eq(m5_EXT_F, 1, fpu_test, m5_if_eq(m5_EXT_M, 1, divmul_test, m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
-   /m5_if_eq(m5_EXT_F, 1, fpu_test, cnt10)
-   /m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10)
 
    / =====Done Defining Configuration=====
    
@@ -580,7 +584,7 @@
       define_hier(PRIO, m5_NUM_PRIOS)
 
       / RISC-V Only
-      if_eq(m5_ISA, ['RISCV'], [''], ['m5_errprint_nl(['Multi-core supported for RISC-V only.'])'])
+      error_if(m5_neq(m5_ISA, RISCV), ['Multi-core supported for RISC-V only.'])
       
       / Headere flit fields. 
       define_vector_with_fields(FLIT, 32, UNUSED, m5_calc(m5_CORE_INDEX_CNT * 2 + m5_VC_INDEX_CNT), VC, m5_calc(m5_CORE_INDEX_CNT * 2), SRC, m5_CORE_INDEX_CNT, DEST, 0)
@@ -635,11 +639,15 @@
         NO_FETCH_BUBBLES, 0)
    
    var(stages_js, [''])
-   / Define stages
-   /   $1: VIZ left of stage in diagram
-   /   $2: Stage name
-   /   $3: Next $1
-   macro(stages, ['m5_if_eq(['$2'],,,['m5_append_var(stages_js, ['defineStage("$2", ']m5_get($2_STAGE) - m5_NEXT_PC_STAGE[', $1, $3); '])m5_stages(m5_shift(m5_shift($@)))'])'])
+   / Define stages for VIZ, appending to stages_js.
+   / Args are (Left, Name) pairs for each stage, followed by the right edge of the last stage.
+   fn(stages, Left: VIZ left of stage in diagram, ?Name: stage name, ..., {
+      if_neq(m5_Name, [''], {
+         / The stage spans from its left to the left of the next stage ($1).
+         append_var(stages_js, ['defineStage("']m5_Name['", ']m5_get(m5_Name['_STAGE']) - m5_NEXT_PC_STAGE[', ']m5_Left[', $1); '])
+         on_return(stages, $@)
+      })
+   })
    stages(
       8.5, NEXT_PC,
       13, FETCH,
@@ -695,10 +703,8 @@
 
    / Check that expressions are ordered.
    fn(ordered, ..., {
-      if_eq(['$2'], [''], [''], {
-         if(m5_get($1) > m5_get($2), {
-            errprint(['$1 (']m5_get($1)[') is greater than $2 (']m5_get($2)[').']m5_nl)
-         })
+      if_neq(['$2'], [''], {
+         error_if(m5_get($1) > m5_get($2), ['$1 (']m5_get($1)[') is greater than $2 (']m5_get($2)[').'])
          ordered(m5_shift($@))
       })
    })
@@ -707,7 +713,7 @@
            EXECUTE_STAGE, RESULT_STAGE, REG_WR_STAGE, MEM_WR_STAGE)
 
    / Check reg bypass limit
-   if(m5_REG_BYPASS_STAGES > 3, ['m5_errprint(['Too many stages of register bypass (']m5_REG_BYPASS_STAGES[').'])'])
+   error_if(m5_REG_BYPASS_STAGES > 3, ['Too many stages of register bypass (']m5_REG_BYPASS_STAGES[').'])
    
 
 
@@ -725,7 +731,7 @@
 
    / Macros for ISA-specific code.
    
-   var(isa, m5_translit(m5_ISA, ['A-Z'], ['a-z']))   // A lower-case version of ISA.
+   var(isa, m5_lowercase(m5_ISA))   /// A lower-case version of ISA.
    
    / Instruction Memory macros are responsible for providing the instruction memory
    / interface for fetch, as:
@@ -860,13 +866,12 @@
    / Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
    / See redirection logic for more detail.
    / Create several defines with items per redirect condition.
-   var(NUM_REDIRECT_CONDITIONS, 0)  /// Incremented for each condition.
+   / Each argument is a quoted list of arguments for process_redirect_condition.
    macro(process_redirect_conditions, [
-      if_eq(['$@'], ['['']'], [''], [
-         process_redirect_condition($1, m5_NUM_REDIRECT_CONDITIONS)
+      if_neq(['$@'], ['['']'], [
+         process_redirect_condition($1)
          process_redirect_conditions(m5_shift($@))
       ])
-      var(NUM_REDIRECT_CONDITIONS, m5_calc(m5_NUM_REDIRECT_CONDITIONS + 1))
    ])
    var(MAX_REDIRECT_BUBBLES, m5_TRAP_BUBBLES)
    
@@ -905,7 +910,6 @@
       prepend_var(redirect_pc_terms,
                   m5_cond_sig()[' ? {>>']m5_get($1_BUBBLES)['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
       if(['$4'], [
-         /m5_def(ABORT_BEFORE_$1, m5_abort_terms)   // The instruction was aborted prior to this abort condition.
          append_var(abort_terms, [' || $2'])
          append_macro(redirect_masking_triggers,
                       ['[' || >>m5_get(m5_bubbles']['_BUBBLES)']$2'])
@@ -1750,11 +1754,10 @@
             logic [40*8-1:0] instr_strs [0:m5_NUM_INSTRS];
             
             m5_repeat(m5_NUM_INSTRS, ['assign instrs[m5_LoopCnt] = m5_eval(m5_eval(m5_get(['instr']m5_LoopCnt))); '])
-            ///m4_forloop(['m5_\instr_ind'], 0, m5_NUM_INSTRS, ['assign instrs[m5_instr_ind] = m5_eval(m5_eval(m5_get(['instr']m5_instr_ind))); '])
             
             // String representations of the instructions for debug, complicated by the need for "\" before "%".
             m5_repeat(m5_NUM_INSTRS,
-                      ['assign instr_strs[m5_LoopCnt] = "m5_for_each_regex(m5_eval(['m5_get(['instr_str']m5_LoopCnt)']), ['\([^%]*\)\(%?\)'], (pre, percent), ['m5_pre\m5_if_eq(m5_percent, ['%'], ['\%'])'])"; '])
+                      ['assign instr_strs[m5_LoopCnt] = "m5_for_each_regex(m5_get(['instr_str']m5_LoopCnt), ['\([^%]*\)\(%?\)'], (pre, percent), ['m5_pre\m5_if_eq(m5_percent, ['%'], ['\%'])'])"; '])
             assign instr_strs[m5_NUM_INSTRS] = "END                                     ";
          
          |fetch
@@ -1780,12 +1783,12 @@
    @m5_EXECUTE_STAGE
       // CSR update. Counting on synthesis to optimize each bit, based on writable_mask.
       // Conditionally include code for h/w and s/w write based on side_effect param (0 - s/w, 1 - s/w + h/w, RO - neither).
-      m5_var(THIS_CSR_RANGE, m5_eval(['m5_get(['CSR_']m5_uppercase(csr_name)['_RANGE'])']))
+      m5_var(THIS_CSR_RANGE, m5_get(['CSR_']m5_uppercase(csr_name)['_RANGE']))
       
       m5+ifelse(side_effects, 1,
          \TLV
             // hw_wr_mask conditioned by hw_wr.
-            $csr_['']csr_name['']_hw_wr_en_mask[m5_THIS_CSR_RANGE] = {m5_eval(['m5_get(['CSR_']m5_uppercase(csr_name)['_HIGH'])']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
+            $csr_['']csr_name['']_hw_wr_en_mask[m5_THIS_CSR_RANGE] = {m5_get(['CSR_']m5_uppercase(csr_name)['_HIGH']){$csr_['']csr_name['']_hw_wr}} & $csr_['']csr_name['']_hw_wr_mask;
             // The CSR value, updated by side-effect writes.
             $upd_csr_['']csr_name[m5_THIS_CSR_RANGE] =
                  ($csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name['']_hw_wr_value) | (~ $csr_['']csr_name['']_hw_wr_en_mask & $csr_['']csr_name);
@@ -3441,9 +3444,15 @@ Outputs:
    fn(np_term, ext, cond_sig, mul, div, fpu, clmul, crc, latency, {
       ~if(m5_ext, {
          ~(>>m5_NON_PIPELINED_LATENCY\m5_cond_sig ? {)
-         ~if(m5_EXT_M, ['['1'b']m5_mul[', 1'b']m5_div[', ']'])
-         ~if(m5_EXT_F, ['['1'b']m5_fpu[', ']'])
-         ~if(m5_EXT_B, ['['1'b']m5_clmul[', 1'b']m5_crc[', ']'])
+         ~if(m5_EXT_M, [
+            ~(['1'b']m5_mul[', 1'b']m5_div[', '])
+         ])
+         ~if(m5_EXT_F, [
+            ~(['1'b']m5_fpu[', '])
+         ])
+         ~if(m5_EXT_B, [
+            ~(['1'b']m5_clmul[', 1'b']m5_crc[', '])
+         ])
          ~(6'd\m5_calc(m5_get(m5_latency) - m5_NON_PIPELINED_LATENCY + 1)} :)
       })
    })
@@ -4322,7 +4331,7 @@ Outputs:
             $header_flit[31:0] = {{m5_FLIT_UNUSED_CNT{1'b0}},
                                   $vc,
                                   $src,
-                                  $csr_pktdest[m5_eval(m5_CORE_INDEX_RANGE)]
+                                  $csr_pktdest[m5_CORE_INDEX_RANGE]
                                  };
          /flit
              // TODO. ADD a WHEN condition.
@@ -4479,12 +4488,11 @@ Outputs:
 ///          {..., $dest} = $head ? $data[..];
 ///          $acceptable = $dest
 \TLV insertion_ring(/_hop, |_in, @_in, |_out, @_out, $_reset, |_name, /_flit, #_hop_dist, #_depth)
-   m4_push(in_delay, m4_defaulted_arg(#_in_delay, 0))
-   m4_push(hop_dist, m4_defaulted_arg(#_hop_dist, 1))
-   m4_push(hop_name, m5_strip_prefix(/_hop))
-   /// Get a parameter of the hop hierarchy.
-   m5_push_macro(hop_param, ['m5_get(m5_translit(']m4_hop_name[', ['a-z'], ['A-Z'])_$']['1)'])
-   m4_push(prev_hop_index, (m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT))
+   m5_push_var(hop_dist, m5_if_eq(#_hop_dist, [''], 1, #_hop_dist))
+   m5_push_var(hop_name, m5_strip_prefix(/_hop))
+   /// Parameters of the hop hierarchy.
+   m5_push_var(hop_cnt, m5_get(m5_uppercase(m5_hop_name)_CNT))
+   m5_push_var(hop_index_range, m5_get(m5_uppercase(m5_hop_name)_INDEX_RANGE))
    
    // ========
    // The Flow
@@ -4495,16 +4503,16 @@ Outputs:
    // Block head flit if FIFO not empty.
    m5+connect(/_hop, |_name['']_in_present, @0, |_name['']_node_to_fifo, @0, /_flit, [''], ['|| (! /_hop|_name['']_fifo_in<>0$would_bypass && $head)'])
    // Pipeline for ring hop.
-   m5+pipe(ff, m4_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
+   m5+pipe(ff, m5_hop_dist, /_hop, |_name, @0, |_name['']_leaving, @0, /_flit)
    // Connect hops in a ring.
    |_name['']_arriving
       @0
-         $ANY = /_hop[(#m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT)]|_name['']_leaving<>0$ANY;
+         $ANY = /_hop[(#m5_hop_name + m5_hop_cnt - 1) % m5_hop_cnt]|_name['']_leaving<>0$ANY;
          /_flit
-            $ANY = /_hop[(#m4_hop_name + m5_hop_param(CNT) - 1) % m5_hop_param(CNT)]|_name['']_leaving/_flit<>0$ANY;
+            $ANY = /_hop[(#m5_hop_name + m5_hop_cnt - 1) % m5_hop_cnt]|_name['']_leaving/_flit<>0$ANY;
    |_name['']_leaving
       @0
-         $blocked = /_hop[(#m4_hop_name + 1) % m5_hop_param(CNT)]|_name['']_arriving<>0$blocked;
+         $blocked = /_hop[(#m5_hop_name + 1) % m5_hop_cnt]|_name['']_arriving<>0$blocked;
    // Fork off ring
    m5+fork(/_hop, |_name['']_arriving, @0, $head_out_inv, |_name['']_continuing, @0, $true, |_out, @_out, /_flit)
    
@@ -4527,7 +4535,7 @@ Outputs:
    |_name['']_arriving
       @0
          // Characterize arriving flit (head/tail/body, header)
-         {$vc[m5_VC_INDEX_RANGE], $dest[m5_hop_param(INDEX_RANGE)]} =
+         {$vc[m5_VC_INDEX_RANGE], $dest[m5_hop_index_range]} =
             $reset  ? '0 :
             ! $body ? {/flit$flit[m5_FLIT_VC_RANGE], /flit$flit[m5_FLIT_DEST_RANGE]} :
                       {>>1$vc, >>1$dest};
@@ -4538,7 +4546,7 @@ Outputs:
          $valid_tail = $accepted && /flit$tail;
          // The ring is expanded through the insertion FIFO (or one additional staging flop before it)
          // Asserts with the first absorbed flit, deasserts for the first flit that can stay on the ring.
-         $valid_dest = $dest == #m4_hop_name;
+         $valid_dest = $dest == #m5_hop_name;
          $head_out = ! /_hop|_out<>0$blocked && $valid_dest;
          $head_out_inv = ! $head_out;
          $true = 1'b1; // (ok signal for fork along out path)
@@ -4565,15 +4573,14 @@ Outputs:
               $would_bypass ? 1'b0 :
                    $RETAIN;
 
-   m4_pop(in_delay)
-   m4_pop(hop_dist)
-   m4_pop(hop_name)
-   m5_pop_macro(hop_param)
-   m4_pop(prev_hop_index)
+   m5_pop(hop_dist)
+   m5_pop(hop_name)
+   m5_pop(hop_cnt)
+   m5_pop(hop_index_range)
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
    m5+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
-   m4_push(trans_ind, m5_if_eq(/_trans, [''], [''], ['   ']))
+   m5_push_var(trans_ind, m5_if_eq(/_trans, [''], [''], ['   ']))
    // In1 is blocked if output is blocked.
    // In1 is blocked if output is blocked or in2 is available.
    |_in1
@@ -4594,9 +4601,9 @@ Outputs:
                   /_top|_in2>>m5_align(@_in2, @_out)$avail;
          ?$avail
             /_trans
-         m4_trans_ind   $ANY = /_top|_in1>>m5_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m5_align(@_in1, @_out)$ANY :
+         m5_trans_ind   $ANY = /_top|_in1>>m5_align(@_in1, @_out)$avail ? /_top|_in1/_trans>>m5_align(@_in1, @_out)$ANY :
                                                                           /_top|_in2/_trans>>m5_align(@_in2, @_out)$ANY;
-   m4_pop(trans_ind)
+   m5_pop(trans_ind)
    
    
 // Can be used to build for many-core without a NoC (during development).
@@ -4741,29 +4748,13 @@ Outputs:
       / Export the values consumed outside this fn into the caller's (cpu_viz's) scope. The
       / values are captured here (as literals) and declared on return, so the child viz macros
       / (instruction_in_memory, source_code_viz, assembly_viz, instruction, cpu_viz) see them.
-      on_return(var, ImemPadL, m5_ImemPadL)
-      on_return(var, ImemPadR, m5_ImemPadR)
-      on_return(var, ImemTitleH, m5_ImemTitleH)
-      on_return(var, ImemLineH, m5_ImemLineH)
-      on_return(var, ImemUnproc, m5_ImemUnproc)
-      on_return(var, ImemSource, m5_ImemSource)
-      on_return(var, ImemBinW, m5_ImemBinW)
-      on_return(var, ImemProcW, m5_ImemProcW)
-      on_return(var, ImemUnprocW, m5_ImemUnprocW)
-      on_return(var, ImemSourceW, m5_ImemSourceW)
-      on_return(var, ImemProcLeft, m5_ImemProcLeft)
-      on_return(var, ImemBinLeft, m5_ImemBinLeft)
-      on_return(var, ImemVizWidth, m5_ImemVizWidth)
-      on_return(var, ImemVizHeight, m5_ImemVizHeight)
-      on_return(var, AsmBoxW, m5_AsmBoxW)
-      on_return(var, AsmBoxH, m5_AsmBoxH)
-      on_return(var, SrcBoxW, m5_SrcBoxW)
-      on_return(var, ImemRowTop, m5_ImemRowTop)
-      on_return(var, SrcWhereLeft, m5_SrcWhereLeft)
-      on_return(var, AsmWhereLeft, m5_AsmWhereLeft)
-      on_return(var, ImemWhereLeft, m5_ImemWhereLeft)
-      on_return(var, VizRightShift, m5_VizRightShift)
-      on_return(var, VizClusterShift, m5_VizClusterShift)
+      for(Name, ['
+         ImemPadL, ImemPadR, ImemTitleH, ImemLineH, ImemUnproc, ImemSource, ImemBinW, ImemProcW, ImemUnprocW,
+         ImemSourceW, ImemProcLeft, ImemBinLeft, ImemVizWidth, ImemVizHeight, AsmBoxW, AsmBoxH, SrcBoxW,
+         ImemRowTop, SrcWhereLeft, AsmWhereLeft, ImemWhereLeft, VizRightShift, VizClusterShift
+      '], [
+         on_return(var, m5_Name, m5_get(m5_Name))
+      ])
    })
 \TLV instruction_in_memory(|_top, _where_)
    /instr_mem[m5_calc(m5_NUM_INSTRS-1):0]
@@ -4937,7 +4928,7 @@ Outputs:
                fill: "white",
                visible: false
             })
-            let unprocLines = [m5_repeat(m5_NUM_ASM_LINES, ['"m5_for_each_regex(m5_eval(['m5_get(['instr_asm_line']m5_LoopCnt)']), ['\([^\\"]*\)\([\\"]?\)'], (pre, spec), ['m5_pre\m5_if_eq(m5_spec, [''], [''], ['\']m5_spec)'])", '])]
+            let unprocLines = [m5_repeat(m5_NUM_ASM_LINES, ['"m5_for_each_regex(m5_get(['instr_asm_line']m5_LoopCnt), ['\([^\\"]*\)\([\\"]?\)'], (pre, spec), ['m5_pre\m5_if_eq(m5_spec, [''], [''], ['\']m5_spec)'])", '])]
             objs.asm_text = new fabric.Text(unprocLines.join("\n"), {
                top: m5_ImemTitleH,
                left: m5_ImemPadL,
@@ -5044,11 +5035,11 @@ Outputs:
       // There is an issue (#406) with \viz code indexing causing signals to be packed, and if a packed value
       // has different fields on different clocks, Verilator throws warnings.
       // These are unconditioned versions of the problematic signals.
-      $unconditioned_reg[m5_eval(['m5_get(']m5_uppercase(_sig_prefix)REGS_INDEX_RANGE))] = $reg;
+      $unconditioned_reg[m5_get(m5_uppercase(_sig_prefix)REGS_INDEX_RANGE)] = $reg;
       $unconditioned_is_reg = $is_reg;
       $unconditioned_reg_value[m5_WORD_RANGE] = $reg_value;
    m5_var(rf_type, m5_if_eq(_sig_prefix, [''], x, f))
-   /regs[m5_eval(['m5_get(']m5_uppercase(_sig_prefix)REGS_RANGE))]
+   /regs[m5_get(m5_uppercase(_sig_prefix)REGS_RANGE)]
       \viz_js
          all: {
             box: {
