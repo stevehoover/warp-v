@@ -4,6 +4,9 @@
   command = "yarn build"
   # Publish path is relative to `base`, i.e. configurator/build.
   publish = "build"
+  # Skip the build unless the configurator (or this file) changed. (Runs from `base`; exit 0 skips.) This replaces
+  # Netlify's built-in base-directory check, which reports skipped production deploys as "Failed".
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- . ../netlify.toml"
 
 [build.environment]
   # CRA 4 / webpack 4 don't build on Netlify's default Node 22 runner.
