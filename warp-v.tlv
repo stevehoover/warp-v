@@ -568,7 +568,7 @@
    default_var(VIZ, 0)   /// Default to 0 unless already defaulted to 1, based on ISA.
    default_var(
      ['# Which program to assemble. The default depends on the ISA extension(s) choice.'],
-     PROG_NAME, m5_if_eq(m5_ISA, RISCV, m5_if_eq(m5_EXT_F, 1, fpu_test, m5_if_eq(m5_EXT_M, 1, divmul_test, m5_if_eq(m5_EXT_B, 1, bmi_test, cnt10))), cnt10))
+     PROG_NAME, m5_if(m5_neq(m5_ISA, RISCV), cnt10, m5_EXT_F, fpu_test, m5_EXT_M, divmul_test, m5_EXT_B, bmi_test, cnt10))
 
    / =====Done Defining Configuration=====
    
@@ -851,7 +851,7 @@
 
    / Redirects are described in the TLV code. Supporting macro definitions are here.
 
-   / m5_process_redirect_conditions appends definitions to the following macros whose initial values are given here.
+   / m5_process_redirect_condition appends definitions to the following variables whose initial values are given here.
    var(NEGATIVE_ONE, -1)
    var(redirect_list, ['NEGATIVE_ONE'])  /// list fed to m5_ordered
    var(redirect_squash_terms, [''])      /// & terms to apply to $GoodPathMask, each reflects the redirect shadow and abort of a trigger that becomes visible.
@@ -859,80 +859,88 @@
    var(redirect_pc_conditions, [''])     /// multiline assignments for terary conditions used by redirect_pc_terms.
    var(redirect_pc_terms, [''])          /// ternary operator terms for redirecting PC (later-stage redirects must be first)
    var(abort_terms, ['1'b0'])            /// || terms for an instruction's abort conditions
-   macro(redirect_masking_triggers, ['1'b0']) /// || terms combining earlier aborting triggers on the same instruction, using "$1" for alignment.
-                                              /// Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
-   var(redirect_viz, [''])                  /// JS code to provide parameters for visualization of the waterfall diagram.
-   var(redirect_cell_viz, [''])             /// JS code to provide parameters for visualization of a cell of waterfall diagram.
-   / Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
-   / See redirection logic for more detail.
-   / Create several defines with items per redirect condition.
-   / Each argument is a quoted list of arguments for process_redirect_condition.
-   macro(process_redirect_conditions, [
-      if_neq(['$@'], ['['']'], [
-         process_redirect_condition($1)
-         process_redirect_conditions(m5_shift($@))
+   var(aborting_redirect_triggers, [''])  /// list of the trigger signals of the aborting redirects processed so far
+   var(redirect_viz, [''])               /// JS code to provide parameters for visualization of the waterfall diagram.
+   var(redirect_cell_viz, [''])          /// JS code to provide parameters for visualization of a cell of waterfall diagram.
+   
+   / || terms combining earlier aborting triggers on the same instruction, aligned for the given number of bubbles.
+   / Each trigger uses this term as it is built to mask its effect, so aborting triggers have the final say.
+   fn(redirect_masking_triggers, Bubbles, {
+      ~(['1'b0'])
+      ~for(AbortingTrigger, m5_aborting_redirect_triggers, [
+         ~([' || >>']m5_Bubbles\m5_AbortingTrigger)
       ])
-   ])
+   })
+   
    var(MAX_REDIRECT_BUBBLES, m5_TRAP_BUBBLES)
    
    / PC redirect conditions. Produce redirect conditions logic as a \TLV block.
-   TLV_fn(redirect_conditions, ['m5_redirect_pc_conditions'])
+   TLV_fn(redirect_conditions, {
+      ~redirect_pc_conditions
+   })
 
-   / Called by m5_process_redirect_conditions (plural) for each redirect condition from fewest bubbles to most to append
-   / to various definitions, initialized above.
+   / Called for each redirect condition from fewest bubbles to most to append to various definitions, initialized above.
    / Args:
-   /   $1: name of define of number of bubble cycles (The same name can be used multiple times, but once per aborting redirect.)
-   /   $2: condition signal of triggering instr. This condition must be explicitly masked by earlier
-   /       trigger conditions that take priority.
-   /   $3: target PC signal of triggering instruction
-   /   $4: 1 for an aborting redirect (0 otherwise)
-   /   $5: VIZ text  for redirect bullet
-   /   $6: VIZ color for redirect bullet
-   /   $7: VIZ bullet left
-   /   $8: VIZ bullet top
-   /   $9: 1 for bad-path redirects (used by RVFI only)
-   /   $10: (opt) ['wait'] to freeze fetch until subsequent redirect
-   macro(process_redirect_condition, [
-      / expression in @m5_NEXT_PC_STAGE asserting for the redirect condition.
+   /   Name: name of define of number of bubble cycles (The same name can be used multiple times, but once per aborting redirect.)
+   /   Trigger: condition signal of triggering instr. This condition must be explicitly masked by earlier
+   /            trigger conditions that take priority.
+   /   Target: target PC signal of triggering instruction
+   /   Aborting: 1 for an aborting redirect (0 otherwise)
+   /   VizText: VIZ text  for redirect bullet
+   /   VizColor: VIZ color for redirect bullet
+   /   VizLeft: VIZ bullet left
+   /   VizTop: VIZ bullet top
+   /   BadPath: 1 for bad-path redirects (used by RVFI only)
+   /   Wait: (opt) ['wait'] to freeze fetch until subsequent redirect
+   fn(process_redirect_condition, Name, Trigger, Target, Aborting, VizText, VizColor, VizLeft, VizTop, BadPath, ?Wait, {
+      var(Bubbles, m5_get(m5_Name['_BUBBLES']))
+      var(CondSig, m5_Trigger['_cond'])
+      append_var(redirect_list, [', ']m5_Name['_BUBBLES'])
+      append_var(redirect_squash_terms,
+                 [' & (']m5_CondSig[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_Bubbles - m5_Aborting)['{1'b1}}, {']m5_calc(m5_Bubbles + m5_Aborting)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+      append_var(redirect_shadow_terms,
+                 [' & (']m5_CondSig[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_Bubbles - m5_BadPath)['{1'b1}}, {']m5_calc(m5_Bubbles + m5_BadPath)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
+      / Expression in @m5_NEXT_PC_STAGE asserting for the redirect condition.
       / = instruction triggers this condition && it's on the current path && it's not masked by an earlier aborting redirect
       /   of this instruction.
-      / Params: $@ (m5_redirect_masking_triggers contains param use)
-      fn(redir_cond, bubbles,
-         ['(>>']m5_get($1_BUBBLES)['$2 && !(']m5_redirect_masking_triggers()[') && $GoodPathMask'][m5_get($1_BUBBLES)][')'])
-      macro(cond_sig, ['$2_cond'])
-      append_var(redirect_list, [', $1_BUBBLES'])
-      append_var(redirect_squash_terms,
-                 [' & (']m5_cond_sig()[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_get($1_BUBBLES) - $4)['{1'b1}}, {']m5_calc(m5_get($1_BUBBLES) + $4)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
-      append_var(redirect_shadow_terms,
-                 [' & (']m5_cond_sig()[' ? {{']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1 - m5_get($1_BUBBLES) - $9)['{1'b1}}, {']m5_calc(m5_get($1_BUBBLES) + $9)['{1'b0}}} : {']m5_calc(m5_MAX_REDIRECT_BUBBLES + 1)['{1'b1}})'])
       prepend_var(redirect_pc_conditions,
-                  m5_cond_sig()[' = ']m5_redir_cond(['$1']);m5_nl)
+                  m5_CondSig[' = (>>']m5_Bubbles\m5_Trigger[' && !(']m5_redirect_masking_triggers(m5_Bubbles)[') && $GoodPathMask'][m5_Bubbles][');']m5_nl)
       prepend_var(redirect_pc_terms,
-                  m5_cond_sig()[' ? {>>']m5_get($1_BUBBLES)['$3, ']m5_if_eq($10, wait, 1'b1, 1'b0)['} : '])
-      if(['$4'], [
-         append_var(abort_terms, [' || $2'])
-         append_macro(redirect_masking_triggers,
-                      ['[' || >>m5_get(m5_bubbles']['_BUBBLES)']$2'])
+                  m5_CondSig[' ? {>>']m5_Bubbles\m5_Target[', ']m5_if_eq(m5_Wait, wait, 1'b1, 1'b0)['} : '])
+      if(m5_Aborting, [
+         append_var(abort_terms, [' || ']m5_Trigger)
+         append_var(aborting_redirect_triggers, m5_Trigger[', '])
       ])
       append_var(redirect_viz,
-                ['ret.$2 = redirect_cond("$2", $5, $6, $7, $8); '])
+                 ['ret.']m5_Trigger[' = redirect_cond("']m5_Trigger['", ']m5_VizText[', ']m5_VizColor[', ']m5_VizLeft[', ']m5_VizTop['); '])
       append_var(redirect_cell_viz,
-                ['if (stage == ']m5_get($1_BUBBLES)[') {ret = ret.concat(render_redir("$2", '/instr$2', $5, $6, ']m5_if_defined_as(EXTRA_$1_BUBBLE, 1, 1, 0)['))}; '])
-   ])
+                 ['if (stage == ']m5_Bubbles[') {ret = ret.concat(render_redir("']m5_Trigger['", '/instr']m5_Trigger['', ']m5_VizText[', ']m5_VizColor[', ']m5_if_defined_as(['EXTRA_']m5_Name['_BUBBLE'], 1, 1, 0)['))}; '])
+   })
 
-   process_redirect_conditions(
-      ['NO_FETCH, $no_fetch, $Pc, 1, "...", "red", 11.8, 30, 1, wait'],
-      ['SECOND_ISSUE, $second_issue, $Pc, 1, "2nd", "orange", 11.8, 26.2, 1'],
-      m5_if(m5_MORE_TO_DO_SUPPORTED, ['['MORE_TO_DO, $more_to_do, $more_to_do_pc, 0, "16b", "#d0f000", 26, 51, 0'],'])
-      m5_if_neq(m5_BRANCH_PRED, fallthrough, ['['PRED_TAKEN, $pred_taken_branch, $branch_target, 0, "PT", "#0080ff", 37.4, 26.2, 0'],'])
-      ['REPLAY, $replay, $Pc, 1, "Re", "#ff8000", 50, 29.1, 1'],
-      m5_if(m5_MEM_REPLAYS, ['['MEM_REPLAY, $mem_replay, $Pc, 1, "M", "#60c060", 62, 53, 1'],'])
-      ['JUMP, $jump, $jump_target, 0, "Jp", "purple", 61, 11, 0'],
-      ['BRANCH, $mispred_branch, $branch_redir_pc, 0, "Br", "blue", 70, 20, 0'],
-      m5_if_eq(m5_HAS_INDIRECT_JUMP, 1, ['['INDIRECT_JUMP, $indirect_jump, $indirect_jump_target, 0, "IJ", "purple", 68, 16, 0'],'], [''])
-      ['NON_PIPELINED, $non_pipelined, $pc_inc, 0, "NP", "red", 75.6, 25, 0, wait'],   /// Note: This is left visible to RVFI here, but hidden explicity if not aborted.
-      ['TRAP, $aborting_trap, $trap_target, 1, "AT", "#ff0080", 75.6, 7, 0'],
-      ['TRAP, $non_aborting_trap, $trap_target, 0, "T", "#ff0080", 75.6, 12, 0'])
+   / Redirection conditions. These conditions must be defined from fewest bubble cycles to most.
+   / See redirection logic for more detail.
+   /                          Name,          Trigger,             Target,                Aborting, VizText, VizColor,  VizLeft, VizTop, BadPath, Wait
+   process_redirect_condition(NO_FETCH,      $no_fetch,           $Pc,                   1,        "...",   "red",     11.8,    30,     1,       wait)
+   process_redirect_condition(SECOND_ISSUE,  $second_issue,       $Pc,                   1,        "2nd",   "orange",  11.8,    26.2,   1)
+   if(m5_MORE_TO_DO_SUPPORTED, [
+      process_redirect_condition(MORE_TO_DO, $more_to_do,         $more_to_do_pc,        0,        "16b",   "#d0f000", 26,      51,     0)
+   ])
+   if_neq(m5_BRANCH_PRED, fallthrough, [
+      process_redirect_condition(PRED_TAKEN, $pred_taken_branch,  $branch_target,        0,        "PT",    "#0080ff", 37.4,    26.2,   0)
+   ])
+   process_redirect_condition(REPLAY,        $replay,             $Pc,                   1,        "Re",    "#ff8000", 50,      29.1,   1)
+   if(m5_MEM_REPLAYS, [
+      process_redirect_condition(MEM_REPLAY, $mem_replay,         $Pc,                   1,        "M",     "#60c060", 62,      53,     1)
+   ])
+   process_redirect_condition(JUMP,          $jump,               $jump_target,          0,        "Jp",    "purple",  61,      11,     0)
+   process_redirect_condition(BRANCH,        $mispred_branch,     $branch_redir_pc,      0,        "Br",    "blue",    70,      20,     0)
+   if(m5_HAS_INDIRECT_JUMP, [
+      process_redirect_condition(INDIRECT_JUMP, $indirect_jump,   $indirect_jump_target, 0,        "IJ",    "purple",  68,      16,     0)
+   ])
+   / Note: NON_PIPELINED is left visible to RVFI here, but hidden explicity if not aborted.
+   process_redirect_condition(NON_PIPELINED, $non_pipelined,      $pc_inc,               0,        "NP",    "red",     75.6,    25,     0,       wait)
+   process_redirect_condition(TRAP,          $aborting_trap,      $trap_target,          1,        "AT",    "#ff0080", 75.6,    7,      0)
+   process_redirect_condition(TRAP,          $non_aborting_trap,  $trap_target,          0,        "T",     "#ff0080", 75.6,    12,     0)
 
    / Ensure proper order.
    / TODO: It would be great to auto-sort.
@@ -990,18 +998,18 @@
    / Requires provision of: $csr_<name>_hw_[wr, wr_mask, wr_value].
    macro(define_csr, [
         define_vector_with_fields(['CSR_']m5_uppercase(['$1']), $3)
-        append_var(csrs, m5_if_eq(m5_csrs, [''], [''], ['[',']'])['['$1']'])
+        append_var(csrs, m5_if_neq(m5_csrs, [''], ['[',']'])['['$1']'])
         var(csr_$1_args, ['$@'])
         set(csrrx_rslt_expr, ['$is_csr_$1 ? {{']m5_calc(32 - m5_get(['CSR_']m5_uppercase(['$1'])['_CNT']))['{1'b0}}, $csr_$1} : ']m5_csrrx_rslt_expr)
         set(valid_csr_expr, m5_valid_csr_expr[' || $is_csr_$1'])
         / VIZ
         set(csr_viz_init_each, m5_csr_viz_init_each['csr_objs["$1_box"] = new fabric.Rect({top: 40 + 18 * ']m5_num_csrs[', left: 20, fill: "white", width: 175, height: 14, visible: true}); csr_objs["$1"] = new fabric.Text("", {top: 40 + 18 * ']m5_num_csrs[', left: 30, fontSize: 14, fontFamily: "monospace"}); '])
         set(csr_viz_render_each, m5_csr_viz_render_each['let old_val_$1 = '/instr$csr_$1'.asInt(NaN).toString(); let val_$1 = '/instr$csr_$1'.step(1).asInt(NaN).toString(); let $1mod = ']m5_if_eq($6, 1, [''/instr$csr_$1_hw_wr'.asBool(false)'], ['val_$1 === old_val_$1'])['; let $1name = String("$1"); let oldVal$1    = $1mod    ? `(${old_val_$1})` : ""; this.getInitObject("$1").set({text: $1name + ": " + val_$1 + oldVal$1}); this.getInitObject("$1").set({fill: $1mod ? "blue" : "black"}); '])
-        set(num_csrs, m5_calc(m5_num_csrs + 1))
+        increment(num_csrs)
    ])
    
    case(ISA, RISCV, [
-      if_defined_as(NO_COUNTER_CSRS, 1, [''], [
+      unless(m5_NO_COUNTER_CSRS, [
          / TODO: This should move to risc-v_defs (which now has a basic map from name to value for the assembler).
          / Define Counter CSRs
          /         Name        Index       Fields                          Reset Value                    Writable Mask                       Side-Effect Writes
@@ -1162,8 +1170,7 @@
       if_eq(m5_ISA, RISCV, [
          / Functions to append to sv_out. Verilator lint pragmas and SV includes.
          fn(verilator_lint, on_off, tag, [
-            / TODO: Use m4_output_sv_line in place of show...
-            append_var(sv_out, m5_nl['   ']['m4_show(['m5_if(m4_include_url_depth, ['m5_nl['   ']'])['/* verilator lint_']']']m5_on_off m5_tag['['[' */']'])'])
+            append_var(sv_out, m5_nl['   ']['m4_output_sv_line(['/* verilator lint_']']m5_on_off m5_tag['[' */'])'])
          ])
          fn(sv_inc, file, [
             append_var(sv_out, m5_nl['   ']['m4_sv_include_url(m5_warpv_includes']m5_quote(m5_file)[')'])
@@ -1174,9 +1181,13 @@
          
          / Heavy-handed lint_off's based on config.
          / TODO: Clean these up as best possible. Some are due to 3rd-party SV modules.
-         if(m5_EXT_B || m5_EXT_F, m5_verilator_lint(off, WIDTH))
-         if(m5_EXT_B, m5_verilator_lint(off, PINMISSING))
-         if(m5_EXT_B, m5_verilator_lint(off, SELRANGE))
+         if(m5_EXT_B || m5_EXT_F, [
+            verilator_lint(off, WIDTH)
+         ])
+         if(m5_EXT_B, [
+            verilator_lint(off, PINMISSING)
+            verilator_lint(off, SELRANGE)
+         ])
 
          if(m5_EXT_M, [
             if(m5_RISCV_FORMAL_ALTOPS, [
@@ -1613,69 +1624,73 @@
          # ========== End Assembly Code ==========
       '])
    })
-
-\TLV riscv_bmi_test_prog()
-   // /==========================\
-   // | B-extension Test Program |
-   // \==========================/
-   //
-   m5_asm(LUI, x1, 0b01110001010101100000)
-   m5_asm(ADDI, x1, x1, 0b010001000001)
-   m5_asm(ADDI, x2, x2, 0b010001000010)
-   m5_asm(ADDI, x3, x3, 0b010000000011)
-   m5_asm(ANDN, x5, x1, x2)
-   m5_asm(ORN, x6, x1, x2)
-   m5_asm(XNOR, x7, x1, x2)
-   m5_asm(SLO, x8, x1, x2)
-   m5_asm(SRO, x20, x1, x2)
-   m5_asm(ROL, x20, x1, x2)
-   m5_asm(ROR, x9, x1, x2)
-   m5_asm(SBCLR, x10, x1, x2)
-   m5_asm(SBSET, x11, x1, x2)
-   m5_asm(SBINV, x12, x1, x2)
-   m5_asm(SBEXT, x20, x1, x2)
-   m5_asm(GORC, x20, x1, x2)
-   m5_asm(GREV, x13, x1, x2)
-   m5_asm(SLOI, x8, x1, 0b111)
-   m5_asm(SROI, x20, x1, 0b111)
-   m5_asm(RORI, x9, x1, 0b111)
-   m5_asm(SBCLRI, x10, x1, 0b111)
-   m5_asm(SBSETI, x11, x1, 0b111)
-   m5_asm(SBINVI, x12, x1, 0b111)
-   m5_asm(SBEXTI, x20, x1, 0b111)
-   m5_asm(GORCI, x20, x1, 0b111)
-   m5_asm(GREVI, x13, x1, 0b111)
-   m5_asm(CLMUL, x14, x1, x2)
-   m5_asm(CLMULR, x15, x1, x2)
-   m5_asm(CLZ, x19, x1)
-   m5_asm(CTZ, x20, x1)
-   m5_asm(PCNT, x21, x1)
-   m5_asm(CRC32_B, x22, x1)
-   m5_asm(CRC32_H, x23, x1)
-   m5_asm(CRC32_W, x24, x1)
-   m5_asm(CRC32C_B, x26, x1)
-   m5_asm(CRC32C_H, x27, x1)
-   m5_asm(CRC32C_W, x28, x1)
-   m5_asm(MIN, x9, x1, x2)
-   m5_asm(MAX, x10, x1, x2)
-   m5_asm(MINU, x11, x1, x2)
-   m5_asm(MAXU, x12, x1, x2)
-   m5_asm(SHFL, x13, x1, x2)
-   m5_asm(UNSHFL, x14, x1, x2)
-   m5_asm(BDEP, x15, x1, x2)
-   m5_asm(BEXT, x16, x1, x2)
-   m5_asm(PACK, x17, x1, x2)
-   m5_asm(PACKU, x18, x1, x2)
-   m5_asm(PACKH, x19, x1, x2)
-   m5_asm(BFP, x20, x1, x2)
-   m5_asm(SHFLI, x21, x1, 0b11111)
-   m5_asm(UNSHFLI, x22, x1, 0b11111)
-   m5_asm(ORI, zero, zero, 0b0)
    
-// Provides the instruction memory and fetch logic, producing.
-//   |fetch$fetch_word
-//   *instrs[]
-//   *instr_strs[]
+   TLV_fn(riscv_bmi_test_prog, {
+      ~assemble(['
+         # /==========================\
+         # | B-extension Test Program |
+         # \==========================/
+         
+            LUI x1, 0b01110001010101100000
+            ADDI x1, x1, 0b010001000001
+            ADDI x2, x2, 0b010001000010
+            ADDI x3, x3, 0b010000000011
+            ANDN x5, x1, x2
+            ORN x6, x1, x2
+            XNOR x7, x1, x2
+            SLO x8, x1, x2
+            SRO x20, x1, x2
+            ROL x20, x1, x2
+            ROR x9, x1, x2
+            SBCLR x10, x1, x2
+            SBSET x11, x1, x2
+            SBINV x12, x1, x2
+            SBEXT x20, x1, x2
+            GORC x20, x1, x2
+            GREV x13, x1, x2
+            SLOI x8, x1, 0b111
+            SROI x20, x1, 0b111
+            RORI x9, x1, 0b111
+            SBCLRI x10, x1, 0b111
+            SBSETI x11, x1, 0b111
+            SBINVI x12, x1, 0b111
+            SBEXTI x20, x1, 0b111
+            GORCI x20, x1, 0b111
+            GREVI x13, x1, 0b111
+            CLMUL x14, x1, x2
+            CLMULR x15, x1, x2
+            CLZ x19, x1
+            CTZ x20, x1
+            PCNT x21, x1
+            CRC32_B x22, x1
+            CRC32_H x23, x1
+            CRC32_W x24, x1
+            CRC32C_B x26, x1
+            CRC32C_H x27, x1
+            CRC32C_W x28, x1
+            MIN x9, x1, x2
+            MAX x10, x1, x2
+            MINU x11, x1, x2
+            MAXU x12, x1, x2
+            SHFL x13, x1, x2
+            UNSHFL x14, x1, x2
+            BDEP x15, x1, x2
+            BEXT x16, x1, x2
+            PACK x17, x1, x2
+            PACKU x18, x1, x2
+            PACKH x19, x1, x2
+            BFP x20, x1, x2
+            SHFLI x21, x1, 0b11111
+            UNSHFLI x22, x1, 0b11111
+            ORI zero, zero, 0b0
+      '])
+   })
+
+
+/// Provides the instruction memory and fetch logic, producing.
+///   |fetch$fetch_word
+///   *instrs[]
+///   *instr_strs[]
 \TLV riscv_imem(_prog_name)
    
    // ==============
@@ -1819,10 +1834,10 @@
          )
 
 // Define all CSRs.
-\TLV riscv_csrs(csrs)
+\TLV riscv_csrs()
    /// TODO: This doesn't maintain alignment. Need an m5+foreach macro.
-   m4_foreach(['m4_csr'], csrs, ['
-   m5+riscv_csr(m5_eval(m5_get(['csr_']m4_csr['_args'])))
+   m5_for(Csr, m5_csrs, ['
+   m5+riscv_csr(m5_eval(m5_get(['csr_']m5_Csr['_args'])))
    '])
 
 \TLV riscv_csr_logic()
@@ -1834,9 +1849,7 @@
 
    // Counter CSR
    //
-   m5+ifelse(m5_if_defined_as(NO_COUNTER_CSRS, 1, 1, 0), 1,
-      \TLV
-      ,
+   m5+ifelse(m5_NO_COUNTER_CSRS, 0,
       \TLV
          // Count within time unit. This is not reset on writes to time CSR, so time CSR is only accurate to time unit.
          $RemainingCyclesWithinTimeUnit[m5_binary_width(m5_CYCLES_PER_TIME_UNIT)-1:0] <=
@@ -2086,7 +2099,7 @@
       /src[2:1]
          // Reg valid for this source, based on instruction type.
          $is_reg =
-             m5_if(m5_EXT_F, (! /instr$fpu_type_instr || /instr$fpu_instr_with_int_src || ((#src == 1) && /instr$fpu_instr_with_int_src1)) &&)
+             m5_if(m5_EXT_F, ['(! /instr$fpu_type_instr || /instr$fpu_instr_with_int_src || ((#src == 1) && /instr$fpu_instr_with_int_src1)) &&'])
              (/instr$is_r_type || /instr$is_r4_type || (/instr$is_i_type && (#src == 1)) || /instr$is_r2_type || /instr$is_s_type || /instr$is_b_type);
          $reg[m5_REGS_INDEX_RANGE] = (#src == 1) ? /instr$raw_rs1[m5_REGS_INDEX_RANGE] : /instr$raw_rs2[m5_REGS_INDEX_RANGE];
          
@@ -2279,23 +2292,24 @@
          )
 
       // hold_inst scope is not needed when long latency instructions are disabled
-      m5_if_eq(m5_calc(m5_EXT_M || m5_EXT_F || m5_EXT_B), 1, ['
-      // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
-      // TODO: This becomes a one-liner once $ANY acts on subscope.
-      // TODO: Use the recirculation condition to instead condition the clock.
-      $commit_non_pipelined = $non_pipelined && $commit;
-      /hold_inst
-         $ANY = /instr$commit_non_pipelined ? |fetch/instr$ANY : >>1$ANY;
-         /src[2:1]
-            $ANY = /instr$commit_non_pipelined ? |fetch/instr/src$ANY : >>1$ANY;
-         m5+ifelse(m5_EXT_F, 1,
-            \TLV
-               /fpu
-                  $ANY = /instr$commit_non_pipelined ? |fetch/instr/fpu$ANY : >>1$ANY;
-                  ///src[2:1]
-                  //   $ANY = /instr$commit_non_pipelined ? |fetch/instr/fpu/src$ANY : >>1$ANY;
-            )
-      '])
+      m5+ifelse(m5_ANY_NON_PIPELINED_INSTRS, 1,
+         \TLV
+            // ORed with 1'b0 for maintaining correct behavior for all 3 combinations of F & M, only F and only M.
+            // TODO: This becomes a one-liner once $ANY acts on subscope.
+            // TODO: Use the recirculation condition to instead condition the clock.
+            $commit_non_pipelined = $non_pipelined && $commit;
+            /hold_inst
+               $ANY = /instr$commit_non_pipelined ? |fetch/instr$ANY : >>1$ANY;
+               /src[2:1]
+                  $ANY = /instr$commit_non_pipelined ? |fetch/instr/src$ANY : >>1$ANY;
+               m5+ifelse(m5_EXT_F, 1,
+                  \TLV
+                     /fpu
+                        $ANY = /instr$commit_non_pipelined ? |fetch/instr/fpu$ANY : >>1$ANY;
+                        ///src[2:1]
+                        //   $ANY = /instr$commit_non_pipelined ? |fetch/instr/fpu/src$ANY : >>1$ANY;
+                  )
+         )
       // Compute results for each instruction, independent of decode (power-hungry, but fast).
       ?$valid_exe
          $equal = /src[1]$reg_value == /src[2]$reg_value;
@@ -2598,7 +2612,7 @@
 
    // CSR logic
    // ---------
-   m5+riscv_csrs([''](m5_csrs)[''])
+   m5+riscv_csrs()
    @_exe_stage
       m5+riscv_csr_logic()
       
@@ -3153,7 +3167,7 @@ Outputs:
 **/
 \TLV dmem(/_cpu)
    // This macro assumes little-endian.
-   m5_if(m5_BIG_ENDIAN, ['m5_errprint(['Error: dmem macro only supports little-endian memory.'])'])
+   m5_error_if(m5_BIG_ENDIAN, ['dmem macro only supports little-endian memory.'])
    /// The scope from which to pull loads into second-issue loads.
    m5_var(LOAD_SCOPE, /instr)
    /* DMEM_STYLE: m5_DMEM_STYLE */
@@ -3518,19 +3532,15 @@ Outputs:
    // This macro handles the stalling logic using a counter, and triggers second issue accordingly.
 
    // latency for division is different for ALTOPS case
-   m5_if_eq(m5_RISCV_FORMAL_ALTOPS, 1, ['
-        m5_var(DIV_LATENCY, 12)
-   '],['
-        m5_var(DIV_LATENCY, 37)
-   '])
+   m5_var(DIV_LATENCY, m5_if(m5_RISCV_FORMAL_ALTOPS, 12, 37))
    m5_var(MUL_LATENCY, 5)       // latency for multiplication is 2 cycles in case of ALTOPS,
                                 // but we wait the normal latency for normal second issue behavior
    
-   m5_if(m5_NON_PIPELINED_LATENCY >= m5_MUL_LATENCY, ['m5_error(Pipeline is too deep to implement non-pipelined MUL.)'])
+   m5_error_if(m5_NON_PIPELINED_LATENCY >= m5_MUL_LATENCY, ['Pipeline is too deep to implement non-pipelined MUL.'])
 
 \TLV warpv_mul(/_top, /_name, $$_rslt, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
    // A multiplier with fixed 5-cycle latency. Inputs are connected with no delay. All outputs arrive 5 cycles later.
-   m5_if_neq(m5_MUL_LATENCY, 5, ['m5_error(['MUL_LATENCY == ']m5_MUL_LATENCY[', but hardware implements a 5-cycle latency.'])'])
+   m5_error_if(m5_MUL_LATENCY != 5, ['MUL_LATENCY == ']m5_MUL_LATENCY[', but hardware implements a 5-cycle latency.'])
    /_name
       
       // instr type is one hot encoding of the required M type instruction
@@ -4036,7 +4046,7 @@ Outputs:
          m5+call(m5_isa['_exe'], @m5_EXECUTE_STAGE, @m5_RESULT_STAGE)
          
          @m5_BRANCH_PRED_STAGE
-            m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch = $pred_taken && $branch;'])
+            m5_if_neq(m5_BRANCH_PRED, fallthrough, ['$pred_taken_branch = $pred_taken && $branch;'])
          @m5_EXECUTE_STAGE
 
             // =======
@@ -4056,7 +4066,7 @@ Outputs:
             ?$valid_decode_branch
                $branch_redir_pc[m5_PC_RANGE] =
                   // If fallthrough predictor, branch mispred always redirects taken, otherwise PC+1 for not-taken.
-                  m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['(! $taken) ? $pc_inc :'])
+                  m5_if_neq(m5_BRANCH_PRED, fallthrough, ['(! $taken) ? $pc_inc :'])
                   $branch_target;
 
             $trap_target[m5_PC_RANGE] = $replay_trap ? $Pc : {{m5_calc(m5_PC_CNT - 2){1'b1}}, 2'b0};  // TODO: What should this be? Using ones to terminate test for now.
@@ -4280,7 +4290,7 @@ Outputs:
                                  /original$trap  ? /original$trap_target :
                                  $jump           ? $jump_target :
                                  $mispred_branch ? ($taken ? $branch_target : $pc + 32'd4) :
-                                 m5_if_eq(m5_BRANCH_PRED, ['fallthrough'], [''], ['$pred_taken_branch ? $branch_target :'])
+                                 m5_if_neq(m5_BRANCH_PRED, fallthrough, ['$pred_taken_branch ? $branch_target :'])
                                  $indirect_jump  ? $indirect_jump_target :
                                                    $pc + 32'd4;
             *rvfi_mem_addr    = (/original$ld || $valid_st) ? {/original$addr[m5_ADDR_MAX:2], 2'b0} : 0;
@@ -4580,7 +4590,7 @@ Outputs:
 
 \TLV arb3(/_top, |_in1, @_in1, |_in2, @_in2, |_out, @_out, /_trans, $_reset1)
    m5+flow_interface(/_top, [' |_in1, @_in1, |_in2, @_in2'], [' |_out, @_out'], $_reset1)
-   m5_push_var(trans_ind, m5_if_eq(/_trans, [''], [''], ['   ']))
+   m5_push_var(trans_ind, m5_if_neq(/_trans, [''], ['   ']))
    // In1 is blocked if output is blocked.
    // In1 is blocked if output is blocked or in2 is available.
    |_in1
@@ -5065,7 +5075,7 @@ Outputs:
                   fontFamily: "monospace",
                   fill: "white"
                })
-               this.abi_\m5_rf_type['']_map = m5_eval(m5_get(['js_abi_']m5_rf_type['_map']));
+               this.abi_\m5_rf_type['']_map = m5_get(['js_abi_']m5_rf_type['_map']);
                return {rf_header, rf_header2}
             },
          },
@@ -5920,9 +5930,9 @@ Outputs:
       @m5_VIZ_STAGE
          m5+layout_viz(['left: 0, top: 0, width: 451, height: 251'], _fill_color)
          
-         m5_if(m5_FORMAL, [''], ['m5+instruction_in_memory(/_des_pipe, ['left: m5_ImemWhereLeft, top: m5_ImemRowTop'])'])
-         m5_if(m5_FORMAL, [''], ['m5_if(m5_ImemSource, ['m5+source_code_viz(/_des_pipe, ['left: m5_SrcWhereLeft, top: m5_ImemRowTop'])'])'])
-         m5_if(m5_FORMAL, [''], ['m5_if(m5_ImemUnproc, ['m5+assembly_viz(/_des_pipe, ['left: m5_AsmWhereLeft, top: m5_ImemRowTop'])'])'])
+         m5_unless(m5_FORMAL, ['m5+instruction_in_memory(/_des_pipe, ['left: m5_ImemWhereLeft, top: m5_ImemRowTop'])'])
+         m5_if(! m5_FORMAL && m5_ImemSource, ['m5+source_code_viz(/_des_pipe, ['left: m5_SrcWhereLeft, top: m5_ImemRowTop'])'])
+         m5_if(! m5_FORMAL && m5_ImemUnproc, ['m5+assembly_viz(/_des_pipe, ['left: m5_AsmWhereLeft, top: m5_ImemRowTop'])'])
             
          /instr
             m5+instruction(['left: 10, top: 0'])
