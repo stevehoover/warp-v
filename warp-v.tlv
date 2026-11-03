@@ -314,7 +314,7 @@
    if(m5_local, [
       var(warpv_includes, ['./'])   /// or ['./warp-v_includes/']
    ], [
-      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/205216ab10985ad3f54f7f39800f89ac4be97aee/'])
+      var(warpv_includes, ['https://raw.githubusercontent.com/stevehoover/warp-v_includes/429b66f/'])
    ])
    
    / This is where you configure the CPU.
