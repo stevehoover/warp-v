@@ -17,10 +17,10 @@ opens it in [Makerchip](https://makerchip.com) for simulation and inspection.
 - **TL-Verilog generation** — produces ready-to-simulate WARP-V TL-Verilog from the chosen settings.
 - **Makerchip integration** — opens the generated core in the Makerchip IDE to compile, simulate, and
   visualize.
-- **Embeddable pane mode** — the configurator can run framed as a third-party pane inside Makerchip,
-  where it exchanges data with sibling panes (e.g. loading assembly from a
-  [Compiler Explorer](https://godbolt.org) pane) and drives compilation in the host IDE. See
-  [Pane / embedded mode](#pane--embedded-mode).
+- **Embeddable view mode** — the configurator can run framed as a third-party view inside Makerchip,
+  where it exchanges data with sibling views (e.g. loading assembly from a
+  [Compiler Explorer](https://godbolt.org) view) and drives compilation in the host IDE. See
+  [View / embedded mode](#view--embedded-mode).
 
 ## Tech stack
 
@@ -57,7 +57,7 @@ The page reloads on edits, and lint errors appear in the console.
 
 ```
 src/
-  App.js                     App root, routing, and pane-mode wiring
+  App.js                     App root, routing, and view-mode wiring
   index.js                   React entry point
   components/
     pages/                   Main configurator screens
@@ -72,24 +72,24 @@ src/
     translation/             Settings → TL-Verilog translation
   utils/
     MakerchipPlugin.js       Launches / drives an embedded Makerchip instance
-    PaneChannelClient.js     Third-party pane communication channel client
+    ViewChannelClient.js     Third-party view communication channel client
     FetchUtils.js, useFetch.js
 ```
 
-## Pane / embedded mode
+## View / embedded mode
 
-When the configurator is loaded inside a Makerchip iframe pane (detected via
-[`isFramed()`](src/utils/PaneChannelClient.js)) it adapts its UI and behavior:
+When the configurator is loaded inside a Makerchip iframe view (detected via
+[`isFramed()`](src/utils/ViewChannelClient.js)) it adapts its UI and behavior:
 
 - Non-essential landing content (logo/video, embedded Makerchip preview, etc.) is hidden so the
-  configurator form fills the pane.
-- It subscribes to the pane communication channel and can receive a `sourceAsm` event — for example,
-  assembly produced by a Compiler Explorer pane — loading it as the custom program and compiling the
+  configurator form fills the view.
+- It subscribes to the view communication channel and can receive a `sourceAsm` event — for example,
+  assembly produced by a Compiler Explorer view — loading it as the custom program and compiling the
   resulting core in the host IDE.
 - Compilation and code loading are driven through the host IDE over the channel's RPC transport,
   rather than through an embedded Makerchip instance.
 
-`PaneChannelClient.js` implements the client side of that channel (readiness handshake, inbound
+`ViewChannelClient.js` implements the client side of that channel (readiness handshake, inbound
 event subscription, and `callIde(...)` RPC).
 
 ## Publishing

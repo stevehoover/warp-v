@@ -75,9 +75,9 @@ export function getTLVCodeForDefinitions(definitions, programName, programText, 
     const formattingSettings = settings.formattingSettings.filter(formattingArg => formattingArg !== "--fmtNoSource")
     const ceVizData = buildCeSourceViz(ceMeta, settings, isa)
     // Compiler Explorer flow: run the compiled program's entry point via a crt0 preamble (see the
-    // m5_assemble Entry arg in risc-v_defs.tlv). The CE pane detects the entry symbol (language-
+    // m5_assemble Entry arg in risc-v_defs.tlv). The CE view detects the entry symbol (language-
     // specific, e.g. `main`, or Fortran's `MAIN__`) and sends it as `entry`; fall back to `main`
-    // for older CE panes that don't. Hand-written programs have no entry and define `reset:`.
+    // for older CE views that don't. Hand-written programs have no entry and define `reset:`.
     // An explicit entry override (the "Entry" field) wins over both — it names a non-`main` compute
     // function whose integer return drives pass/fail (e.g. gfortran's `chk_`).
     const entryOverride = (settings.programEntry || "").trim()
@@ -118,7 +118,7 @@ m4+module_def()
 }
 
 // Emit the Compiler Explorer source-tracking DATA as TL-Verilog appended to the generated
-// design. `ceMeta` carries the static data delivered by the Compiler Explorer pane:
+// design. `ceMeta` carries the static data delivered by the Compiler Explorer view:
 // `source_code`, `asm_lines`, and `asm_line_to_source_line` (per asm row, the 1-based source
 // line, or null). The data is consumed by WARP-V's "Instr. Memory" VIZ
 // (`m5+instruction_in_memory` in warp-v.tlv), which renders the source-code column and

@@ -8,10 +8,10 @@ import {getTLVCodeForDefinitions, translateJsonToM4Macros} from "./components/tr
 import {Footer} from "./components/header/Footer";
 import {Header} from "./components/header/Header";
 import {WarpVPageBase} from "./components/pages/WarpVPageBase";
-import {callIde, isFramed, onPaneEvent, postReady, registerPaneMethod} from "./utils/PaneChannelClient";
+import {callIde, isFramed, onViewEvent, postReady, registerViewMethod} from "./utils/ViewChannelClient";
 
 // Extract the delivered assembly text and PC-tracking metadata from a `sourceAsm`/`build`
-// payload (as sent by a Compiler Explorer pane).
+// payload (as sent by a Compiler Explorer view).
 function deliveredFromPayload(payload) {
     const asm = typeof payload?.asmText === "string" ? payload.asmText : ""
     const asmRows = Array.isArray(payload?.asm) ? payload.asm : []
@@ -22,25 +22,25 @@ function deliveredFromPayload(payload) {
             asm_lines: asmRows.map(r => (typeof r?.text === "string" ? r.text : "")),
             // Per asm row, the 1-based source line it came from (or null for label/blank rows).
             asm_line_to_source_line: asmRows.map(r => (typeof r?.line === "number" ? r.line : null)),
-            // Entry-point label the CE pane detected (language-specific, e.g. `main` or Fortran's
-            // `MAIN__`); drives the crt0 preamble. Null/absent for older CE panes.
+            // Entry-point label the CE view detected (language-specific, e.g. `main` or Fortran's
+            // `MAIN__`); drives the crt0 preamble. Null/absent for older CE views.
             entry: typeof payload?.entry === "string" ? payload.entry : null,
             // Producer language/compiler tag (e.g. `c`, `fortran`); selects a runtime shim in
-            // m5_assemble (self-serve: tags with no registered shim inject nothing). Null for older panes.
+            // m5_assemble (self-serve: tags with no registered shim inject nothing). Null for older views.
             lang: typeof payload?.lang === "string" ? payload.lang : null,
         },
     }
 }
 
-// When loaded as a Makerchip pane, follow the host IDE's dark/light mode. One-way: the pane
+// When loaded as a Makerchip view, follow the host IDE's dark/light mode. One-way: the view
 // mirrors the IDE and never pushes its color mode back. Reads the initial theme from the
 // `getContext` RPC and then tracks live `theme` broadcasts. Rendered inside ChakraProvider so
 // it can drive Chakra's color mode.
-function PaneThemeSync() {
+function ViewThemeSync() {
     const {setColorMode} = useColorMode()
     useEffect(() => {
         if (!isFramed()) return undefined
-        const off = onPaneEvent("theme", (payload) => {
+        const off = onViewEvent("theme", (payload) => {
             if (payload && typeof payload.dark === "boolean") setColorMode(payload.dark ? "dark" : "light")
         })
         callIde("getContext")
@@ -100,13 +100,13 @@ function App() {
     // and asm line each cycle. Null unless a `sourceAsm` delivery carried it.
     const [ceMeta, setCeMeta] = useState(null)
 
-    // Mirror the latest state so the pane-RPC handlers below (registered once at mount) can read
+    // Mirror the latest state so the view-RPC handlers below (registered once at mount) can read
     // fresh values, dodging stale closures. Updated on every render.
     const liveStateRef = useRef(null)
     liveStateRef.current = {configuratorGlobalSettings, programText, ceMeta, configuratorCustomProgramName}
 
-    // When loaded as a Makerchip pane, accept a delivered program (assembly + PC-tracking
-    // metadata) from a Compiler Explorer pane, two ways:
+    // When loaded as a Makerchip view, accept a delivered program (assembly + PC-tracking
+    // metadata) from a Compiler Explorer view, two ways:
     //   - the `sourceAsm` bus event (fire-and-forget), and
     //   - the `build` inbound RPC, whose caller can additionally get the resulting host compile id
     //     back (so an AI/extension can await/poll the compilation it triggered).
@@ -135,14 +135,14 @@ function App() {
             })
         }
 
-        const off = onPaneEvent("sourceAsm", (payload) => {
+        const off = onViewEvent("sourceAsm", (payload) => {
             applyDelivered(payload, payload?.build ? {} : null)
         })
 
         // `build(payload, waitForCompileId)`: like a `sourceAsm` build, but if waitForCompileId the
         // returned promise resolves with the host compile id (WarpVPageBase relays it); otherwise
         // it resolves immediately (fire-and-forget, avoiding the host round-trip).
-        const offBuild = registerPaneMethod("build", (payload, waitForCompileId) =>
+        const offBuild = registerViewMethod("build", (payload, waitForCompileId) =>
             new Promise((resolve) => {
                 applyDelivered(payload, {resolve: waitForCompileId ? resolve : null})
                 if (!waitForCompileId) resolve(null)
@@ -156,7 +156,7 @@ function App() {
         // where `general` is the top-of-form settings (warpVVersion, isa, depth, custom-program
         // flags, ...), `pipeline` maps each ConfigurationParameter jsonKey to its value, and
         // `programText` is the (assembly) program source.
-        const offGetConfig = registerPaneMethod("getConfig", () => {
+        const offGetConfig = registerViewMethod("getConfig", () => {
             const {configuratorGlobalSettings: cgs, programText: pt} = liveStateRef.current
             return {general: cgs.generalSettings, pipeline: cgs.settings, programText: pt}
         })
@@ -172,7 +172,7 @@ function App() {
             "warpVVersion", "isa", "isaExtensions", "depth",
             "formattingSettings", "customProgramEnabled", "customInstructionsEnabled", "programEntry"
         ])
-        const offSetConfig = registerPaneMethod("setConfig", (patch) => {
+        const offSetConfig = registerViewMethod("setConfig", (patch) => {
             if (!patch || typeof patch !== "object") {
                 return {error: "setConfig expects an object { general?, pipeline?, programText? }"}
             }
@@ -222,7 +222,7 @@ function App() {
         // Return the generated TLV for the current configuration (same source the configurator's
         // preview/"Open in Makerchip" use). Throws (surfaced as an RPC error) if a pipeline value
         // fails m4 translation.
-        const offGetTlv = registerPaneMethod("getTlv", () => {
+        const offGetTlv = registerViewMethod("getTlv", () => {
             const {configuratorGlobalSettings: cgs, programText: pt, ceMeta: meta, configuratorCustomProgramName: name} = liveStateRef.current
             const gs = cgs.generalSettings
             const macros = translateJsonToM4Macros({general: gs, pipeline: cgs.settings})
@@ -242,7 +242,7 @@ function App() {
     }
 
     return <ChakraProvider theme={theme}>
-        <PaneThemeSync/>
+        <ViewThemeSync/>
         <Box minHeight='480px'>
             {<Header/>}
 

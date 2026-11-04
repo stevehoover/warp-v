@@ -38,9 +38,9 @@ let instanceCounter = 0;
  * @param code Optional initial TL-Verilog source to load. Instantiation is deferred until
  *             this is provided (non-null) so the IDE seeds with this code rather than its
  *             own default. Later changes are ignored (the IDE is only created once).
- * @param defaultPane Optional name of a pane (e.g. "Viz") to activate once the IDE is ready.
+ * @param defaultView Optional name of a view (e.g. "Viz") to activate once the IDE is ready.
  */
-export function MakerchipPlugin({onReady, code, defaultPane, ...rest}) {
+export function MakerchipPlugin({onReady, code, defaultView, ...rest}) {
     const containerId = useRef(`makerchip-plugin-${++instanceCounter}`).current;
     const startedRef = useRef(false);
     // Track the latest code so the IDE can be seeded with the settled config once the module loads.
@@ -57,10 +57,12 @@ export function MakerchipPlugin({onReady, code, defaultPane, ...rest}) {
         loadPluginModule()
             .then((IdePlugin) => IdePlugin.create(containerId, {hasEditor: true, code: codeRef.current}))
             .then((instance) => {
-                if (defaultPane) {
+                if (defaultView) {
                     // onReady fires once the IDE iframe is fully loaded (after the initial code load).
-                    instance.onReady = () => instance.activatePane(defaultPane)
-                        .catch((err) => console.error(`Failed to activate pane '${defaultPane}':`, err));
+                    // Makerchip servers that predate "views" (IdePlugin < 2.1.0) only have activatePane.
+                    const activate = (instance.activateView ?? instance.activatePane).bind(instance);
+                    instance.onReady = () => activate(defaultView)
+                        .catch((err) => console.error(`Failed to activate view '${defaultView}':`, err));
                 }
                 if (onReady) onReady(instance);
             })

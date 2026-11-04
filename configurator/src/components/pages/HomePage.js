@@ -2,7 +2,7 @@ import {Box, Container, Heading, HStack, Image, Text} from '@chakra-ui/react';
 import React from 'react';
 import {ConfigurationParameters} from "../translation/ConfigurationParameters";
 import {ConfigureCpuComponent} from "./ConfigureCpuComponent";
-import {isFramed} from "../../utils/PaneChannelClient";
+import {isFramed} from "../../utils/ViewChannelClient";
 
 export const pipelineParams = ["ld_return_align"].concat(ConfigurationParameters.map(param => param.jsonKey).filter(jsonKey => jsonKey !== "branch_pred" && jsonKey.endsWith("_stage")))
 export const hazardsParams = ConfigurationParameters.filter(param => param.jsonKey.startsWith("extra_")).map(param => param.jsonKey)

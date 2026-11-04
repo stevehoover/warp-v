@@ -159,7 +159,7 @@ A few pointers for exploring WARP-V in Makerchip:
 
   - Learn TL-Verilog and Makerchip first, following tutorials and other resources, at <a href="http://www.makerchip.com/" target="_blank" atom_fix="_">makerchip.com</a>. There are several courses available for building your own RISC-V CPU similar to WARP-V, but less parameterized, available via the menus.
   - This link will <a href="http://www.makerchip.com/sandbox?code_url=https:%2F%2Fraw.githubusercontent.com%2Fstevehoover%2Fwarp-v%2Fmaster%2Fwarp-v.tlv" target="_blank" atom_fix="_">open the latest WARP-V in Makerchip</a>.
-  - Reverse-engineer the WARP-V design at the TL-Verilog level, not by reading WARP-V source code. Configure WARP-V at [warp-v.org](https://warp-v.org) as you choose, compile, and explore the model in the "Nav-TLV" pane.
+  - Reverse-engineer the WARP-V design at the TL-Verilog level, not by reading WARP-V source code. Configure WARP-V at [warp-v.org](https://warp-v.org) as you choose, compile, and explore the model in the "Nav-TLV" view.
   - You can then correlate this back to the source code by clicking Nav-TLV line numbers. This highlights the corresponding source code line.
 
 

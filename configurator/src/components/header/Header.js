@@ -1,7 +1,7 @@
 import { Box, Flex, useColorModeValue, useColorModeValue as mode, VisuallyHidden } from '@chakra-ui/react';
 import { Logo } from './Logo';
 import { NavContent } from './NavContent';
-import { isFramed } from '../../utils/PaneChannelClient';
+import { isFramed } from '../../utils/ViewChannelClient';
 import React from 'react';
 
 export function Header() {

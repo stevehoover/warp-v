@@ -1,11 +1,11 @@
-// Minimal client for the Makerchip "connected third-party pane" PaneChannel protocol
+// Minimal client for the Makerchip "connected third-party view" ViewChannel protocol
 // (postMessage, protocol version 1). Lets the configurator, when loaded as a Makerchip
-// pane, subscribe to bus events (e.g. `sourceAsm` from a Compiler Explorer pane), call
+// view, subscribe to bus events (e.g. `sourceAsm` from a Compiler Explorer view), call
 // whitelisted IDE operations over RPC (e.g. `loadCode`), and expose its own methods for the
-// host IDE to call inward (e.g. `build`, via the host's `callPane` Plugin API).
+// host IDE to call inward (e.g. `build`, via the host's `callView` Plugin API).
 //
-// See mono doc-src/plugin/Third_Party_Pane_API.md. The IDE stamps/validates `source`; a
-// pane only ever talks to its own `window.parent`.
+// See mono doc-src/plugin/Third_Party_View_API.md. The IDE stamps/validates `source`; a
+// view only ever talks to its own `window.parent`.
 
 const V = 1;
 const TARGET_ORIGIN = "*";
@@ -15,9 +15,9 @@ let readySent = false;
 let rpcSeq = 0;
 const rpcPending = new Map();          // id -> {resolve, reject}
 const busHandlers = new Map();         // type -> Set(handler)
-const paneMethods = new Map();         // method -> handler (inbound host->pane RPC)
+const viewMethods = new Map();         // method -> handler (inbound host->view RPC)
 
-/** True when running inside a frame (i.e. potentially as a Makerchip pane). */
+/** True when running inside a frame (i.e. potentially as a Makerchip view). */
 export function isFramed() {
     return typeof window !== "undefined" && window.parent !== window;
 }
@@ -45,16 +45,16 @@ function attach() {
     });
 }
 
-// Service a host->pane RPC request ({kind:"rpc-call", id, method, args}) by dispatching to a
-// handler registered via registerPaneMethod, and reply with {kind:"rpc-call-result", id, result}
-// (or {kind:"rpc-call-error", id, error}). Only fired when the pane declared channel.rpc on the
+// Service a host->view RPC request ({kind:"rpc-call", id, method, args}) by dispatching to a
+// handler registered via registerViewMethod, and reply with {kind:"rpc-call-result", id, result}
+// (or {kind:"rpc-call-error", id, error}). Only fired when the view declared channel.rpc on the
 // host side (see mono BusParticipant); the id correlates the reply.
 function handleInboundRpc(msg) {
     const {id, method, args} = msg;
     Promise.resolve()
         .then(() => {
-            const handler = paneMethods.get(method);
-            if (!handler) throw new Error(`No pane method '${method}'`);
+            const handler = viewMethods.get(method);
+            if (!handler) throw new Error(`No view method '${method}'`);
             return handler(...(Array.isArray(args) ? args : []));
         })
         .then(result => {
@@ -80,7 +80,7 @@ export function postReady() {
  * Subscribe to a bus event type. `handler(payload, envelope)` is called for each delivery.
  * @returns an unsubscribe function.
  */
-export function onPaneEvent(type, handler) {
+export function onViewEvent(type, handler) {
     attach();
     let handlers = busHandlers.get(type);
     if (!handlers) {
@@ -99,7 +99,7 @@ export function callIde(method, ...args) {
     const id = ++rpcSeq;
     return new Promise((resolve, reject) => {
         if (!isFramed()) {
-            reject(new Error("callIde: not running as a pane (no parent frame)"));
+            reject(new Error("callIde: not running as a view (no parent frame)"));
             return;
         }
         rpcPending.set(id, {resolve, reject});
@@ -109,14 +109,14 @@ export function callIde(method, ...args) {
 }
 
 /**
- * Expose a pane method the host IDE can invoke inward via its `callPane` Plugin API (host->pane
+ * Expose a view method the host IDE can invoke inward via its `callView` Plugin API (host->view
  * RPC). `handler(...args)` may return a value or a Promise; its (awaited) result is returned to
- * the host. Requires the pane to have been opened with `channel.rpc: true`. Registering the same
+ * the host. Requires the view to have been opened with `channel.rpc: true`. Registering the same
  * method again replaces the handler.
  * @returns an unregister function.
  */
-export function registerPaneMethod(method, handler) {
+export function registerViewMethod(method, handler) {
     attach();
-    paneMethods.set(method, handler);
-    return () => { if (paneMethods.get(method) === handler) paneMethods.delete(method); };
+    viewMethods.set(method, handler);
+    return () => { if (viewMethods.get(method) === handler) viewMethods.delete(method); };
 }

@@ -4,7 +4,7 @@ import {getTLVCodeForDefinitions, translateJsonToM4Macros, translateParametersTo
 import {CoreDetailsComponent} from "./CoreDetailsComponent";
 import {openInMakerchip, OpenInMakerchipModal} from "../../utils/FetchUtils";
 import {MakerchipPlugin} from "../../utils/MakerchipPlugin";
-import {callIde, isFramed} from "../../utils/PaneChannelClient";
+import {callIde, isFramed} from "../../utils/ViewChannelClient";
 import useFetch from "../../utils/useFetch";
 
 export function WarpVPageBase({
@@ -45,7 +45,7 @@ export function WarpVPageBase({
     const makerchipFetch = useFetch("https://faas.makerchip.com")
     const toast = useToast()
     const [makerchipPlugin, setMakerchipPlugin] = useState(null)
-    // In pane mode we compile in the HOST Makerchip IDE (via the `compile` RPC) rather than an
+    // In view mode we compile in the HOST Makerchip IDE (via the `compile` RPC) rather than an
     // embedded IDE, so the "See it in action" embedded Makerchip is hidden.
     const framed = isFramed()
 
@@ -65,7 +65,7 @@ export function WarpVPageBase({
     const coreJsonKey = JSON.stringify(coreJson)
     const initialTLV = useMemo(() => coreJson ? generateTLV() : null, [coreJsonKey])  // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Pane mode: once a `sourceAsm`/`build` delivery has flagged a pending build AND coreJson has
+    // View mode: once a `sourceAsm`/`build` delivery has flagged a pending build AND coreJson has
     // regenerated to reflect the enabled custom program, generate the TLV and compile it in the
     // host IDE. generateTLV() now reads the current settings and programText directly, so no
     // stale-state workaround is needed.
@@ -315,7 +315,7 @@ export function WarpVPageBase({
                         Tab</Button>
                 </HStack>
 
-                {!framed && <MakerchipPlugin onReady={setMakerchipPlugin} code={initialTLV} defaultPane='Viz' h='66vh'/>}
+                {!framed && <MakerchipPlugin onReady={setMakerchipPlugin} code={initialTLV} defaultView='Viz' h='66vh'/>}
             </Box>
         </Box>
         {/* CoreDetailsComponent used to contain "generalSettings={configuratorGlobalSettings.generalSettings} settings={configuratorGlobalSettings.settings}", but this resulted in "generalSettings="[object Object]" settings="[object Object]"" and a warning from React: "Warning: React does not recognize the `generalSettings` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `generalsettings` instead. If you accidentally passed it from a parent component, remove it from the DOM element." */}

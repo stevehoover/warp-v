@@ -4,7 +4,7 @@ import {HiOutlineMenu, HiX} from 'react-icons/hi';
 import {NavLink} from './NavLink';
 import {NavItemTransition, NavListTransition} from './Transition';
 import {ColorModeSwitcher} from '../../ColorModeSwitcher';
-import {isFramed} from '../../utils/PaneChannelClient';
+import {isFramed} from '../../utils/ViewChannelClient';
 
 const links = [
     {label: 'Home', href: '/'},
@@ -12,7 +12,7 @@ const links = [
     {label: 'Redwood EDA, LLC', href: 'https://redwoodeda.com', target: "_blank"},
 ];
 
-// When embedded as a Makerchip pane, links that navigate within the frame would replace the
+// When embedded as a Makerchip view, links that navigate within the frame would replace the
 // configurator itself. Drop same-frame links (e.g. "Home") and force external links to open in
 // a new window.
 function visibleLinks() {
@@ -56,7 +56,7 @@ function DesktopNavContent(props) {
             ))*/}
         </HStack>
 
-        {/* When framed as a Makerchip pane, colour mode is inherited from the IDE, so hide the toggle. */}
+        {/* When framed as a Makerchip view, colour mode is inherited from the IDE, so hide the toggle. */}
         {!isFramed() &&
             <Box ml="auto" mr={15}>
                 <ColorModeSwitcher/>

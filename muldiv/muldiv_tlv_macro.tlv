@@ -18,7 +18,7 @@
    m4_sv_include_url(['https:/']['/raw.githubusercontent.com/shivampotdar/warp-v/m_ext/muldiv/picorv32_pcpi_fast_mul.sv'])
    // Macro providing required top-level module definition, random
    // stimulus support, and Verilator config.
-   m4_makerchip_module()   // (Expanded in Nav-TLV pane.)
+   m4_makerchip_module()   // (Expanded in Nav-TLV view.)
 
 \TLV warpv_mul(/_top, /_name, $_rslt, $_wr, $_wait, $_ready, $_clk, $_reset, $_op_a, $_op_b, $_instr_type, $_muldiv_valid)
    /_name      

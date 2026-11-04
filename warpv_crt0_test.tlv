@@ -6,7 +6,7 @@
    //
    // The crt0 preamble inits sp, `call`s the named Entry, and maps its a0 return to pass/fail
    // (0 => pass). Switch PROG_NAME to `crt0test_fortran` to exercise a non-`main` entry name
-   // (Fortran's `MAIN__`), proving the mechanism is entry-name-agnostic, matching what the CE pane
+   // (Fortran's `MAIN__`), proving the mechanism is entry-name-agnostic, matching what the CE view
    // now detects and sends per language.
    m4_include_lib(['./warp-v.tlv'])
 \m5
