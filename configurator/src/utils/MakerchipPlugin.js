@@ -30,6 +30,8 @@ function loadPluginModule() {
 
 let instanceCounter = 0;
 
+const TERMS_ACCEPTED_KEY = "makerchipTermsAcceptedAt";
+
 /**
  * Embeds an interactive Makerchip IDE.
  *
@@ -55,8 +57,14 @@ export function MakerchipPlugin({onReady, code, defaultView, ...rest}) {
         if (startedRef.current || !hasCode) return;
         startedRef.current = true;
         loadPluginModule()
-            .then((IdePlugin) => IdePlugin.create(containerId, {hasEditor: true, code: codeRef.current}))
+            .then((IdePlugin) => IdePlugin.create(containerId, {
+                hasEditor: true,
+                code: codeRef.current,
+                termsAcceptedAt: localStorage.getItem(TERMS_ACCEPTED_KEY),
+            }))
             .then((instance) => {
+                // Remember the user's acceptance of the Makerchip terms, so they aren't asked again.
+                instance.onTermsAccepted = (acceptedAt) => localStorage.setItem(TERMS_ACCEPTED_KEY, acceptedAt);
                 if (defaultView) {
                     // onReady fires once the IDE iframe is fully loaded (after the initial code load).
                     // Makerchip servers that predate "views" (IdePlugin < 2.1.0) only have activatePane.
